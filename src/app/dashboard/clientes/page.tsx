@@ -1,17 +1,19 @@
-import { MOCK_CLIENTS } from "@/lib/mock-data";
+import { getAllClients } from "@/lib/clients-db";
 import ClientsContent from "@/components/dashboard/clients/clients-content";
 
 export const metadata = {
   title: "Clientes — AdvMartins",
 };
 
-export default function ClientesPage() {
-  const ativos = MOCK_CLIENTS.filter((c) => c.status === "ativo").length;
-  const total = MOCK_CLIENTS.length;
+export const dynamic = "force-dynamic";
+
+export default async function ClientesPage() {
+  const clients = await getAllClients();
+  const ativos = clients.filter((c) => c.status === "ativo").length;
+  const total = clients.length;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="font-heading text-3xl font-semibold text-fg">
           Clientes
@@ -21,7 +23,7 @@ export default function ClientesPage() {
         </p>
       </div>
 
-      <ClientsContent clients={MOCK_CLIENTS} />
+      <ClientsContent clients={clients} />
     </div>
   );
 }

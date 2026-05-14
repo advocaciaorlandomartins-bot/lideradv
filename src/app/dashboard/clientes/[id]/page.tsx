@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { MOCK_CLIENTS } from "@/lib/mock-data";
+import { getClientById } from "@/lib/clients-db";
+import DeleteClientButton from "@/components/dashboard/clients/delete-client-button";
 import {
   ChevronRightIcon,
   FolderOpenIcon,
@@ -10,9 +11,7 @@ import {
   ClockIcon,
 } from "@/components/icons";
 
-export function generateStaticParams() {
-  return MOCK_CLIENTS.map((c) => ({ id: c.id }));
-}
+export const dynamic = "force-dynamic";
 
 const AVATAR_COLORS = [
   "bg-blue-100 text-blue-700",
@@ -33,7 +32,6 @@ function initials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// Mock processes for the client detail view
 const MOCK_PROCESSES = [
   {
     id: "p1",
@@ -72,7 +70,7 @@ export default async function ClienteDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const client = MOCK_CLIENTS.find((c) => c.id === id);
+  const client = await getClientById(id);
   if (!client) notFound();
 
   const processes =
@@ -130,6 +128,7 @@ export default async function ClienteDetailPage({
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
+            <DeleteClientButton id={client.id} />
             <Link
               href={`/dashboard/clientes/${client.id}/editar`}
               className="flex h-9 items-center rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors duration-150 hover:border-primary hover:text-primary"

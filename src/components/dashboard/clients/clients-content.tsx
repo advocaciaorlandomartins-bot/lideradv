@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import type { Client } from "@/lib/mock-data";
+import type { Client } from "@/lib/clients-db";
 import {
   MagnifyingGlassIcon,
   UserPlusIcon,

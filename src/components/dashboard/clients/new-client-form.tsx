@@ -71,11 +71,34 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-interface AddressFields {
-  street: string;
-  neighborhood: string;
-  city: string;
-  state: string;
+function maskCPF(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+function maskCNPJ(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 14);
+  return d
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1/$2")
+    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+}
+
+function maskCEP(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 8);
+  return d.replace(/(\d{5})(\d{1,3})$/, "$1-$2");
+}
+
+function formatPhone(raw: string) {
+  const d = raw.replace(/\D/g, "");
+  if (d.length < 10) return raw;
+  const ddd = d.slice(0, 2);
+  const num = d.slice(2);
+  return `(${ddd}) ${num.slice(0, num.length - 4)}-${num.slice(-4)}`;
 }
 
 export default function NewClientForm() {
@@ -85,13 +108,61 @@ export default function NewClientForm() {
   >(createClientAction, null);
 
   const [type, setType] = useState<"PF" | "PJ">("PF");
+  const [docValue, setDocValue] = useState("");
+  const [nameValue, setNameValue] = useState("");
+  const [tradeNameValue, setTradeNameValue] = useState("");
+  const [emailValue, setEmailValue] = useState("");
+  const [phoneValue, setPhoneValue] = useState("");
+  const [cepValue, setCepValue] = useState("");
+  const [numberValue, setNumberValue] = useState("");
+  const [complementValue, setComplementValue] = useState("");
+  const [street, setStreet] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [city, setCity] = useState("");
+  const [uf, setUf] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
-  const [address, setAddress] = useState<AddressFields>({
-    street: "",
-    neighborhood: "",
-    city: "",
-    state: "",
-  });
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+
+  function handleTypeChange(t: "PF" | "PJ") {
+    setType(t);
+    setDocValue("");
+  }
+
+  async function fetchCnpj(digits: string) {
+    setCnpjLoading(true);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.razao_social) setNameValue(data.razao_social);
+      if (data.nome_fantasia) setTradeNameValue(data.nome_fantasia);
+      if (data.email) setEmailValue(data.email.toLowerCase());
+      if (data.ddd_telefone_1) setPhoneValue(formatPhone(data.ddd_telefone_1));
+      const rawCep = (data.cep ?? "").replace(/\D/g, "");
+      if (rawCep) setCepValue(maskCEP(rawCep));
+      if (data.logradouro) setStreet(data.logradouro);
+      if (data.numero) setNumberValue(data.numero);
+      if (data.complemento) setComplementValue(data.complemento);
+      if (data.bairro) setNeighborhood(data.bairro);
+      if (data.municipio) setCity(data.municipio);
+      if (data.uf) setUf(data.uf);
+    } catch {
+      // silently fail — user fills manually
+    } finally {
+      setCnpjLoading(false);
+    }
+  }
+
+  function handleDocChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value;
+    if (type === "PF") {
+      setDocValue(maskCPF(raw));
+    } else {
+      const digits = raw.replace(/\D/g, "").slice(0, 14);
+      setDocValue(maskCNPJ(raw));
+      if (digits.length === 14) fetchCnpj(digits);
+    }
+  }
 
   async function handleCepBlur(e: React.FocusEvent<HTMLInputElement>) {
     const cep = e.target.value.replace(/\D/g, "");
@@ -101,12 +172,10 @@ export default function NewClientForm() {
       const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
       const data = await res.json();
       if (!data.erro) {
-        setAddress({
-          street: data.logradouro ?? "",
-          neighborhood: data.bairro ?? "",
-          city: data.localidade ?? "",
-          state: data.uf ?? "",
-        });
+        setStreet(data.logradouro ?? "");
+        setNeighborhood(data.bairro ?? "");
+        setCity(data.localidade ?? "");
+        setUf(data.uf ?? "");
       }
     } catch {
       // silently fail — user fills manually
@@ -145,7 +214,7 @@ export default function NewClientForm() {
                 name="type"
                 value={t}
                 checked={type === t}
-                onChange={() => setType(t)}
+                onChange={() => handleTypeChange(t)}
                 className="accent-primary"
               />
               <div>
@@ -178,24 +247,35 @@ export default function NewClientForm() {
                 placeholder={
                   type === "PF" ? "Dr. João Roberto Silva" : "Empresa Ltda"
                 }
-                disabled={isPending}
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                disabled={isPending || cnpjLoading}
                 className={inputClass}
               />
             </Field>
           </div>
+
           <Field label={type === "PF" ? "CPF" : "CNPJ"} required>
-            <input
-              name="doc"
-              type="text"
-              inputMode="numeric"
-              required
-              placeholder={
-                type === "PF" ? "000.000.000-00" : "00.000.000/0001-00"
-              }
-              disabled={isPending}
-              className={inputClass}
-            />
+            <div className="relative">
+              <input
+                name="doc"
+                type="text"
+                inputMode="numeric"
+                required
+                placeholder={
+                  type === "PF" ? "000.000.000-00" : "00.000.000/0001-00"
+                }
+                value={docValue}
+                onChange={handleDocChange}
+                disabled={isPending}
+                className={`${inputClass} pr-10`}
+              />
+              {cnpjLoading && (
+                <SpinnerIcon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              )}
+            </div>
           </Field>
+
           {type === "PF" ? (
             <Field label="Data de nascimento">
               <input
@@ -211,7 +291,9 @@ export default function NewClientForm() {
                 name="trade_name"
                 type="text"
                 placeholder="Nome fantasia"
-                disabled={isPending}
+                value={tradeNameValue}
+                onChange={(e) => setTradeNameValue(e.target.value)}
+                disabled={isPending || cnpjLoading}
                 className={inputClass}
               />
             </Field>
@@ -230,7 +312,9 @@ export default function NewClientForm() {
               autoComplete="email"
               required
               placeholder="email@exemplo.com.br"
-              disabled={isPending}
+              value={emailValue}
+              onChange={(e) => setEmailValue(e.target.value)}
+              disabled={isPending || cnpjLoading}
               className={inputClass}
             />
           </Field>
@@ -241,7 +325,9 @@ export default function NewClientForm() {
               autoComplete="tel"
               required
               placeholder="(11) 9 0000-0000"
-              disabled={isPending}
+              value={phoneValue}
+              onChange={(e) => setPhoneValue(e.target.value)}
+              disabled={isPending || cnpjLoading}
               className={inputClass}
             />
           </Field>
@@ -263,8 +349,10 @@ export default function NewClientForm() {
                   required
                   placeholder="00000-000"
                   maxLength={9}
-                  disabled={isPending}
+                  value={cepValue}
+                  onChange={(e) => setCepValue(maskCEP(e.target.value))}
                   onBlur={handleCepBlur}
+                  disabled={isPending || cnpjLoading}
                   className={`${inputClass} pr-10`}
                 />
                 {cepLoading && (
@@ -282,11 +370,9 @@ export default function NewClientForm() {
                 type="text"
                 required
                 placeholder="Rua, Av., Travessa…"
-                disabled={isPending}
-                value={address.street}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, street: e.target.value }))
-                }
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
+                disabled={isPending || cnpjLoading}
                 className={inputClass}
               />
             </Field>
@@ -300,7 +386,9 @@ export default function NewClientForm() {
                 type="text"
                 required
                 placeholder="123"
-                disabled={isPending}
+                value={numberValue}
+                onChange={(e) => setNumberValue(e.target.value)}
+                disabled={isPending || cnpjLoading}
                 className={inputClass}
               />
             </Field>
@@ -313,7 +401,9 @@ export default function NewClientForm() {
                 name="complement"
                 type="text"
                 placeholder="Apto, Sala, Bloco…"
-                disabled={isPending}
+                value={complementValue}
+                onChange={(e) => setComplementValue(e.target.value)}
+                disabled={isPending || cnpjLoading}
                 className={inputClass}
               />
             </Field>
@@ -327,11 +417,9 @@ export default function NewClientForm() {
                 type="text"
                 required
                 placeholder="Bairro"
-                disabled={isPending}
-                value={address.neighborhood}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, neighborhood: e.target.value }))
-                }
+                value={neighborhood}
+                onChange={(e) => setNeighborhood(e.target.value)}
+                disabled={isPending || cnpjLoading}
                 className={inputClass}
               />
             </Field>
@@ -345,11 +433,9 @@ export default function NewClientForm() {
                 type="text"
                 required
                 placeholder="Cidade"
-                disabled={isPending}
-                value={address.city}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, city: e.target.value }))
-                }
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                disabled={isPending || cnpjLoading}
                 className={inputClass}
               />
             </Field>
@@ -361,17 +447,15 @@ export default function NewClientForm() {
               <select
                 name="state"
                 required
-                disabled={isPending}
-                value={address.state}
-                onChange={(e) =>
-                  setAddress((a) => ({ ...a, state: e.target.value }))
-                }
+                value={uf}
+                onChange={(e) => setUf(e.target.value)}
+                disabled={isPending || cnpjLoading}
                 className="h-11 w-full cursor-pointer rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
               >
                 <option value="">UF</option>
-                {ESTADOS.map((uf) => (
-                  <option key={uf} value={uf}>
-                    {uf}
+                {ESTADOS.map((estado) => (
+                  <option key={estado} value={estado}>
+                    {estado}
                   </option>
                 ))}
               </select>
@@ -404,7 +488,7 @@ export default function NewClientForm() {
         </Link>
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || cnpjLoading}
           className="flex h-11 items-center gap-2 rounded-lg bg-cta px-6 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           {isPending ? (

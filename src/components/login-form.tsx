@@ -1,8 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { loginAction, type LoginState } from "@/lib/auth-actions";
-import { EyeIcon, EyeOffIcon, ScalesIcon, SpinnerIcon } from "@/components/icons";
+import {
+  EyeIcon,
+  EyeOffIcon,
+  ScalesIcon,
+  SpinnerIcon,
+} from "@/components/icons";
 
 export default function LoginForm() {
   const [state, formAction, isPending] = useActionState<LoginState, FormData>(
@@ -123,7 +129,17 @@ export default function LoginForm() {
         </button>
       </form>
 
-      <p className="mt-10 text-center font-body text-xs leading-relaxed text-muted">
+      <p className="mt-6 text-center font-body text-sm text-muted">
+        Não tem conta?{" "}
+        <Link
+          href="/registro"
+          className="font-semibold text-primary hover:text-primary-dark transition-colors duration-150"
+        >
+          Criar conta
+        </Link>
+      </p>
+
+      <p className="mt-4 text-center font-body text-xs leading-relaxed text-muted">
         Sistema exclusivo para advogados autorizados.
         <br />
         Em caso de problemas, contate o administrador.

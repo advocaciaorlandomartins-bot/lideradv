@@ -15,6 +15,9 @@
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": "eslint --fix"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

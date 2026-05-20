@@ -1,0 +1,59 @@
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { getColaboradorFull } from "@/lib/colaboradores-db";
+import EditColaboradorForm from "@/components/dashboard/colaboradores/edit-colaborador-form";
+import { ChevronRightIcon } from "@/components/icons";
+
+export const metadata = {
+  title: "Editar Colaborador — AdvMartins",
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function EditarColaboradorPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const colaborador = await getColaboradorFull(id);
+  if (!colaborador) notFound();
+
+  return (
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 font-body text-sm text-muted">
+        <Link
+          href="/dashboard/colaboradores"
+          className="hover:text-primary transition-colors duration-150"
+        >
+          Colaboradores
+        </Link>
+        <ChevronRightIcon className="h-3.5 w-3.5" />
+        <Link
+          href={`/dashboard/colaboradores/${id}`}
+          className="hover:text-primary transition-colors duration-150 truncate max-w-[160px]"
+        >
+          {colaborador.nome}
+        </Link>
+        <ChevronRightIcon className="h-3.5 w-3.5" />
+        <span className="text-fg font-semibold">Editar</span>
+      </nav>
+
+      {/* Header */}
+      <div>
+        <h1 className="font-heading text-3xl font-semibold text-fg">
+          Editar colaborador
+        </h1>
+        <p className="mt-1 font-body text-sm text-muted">
+          Atualize os dados do colaborador.
+        </p>
+      </div>
+
+      {/* Form card */}
+      <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:p-8">
+        <EditColaboradorForm colaborador={colaborador} />
+      </div>
+    </div>
+  );
+}

@@ -265,3 +265,13 @@ export function PlusIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function CurrencyIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v12" />
+      <path d="M15 9.5a3 3 0 0 0-6 0c0 1.66 1.34 2.5 3 3s3 1.34 3 3a3 3 0 0 1-6 0" />
+    </Icon>
+  );
+}

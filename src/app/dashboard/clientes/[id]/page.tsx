@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getClientById } from "@/lib/clients-db";
+import { getProcessosByClientId } from "@/lib/processos-db";
+import { getDocumentosByEntityId } from "@/lib/documents-db";
 import DeleteClientButton from "@/components/dashboard/clients/delete-client-button";
+import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import {
   ChevronRightIcon,
   FolderOpenIcon,
   BanknotesIcon,
   CalendarIcon,
-  AlertIcon,
   ClockIcon,
 } from "@/components/icons";
 
@@ -32,27 +34,6 @@ function initials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-const MOCK_PROCESSES = [
-  {
-    id: "p1",
-    number: "1023456-78.2025.8.26.0100",
-    type: "Ação Trabalhista",
-    court: "1ª Vara do Trabalho — SP",
-    status: "Em andamento",
-    lastUpdate: "14/05/2026",
-    urgent: true,
-  },
-  {
-    id: "p2",
-    number: "0054321-12.2025.8.26.0050",
-    type: "Ação Civil Pública",
-    court: "2ª Câmara Cível — SP",
-    status: "Recurso pendente",
-    lastUpdate: "10/05/2026",
-    urgent: false,
-  },
-];
-
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-8">
@@ -70,11 +51,12 @@ export default async function ClienteDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const client = await getClientById(id);
+  const [client, processes, documentos] = await Promise.all([
+    getClientById(id),
+    getProcessosByClientId(id),
+    getDocumentosByEntityId("cliente", id),
+  ]);
   if (!client) notFound();
-
-  const processes =
-    client.processes > 0 ? MOCK_PROCESSES.slice(0, client.processes) : [];
 
   return (
     <div className="space-y-6">
@@ -169,7 +151,7 @@ export default async function ClienteDetailPage({
               {
                 icon: FolderOpenIcon,
                 label: "Processos",
-                value: String(client.processes),
+                value: String(processes.length),
               },
               { icon: BanknotesIcon, label: "Em aberto", value: "R$ 0" },
               { icon: CalendarIcon, label: "Audiências", value: "0" },
@@ -194,7 +176,7 @@ export default async function ClienteDetailPage({
         <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-heading text-base font-semibold text-fg">
-              Processos ({client.processes})
+              Processos ({processes.length})
             </h2>
             <Link
               href={`/dashboard/processos/novo?cliente=${client.id}`}
@@ -214,41 +196,65 @@ export default async function ClienteDetailPage({
           ) : (
             <ul className="space-y-3">
               {processes.map((p) => (
-                <li
-                  key={p.id}
-                  className="rounded-lg border border-border p-4 transition-colors duration-150 hover:bg-slate-50"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-body text-xs font-mono text-muted">
-                          {p.number}
-                        </span>
-                        {p.urgent && (
-                          <AlertIcon className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                <li key={p.id}>
+                  <Link
+                    href={`/dashboard/processos/${p.id}`}
+                    className="block rounded-lg border border-border p-4 transition-colors duration-150 hover:bg-slate-50"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        {p.numero && (
+                          <span className="font-mono text-xs text-muted">
+                            {p.numero}
+                          </span>
+                        )}
+                        <p className="mt-0.5 font-body text-sm font-semibold text-fg">
+                          {p.tipo_acao}
+                        </p>
+                        {p.vara && (
+                          <p className="font-body text-xs text-muted">
+                            {p.vara}
+                          </p>
                         )}
                       </div>
-                      <p className="mt-0.5 font-body text-sm font-semibold text-fg">
-                        {p.type}
-                      </p>
-                      <p className="font-body text-xs text-muted">{p.court}</p>
+                      <div className="text-right flex-shrink-0">
+                        <span
+                          className={`inline-block rounded-full px-2.5 py-0.5 font-body text-xs font-semibold ${
+                            p.status === "ativo"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : p.status === "arquivado"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {p.status === "ativo"
+                            ? "Ativo"
+                            : p.status === "arquivado"
+                              ? "Arquivado"
+                              : "Encerrado"}
+                        </span>
+                        {p.data_distribuicao && (
+                          <p className="mt-1 flex items-center gap-1 justify-end font-body text-xs text-muted">
+                            <ClockIcon className="h-3 w-3" />
+                            {p.data_distribuicao}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <span className="inline-block rounded-full bg-blue-50 px-2.5 py-0.5 font-body text-xs font-semibold text-blue-600">
-                        {p.status}
-                      </span>
-                      <p className="mt-1 flex items-center gap-1 justify-end font-body text-xs text-muted">
-                        <ClockIcon className="h-3 w-3" />
-                        {p.lastUpdate}
-                      </p>
-                    </div>
-                  </div>
+                  </Link>
                 </li>
               ))}
             </ul>
           )}
         </div>
       </div>
+
+      {/* Documentos */}
+      <DocumentsSection
+        entityType="cliente"
+        entityId={client.id}
+        documents={documentos}
+      />
     </div>
   );
 }

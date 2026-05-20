@@ -9,6 +9,7 @@ import {
   FolderOpenIcon,
   BanknotesIcon,
   ClipboardListIcon,
+  UserPlusIcon,
   LockClosedIcon,
   MagnifyingGlassIcon,
   LogoutIcon,
@@ -21,6 +22,11 @@ const navItems = [
   { href: "/dashboard/processos", icon: FolderOpenIcon, label: "Processos" },
   { href: "/dashboard/financeiro", icon: BanknotesIcon, label: "Financeiro" },
   { href: "/dashboard/pericias", icon: ClipboardListIcon, label: "Perícias" },
+  {
+    href: "/dashboard/colaboradores",
+    icon: UserPlusIcon,
+    label: "Colaboradores",
+  },
   { href: "/dashboard/senhas", icon: LockClosedIcon, label: "Cofre de Senhas" },
   { href: "/dashboard/oab", icon: MagnifyingGlassIcon, label: "Busca OAB" },
 ];

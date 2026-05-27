@@ -42,10 +42,10 @@ const NAV_ITEMS = [
     modulo: "financeiro",
   },
   {
-    href: "/dashboard/pericias",
+    href: "/dashboard/controles",
     icon: ClipboardListIcon,
-    label: "Perícias",
-    modulo: "pericias",
+    label: "Controles",
+    modulo: "controles",
   },
   {
     href: "/dashboard/modelos",

@@ -306,7 +306,7 @@ export default function ControleForm({
                 disabled={!dataEvento}
                 title={
                   isDCB
-                    ? "Preencher com Prazo para PP − 15 dias"
+                    ? "Preencher com Prazo Prorrogação − 15 dias"
                     : "Preencher com data do evento + 2 dias"
                 }
                 className="shrink-0 h-10 rounded-lg border border-border px-3 font-body text-xs font-semibold text-fg hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"

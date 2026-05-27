@@ -23,7 +23,7 @@ export const TIPOS_CONTROLE = [
   {
     key: "dcb",
     label: "Prorrogação (DCB)",
-    col_data: "Prazo para PP",
+    col_data: "Prazo Prorrogação",
     col_evento: "Informações",
     label_novo: "Novo DCB",
   },

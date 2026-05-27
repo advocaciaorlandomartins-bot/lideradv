@@ -1,27 +1,77 @@
 "use server";
 
+import crypto from "crypto";
 import { redirect } from "next/navigation";
+import sql from "./db";
+import { createSession, destroySession } from "./session";
 
 export type LoginState = { error: string } | null;
+
+function verifyPassword(input: string, stored: string): boolean {
+  const parts = stored.split(":");
+  if (parts.length !== 3 || parts[0] !== "sha256") return false;
+  const [, salt, hash] = parts;
+  const check = crypto
+    .createHash("sha256")
+    .update(input + salt)
+    .digest("hex");
+  return check === hash;
+}
 
 export async function loginAction(
   _prevState: LoginState,
   formData: FormData
 ): Promise<LoginState> {
-  const email = ((formData.get("email") as string | null) ?? "").trim();
-  const password = (formData.get("password") as string | null) ?? "";
+  const login = ((formData.get("login") as string | null) ?? "")
+    .trim()
+    .toLowerCase();
+  const senha = (formData.get("senha") as string | null) ?? "";
 
-  if (!email || !password) {
-    return { error: "Preencha o e-mail e a senha para continuar." };
+  if (!login || !senha) {
+    return { error: "Preencha o login e a senha para continuar." };
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return { error: "Informe um e-mail válido." };
+  const rows = await sql`
+    SELECT id::text, login, nome, categoria, senha_hash, ativo, validade
+    FROM usuarios
+    WHERE login = ${login}
+    LIMIT 1
+  `;
+
+  const user = rows[0];
+
+  if (!user) return { error: "Login ou senha incorretos." };
+  if (!user.ativo)
+    return { error: "Usuário inativo. Contate o administrador." };
+
+  if (user.validade) {
+    const exp = new Date(String(user.validade));
+    exp.setHours(23, 59, 59, 999);
+    if (exp < new Date()) {
+      return { error: "Acesso expirado. Contate o administrador." };
+    }
   }
 
-  // TODO: verificar credenciais no banco Neon
+  if (!verifyPassword(senha, String(user.senha_hash))) {
+    return { error: "Login ou senha incorretos." };
+  }
+
+  await sql`
+    UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ${String(user.id)}::uuid
+  `;
+
+  await createSession({
+    id: String(user.id),
+    login: String(user.login),
+    categoria: String(user.categoria),
+  });
+
   redirect("/dashboard");
+}
+
+export async function logoutAction(): Promise<void> {
+  await destroySession();
+  redirect("/");
 }
 
 export type RegisterState = { error: string } | { success: true } | null;

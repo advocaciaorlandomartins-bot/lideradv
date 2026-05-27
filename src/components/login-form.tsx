@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState, useState } from "react";
 import { loginAction, type LoginState } from "@/lib/auth-actions";
 import {
@@ -15,7 +14,7 @@ export default function LoginForm() {
     loginAction,
     null
   );
-  const [showPassword, setShowPassword] = useState(false);
+  const [showSenha, setShowSenha] = useState(false);
 
   return (
     <div className="w-full max-w-md">
@@ -40,7 +39,6 @@ export default function LoginForm() {
       </div>
 
       <form action={formAction} className="space-y-5" noValidate>
-        {/* Error message */}
         {state?.error && (
           <div
             role="alert"
@@ -50,47 +48,39 @@ export default function LoginForm() {
           </div>
         )}
 
-        {/* Email */}
+        {/* Login */}
         <div className="flex flex-col gap-1.5">
           <label
-            htmlFor="email"
+            htmlFor="login"
             className="font-body text-sm font-semibold text-fg"
           >
-            E-mail
+            Login
           </label>
           <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
+            id="login"
+            name="login"
+            type="text"
+            autoComplete="username"
             required
-            placeholder="seu@email.com.br"
+            placeholder="seu.login"
             disabled={isPending}
             className="h-12 w-full rounded-lg border border-border bg-white px-4 font-body text-base text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
           />
         </div>
 
-        {/* Password */}
+        {/* Senha */}
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <label
-              htmlFor="password"
-              className="font-body text-sm font-semibold text-fg"
-            >
-              Senha
-            </label>
-            <a
-              href="/recuperar-senha"
-              className="font-body text-sm text-primary hover:text-primary-dark transition-colors duration-150 cursor-pointer"
-            >
-              Esqueci minha senha
-            </a>
-          </div>
+          <label
+            htmlFor="senha"
+            className="font-body text-sm font-semibold text-fg"
+          >
+            Senha
+          </label>
           <div className="relative">
             <input
-              id="password"
-              name="password"
-              type={showPassword ? "text" : "password"}
+              id="senha"
+              name="senha"
+              type={showSenha ? "text" : "password"}
               autoComplete="current-password"
               required
               placeholder="••••••••"
@@ -99,11 +89,11 @@ export default function LoginForm() {
             />
             <button
               type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              onClick={() => setShowSenha((v) => !v)}
+              aria-label={showSenha ? "Ocultar senha" : "Mostrar senha"}
               className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded p-0.5 text-muted transition-colors duration-150 hover:text-fg focus:outline-none focus:ring-2 focus:ring-blue-200"
             >
-              {showPassword ? (
+              {showSenha ? (
                 <EyeOffIcon className="h-5 w-5" />
               ) : (
                 <EyeIcon className="h-5 w-5" />
@@ -129,18 +119,8 @@ export default function LoginForm() {
         </button>
       </form>
 
-      <p className="mt-6 text-center font-body text-sm text-muted">
-        Não tem conta?{" "}
-        <Link
-          href="/registro"
-          className="font-semibold text-primary hover:text-primary-dark transition-colors duration-150"
-        >
-          Criar conta
-        </Link>
-      </p>
-
-      <p className="mt-4 text-center font-body text-xs leading-relaxed text-muted">
-        Sistema exclusivo para advogados autorizados.
+      <p className="mt-6 text-center font-body text-xs leading-relaxed text-muted">
+        Sistema exclusivo para usuários autorizados.
         <br />
         Em caso de problemas, contate o administrador.
       </p>

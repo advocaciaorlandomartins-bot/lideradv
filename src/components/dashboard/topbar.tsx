@@ -1,12 +1,28 @@
 "use client";
 
-import { BellIcon, Bars3Icon } from "@/components/icons";
+import { useTransition } from "react";
+import { Bars3Icon } from "@/components/icons";
+import { logoutAction } from "@/lib/auth-actions";
+import type { SessionUser } from "@/lib/session";
 
 interface TopbarProps {
   onMenuClick: () => void;
+  user: SessionUser;
 }
 
-export default function Topbar({ onMenuClick }: TopbarProps) {
+function initials(login: string): string {
+  return login.slice(0, 2).toUpperCase();
+}
+
+export default function Topbar({ onMenuClick, user }: TopbarProps) {
+  const [pending, startTransition] = useTransition();
+
+  function handleLogout() {
+    startTransition(async () => {
+      await logoutAction();
+    });
+  }
+
   return (
     <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-border bg-white px-5 lg:px-8">
       {/* Left: hamburger + brand (mobile) */}
@@ -23,32 +39,30 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         </span>
       </div>
 
-      {/* Right: notification + user */}
+      {/* Right: user + logout */}
       <div className="flex items-center gap-3">
-        {/* Notification bell */}
-        <button
-          aria-label="Notificações"
-          className="relative cursor-pointer rounded-lg p-2 text-muted transition-colors duration-150 hover:bg-slate-100 hover:text-fg focus:outline-none focus:ring-2 focus:ring-blue-200"
-        >
-          <BellIcon className="h-5 w-5" />
-          {/* Badge */}
-          <span
-            aria-label="3 notificações"
-            className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-cta font-body text-[10px] font-bold text-white"
-          >
-            3
-          </span>
-        </button>
-
-        {/* User avatar */}
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary font-body text-sm font-bold text-white">
-            OM
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary font-body text-sm font-bold text-white select-none">
+            {initials(user.login)}
           </div>
-          <span className="hidden font-body text-sm font-semibold text-fg md:block">
-            Dr. Orlando Martins
-          </span>
+          <div className="hidden md:flex md:flex-col md:leading-tight">
+            <span className="font-body text-sm font-semibold text-fg">
+              {user.login}
+            </span>
+            <span className="font-body text-xs text-muted">
+              {user.categoria}
+            </span>
+          </div>
         </div>
+
+        <button
+          onClick={handleLogout}
+          disabled={pending}
+          title="Sair"
+          className="cursor-pointer rounded-lg border border-border px-3 h-8 font-body text-xs font-semibold text-muted transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-50"
+        >
+          {pending ? "…" : "Sair"}
+        </button>
       </div>
     </header>
   );

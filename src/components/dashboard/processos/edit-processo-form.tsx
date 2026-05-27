@@ -43,6 +43,7 @@ const AREAS = [
 ];
 
 const FASES = [
+  "Administrativo INSS",
   "Conhecimento",
   "Instrução",
   "Julgamento",

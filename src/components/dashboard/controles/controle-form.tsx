@@ -20,6 +20,13 @@ import {
   type LocalAudiencia,
 } from "@/lib/controles-types";
 
+function addDays(dateStr: string, days: number): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 const inputCls =
   "w-full h-10 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100";
 const labelCls = "block font-body text-sm font-semibold text-fg mb-1.5";
@@ -83,6 +90,12 @@ export default function ControleForm({
       : "";
   const [selectedLocalId, setSelectedLocalId] = useState(initSelectedLocalId);
   const [localMode, setLocalMode] = useState<"existente" | "novo">("existente");
+
+  // ── Data do evento e prazo interno ──
+  const [dataEvento, setDataEvento] = useState(controle?.data_evento ?? "");
+  const [prazoInterno, setPrazoInterno] = useState(
+    controle?.prazo_interno ?? ""
+  );
 
   const tipoConfig = getTipoConfig(tipo);
   const isAudiencia = tipo === "audiencias";
@@ -258,7 +271,8 @@ export default function ControleForm({
             <input
               type="date"
               name="data_evento"
-              defaultValue={controle?.data_evento ?? ""}
+              value={dataEvento}
+              onChange={(e) => setDataEvento(e.target.value)}
               className={inputCls}
             />
           </div>
@@ -276,8 +290,31 @@ export default function ControleForm({
             </div>
           )}
 
-          {/* Descrição / Tipo-Título */}
+          {/* Prazo Interno — todos os tipos */}
           <div className={isAudiencia ? "" : "sm:col-span-2"}>
+            <label className={labelCls}>Prazo Interno</label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                name="prazo_interno"
+                value={prazoInterno}
+                onChange={(e) => setPrazoInterno(e.target.value)}
+                className="flex-1 h-10 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
+              />
+              <button
+                type="button"
+                onClick={() => setPrazoInterno(addDays(dataEvento, 2))}
+                disabled={!dataEvento}
+                title="Preencher com data do evento + 2 dias"
+                className="shrink-0 h-10 rounded-lg border border-border px-3 font-body text-xs font-semibold text-fg hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                +2 dias
+              </button>
+            </div>
+          </div>
+
+          {/* Descrição / Tipo-Título */}
+          <div className="sm:col-span-2">
             <label className={labelCls}>
               {isAudiencia
                 ? "Tipo / Título da audiência"

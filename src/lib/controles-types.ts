@@ -96,6 +96,7 @@ export interface Controle {
   responsavel_login: string | null;
   tipo_demanda: string | null;
   observacoes: string | null;
+  prazo_interno: string | null;
   dados: Record<string, string | null> | null;
   created_at: string;
 }

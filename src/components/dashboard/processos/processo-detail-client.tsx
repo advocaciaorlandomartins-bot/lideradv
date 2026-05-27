@@ -1,0 +1,1942 @@
+"use client";
+
+import { useState, useTransition, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import type {
+  ProcessoExtended,
+  HistoricoRegistro,
+  EventoControle,
+  TarefaProcesso,
+  PendenciaCliente,
+  ColaboradorSimples,
+} from "@/lib/processo-full-db";
+import type { ModeloDocumento } from "@/lib/modelos-db";
+import {
+  avancarFaseAction,
+  arquivarProcessoAction,
+  updateRelatoAction,
+  updateResponsavelAction,
+  createHistoricoRegistroAction,
+  deleteHistoricoRegistroAction,
+  createEventoControleAction,
+  deleteEventoControleAction,
+  createTarefaProcessoAction,
+  updateTarefaStatusAction,
+  deleteTarefaAction,
+  createPendenciaAction,
+  updatePendenciaStatusAction,
+  deletePendenciaAction,
+} from "@/lib/processo-full-actions";
+import {
+  XMarkIcon,
+  SpinnerIcon,
+  DocumentTextIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  CalendarIcon,
+  CheckIcon,
+  ClockIcon,
+  FolderOpenIcon,
+  ArrowDownTrayIcon,
+} from "@/components/icons";
+
+// ── Types ──────────────────────────────────────────────────────
+
+interface Props {
+  processo: ProcessoExtended;
+  historico: HistoricoRegistro[];
+  eventos: EventoControle[];
+  tarefas: TarefaProcesso[];
+  pendencias: PendenciaCliente[];
+  colaboradores: ColaboradorSimples[];
+  modelos: ModeloDocumento[];
+}
+
+type Tab = "dados" | "relato" | "linha_do_tempo";
+
+// ── Style helpers ───────────────────────────────────────────────
+
+const inputCls =
+  "w-full h-10 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100";
+const selectCls =
+  "w-full h-10 cursor-pointer rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100";
+const labelCls =
+  "block font-body text-xs font-semibold uppercase tracking-wide text-muted mb-1";
+const btnPrimary =
+  "flex items-center gap-1.5 rounded-lg bg-primary px-4 h-9 font-body text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
+const btnOutline =
+  "flex items-center gap-1.5 rounded-lg border border-border px-4 h-9 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary cursor-pointer";
+const btnDanger =
+  "font-body text-xs font-semibold text-red-500 hover:text-red-700 transition-colors cursor-pointer";
+
+// ── Modal wrapper ───────────────────────────────────────────────
+
+function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-lg rounded-2xl border border-border bg-white shadow-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4 flex-shrink-0">
+          <h2 className="font-heading text-lg font-semibold text-fg">
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-slate-100 hover:text-fg cursor-pointer"
+          >
+            <XMarkIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Phase Timeline ─────────────────────────────────────────────
+
+const FASES = [
+  {
+    key: "pre_contrato",
+    label: "Pré-contrato",
+    field: "fase_precontrato_at" as const,
+  },
+  {
+    key: "elaboracao",
+    label: "Elaboração",
+    field: "fase_elaboracao_at" as const,
+  },
+  {
+    key: "arquivado",
+    label: "Arquivada(o)",
+    field: "fase_arquivado_at" as const,
+  },
+];
+
+function FaseTimeline({
+  processo,
+  onAvancar,
+  onArquivar,
+}: {
+  processo: ProcessoExtended;
+  onAvancar: () => void;
+  onArquivar: () => void;
+}) {
+  const currentIdx = FASES.findIndex((f) => f.key === processo.fase_workflow);
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-heading text-sm font-semibold text-fg">
+          Progressão do Processo
+        </h3>
+        <div className="flex gap-2">
+          {processo.fase_workflow !== "arquivado" && (
+            <>
+              {processo.fase_workflow === "pre_contrato" && (
+                <button onClick={onAvancar} className={btnOutline}>
+                  <ChevronRightIcon className="h-3.5 w-3.5" />
+                  Avançar Fase
+                </button>
+              )}
+              <button onClick={onArquivar} className={btnOutline}>
+                <FolderOpenIcon className="h-3.5 w-3.5" />
+                Arquivar
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-start gap-0">
+        {FASES.map((fase, idx) => {
+          const done = idx < currentIdx;
+          const active = idx === currentIdx;
+          const pending = idx > currentIdx;
+          const date = processo[fase.field];
+
+          return (
+            <div key={fase.key} className="flex flex-1 items-start">
+              <div className="flex flex-col items-center flex-1">
+                <div className="flex items-center w-full">
+                  {idx > 0 && (
+                    <div
+                      className={`h-0.5 flex-1 transition-colors ${done || active ? "bg-primary" : "bg-border"}`}
+                    />
+                  )}
+                  <div
+                    className={`h-8 w-8 flex-shrink-0 rounded-full flex items-center justify-center border-2 transition-colors ${
+                      done
+                        ? "border-primary bg-primary"
+                        : active
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-white"
+                    }`}
+                  >
+                    {done ? (
+                      <CheckIcon className="h-4 w-4 text-white" />
+                    ) : (
+                      <span
+                        className={`font-body text-xs font-bold ${active ? "text-primary" : "text-muted"}`}
+                      >
+                        {idx + 1}
+                      </span>
+                    )}
+                  </div>
+                  {idx < FASES.length - 1 && (
+                    <div
+                      className={`h-0.5 flex-1 transition-colors ${done ? "bg-primary" : "bg-border"}`}
+                    />
+                  )}
+                </div>
+                <div className="mt-2 text-center">
+                  <p
+                    className={`font-body text-xs font-semibold ${active ? "text-primary" : done ? "text-fg" : "text-muted"}`}
+                  >
+                    {fase.label}
+                  </p>
+                  {date && (
+                    <p className="font-body text-[10px] text-muted mt-0.5">
+                      {date}
+                    </p>
+                  )}
+                  {active && !date && (
+                    <p className="font-body text-[10px] text-primary mt-0.5">
+                      Fase atual
+                    </p>
+                  )}
+                  {pending && (
+                    <p className="font-body text-[10px] text-slate-300 mt-0.5">
+                      —
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Dados Tab ──────────────────────────────────────────────────
+
+const PRIORIDADE_STYLES: Record<string, string> = {
+  Alta: "bg-red-50 text-red-600 border-red-200",
+  Média: "bg-amber-50 text-amber-700 border-amber-200",
+  Baixa: "bg-emerald-50 text-emerald-700 border-emerald-200",
+};
+
+function DadosField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-6">
+      <span className="w-36 flex-shrink-0 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+        {label}
+      </span>
+      <span className="font-body text-sm text-fg">{value || "—"}</span>
+    </div>
+  );
+}
+
+function DadosTab({ processo }: { processo: ProcessoExtended }) {
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap gap-2 mb-4">
+        <span className="rounded-full border px-3 py-1 font-body text-xs font-semibold bg-violet-50 text-violet-700 border-violet-200">
+          {processo.tipo_demanda}
+        </span>
+        <span
+          className={`rounded-full border px-3 py-1 font-body text-xs font-semibold ${PRIORIDADE_STYLES[processo.prioridade] ?? "bg-slate-100 text-slate-500 border-border"}`}
+        >
+          {processo.prioridade}
+        </span>
+        <span className="rounded-full border px-3 py-1 font-body text-xs font-semibold bg-blue-50 text-blue-600 border-blue-200">
+          {processo.area}
+        </span>
+      </div>
+
+      <DadosField label="Tipo de Ação" value={processo.tipo_acao} />
+      {processo.assunto && (
+        <DadosField label="Assunto" value={processo.assunto} />
+      )}
+      {processo.numero && (
+        <DadosField label="Nº Protocolo" value={processo.numero} />
+      )}
+      {processo.vara && (
+        <DadosField label="Vara / Juízo" value={processo.vara} />
+      )}
+      {processo.comarca && (
+        <DadosField label="Comarca" value={processo.comarca} />
+      )}
+      {processo.data_distribuicao && (
+        <DadosField label="Distribuição" value={processo.data_distribuicao} />
+      )}
+      {processo.valor_causa != null && (
+        <DadosField
+          label="Valor da causa"
+          value={processo.valor_causa.toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          })}
+        />
+      )}
+      {processo.parte_contraria && (
+        <DadosField label="Parte contrária" value={processo.parte_contraria} />
+      )}
+      {processo.parte_contraria_doc && (
+        <DadosField
+          label="Doc. parte contr."
+          value={processo.parte_contraria_doc}
+        />
+      )}
+      {processo.resultado && (
+        <DadosField label="Resultado" value={processo.resultado} />
+      )}
+      {processo.notas && (
+        <DadosField label="Observações" value={processo.notas} />
+      )}
+    </div>
+  );
+}
+
+// ── Relato Tab ─────────────────────────────────────────────────
+
+function RelatoTab({ processo }: { processo: ProcessoExtended }) {
+  const [text, setText] = useState(processo.relato ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const router = useRouter();
+
+  async function handleSave() {
+    setSaving(true);
+    const result = await updateRelatoAction(processo.id, text);
+    setSaving(false);
+    if (!result.error) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      router.refresh();
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={14}
+        placeholder="Descreva o relato do processo de forma narrativa…"
+        className="w-full resize-y rounded-lg border border-border bg-white p-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+      />
+      <div className="flex justify-end">
+        <button onClick={handleSave} disabled={saving} className={btnPrimary}>
+          {saving ? (
+            <>
+              <SpinnerIcon className="h-4 w-4" />
+              Salvando…
+            </>
+          ) : saved ? (
+            <>
+              <CheckIcon className="h-4 w-4" />
+              Salvo
+            </>
+          ) : (
+            "Salvar Relato"
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Linha do Tempo Tab ─────────────────────────────────────────
+
+const TIPO_REGISTRO_CORES: Record<string, string> = {
+  Demanda: "bg-blue-100 text-blue-700",
+  Cliente: "bg-violet-100 text-violet-700",
+  "Registro de Atividades": "bg-emerald-100 text-emerald-700",
+};
+
+function LinhaDoTempoTab({
+  registros,
+  processo,
+  onNovoRegistro,
+}: {
+  registros: HistoricoRegistro[];
+  processo: ProcessoExtended;
+  onNovoRegistro: () => void;
+}) {
+  const [filtroTipo, setFiltroTipo] = useState<string>("Todos");
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  const filtered =
+    filtroTipo === "Todos"
+      ? registros
+      : registros.filter((r) => r.tipo === filtroTipo);
+
+  function handleDelete(id: string) {
+    if (!confirm("Excluir este registro?")) return;
+    startTransition(async () => {
+      await deleteHistoricoRegistroAction(id, processo.id);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-2 flex-wrap">
+          {["Todos", "Demanda", "Cliente", "Registro de Atividades"].map(
+            (t) => (
+              <button
+                key={t}
+                onClick={() => setFiltroTipo(t)}
+                className={`rounded-full px-3 py-1 font-body text-xs font-semibold transition-colors cursor-pointer ${
+                  filtroTipo === t
+                    ? "bg-primary text-white"
+                    : "bg-slate-100 text-muted hover:bg-slate-200"
+                }`}
+              >
+                {t}
+              </button>
+            )
+          )}
+        </div>
+        <button onClick={onNovoRegistro} className={btnPrimary}>
+          <PlusIcon className="h-3.5 w-3.5" />
+          Novo registro
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-10 text-center">
+          <ClockIcon className="h-8 w-8 text-slate-300" />
+          <p className="font-body text-sm text-muted">
+            Nenhum registro na linha do tempo
+          </p>
+        </div>
+      ) : (
+        <div className="relative border-l-2 border-border ml-3 space-y-4 pl-6">
+          {filtered.map((reg) => (
+            <div key={reg.id} className="relative">
+              <div className="absolute -left-[29px] top-3 h-3 w-3 rounded-full border-2 border-primary bg-white" />
+              <div
+                className={`rounded-xl border p-4 ${reg.destaque ? "border-amber-200 bg-amber-50" : "border-border bg-white"}`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 font-body text-[11px] font-bold ${TIPO_REGISTRO_CORES[reg.tipo] ?? "bg-slate-100 text-slate-500"}`}
+                    >
+                      {reg.tipo}
+                    </span>
+                    {reg.destaque && (
+                      <span className="rounded-full bg-amber-200 px-2.5 py-0.5 font-body text-[11px] font-bold text-amber-800">
+                        ★ Destaque
+                      </span>
+                    )}
+                    {reg.situacao && (
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-body text-[11px] text-slate-600">
+                        {reg.situacao}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDelete(reg.id)}
+                    className={btnDanger}
+                  >
+                    Excluir
+                  </button>
+                </div>
+                <p className="font-body text-sm text-fg whitespace-pre-wrap leading-relaxed">
+                  {reg.texto}
+                </p>
+                <div className="mt-2 flex gap-4 font-body text-xs text-muted">
+                  <span>{reg.created_at_formatted}</span>
+                  {reg.data_referencia && (
+                    <span>Ref: {reg.data_referencia}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Eventos Section ─────────────────────────────────────────────
+
+const TIPO_EVENTO_CORES: Record<string, string> = {
+  Audiência: "bg-blue-50 text-blue-700",
+  Perícia: "bg-violet-50 text-violet-700",
+  Prazo: "bg-red-50 text-red-700",
+  Protocolo: "bg-emerald-50 text-emerald-700",
+  Reunião: "bg-amber-50 text-amber-700",
+};
+
+function EventosSection({
+  eventos,
+  processo,
+  onNovo,
+}: {
+  eventos: EventoControle[];
+  processo: ProcessoExtended;
+  onNovo: () => void;
+}) {
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleDelete(id: string) {
+    if (!confirm("Excluir evento?")) return;
+    startTransition(async () => {
+      await deleteEventoControleAction(id, processo.id);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-heading text-base font-semibold text-fg">
+          Eventos / Controles ({eventos.length})
+        </h2>
+        <button onClick={onNovo} className={btnOutline}>
+          <PlusIcon className="h-3.5 w-3.5" />
+          Novo evento
+        </button>
+      </div>
+
+      {eventos.length === 0 ? (
+        <p className="font-body text-sm text-muted text-center py-6">
+          Nenhum evento registrado
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {eventos.map((ev) => (
+            <li
+              key={ev.id}
+              className="flex items-start gap-3 rounded-lg border border-border p-3"
+            >
+              <CalendarIcon className="h-4 w-4 text-muted flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-body text-sm font-semibold text-fg">
+                    {ev.titulo}
+                  </span>
+                  {ev.tipo && (
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${TIPO_EVENTO_CORES[ev.tipo] ?? "bg-slate-100 text-slate-500"}`}
+                    >
+                      {ev.tipo}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-3 mt-1 font-body text-xs text-muted">
+                  {ev.data && (
+                    <span>
+                      {ev.data}
+                      {ev.hora ? ` às ${ev.hora}` : ""}
+                    </span>
+                  )}
+                  {ev.local && <span>📍 {ev.local}</span>}
+                  {ev.responsavel_nome && <span>👤 {ev.responsavel_nome}</span>}
+                </div>
+              </div>
+              <button onClick={() => handleDelete(ev.id)} className={btnDanger}>
+                Excluir
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── Responsável Section ────────────────────────────────────────
+
+function ResponsavelSection({
+  processo,
+  colaboradores,
+}: {
+  processo: ProcessoExtended;
+  colaboradores: ColaboradorSimples[];
+}) {
+  const [value, setValue] = useState(processo.responsavel_id ?? "");
+  const [saving, setSaving] = useState(false);
+  const router = useRouter();
+
+  async function handleChange(v: string) {
+    setValue(v);
+    setSaving(true);
+    await updateResponsavelAction(processo.id, v || null);
+    setSaving(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+      <h3 className="font-heading text-sm font-semibold text-fg mb-3">
+        Responsável
+      </h3>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          disabled={saving}
+          className={selectCls}
+        >
+          <option value="">— Sem responsável —</option>
+          {colaboradores.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nome} ({c.cargo})
+            </option>
+          ))}
+        </select>
+        {saving && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <SpinnerIcon className="h-4 w-4 text-muted" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Tarefas Section ────────────────────────────────────────────
+
+function TarefasSection({
+  tarefas,
+  processo,
+  onNova,
+}: {
+  tarefas: TarefaProcesso[];
+  processo: ProcessoExtended;
+  onNova: () => void;
+}) {
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  function toggleStatus(t: TarefaProcesso) {
+    const next = t.status === "pendente" ? "concluida" : "pendente";
+    startTransition(async () => {
+      await updateTarefaStatusAction(t.id, next, processo.id);
+      router.refresh();
+    });
+  }
+
+  function handleDelete(id: string) {
+    if (!confirm("Excluir tarefa?")) return;
+    startTransition(async () => {
+      await deleteTarefaAction(id, processo.id);
+      router.refresh();
+    });
+  }
+
+  const PRIORIDADE_DOT: Record<string, string> = {
+    Alta: "bg-red-500",
+    Normal: "bg-amber-500",
+    Baixa: "bg-slate-400",
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-heading text-sm font-semibold text-fg">
+          Tarefas ({tarefas.length})
+        </h3>
+        <button
+          onClick={onNova}
+          className="font-body text-xs font-semibold text-primary hover:text-primary/80 cursor-pointer"
+        >
+          + Nova
+        </button>
+      </div>
+
+      {tarefas.length === 0 ? (
+        <p className="font-body text-xs text-muted text-center py-4">
+          Sem tarefas
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {tarefas.map((t) => (
+            <li key={t.id} className="flex items-start gap-2">
+              <button
+                onClick={() => toggleStatus(t)}
+                className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
+                  t.status === "concluida"
+                    ? "bg-primary border-primary"
+                    : "border-border hover:border-primary"
+                }`}
+              >
+                {t.status === "concluida" && (
+                  <CheckIcon className="h-2.5 w-2.5 text-white" />
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <p
+                  className={`font-body text-sm leading-tight ${t.status === "concluida" ? "line-through text-muted" : "text-fg"}`}
+                >
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full mr-1.5 ${PRIORIDADE_DOT[t.prioridade] ?? "bg-slate-400"}`}
+                  />
+                  {t.titulo}
+                </p>
+                <div className="flex gap-2 mt-0.5 font-body text-[11px] text-muted">
+                  {t.responsavel && <span>{t.responsavel}</span>}
+                  {t.prazo && <span>· {t.prazo}</span>}
+                </div>
+              </div>
+              <button onClick={() => handleDelete(t.id)} className={btnDanger}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── Pendências Section ─────────────────────────────────────────
+
+function PendenciasSection({
+  pendencias,
+  processo,
+  onNova,
+}: {
+  pendencias: PendenciaCliente[];
+  processo: ProcessoExtended;
+  onNova: () => void;
+}) {
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  function toggle(p: PendenciaCliente) {
+    const next = p.status === "pendente" ? "resolvida" : "pendente";
+    startTransition(async () => {
+      await updatePendenciaStatusAction(p.id, next, processo.id);
+      router.refresh();
+    });
+  }
+
+  function handleDelete(id: string) {
+    if (!confirm("Excluir pendência?")) return;
+    startTransition(async () => {
+      await deletePendenciaAction(id, processo.id);
+      router.refresh();
+    });
+  }
+
+  function handleWhatsApp(descricao: string) {
+    const msg = encodeURIComponent(
+      `Olá! Temos uma pendência referente ao seu processo:\n\n${descricao}\n\nPor favor, providencie o mais breve possível. Grato(a)!`
+    );
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-heading text-sm font-semibold text-fg">
+          Pendências ({pendencias.filter((p) => p.status === "pendente").length}
+          )
+        </h3>
+        <button
+          onClick={onNova}
+          className="font-body text-xs font-semibold text-primary hover:text-primary/80 cursor-pointer"
+        >
+          + Nova
+        </button>
+      </div>
+
+      {pendencias.length === 0 ? (
+        <p className="font-body text-xs text-muted text-center py-4">
+          Sem pendências
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {pendencias.map((p) => (
+            <li key={p.id} className="flex items-start gap-2">
+              <button
+                onClick={() => toggle(p)}
+                className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
+                  p.status === "resolvida"
+                    ? "bg-emerald-500 border-emerald-500"
+                    : "border-amber-400 hover:border-amber-500"
+                }`}
+              >
+                {p.status === "resolvida" && (
+                  <CheckIcon className="h-2.5 w-2.5 text-white" />
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <p
+                  className={`font-body text-xs leading-relaxed ${p.status === "resolvida" ? "line-through text-muted" : "text-fg"}`}
+                >
+                  {p.descricao}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {p.status === "pendente" && (
+                  <button
+                    onClick={() => handleWhatsApp(p.descricao)}
+                    title="Solicitar via WhatsApp"
+                    className="text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer font-body text-xs font-semibold"
+                  >
+                    WA
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDelete(p.id)}
+                  className={btnDanger}
+                >
+                  ×
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── Docs Automatizados Section ─────────────────────────────────
+
+const DOCS_PADRAO = [
+  {
+    key: "procuracao",
+    label: "Procuração Ad Judicia",
+    desc: "Com dados do cliente preenchidos",
+  },
+  {
+    key: "contrato_honorarios",
+    label: "Contrato de Honorários",
+    desc: "Prestação de serviços advocatícios",
+  },
+  {
+    key: "declaracao_hipossuficiencia",
+    label: "Declaração de Hipossuficiência",
+    desc: "Benefícios da justiça gratuita",
+  },
+  {
+    key: "notificacao_extrajudicial",
+    label: "Notificação Extrajudicial",
+    desc: "Com dados do notificante preenchidos",
+  },
+];
+
+function DocsAutomatizadosSection({
+  clientId,
+  modelos,
+}: {
+  clientId: string;
+  modelos: ModeloDocumento[];
+}) {
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [docTab, setDocTab] = useState<"padrao" | "meus">("padrao");
+
+  async function handleGerarPadrao(templateKey: string, label: string) {
+    setLoadingKey(templateKey);
+    try {
+      const res = await fetch(
+        `/api/clientes/${clientId}/gerar-documento?template=${templateKey}`
+      );
+      if (!res.ok) throw new Error("Erro ao gerar");
+      const blob = await res.blob();
+      downloadBlob(blob, `${label.replace(/\s+/g, "_")}.pdf`);
+    } finally {
+      setLoadingKey(null);
+    }
+  }
+
+  async function handleGerarModelo(modeloId: string, titulo: string) {
+    setLoadingKey(modeloId);
+    try {
+      const res = await fetch(
+        `/api/gerar-modelo?modeloId=${modeloId}&clienteId=${clientId}`
+      );
+      if (!res.ok) throw new Error("Erro ao gerar");
+      const blob = await res.blob();
+      downloadBlob(blob, `${titulo.replace(/\s+/g, "_")}.pdf`);
+    } finally {
+      setLoadingKey(null);
+    }
+  }
+
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const modelosAtivos = modelos.filter((m) => m.ativo);
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3">
+        <DocumentTextIcon className="h-4 w-4 text-primary" />
+        <h3 className="font-heading text-sm font-semibold text-fg">
+          Documentos Automatizados
+        </h3>
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-1 rounded-lg border border-border bg-slate-50 p-1 mb-4">
+        <button
+          onClick={() => setDocTab("padrao")}
+          className={`flex-1 rounded-md py-1.5 font-body text-xs font-semibold transition-colors cursor-pointer ${
+            docTab === "padrao"
+              ? "bg-white text-primary shadow-sm"
+              : "text-muted hover:text-fg"
+          }`}
+        >
+          Padrão
+        </button>
+        <button
+          onClick={() => setDocTab("meus")}
+          className={`flex-1 rounded-md py-1.5 font-body text-xs font-semibold transition-colors cursor-pointer ${
+            docTab === "meus"
+              ? "bg-white text-primary shadow-sm"
+              : "text-muted hover:text-fg"
+          }`}
+        >
+          Meus Modelos
+          {modelosAtivos.length > 0 && (
+            <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-white">
+              {modelosAtivos.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Padrão tab */}
+      {docTab === "padrao" && (
+        <ul className="space-y-2">
+          {DOCS_PADRAO.map((doc) => (
+            <li
+              key={doc.key}
+              className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+            >
+              <div>
+                <p className="font-body text-xs font-semibold text-fg">
+                  {doc.label}
+                </p>
+                <p className="font-body text-[11px] text-muted">{doc.desc}</p>
+              </div>
+              <button
+                onClick={() => handleGerarPadrao(doc.key, doc.label)}
+                disabled={loadingKey === doc.key}
+                className="flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-1.5 font-body text-xs font-semibold text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 cursor-pointer flex-shrink-0 ml-2"
+              >
+                {loadingKey === doc.key ? (
+                  <SpinnerIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                )}
+                PDF
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Meus Modelos tab */}
+      {docTab === "meus" && (
+        <>
+          {modelosAtivos.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-6 text-center">
+              <DocumentTextIcon className="h-7 w-7 text-slate-300" />
+              <p className="font-body text-xs text-muted">
+                Nenhum modelo cadastrado
+              </p>
+              <Link
+                href="/dashboard/modelos/novo"
+                className="font-body text-xs font-semibold text-primary hover:underline"
+              >
+                Criar modelo →
+              </Link>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {modelosAtivos.map((m) => (
+                <li
+                  key={m.id}
+                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-body text-xs font-semibold text-fg truncate">
+                      {m.titulo}
+                    </p>
+                    {m.descricao && (
+                      <p className="font-body text-[11px] text-muted truncate">
+                        {m.descricao}
+                      </p>
+                    )}
+                    {m.categoria && (
+                      <p className="font-body text-[10px] text-slate-400">
+                        {m.categoria}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleGerarModelo(m.id, m.titulo)}
+                    disabled={loadingKey === m.id}
+                    className="flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-1.5 font-body text-xs font-semibold text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 cursor-pointer flex-shrink-0 ml-2"
+                  >
+                    {loadingKey === m.id ? (
+                      <SpinnerIcon className="h-3.5 w-3.5" />
+                    ) : (
+                      <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                    )}
+                    PDF
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-3 border-t border-border pt-3">
+            <Link
+              href="/dashboard/modelos"
+              className="font-body text-xs font-semibold text-primary hover:underline"
+            >
+              Gerenciar modelos →
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Modals ─────────────────────────────────────────────────────
+
+function AvancarFaseModal({
+  processo,
+  onClose,
+}: {
+  processo: ProcessoExtended;
+  onClose: () => void;
+}) {
+  const [loading, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  function handleAvancar() {
+    setError(null);
+    startTransition(async () => {
+      const result = await avancarFaseAction(processo.id, "elaboracao");
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+        onClose();
+      }
+    });
+  }
+
+  return (
+    <Modal title="Avançar Fase" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        <p className="font-body text-sm text-muted">
+          Você está avançando este processo de <strong>Pré-contrato</strong>{" "}
+          para <strong>Elaboração</strong>.
+        </p>
+        <div className="rounded-lg border border-border p-4 bg-slate-50 space-y-1">
+          <p className="font-body text-xs text-muted font-semibold uppercase tracking-wide">
+            Processo
+          </p>
+          <p className="font-body text-sm font-semibold text-fg">
+            {processo.tipo_acao}
+          </p>
+          <p className="font-body text-xs text-muted">{processo.client_name}</p>
+        </div>
+        {error && (
+          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 font-body text-sm text-red-700">
+            {error}
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <button onClick={onClose} className={btnOutline}>
+          Cancelar
+        </button>
+        <button
+          onClick={handleAvancar}
+          disabled={loading}
+          className={btnPrimary}
+        >
+          {loading ? <SpinnerIcon className="h-4 w-4" /> : null}
+          Confirmar Avanço
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function ArquivarModal({
+  processo,
+  onClose,
+}: {
+  processo: ProcessoExtended;
+  onClose: () => void;
+}) {
+  const [resultado, setResultado] = useState("");
+  const [obs, setObs] = useState("");
+  const [loading, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const RESULTADOS = [
+    "Deferido",
+    "Indeferido",
+    "Parcialmente deferido",
+    "Falta de viabilidade",
+    "Desistência",
+    "Acordo extrajudicial",
+    "Sentença favorável",
+    "Sentença desfavorável",
+    "Outro",
+  ];
+
+  function handleArquivar() {
+    if (!resultado) {
+      setError("Selecione o resultado.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await arquivarProcessoAction(processo.id, resultado, obs);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+        onClose();
+      }
+    });
+  }
+
+  return (
+    <Modal title="Arquivar Processo" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        <div>
+          <label className={labelCls}>Resultado *</label>
+          <select
+            value={resultado}
+            onChange={(e) => setResultado(e.target.value)}
+            className={selectCls}
+          >
+            <option value="">Selecione…</option>
+            {RESULTADOS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Observação</label>
+          <textarea
+            value={obs}
+            onChange={(e) => setObs(e.target.value)}
+            rows={3}
+            placeholder="Observação final sobre o processo…"
+            className="w-full resize-none rounded-lg border border-border bg-white p-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+        {error && (
+          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 font-body text-sm text-red-700">
+            {error}
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <button onClick={onClose} className={btnOutline}>
+          Cancelar
+        </button>
+        <button
+          onClick={handleArquivar}
+          disabled={loading}
+          className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 h-9 font-body text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
+        >
+          {loading ? (
+            <SpinnerIcon className="h-4 w-4" />
+          ) : (
+            <FolderOpenIcon className="h-4 w-4" />
+          )}
+          Arquivar
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function NovoRegistroModal({
+  processo,
+  onClose,
+}: {
+  processo: ProcessoExtended;
+  onClose: () => void;
+}) {
+  const [texto, setTexto] = useState("");
+  const [tipo, setTipo] = useState("Demanda");
+  const [dataRef, setDataRef] = useState("");
+  const [situacao, setSituacao] = useState("");
+  const [destaque, setDestaque] = useState(false);
+  const [loading, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  function handleCreate() {
+    setError(null);
+    if (!texto.trim()) {
+      setError("O texto é obrigatório.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await createHistoricoRegistroAction({
+        processoId: processo.id,
+        clientId: processo.client_id,
+        texto,
+        tipo,
+        dataReferencia: dataRef || null,
+        situacao: situacao || null,
+        destaque,
+      });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+        onClose();
+      }
+    });
+  }
+
+  return (
+    <Modal title="Novo Registro" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        <div>
+          <label className={labelCls}>Tipo de registro</label>
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value)}
+            className={selectCls}
+          >
+            <option value="Demanda">Demanda</option>
+            <option value="Cliente">Cliente</option>
+            <option value="Registro de Atividades">
+              Registro de Atividades
+            </option>
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Texto *</label>
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            rows={5}
+            placeholder="Descreva o registro…"
+            className="w-full resize-none rounded-lg border border-border bg-white p-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Data referência</label>
+            <input
+              type="date"
+              value={dataRef}
+              onChange={(e) => setDataRef(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Situação</label>
+            <input
+              type="text"
+              value={situacao}
+              onChange={(e) => setSituacao(e.target.value)}
+              placeholder="Ex: Em análise"
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={destaque}
+            onChange={(e) => setDestaque(e.target.checked)}
+            className="rounded border-border"
+          />
+          <span className="font-body text-sm text-fg">
+            Marcar como destaque
+          </span>
+        </label>
+        {error && (
+          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 font-body text-sm text-red-700">
+            {error}
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <button onClick={onClose} className={btnOutline}>
+          Cancelar
+        </button>
+        <button
+          onClick={handleCreate}
+          disabled={loading}
+          className={btnPrimary}
+        >
+          {loading && <SpinnerIcon className="h-4 w-4" />}
+          Salvar Registro
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function NovoEventoModal({
+  processo,
+  colaboradores,
+  onClose,
+}: {
+  processo: ProcessoExtended;
+  colaboradores: ColaboradorSimples[];
+  onClose: () => void;
+}) {
+  const [titulo, setTitulo] = useState("");
+  const [tipo, setTipo] = useState("");
+  const [data, setData] = useState("");
+  const [hora, setHora] = useState("");
+  const [local, setLocal] = useState("");
+  const [link, setLink] = useState("");
+  const [responsavelId, setResponsavelId] = useState("");
+  const [loading, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  function handleCreate() {
+    setError(null);
+    startTransition(async () => {
+      const result = await createEventoControleAction({
+        processoId: processo.id,
+        titulo,
+        tipo: tipo || null,
+        data: data || null,
+        hora: hora || null,
+        local: local || null,
+        linkVirtual: link || null,
+        responsavelId: responsavelId || null,
+      });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+        onClose();
+      }
+    });
+  }
+
+  return (
+    <Modal title="Novo Evento / Controle" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        <div>
+          <label className={labelCls}>Título *</label>
+          <input
+            type="text"
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            placeholder="Ex: Audiência de instrução"
+            className={inputCls}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Tipo</label>
+            <select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">— Selecione —</option>
+              {[
+                "Audiência",
+                "Perícia",
+                "Prazo",
+                "Protocolo",
+                "Reunião",
+                "Outro",
+              ].map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Responsável</label>
+            <select
+              value={responsavelId}
+              onChange={(e) => setResponsavelId(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">— Nenhum —</option>
+              {colaboradores.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Data</label>
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Hora</label>
+            <input
+              type="time"
+              value={hora}
+              onChange={(e) => setHora(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Local</label>
+          <input
+            type="text"
+            value={local}
+            onChange={(e) => setLocal(e.target.value)}
+            placeholder="Ex: Fórum Central, sala 3"
+            className={inputCls}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>Link virtual</label>
+          <input
+            type="url"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="https://meet.google.com/…"
+            className={inputCls}
+          />
+        </div>
+        {error && (
+          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 font-body text-sm text-red-700">
+            {error}
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <button onClick={onClose} className={btnOutline}>
+          Cancelar
+        </button>
+        <button
+          onClick={handleCreate}
+          disabled={loading}
+          className={btnPrimary}
+        >
+          {loading && <SpinnerIcon className="h-4 w-4" />}
+          Salvar Evento
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function NovaTarefaModal({
+  processo,
+  colaboradores,
+  onClose,
+}: {
+  processo: ProcessoExtended;
+  colaboradores: ColaboradorSimples[];
+  onClose: () => void;
+}) {
+  const [titulo, setTitulo] = useState("");
+  const [responsavel, setResponsavel] = useState("");
+  const [prioridade, setPrioridade] = useState("Normal");
+  const [prazo, setPrazo] = useState("");
+  const [hora, setHora] = useState("");
+  const [comentarios, setComentarios] = useState("");
+  const [loading, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  function handleCreate() {
+    setError(null);
+    startTransition(async () => {
+      const result = await createTarefaProcessoAction({
+        processoId: processo.id,
+        clientId: processo.client_id,
+        titulo,
+        responsavel: responsavel || null,
+        prioridade,
+        prazo: prazo || null,
+        hora: hora || null,
+        comentarios: comentarios || null,
+      });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+        onClose();
+      }
+    });
+  }
+
+  return (
+    <Modal title="Nova Tarefa" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        <div>
+          <label className={labelCls}>Tarefa *</label>
+          <input
+            type="text"
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            placeholder="Descreva a tarefa…"
+            className={inputCls}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Responsável</label>
+            <select
+              value={responsavel}
+              onChange={(e) => setResponsavel(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">— Selecione —</option>
+              {colaboradores.map((c) => (
+                <option key={c.id} value={c.nome}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Prioridade</label>
+            <select
+              value={prioridade}
+              onChange={(e) => setPrioridade(e.target.value)}
+              className={selectCls}
+            >
+              <option value="Alta">Alta</option>
+              <option value="Normal">Normal</option>
+              <option value="Baixa">Baixa</option>
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Prazo</label>
+            <input
+              type="date"
+              value={prazo}
+              onChange={(e) => setPrazo(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Hora</label>
+            <input
+              type="time"
+              value={hora}
+              onChange={(e) => setHora(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <div>
+          <label className={labelCls}>Comentários</label>
+          <textarea
+            value={comentarios}
+            onChange={(e) => setComentarios(e.target.value)}
+            rows={3}
+            className="w-full resize-none rounded-lg border border-border bg-white p-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+        {error && (
+          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 font-body text-sm text-red-700">
+            {error}
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <button onClick={onClose} className={btnOutline}>
+          Cancelar
+        </button>
+        <button
+          onClick={handleCreate}
+          disabled={loading}
+          className={btnPrimary}
+        >
+          {loading && <SpinnerIcon className="h-4 w-4" />}
+          Salvar Tarefa
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function NovaPendenciaModal({
+  processo,
+  onClose,
+}: {
+  processo: ProcessoExtended;
+  onClose: () => void;
+}) {
+  const [descricao, setDescricao] = useState("");
+  const [loading, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  function handleCreate() {
+    setError(null);
+    startTransition(async () => {
+      const result = await createPendenciaAction({
+        processoId: processo.id,
+        clientId: processo.client_id,
+        descricao,
+      });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+        onClose();
+      }
+    });
+  }
+
+  return (
+    <Modal title="Nova Pendência" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        <div>
+          <label className={labelCls}>Pendência *</label>
+          <textarea
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            rows={4}
+            placeholder="Descreva o documento ou informação pendente do cliente…"
+            className="w-full resize-none rounded-lg border border-border bg-white p-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+        {error && (
+          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 font-body text-sm text-red-700">
+            {error}
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <button onClick={onClose} className={btnOutline}>
+          Cancelar
+        </button>
+        <button
+          onClick={handleCreate}
+          disabled={loading}
+          className={btnPrimary}
+        >
+          {loading && <SpinnerIcon className="h-4 w-4" />}
+          Adicionar Pendência
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Novo Dropdown Button ────────────────────────────────────────
+
+function NovoDropdown({ processo }: { processo: ProcessoExtended }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex h-9 items-center gap-1.5 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover cursor-pointer"
+      >
+        <PlusIcon className="h-3.5 w-3.5" />
+        Novo(a)
+        <svg
+          className="h-3.5 w-3.5 ml-0.5"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-40 mt-1.5 w-52 rounded-xl border border-border bg-white py-1 shadow-lg">
+            {[
+              { label: "Cliente", href: "/dashboard/clientes/novo" },
+              { label: "Processo/Demanda", href: "/dashboard/processos/novo" },
+              {
+                label: "Receita/Despesa",
+                href: "/dashboard/financeiro/novo",
+              },
+            ].map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="block px-4 py-2.5 font-body text-sm text-fg transition-colors hover:bg-slate-50 hover:text-primary"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────
+
+export default function ProcessoDetailClient({
+  processo,
+  historico,
+  eventos,
+  tarefas,
+  pendencias,
+  colaboradores,
+  modelos,
+}: Props) {
+  const [tab, setTab] = useState<Tab>("dados");
+  const [avancarOpen, setAvancarOpen] = useState(false);
+  const [arquivarOpen, setArquivarOpen] = useState(false);
+  const [novoRegistroOpen, setNovoRegistroOpen] = useState(false);
+  const [novoEventoOpen, setNovoEventoOpen] = useState(false);
+  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+  const [novaPendenciaOpen, setNovaPendenciaOpen] = useState(false);
+
+  const TABS: { key: Tab; label: string }[] = [
+    { key: "dados", label: "Dados" },
+    { key: "relato", label: "Relato" },
+    { key: "linha_do_tempo", label: "Linha do Tempo" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                Cliente
+              </span>
+              <Link
+                href={`/dashboard/clientes/${processo.client_id}`}
+                className="font-heading text-xl font-semibold text-primary hover:text-primary/80 transition-colors"
+              >
+                {processo.client_name}
+              </Link>
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-body text-xs font-semibold ${
+                  processo.status === "ativo"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : processo.status === "arquivado"
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    processo.status === "ativo"
+                      ? "bg-emerald-500"
+                      : processo.status === "arquivado"
+                        ? "bg-amber-500"
+                        : "bg-slate-400"
+                  }`}
+                />
+                {processo.status === "ativo"
+                  ? "Ativo"
+                  : processo.status === "arquivado"
+                    ? "Arquivado"
+                    : "Encerrado"}
+              </span>
+            </div>
+            <p className="font-heading text-base font-semibold text-fg">
+              {processo.tipo_acao}
+            </p>
+            {processo.numero && (
+              <p className="font-mono text-xs text-muted mt-0.5">
+                {processo.numero}
+              </p>
+            )}
+            <div className="flex gap-3 mt-1.5">
+              <Link
+                href={`/dashboard/clientes/${processo.client_id}`}
+                className="font-body text-xs text-primary hover:underline"
+              >
+                Ficha do cliente →
+              </Link>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 items-start">
+            <NovoDropdown processo={processo} />
+            <Link
+              href={`/dashboard/processos/${processo.id}/editar`}
+              className={btnOutline}
+            >
+              Editar
+            </Link>
+            <Link
+              href={`/dashboard/financeiro/novo?processo=${processo.id}`}
+              className={btnOutline}
+            >
+              Financeiro
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase Timeline */}
+      <FaseTimeline
+        processo={processo}
+        onAvancar={() => setAvancarOpen(true)}
+        onArquivar={() => setArquivarOpen(true)}
+      />
+
+      {/* Tab Nav */}
+      <div className="flex gap-1 rounded-xl border border-border bg-white p-1.5 shadow-sm">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex-1 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors cursor-pointer ${
+              tab === t.key
+                ? "bg-primary text-white shadow-sm"
+                : "text-muted hover:bg-slate-100 hover:text-fg"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+        {tab === "dados" && <DadosTab processo={processo} />}
+        {tab === "relato" && <RelatoTab processo={processo} />}
+        {tab === "linha_do_tempo" && (
+          <LinhaDoTempoTab
+            registros={historico}
+            processo={processo}
+            onNovoRegistro={() => setNovoRegistroOpen(true)}
+          />
+        )}
+      </div>
+
+      {/* Bottom grid */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Eventos / Controles — 2 cols */}
+        <div className="lg:col-span-2">
+          <EventosSection
+            eventos={eventos}
+            processo={processo}
+            onNovo={() => setNovoEventoOpen(true)}
+          />
+        </div>
+
+        {/* Sidebar — 1 col */}
+        <div className="flex flex-col gap-4">
+          <ResponsavelSection
+            processo={processo}
+            colaboradores={colaboradores}
+          />
+          <TarefasSection
+            tarefas={tarefas}
+            processo={processo}
+            onNova={() => setNovaTarefaOpen(true)}
+          />
+          <PendenciasSection
+            pendencias={pendencias}
+            processo={processo}
+            onNova={() => setNovaPendenciaOpen(true)}
+          />
+          <DocsAutomatizadosSection
+            clientId={processo.client_id}
+            modelos={modelos}
+          />
+        </div>
+      </div>
+
+      {/* Modals */}
+      {avancarOpen && processo.fase_workflow === "pre_contrato" && (
+        <AvancarFaseModal
+          processo={processo}
+          onClose={() => setAvancarOpen(false)}
+        />
+      )}
+      {arquivarOpen && (
+        <ArquivarModal
+          processo={processo}
+          onClose={() => setArquivarOpen(false)}
+        />
+      )}
+      {novoRegistroOpen && (
+        <NovoRegistroModal
+          processo={processo}
+          onClose={() => setNovoRegistroOpen(false)}
+        />
+      )}
+      {novoEventoOpen && (
+        <NovoEventoModal
+          processo={processo}
+          colaboradores={colaboradores}
+          onClose={() => setNovoEventoOpen(false)}
+        />
+      )}
+      {novaTarefaOpen && (
+        <NovaTarefaModal
+          processo={processo}
+          colaboradores={colaboradores}
+          onClose={() => setNovaTarefaOpen(false)}
+        />
+      )}
+      {novaPendenciaOpen && (
+        <NovaPendenciaModal
+          processo={processo}
+          onClose={() => setNovaPendenciaOpen(false)}
+        />
+      )}
+    </div>
+  );
+}

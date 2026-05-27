@@ -14,6 +14,8 @@ import {
   MagnifyingGlassIcon,
   LogoutIcon,
   XMarkIcon,
+  DocumentTextIcon,
+  CogIcon,
 } from "@/components/icons";
 
 const navItems = [
@@ -22,6 +24,7 @@ const navItems = [
   { href: "/dashboard/processos", icon: FolderOpenIcon, label: "Processos" },
   { href: "/dashboard/financeiro", icon: BanknotesIcon, label: "Financeiro" },
   { href: "/dashboard/pericias", icon: ClipboardListIcon, label: "Perícias" },
+  { href: "/dashboard/modelos", icon: DocumentTextIcon, label: "Modelos" },
   {
     href: "/dashboard/colaboradores",
     icon: UserPlusIcon,
@@ -29,6 +32,7 @@ const navItems = [
   },
   { href: "/dashboard/senhas", icon: LockClosedIcon, label: "Cofre de Senhas" },
   { href: "/dashboard/oab", icon: MagnifyingGlassIcon, label: "Busca OAB" },
+  { href: "/dashboard/configuracoes", icon: CogIcon, label: "Configurações" },
 ];
 
 interface SidebarProps {

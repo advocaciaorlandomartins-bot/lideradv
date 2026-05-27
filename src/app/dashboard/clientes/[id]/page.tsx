@@ -5,6 +5,7 @@ import { getProcessosByClientId } from "@/lib/processos-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 import DeleteClientButton from "@/components/dashboard/clients/delete-client-button";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
+import GerarDocumentoButton from "@/components/dashboard/clients/gerar-documento-button";
 import {
   ChevronRightIcon,
   FolderOpenIcon,
@@ -117,6 +118,10 @@ export default async function ClienteDetailPage({
             >
               Editar
             </Link>
+            <GerarDocumentoButton
+              clientId={client.id}
+              clientName={client.name}
+            />
             <Link
               href={`/dashboard/processos/novo?cliente=${client.id}`}
               className="flex h-9 items-center gap-1.5 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover"

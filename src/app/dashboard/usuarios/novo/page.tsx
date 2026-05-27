@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { ShieldCheckIcon } from "@/components/icons";
 import UsuarioForm from "@/components/dashboard/usuarios/usuario-form";
+import { getColaboradoresForSelect } from "@/lib/usuarios-db";
 
-export default function NovoUsuarioPage() {
+export default async function NovoUsuarioPage() {
+  const colaboradores = await getColaboradoresForSelect();
+
   return (
     <div className="space-y-6">
       <div>
@@ -35,7 +38,7 @@ export default function NovoUsuarioPage() {
         </nav>
       </div>
 
-      <UsuarioForm />
+      <UsuarioForm colaboradores={colaboradores} />
     </div>
   );
 }

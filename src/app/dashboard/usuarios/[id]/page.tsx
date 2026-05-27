@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ShieldCheckIcon } from "@/components/icons";
-import { getUsuarioById } from "@/lib/usuarios-db";
+import { getUsuarioById, getColaboradoresForSelect } from "@/lib/usuarios-db";
 import UsuarioForm from "@/components/dashboard/usuarios/usuario-form";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,10 @@ export default async function EditarUsuarioPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const usuario = await getUsuarioById(id);
+  const [usuario, colaboradores] = await Promise.all([
+    getUsuarioById(id),
+    getColaboradoresForSelect(),
+  ]);
   if (!usuario) notFound();
 
   return (
@@ -47,7 +50,7 @@ export default async function EditarUsuarioPage({
         </nav>
       </div>
 
-      <UsuarioForm usuario={usuario} />
+      <UsuarioForm usuario={usuario} colaboradores={colaboradores} />
     </div>
   );
 }

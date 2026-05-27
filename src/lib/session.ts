@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
+import type { Permissoes } from "./permissoes";
 
 const COOKIE = "adv_session";
 const MAX_AGE = 60 * 60 * 8; // 8 h
@@ -18,6 +19,7 @@ export interface SessionUser {
   id: string;
   login: string;
   categoria: string;
+  permissoes: Permissoes;
 }
 
 export async function createSession(user: SessionUser): Promise<void> {
@@ -51,7 +53,12 @@ export async function getSession(): Promise<SessionUser | null> {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());
     if (typeof data.exp !== "number" || data.exp < Date.now() / 1000)
       return null;
-    return { id: data.id, login: data.login, categoria: data.categoria };
+    return {
+      id: data.id,
+      login: data.login,
+      categoria: data.categoria,
+      permissoes: data.permissoes ?? {},
+    };
   } catch {
     return null;
   }

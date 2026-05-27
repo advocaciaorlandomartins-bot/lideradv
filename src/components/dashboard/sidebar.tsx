@@ -18,32 +18,85 @@ import {
   ShieldCheckIcon,
   CogIcon,
 } from "@/components/icons";
+import { hasPermission } from "@/lib/permissoes";
+import type { SessionUser } from "@/lib/session";
 
-const navItems = [
-  { href: "/dashboard", icon: HomeIcon, label: "Dashboard" },
-  { href: "/dashboard/clientes", icon: UsersIcon, label: "Clientes" },
-  { href: "/dashboard/processos", icon: FolderOpenIcon, label: "Processos" },
-  { href: "/dashboard/financeiro", icon: BanknotesIcon, label: "Financeiro" },
-  { href: "/dashboard/pericias", icon: ClipboardListIcon, label: "Perícias" },
-  { href: "/dashboard/modelos", icon: DocumentTextIcon, label: "Modelos" },
+const NAV_ITEMS = [
+  { href: "/dashboard", icon: HomeIcon, label: "Dashboard", modulo: null },
+  {
+    href: "/dashboard/clientes",
+    icon: UsersIcon,
+    label: "Clientes",
+    modulo: "clientes",
+  },
+  {
+    href: "/dashboard/processos",
+    icon: FolderOpenIcon,
+    label: "Processos",
+    modulo: "processos",
+  },
+  {
+    href: "/dashboard/financeiro",
+    icon: BanknotesIcon,
+    label: "Financeiro",
+    modulo: "financeiro",
+  },
+  {
+    href: "/dashboard/pericias",
+    icon: ClipboardListIcon,
+    label: "Perícias",
+    modulo: "pericias",
+  },
+  {
+    href: "/dashboard/modelos",
+    icon: DocumentTextIcon,
+    label: "Modelos",
+    modulo: "modelos",
+  },
   {
     href: "/dashboard/colaboradores",
     icon: UserPlusIcon,
     label: "Colaboradores",
+    modulo: "colaboradores",
   },
-  { href: "/dashboard/senhas", icon: LockClosedIcon, label: "Cofre de Senhas" },
-  { href: "/dashboard/oab", icon: MagnifyingGlassIcon, label: "Busca OAB" },
-  { href: "/dashboard/usuarios", icon: ShieldCheckIcon, label: "Usuários" },
-  { href: "/dashboard/configuracoes", icon: CogIcon, label: "Configurações" },
-];
+  {
+    href: "/dashboard/senhas",
+    icon: LockClosedIcon,
+    label: "Cofre de Senhas",
+    modulo: null,
+  },
+  {
+    href: "/dashboard/oab",
+    icon: MagnifyingGlassIcon,
+    label: "Busca OAB",
+    modulo: null,
+  },
+  {
+    href: "/dashboard/usuarios",
+    icon: ShieldCheckIcon,
+    label: "Usuários",
+    modulo: "usuarios",
+  },
+  {
+    href: "/dashboard/configuracoes",
+    icon: CogIcon,
+    label: "Configurações",
+    modulo: "configuracoes",
+  },
+] as const;
 
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
+  user: SessionUser;
 }
 
-export default function Sidebar({ open, onClose }: SidebarProps) {
+export default function Sidebar({ open, onClose, user }: SidebarProps) {
   const pathname = usePathname();
+
+  const visibleItems = NAV_ITEMS.filter(
+    ({ modulo }) => modulo === null || hasPermission(user, modulo, "ver")
+  );
 
   return (
     <>
@@ -88,7 +141,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           className="flex-1 overflow-y-auto px-3 py-4"
           aria-label="Menu principal"
         >
-          {/* Skip link */}
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-primary focus:outline-none"
@@ -97,7 +149,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </a>
 
           <ul className="space-y-0.5">
-            {navItems.map(({ href, icon: Icon, label }) => {
+            {visibleItems.map(({ href, icon: Icon, label }) => {
               const isActive =
                 href === "/dashboard"
                   ? pathname === "/dashboard"

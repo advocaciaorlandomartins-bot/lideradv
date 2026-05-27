@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { redirect } from "next/navigation";
 import sql from "./db";
 import { createSession, destroySession } from "./session";
+import { resolvePermissoes } from "./permissoes";
 
 export type LoginState = { error: string } | null;
 
@@ -32,7 +33,7 @@ export async function loginAction(
   }
 
   const rows = await sql`
-    SELECT id::text, login, nome, categoria, senha_hash, ativo, validade
+    SELECT id::text, login, categoria, senha_hash, ativo, validade, permissoes
     FROM usuarios
     WHERE login = ${login}
     LIMIT 1
@@ -60,10 +61,17 @@ export async function loginAction(
     UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ${String(user.id)}::uuid
   `;
 
+  const permissoes = resolvePermissoes(
+    String(user.categoria),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (user.permissoes as any) ?? null
+  );
+
   await createSession({
     id: String(user.id),
     login: String(user.login),
     categoria: String(user.categoria),
+    permissoes,
   });
 
   redirect("/dashboard");
@@ -122,6 +130,5 @@ export async function registerAction(
     return { error: "As senhas não coincidem." };
   }
 
-  // TODO: criar usuário no banco Neon e verificar duplicidade de e-mail/OAB
   redirect("/dashboard");
 }

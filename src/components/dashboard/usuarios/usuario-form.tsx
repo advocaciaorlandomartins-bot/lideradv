@@ -8,7 +8,18 @@ import {
   updateUsuarioAction,
   type UsuarioFormState,
 } from "@/lib/usuarios-actions";
-import { CATEGORIAS, type Usuario } from "@/lib/usuarios-types";
+import {
+  CATEGORIAS,
+  type Usuario,
+  type ColaboradorOption,
+} from "@/lib/usuarios-types";
+import {
+  MODULOS,
+  ACOES,
+  DEFAULTS_POR_CATEGORIA,
+  resolvePermissoes,
+  type Permissoes,
+} from "@/lib/permissoes";
 
 const inputCls =
   "w-full h-10 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100";
@@ -18,9 +29,15 @@ const selectCls =
 
 interface Props {
   usuario?: Usuario;
+  colaboradores: ColaboradorOption[];
 }
 
-export default function UsuarioForm({ usuario }: Props) {
+function buildInitialPerms(usuario?: Usuario): Permissoes {
+  const cat = usuario?.categoria ?? "Colaborador(a)";
+  return resolvePermissoes(cat, usuario?.permissoes ?? null);
+}
+
+export default function UsuarioForm({ usuario, colaboradores }: Props) {
   const isEdit = !!usuario;
   const router = useRouter();
 
@@ -33,15 +50,61 @@ export default function UsuarioForm({ usuario }: Props) {
   const [showSenha, setShowSenha] = useState(false);
   const [showConf, setShowConf] = useState(false);
   const [ativo, setAtivo] = useState(usuario?.ativo ?? true);
+  const [categoria, setCategoria] = useState(usuario?.categoria ?? "");
+  const [colaboradorId, setColaboradorId] = useState(
+    usuario?.colaborador_id ?? ""
+  );
+  const [perms, setPerms] = useState<Permissoes>(buildInitialPerms(usuario));
+
+  function handleCategoriaChange(cat: string) {
+    setCategoria(cat);
+    if (cat) setPerms(resolvePermissoes(cat, null));
+  }
+
+  function togglePerm(mod: string, acao: string) {
+    setPerms((prev) => {
+      const current = prev[mod] ?? [];
+      const next = current.includes(acao)
+        ? current.filter((a) => a !== acao)
+        : [...current, acao];
+      return { ...prev, [mod]: next };
+    });
+  }
+
+  function setModuleAll(mod: string, checked: boolean) {
+    setPerms((prev) => ({
+      ...prev,
+      [mod]: checked ? ACOES.map((a) => a.key) : [],
+    }));
+  }
+
+  function resetToDefaults() {
+    if (!categoria) return;
+    setPerms(DEFAULTS_POR_CATEGORIA[categoria] ?? {});
+  }
 
   if (state?.success && !isEdit) {
     router.push("/dashboard/usuarios");
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-6 max-w-2xl">
+    <form action={formAction} className="flex flex-col gap-6 max-w-3xl">
       {isEdit && <input type="hidden" name="id" value={usuario.id} />}
       <input type="hidden" name="ativo" value={String(ativo)} />
+
+      {/* hidden permissoes fields */}
+      {MODULOS.map(({ key: mod }) =>
+        ACOES.map(({ key: acao }) =>
+          (perms[mod] ?? []).includes(acao) ? (
+            <input
+              key={`${mod}_${acao}`}
+              type="hidden"
+              name={`perm_${mod}_${acao}`}
+              value="on"
+            />
+          ) : null
+        )
+      )}
 
       {state?.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">
@@ -56,7 +119,7 @@ export default function UsuarioForm({ usuario }: Props) {
         </div>
       )}
 
-      {/* ── Dados do usuário ── */}
+      {/* ── Dados de acesso ── */}
       <div className="rounded-xl border border-border bg-white p-5 space-y-4">
         <h2 className="font-heading text-sm font-semibold text-fg">
           Dados de acesso
@@ -76,9 +139,7 @@ export default function UsuarioForm({ usuario }: Props) {
               placeholder="ex: orlando"
               className={inputCls}
             />
-            <p className="mt-1 font-body text-xs text-muted">
-              Apenas letras, números e ponto. Sem espaços.
-            </p>
+            <p className="mt-1 font-body text-xs text-muted">Sem espaços.</p>
           </div>
 
           <div>
@@ -88,10 +149,17 @@ export default function UsuarioForm({ usuario }: Props) {
             <input
               type="text"
               name="nome"
+              value={
+                colaboradorId
+                  ? (colaboradores.find((c) => c.id === colaboradorId)?.nome ??
+                    "")
+                  : undefined
+              }
               defaultValue={usuario?.nome ?? ""}
               required
+              readOnly={!!colaboradorId}
               placeholder="Nome do usuário"
-              className={inputCls}
+              className={`${inputCls} ${colaboradorId ? "bg-slate-50 text-muted" : ""}`}
             />
           </div>
 
@@ -153,20 +221,42 @@ export default function UsuarioForm({ usuario }: Props) {
         </div>
       </div>
 
-      {/* ── Perfil e acesso ── */}
+      {/* ── Perfil e vigência ── */}
       <div className="rounded-xl border border-border bg-white p-5 space-y-4">
         <h2 className="font-heading text-sm font-semibold text-fg">
           Perfil e vigência
         </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Colaborador */}
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Colaborador vinculado</label>
+            <select
+              name="colaborador_id"
+              value={colaboradorId}
+              onChange={(e) => setColaboradorId(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">— Nenhum —</option>
+              {colaboradores.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome} ({c.cargo})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 font-body text-xs text-muted">
+              Vincule ao colaborador correspondente para sincronizar o nome.
+            </p>
+          </div>
+
           <div>
             <label className={labelCls}>
               Categoria <span className="text-red-500">*</span>
             </label>
             <select
               name="categoria"
-              defaultValue={usuario?.categoria ?? ""}
+              value={categoria}
+              onChange={(e) => handleCategoriaChange(e.target.value)}
               required
               className={selectCls}
             >
@@ -200,14 +290,10 @@ export default function UsuarioForm({ usuario }: Props) {
                 role="switch"
                 aria-checked={ativo}
                 onClick={() => setAtivo((v) => !v)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
-                  ativo ? "bg-emerald-500" : "bg-slate-300"
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${ativo ? "bg-emerald-500" : "bg-slate-300"}`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                    ativo ? "translate-x-6" : "translate-x-1"
-                  }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${ativo ? "translate-x-6" : "translate-x-1"}`}
                 />
               </button>
               <span className="ml-3 font-body text-sm text-fg">
@@ -216,6 +302,82 @@ export default function UsuarioForm({ usuario }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Permissões ── */}
+      <div className="rounded-xl border border-border bg-white p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-heading text-sm font-semibold text-fg">
+            Permissões de acesso
+          </h2>
+          <button
+            type="button"
+            onClick={resetToDefaults}
+            className="font-body text-xs text-primary hover:underline cursor-pointer"
+          >
+            Restaurar padrões da categoria
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="pb-2 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted w-40">
+                  Módulo
+                </th>
+                {ACOES.map(({ label }) => (
+                  <th
+                    key={label}
+                    className="pb-2 text-center font-body text-xs font-semibold uppercase tracking-wide text-muted w-20"
+                  >
+                    {label}
+                  </th>
+                ))}
+                <th className="pb-2 text-center font-body text-xs font-semibold uppercase tracking-wide text-muted w-16">
+                  Todos
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {MODULOS.map(({ key: mod, label: modLabel }) => {
+                const modPerms = perms[mod] ?? [];
+                const allChecked = ACOES.every(({ key: a }) =>
+                  modPerms.includes(a)
+                );
+                return (
+                  <tr key={mod} className="hover:bg-slate-50">
+                    <td className="py-2.5 font-body text-sm text-fg font-medium">
+                      {modLabel}
+                    </td>
+                    {ACOES.map(({ key: acao }) => (
+                      <td key={acao} className="py-2.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={modPerms.includes(acao)}
+                          onChange={() => togglePerm(mod, acao)}
+                          className="h-4 w-4 cursor-pointer rounded border-border text-primary accent-primary"
+                        />
+                      </td>
+                    ))}
+                    <td className="py-2.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={allChecked}
+                        onChange={(e) => setModuleAll(mod, e.target.checked)}
+                        className="h-4 w-4 cursor-pointer rounded border-border text-primary accent-primary"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="font-body text-xs text-muted">
+          Ao mudar a categoria, as permissões são redefinidas para o padrão
+          dela.
+        </p>
       </div>
 
       {/* ── Actions ── */}

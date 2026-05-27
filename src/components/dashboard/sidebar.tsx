@@ -15,6 +15,7 @@ import {
   LogoutIcon,
   XMarkIcon,
   DocumentTextIcon,
+  ShieldCheckIcon,
   CogIcon,
 } from "@/components/icons";
 
@@ -32,6 +33,7 @@ const navItems = [
   },
   { href: "/dashboard/senhas", icon: LockClosedIcon, label: "Cofre de Senhas" },
   { href: "/dashboard/oab", icon: MagnifyingGlassIcon, label: "Busca OAB" },
+  { href: "/dashboard/usuarios", icon: ShieldCheckIcon, label: "Usuários" },
   { href: "/dashboard/configuracoes", icon: CogIcon, label: "Configurações" },
 ];
 

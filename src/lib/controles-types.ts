@@ -102,6 +102,7 @@ export interface Controle {
 export interface ClienteOption {
   id: string;
   nome: string;
+  doc: string;
 }
 export interface ProcessoOption {
   id: string;

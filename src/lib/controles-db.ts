@@ -130,12 +130,16 @@ export async function getControleById(id: string): Promise<Controle | null> {
 
 export async function getClientesForControle(): Promise<ClienteOption[]> {
   const rows = await sql`
-    SELECT id::text, name AS nome
+    SELECT id::text, name AS nome, COALESCE(doc, '') AS doc
     FROM clients
     WHERE status = 'ativo'
     ORDER BY name ASC
   `;
-  return rows.map((r) => ({ id: String(r.id), nome: String(r.nome) }));
+  return rows.map((r) => ({
+    id: String(r.id),
+    nome: String(r.nome),
+    doc: String(r.doc),
+  }));
 }
 
 export async function getProcessosForControle(): Promise<ProcessoOption[]> {

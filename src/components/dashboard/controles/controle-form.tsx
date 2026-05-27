@@ -33,6 +33,10 @@ interface Props {
   usuarios: UsuarioOption[];
 }
 
+function normalizeSearch(s: string) {
+  return s.toLowerCase().replace(/\D/g, "") || s.toLowerCase();
+}
+
 export default function ControleForm({
   controle,
   tipoInicial,
@@ -51,8 +55,22 @@ export default function ControleForm({
 
   const [tipo, setTipo] = useState(controle?.tipo ?? tipoInicial);
   const [clienteId, setClienteId] = useState(controle?.cliente_id ?? "");
+  const [search, setSearch] = useState("");
 
   const tipoConfig = getTipoConfig(tipo);
+
+  const filteredClientes =
+    search.trim() === ""
+      ? clientes
+      : clientes.filter((c) => {
+          const q = search.trim().toLowerCase();
+          const matchNome = c.nome.toLowerCase().includes(q);
+          const matchDoc =
+            c.doc.replace(/\D/g, "").includes(q.replace(/\D/g, "")) &&
+            q.replace(/\D/g, "").length > 0;
+          return matchNome || matchDoc;
+        });
+
   const processosDoCliente = clienteId
     ? processos.filter((p) => p.cliente_id === clienteId)
     : processos;
@@ -76,6 +94,88 @@ export default function ControleForm({
           Controle atualizado com sucesso.
         </div>
       )}
+
+      {/* ── Vínculos ── */}
+      <div className="rounded-xl border border-border bg-white p-5 space-y-4">
+        <h2 className="font-heading text-sm font-semibold text-fg">Vínculos</h2>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Busca de cliente */}
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Buscar cliente</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Nome ou CPF / CNPJ..."
+              className={inputCls}
+            />
+            {search.trim() !== "" && (
+              <p className="mt-1 font-body text-xs text-muted">
+                {filteredClientes.length} cliente(s) encontrado(s)
+              </p>
+            )}
+          </div>
+
+          {/* Cliente */}
+          <div>
+            <label className={labelCls}>Cliente</label>
+            <select
+              name="cliente_id"
+              value={clienteId}
+              onChange={(e) => setClienteId(e.target.value)}
+              className={selectCls}
+            >
+              <option value="">— Nenhum —</option>
+              {filteredClientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                  {c.doc ? ` — ${c.doc}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Processo */}
+          <div>
+            <label className={labelCls}>Processo</label>
+            <select
+              name="processo_id"
+              defaultValue={controle?.processo_id ?? ""}
+              className={selectCls}
+            >
+              <option value="">— Nenhum —</option>
+              {processosDoCliente.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.numero}
+                </option>
+              ))}
+            </select>
+            {clienteId && processosDoCliente.length === 0 && (
+              <p className="mt-1 font-body text-xs text-muted">
+                Nenhum processo ativo para este cliente.
+              </p>
+            )}
+          </div>
+
+          {/* Responsável */}
+          <div>
+            <label className={labelCls}>Responsável</label>
+            <select
+              name="responsavel_id"
+              defaultValue={controle?.responsavel_id ?? ""}
+              className={selectCls}
+            >
+              <option value="">— Nenhum —</option>
+              {usuarios.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nome} ({u.login})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
 
       {/* ── Identificação ── */}
       <div className="rounded-xl border border-border bg-white p-5 space-y-4">
@@ -161,70 +261,6 @@ export default function ControleForm({
               </select>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* ── Vínculos ── */}
-      <div className="rounded-xl border border-border bg-white p-5 space-y-4">
-        <h2 className="font-heading text-sm font-semibold text-fg">Vínculos</h2>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Cliente */}
-          <div>
-            <label className={labelCls}>Cliente</label>
-            <select
-              name="cliente_id"
-              value={clienteId}
-              onChange={(e) => setClienteId(e.target.value)}
-              className={selectCls}
-            >
-              <option value="">— Nenhum —</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Processo */}
-          <div>
-            <label className={labelCls}>Processo</label>
-            <select
-              name="processo_id"
-              defaultValue={controle?.processo_id ?? ""}
-              className={selectCls}
-            >
-              <option value="">— Nenhum —</option>
-              {processosDoCliente.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.numero}
-                </option>
-              ))}
-            </select>
-            {clienteId && processosDoCliente.length === 0 && (
-              <p className="mt-1 font-body text-xs text-muted">
-                Nenhum processo ativo para este cliente.
-              </p>
-            )}
-          </div>
-
-          {/* Responsável */}
-          <div>
-            <label className={labelCls}>Responsável</label>
-            <select
-              name="responsavel_id"
-              defaultValue={controle?.responsavel_id ?? ""}
-              className={selectCls}
-            >
-              <option value="">— Nenhum —</option>
-              {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nome} ({u.login})
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
 

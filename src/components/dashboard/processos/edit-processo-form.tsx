@@ -1,13 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   updateProcessoAction,
   type ProcessoFormState,
 } from "@/lib/processo-actions";
 import type { ProcessoFull } from "@/lib/processos-db";
 import { SpinnerIcon } from "@/components/icons";
+
+const TIPOS_ACAO = [
+  "B21 - Pensão por morte",
+  "B25 - Auxílio-reclusão",
+  "B31 - Auxílio-doença",
+  "B32 - Aposentadoria por invalidez",
+  "B41 - Aposentadoria por idade",
+  "B42 - Aposentadoria por tempo de contribuição",
+  "B46 - Aposentadoria especial",
+  "B80 - Salário Maternidade",
+  "B87 - BPC à pessoa com deficiência",
+  "B88 - BPC à pessoa idosa",
+  "B91 - Auxílio-doença acidentário",
+  "B92 - Aposentadoria por invalidez acidentária",
+  "B94 - Auxílio-acidente",
+  "CP - Complemento Positivo",
+  "Revisão do Benefício",
+  "Acréscimo de 25%",
+];
 
 const AREAS = [
   "Cível",
@@ -85,6 +104,14 @@ export default function EditProcessoForm({ processo, clients }: Props) {
     FormData
   >(boundAction, null);
 
+  const inList = TIPOS_ACAO.includes(processo.tipo_acao ?? "");
+  const [tipoAcaoSel, setTipoAcaoSel] = useState(
+    inList ? (processo.tipo_acao ?? "") : processo.tipo_acao ? "outro" : ""
+  );
+  const [tipoAcaoManual, setTipoAcaoManual] = useState(
+    inList ? "" : (processo.tipo_acao ?? "")
+  );
+
   return (
     <form action={formAction} className="space-y-8" noValidate>
       {state?.error && (
@@ -137,15 +164,37 @@ export default function EditProcessoForm({ processo, clients }: Props) {
           </div>
           <div className="sm:col-span-2">
             <Field label="Tipo de ação" required>
-              <input
-                name="tipo_acao"
-                type="text"
-                required
-                placeholder="Ex: Ação de Cobrança, Rescisão Contratual…"
-                defaultValue={processo.tipo_acao}
+              <select
+                value={tipoAcaoSel}
+                onChange={(e) => {
+                  setTipoAcaoSel(e.target.value);
+                  if (e.target.value !== "outro") setTipoAcaoManual("");
+                }}
                 disabled={isPending}
-                className={inputClass}
-              />
+                className={selectClass}
+              >
+                <option value="">— Selecione —</option>
+                {TIPOS_ACAO.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+                <option value="outro">Outro (digitar manualmente)…</option>
+              </select>
+              {tipoAcaoSel === "outro" ? (
+                <input
+                  name="tipo_acao"
+                  type="text"
+                  required
+                  value={tipoAcaoManual}
+                  onChange={(e) => setTipoAcaoManual(e.target.value)}
+                  placeholder="Digite o tipo de ação…"
+                  disabled={isPending}
+                  className={inputClass + " mt-2"}
+                />
+              ) : (
+                <input type="hidden" name="tipo_acao" value={tipoAcaoSel} />
+              )}
             </Field>
           </div>
           <Field label="Área jurídica" required>

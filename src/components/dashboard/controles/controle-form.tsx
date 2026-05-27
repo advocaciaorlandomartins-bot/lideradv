@@ -242,6 +242,22 @@ export default function ControleForm({
         </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Tipo de Perícia — primeiro campo para perícias */}
+          {isPericia && (
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Tipo de Perícia</label>
+              <select
+                name="tipo_pericia"
+                defaultValue={savedDados?.tipo_pericia ?? ""}
+                className={selectCls}
+              >
+                <option value="">— Selecione —</option>
+                <option value="Perícia Médica">Perícia Médica</option>
+                <option value="Avaliação Social">Avaliação Social</option>
+              </select>
+            </div>
+          )}
+
           {/* Data */}
           <div className={hasHora ? "" : "sm:col-span-2"}>
             <label className={labelCls}>{tipoConfig.col_data}</label>
@@ -414,19 +430,6 @@ export default function ControleForm({
           {/* ── Campos exclusivos: Perícias ── */}
           {isPericia && (
             <>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Tipo de Perícia</label>
-                <select
-                  name="tipo_pericia"
-                  defaultValue={savedDados?.tipo_pericia ?? ""}
-                  className={selectCls}
-                >
-                  <option value="">— Selecione —</option>
-                  <option value="Perícia Médica">Perícia Médica</option>
-                  <option value="Avaliação Social">Avaliação Social</option>
-                </select>
-              </div>
-
               <div className="sm:col-span-2">
                 <label className={labelCls}>Local</label>
                 <div className="space-y-2">

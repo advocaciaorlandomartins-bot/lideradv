@@ -41,6 +41,30 @@ function formatDate(iso: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
+function DcbCountdown({ dataEvento }: { dataEvento: string | null }) {
+  if (!dataEvento) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dataEvento + "T00:00:00");
+  const days = Math.round((target.getTime() - today.getTime()) / 86400000);
+  if (days > 5) return null;
+
+  const label =
+    days < 0
+      ? `Vencido há ${Math.abs(days)} dia${Math.abs(days) !== 1 ? "s" : ""}`
+      : days === 0
+        ? "Vence hoje!"
+        : days === 1
+          ? "Vence amanhã"
+          : `${days} dias restantes`;
+
+  return (
+    <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 font-body text-[11px] font-semibold text-red-700">
+      ⚠ {label}
+    </span>
+  );
+}
+
 function RowActions({ controle }: { controle: Controle }) {
   const [pending, startTransition] = useTransition();
 
@@ -365,6 +389,11 @@ export default function ControlesContent({
                     {/* Date */}
                     <td className="px-4 py-3 font-body text-sm text-fg whitespace-nowrap">
                       {formatDate(c.data_evento)}
+                      {c.tipo === "dcb" && c.status === "pendente" && (
+                        <div>
+                          <DcbCountdown dataEvento={c.data_evento} />
+                        </div>
+                      )}
                     </td>
                     {/* Descrição */}
                     <td className="px-4 py-3 font-body text-sm text-fg max-w-xs">

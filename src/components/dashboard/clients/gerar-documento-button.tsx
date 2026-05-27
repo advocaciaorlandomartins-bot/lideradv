@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   DocumentTextIcon,
   ArrowDownTrayIcon,
@@ -57,12 +57,22 @@ interface Props {
 
 export default function GerarDocumentoButton({ clientId, clientName }: Props) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<TemplateKey | null>(null);
+  const [selected, setSelected] = useState<Set<TemplateKey>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const allChecked = selected.size === TEMPLATES.length;
+  const someChecked = selected.size > 0 && !allChecked;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someChecked;
+    }
+  }, [someChecked]);
 
   function handleOpen() {
-    setSelected(null);
+    setSelected(new Set());
     setError(null);
     setOpen(true);
   }
@@ -72,36 +82,56 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
     setOpen(false);
   }
 
+  function toggleTemplate(key: TemplateKey) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (allChecked) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(TEMPLATES.map((t) => t.key)));
+    }
+  }
+
   async function handleGenerate() {
-    if (!selected) return;
+    if (selected.size === 0) return;
     setLoading(true);
     setError(null);
 
+    const safeName = clientName
+      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .trim()
+      .replace(/\s+/g, "_");
+
     try {
-      const res = await fetch(
-        `/api/clientes/${clientId}/gerar-documento?template=${selected}`
-      );
+      for (const key of selected) {
+        const res = await fetch(
+          `/api/clientes/${clientId}/gerar-documento?template=${key}`
+        );
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Erro ao gerar documento.");
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? "Erro ao gerar documento.");
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const templateLabel =
+          TEMPLATES.find((t) => t.key === key)?.label ?? "Documento";
+        a.href = url;
+        a.download = `${templateLabel.replace(/\s+/g, "_")}_${safeName}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const templateLabel =
-        TEMPLATES.find((t) => t.key === selected)?.label ?? "Documento";
-      const safeName = clientName
-        .replace(/[^a-zA-Z0-9\s]/g, "")
-        .trim()
-        .replace(/\s+/g, "_");
-      a.href = url;
-      a.download = `${templateLabel.replace(/\s+/g, "_")}_${safeName}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
       setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao gerar documento.");
@@ -109,6 +139,13 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
       setLoading(false);
     }
   }
+
+  const btnLabel =
+    selected.size === 0
+      ? "Baixar PDF"
+      : selected.size === 1
+        ? "Baixar PDF"
+        : `Baixar ${selected.size} PDFs`;
 
   return (
     <>
@@ -146,37 +183,87 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
             {/* Body */}
             <div className="px-6 py-5">
               <p className="mb-4 font-body text-sm text-muted">
-                Selecione o modelo. Os dados de{" "}
+                Selecione os modelos. Os dados de{" "}
                 <span className="font-semibold text-fg">{clientName}</span>{" "}
                 serão preenchidos automaticamente.
               </p>
 
+              {/* Marcar todos */}
+              <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-4 py-2.5 transition-colors hover:bg-slate-50">
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={toggleAll}
+                  disabled={loading}
+                  className="h-4 w-4 cursor-pointer rounded border-border accent-primary disabled:opacity-50"
+                />
+                <span className="font-body text-sm font-semibold text-fg">
+                  {allChecked ? "Desmarcar todos" : "Marcar todos"}
+                </span>
+                {selected.size > 0 && (
+                  <span className="ml-auto font-body text-xs text-muted">
+                    {selected.size} de {TEMPLATES.length} selecionados
+                  </span>
+                )}
+              </label>
+
+              {/* Template cards */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {TEMPLATES.map((t) => (
-                  <button
-                    key={t.key}
-                    onClick={() => setSelected(t.key)}
-                    disabled={loading}
-                    className={`flex flex-col items-start gap-1.5 rounded-xl border-2 p-4 text-left transition-all duration-150 cursor-pointer disabled:opacity-50 ${
-                      selected === t.key
-                        ? "border-primary bg-blue-50 shadow-sm"
-                        : "border-border hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-body text-xs font-bold ${t.color}`}
+                {TEMPLATES.map((t) => {
+                  const isSelected = selected.has(t.key);
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => toggleTemplate(t.key)}
+                      disabled={loading}
+                      className={`flex flex-col items-start gap-1.5 rounded-xl border-2 p-4 text-left transition-all duration-150 cursor-pointer disabled:opacity-50 ${
+                        isSelected
+                          ? "border-primary bg-blue-50 shadow-sm"
+                          : "border-border hover:border-slate-300 hover:bg-slate-50"
+                      }`}
                     >
-                      <DocumentTextIcon className="h-3.5 w-3.5" />
-                      PDF
-                    </div>
-                    <span className="font-body text-sm font-semibold text-fg leading-snug">
-                      {t.label}
-                    </span>
-                    <span className="font-body text-xs text-muted leading-relaxed">
-                      {t.description}
-                    </span>
-                  </button>
-                ))}
+                      <div className="flex w-full items-start justify-between gap-2">
+                        <div
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-body text-xs font-bold ${t.color}`}
+                        >
+                          <DocumentTextIcon className="h-3.5 w-3.5" />
+                          PDF
+                        </div>
+                        <span
+                          className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
+                            isSelected
+                              ? "border-primary bg-primary text-white"
+                              : "border-border bg-white"
+                          }`}
+                        >
+                          {isSelected && (
+                            <svg
+                              className="h-3 w-3"
+                              viewBox="0 0 12 12"
+                              fill="none"
+                            >
+                              <path
+                                d="M2 6l3 3 5-5"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          )}
+                        </span>
+                      </div>
+                      <span className="font-body text-sm font-semibold text-fg leading-snug">
+                        {t.label}
+                      </span>
+                      <span className="font-body text-xs text-muted leading-relaxed">
+                        {t.description}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {error && (
@@ -197,7 +284,7 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
               </button>
               <button
                 onClick={handleGenerate}
-                disabled={!selected || loading}
+                disabled={selected.size === 0 || loading}
                 className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 {loading ? (
@@ -208,7 +295,7 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
                 ) : (
                   <>
                     <ArrowDownTrayIcon className="h-4 w-4" />
-                    Baixar PDF
+                    {btnLabel}
                   </>
                 )}
               </button>

@@ -40,6 +40,8 @@ export async function saveEscritorioConfigAction(
   const modeloTimbrado =
     ((formData.get("modelo_timbrado") as string) ?? "classico").trim() ||
     "classico";
+  const fundoTimbrado =
+    ((formData.get("fundo_timbrado") as string) ?? "").trim() || null;
 
   if (!nome) return { error: "O nome do escritório é obrigatório." };
 
@@ -56,7 +58,7 @@ export async function saveEscritorioConfigAction(
           line_height = ${lineHeight}, margem_topo = ${margemTopo},
           margem_direita = ${margemDireita}, margem_inferior = ${margemInferior},
           margem_esquerda = ${margemEsquerda}, modelo_timbrado = ${modeloTimbrado},
-          updated_at = NOW()
+          fundo_timbrado = ${fundoTimbrado}, updated_at = NOW()
         WHERE id = ${existing[0].id}::uuid
       `;
     } else {
@@ -64,12 +66,12 @@ export async function saveEscritorioConfigAction(
         INSERT INTO escritorio_config
           (nome, oab, cnpj, telefone, email, site, endereco, cidade, estado, cep,
            logo_url, font_padrao, tamanho_padrao, line_height,
-           margem_topo, margem_direita, margem_inferior, margem_esquerda, modelo_timbrado)
+           margem_topo, margem_direita, margem_inferior, margem_esquerda, modelo_timbrado, fundo_timbrado)
         VALUES
           (${nome}, ${oab}, ${cnpj}, ${telefone}, ${email}, ${site},
            ${endereco}, ${cidade}, ${estado}, ${cep}, ${logoUrl},
            ${fontPadrao}, ${tamanhoPadrao}, ${lineHeight},
-           ${margemTopo}, ${margemDireita}, ${margemInferior}, ${margemEsquerda}, ${modeloTimbrado})
+           ${margemTopo}, ${margemDireita}, ${margemInferior}, ${margemEsquerda}, ${modeloTimbrado}, ${fundoTimbrado})
       `;
     }
   } catch (err) {

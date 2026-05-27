@@ -5,6 +5,7 @@ import { getModeloById } from "@/lib/modelos-db";
 import { getClientFull } from "@/lib/clients-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
+import { applyFundoTimbrado } from "@/lib/pdf-fundo";
 import { ModeloPdfDoc } from "@/lib/modelo-pdf";
 
 export const dynamic = "force-dynamic";
@@ -92,7 +93,15 @@ export async function GET(request: Request) {
     usarTimbrado: modelo.usar_timbrado,
   }) as ReactElement<DocumentProps>;
 
-  const buffer = await renderToBuffer(doc);
+  let buffer = await renderToBuffer(doc);
+  if (escritorioConfig.fundo_timbrado) {
+    const withBg = await applyFundoTimbrado(
+      new Uint8Array(buffer),
+      escritorioConfig.fundo_timbrado
+    );
+    buffer = Buffer.from(withBg);
+  }
+
   const safeName = client.name
     .replace(/[^a-zA-Z0-9\s]/g, "")
     .trim()

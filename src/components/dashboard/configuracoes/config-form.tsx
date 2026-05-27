@@ -294,6 +294,12 @@ export default function ConfigForm({ config }: Props) {
     config.modelo_timbrado ?? "classico"
   );
 
+  // Background letterhead
+  const [fundoData, setFundoData] = useState(config.fundo_timbrado ?? "");
+  const [fundoUploading, setFundoUploading] = useState(false);
+  const [fundoError, setFundoError] = useState<string | null>(null);
+  const fundoFileRef = useRef<HTMLInputElement>(null);
+
   // Identification
   const [nome, setNome] = useState(config.nome);
   const [oab, setOab] = useState(config.oab ?? "");
@@ -394,6 +400,70 @@ export default function ConfigForm({ config }: Props) {
     setLogoUrl("");
     setPreviewUrl("");
     if (fileRef.current) fileRef.current.value = "";
+  }
+
+  // Background letterhead upload
+  // SVG → converted to PNG in browser via canvas; PDF → stored as data URI
+  async function handleFundoUpload(file: File) {
+    const allowed = [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/svg+xml",
+      "application/pdf",
+    ];
+    if (!allowed.includes(file.type)) {
+      setFundoError("Formatos aceitos: PDF, PNG, JPG ou SVG.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setFundoError("O arquivo deve ter no máximo 10 MB.");
+      return;
+    }
+    setFundoUploading(true);
+    setFundoError(null);
+    try {
+      const raw = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Falha ao ler o arquivo."));
+        reader.readAsDataURL(file);
+      });
+
+      if (file.type === "image/svg+xml") {
+        // Convert SVG → PNG so pdf-lib can embed it
+        const png = await new Promise<string>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = A4_W;
+            canvas.height = A4_H;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              reject(new Error("Canvas indisponível."));
+              return;
+            }
+            ctx.drawImage(img, 0, 0, A4_W, A4_H);
+            resolve(canvas.toDataURL("image/png"));
+          };
+          img.onerror = () => reject(new Error("SVG inválido."));
+          img.src = raw;
+        });
+        setFundoData(png);
+      } else {
+        setFundoData(raw);
+      }
+    } catch (err) {
+      console.error("fundo upload error:", err);
+      setFundoError("Erro ao processar arquivo. Tente novamente.");
+    } finally {
+      setFundoUploading(false);
+    }
+  }
+
+  function removeFundo() {
+    setFundoData("");
+    if (fundoFileRef.current) fundoFileRef.current.value = "";
   }
 
   // ── Preview computed values ────────────────────────────────────
@@ -676,6 +746,104 @@ export default function ConfigForm({ config }: Props) {
                 </p>
               </button>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Fundo do documento ── */}
+      <div className="rounded-xl border border-border bg-white p-5">
+        <h2 className="font-heading text-sm font-semibold text-fg mb-1">
+          Fundo do papel timbrado
+        </h2>
+        <p className="font-body text-xs text-muted mb-4">
+          Imagem ou PDF aplicado como fundo em cada página de todos os
+          documentos gerados. Suporte: PDF, PNG, JPG e SVG (SVG é convertido
+          para PNG automaticamente).
+        </p>
+
+        <input type="hidden" name="fundo_timbrado" value={fundoData} />
+        <input
+          ref={fundoFileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/svg+xml,application/pdf"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFundoUpload(f);
+          }}
+        />
+
+        <div className="flex items-start gap-5">
+          {/* Thumbnail / preview */}
+          <div className="flex h-28 w-20 flex-shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-border bg-slate-50 overflow-hidden relative">
+            {fundoData && !fundoData.startsWith("data:application/pdf") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={fundoData}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : fundoData ? (
+              <div className="flex flex-col items-center gap-1 p-2">
+                <svg
+                  className="h-8 w-8 text-red-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+                <span className="font-body text-[10px] text-muted text-center leading-tight">
+                  PDF
+                </span>
+              </div>
+            ) : (
+              <span className="font-body text-[10px] text-muted text-center px-2 leading-tight">
+                Sem fundo
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              disabled={fundoUploading}
+              onClick={() => fundoFileRef.current?.click()}
+              className="flex h-9 items-center gap-2 rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary disabled:opacity-60 cursor-pointer"
+            >
+              {fundoUploading && <SpinnerIcon className="h-4 w-4" />}
+              {fundoUploading
+                ? "Processando…"
+                : fundoData
+                  ? "Alterar fundo"
+                  : "Enviar fundo"}
+            </button>
+            {fundoData && (
+              <button
+                type="button"
+                onClick={removeFundo}
+                className="h-9 rounded-lg border border-red-200 px-4 font-body text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 cursor-pointer"
+              >
+                Remover fundo
+              </button>
+            )}
+            <p className="font-body text-xs text-muted">
+              Tamanho máximo: 10 MB. Use uma imagem em tamanho A4 para melhor
+              resultado.
+            </p>
+            {fundoError && (
+              <p className="font-body text-xs text-red-600">{fundoError}</p>
+            )}
+            {fundoData && (
+              <p className="font-body text-xs text-emerald-600">
+                ✓ Fundo ativo — será aplicado a todos os PDFs gerados.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -967,6 +1135,12 @@ export default function ConfigForm({ config }: Props) {
                 transform: `scale(${PREVIEW_SCALE})`,
                 transformOrigin: "top left",
                 backgroundColor: "white",
+                backgroundImage:
+                  fundoData && !fundoData.startsWith("data:application/pdf")
+                    ? `url("${fundoData}")`
+                    : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "top center",
                 paddingTop: margens.topo * MM_TO_PX,
                 paddingRight: margens.direita * MM_TO_PX,
                 paddingBottom: margens.inferior * MM_TO_PX,
@@ -1073,6 +1247,16 @@ export default function ConfigForm({ config }: Props) {
                 modeloTimbrado}
             </strong>
           </span>
+          {fundoData && (
+            <span className="text-emerald-600">
+              Fundo:{" "}
+              <strong>
+                {fundoData.startsWith("data:application/pdf")
+                  ? "PDF ativo"
+                  : "imagem ativa"}
+              </strong>
+            </span>
+          )}
         </div>
       </div>
 

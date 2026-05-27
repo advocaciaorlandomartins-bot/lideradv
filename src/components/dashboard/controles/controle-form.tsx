@@ -104,7 +104,7 @@ export default function ControleForm({
     ? processos.filter((p) => p.cliente_id === clienteId)
     : processos;
 
-  if (state?.success && !isEdit) {
+  if (state?.success) {
     router.push(`/dashboard/controles?tipo=${tipo}`);
   }
 

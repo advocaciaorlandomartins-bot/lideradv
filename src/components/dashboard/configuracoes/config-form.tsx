@@ -300,6 +300,13 @@ export default function ConfigForm({ config }: Props) {
   const [fundoError, setFundoError] = useState<string | null>(null);
   const fundoFileRef = useRef<HTMLInputElement>(null);
 
+  // Parâmetros financeiros
+  const [salarioMinimo, setSalarioMinimo] = useState(
+    (config.salario_minimo ?? 1518).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+    })
+  );
+
   // Identification
   const [nome, setNome] = useState(config.nome);
   const [oab, setOab] = useState(config.oab ?? "");
@@ -1257,6 +1264,71 @@ export default function ConfigForm({ config }: Props) {
               </strong>
             </span>
           )}
+        </div>
+      </div>
+
+      {/* ── Parâmetros financeiros ── */}
+      <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+        <h3 className="font-heading text-base font-semibold text-fg mb-1">
+          Parâmetros financeiros
+        </h3>
+        <p className="font-body text-xs text-muted mb-5">
+          Valores utilizados nos cálculos automáticos do sistema — atualizar
+          conforme portaria anual.
+        </p>
+        <div className="max-w-xs">
+          <label className="block font-body text-sm font-semibold text-fg mb-1.5">
+            Salário mínimo vigente
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+              R$
+            </span>
+            <input
+              name="salario_minimo"
+              type="text"
+              inputMode="decimal"
+              value={salarioMinimo}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const commaIdx = raw.lastIndexOf(",");
+                if (commaIdx !== -1) {
+                  const intDigits = raw.slice(0, commaIdx).replace(/\D/g, "");
+                  const decDigits = raw
+                    .slice(commaIdx + 1)
+                    .replace(/\D/g, "")
+                    .slice(0, 2);
+                  const intNum = intDigits ? parseInt(intDigits, 10) : 0;
+                  setSalarioMinimo(
+                    `${intNum.toLocaleString("pt-BR")},${decDigits}`
+                  );
+                } else {
+                  const digits = raw.replace(/\D/g, "");
+                  setSalarioMinimo(
+                    digits ? parseInt(digits, 10).toLocaleString("pt-BR") : ""
+                  );
+                }
+              }}
+              onBlur={() => {
+                if (!salarioMinimo) return;
+                const commaIdx = salarioMinimo.indexOf(",");
+                if (commaIdx === -1) {
+                  setSalarioMinimo(salarioMinimo + ",00");
+                } else {
+                  const dec = salarioMinimo
+                    .slice(commaIdx + 1)
+                    .padEnd(2, "0")
+                    .slice(0, 2);
+                  setSalarioMinimo(salarioMinimo.slice(0, commaIdx + 1) + dec);
+                }
+              }}
+              placeholder="1.518,00"
+              className="h-11 w-full rounded-lg border border-border bg-white pl-10 pr-4 font-body text-sm text-fg outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <p className="mt-1.5 font-body text-xs text-muted">
+            Portaria MTE — Decreto anual do Governo Federal
+          </p>
         </div>
       </div>
 

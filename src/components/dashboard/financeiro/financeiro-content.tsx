@@ -3,6 +3,16 @@
 import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import type { Lancamento, LancamentoKpis } from "@/lib/lancamentos-db";
 import {
   markAsPagoAction,
@@ -133,7 +143,13 @@ function TipoIndicator({
 
 // ── Row actions ────────────────────────────────────────────
 
-function RowActions({ lancamento }: { lancamento: Lancamento }) {
+function RowActions({
+  lancamento,
+  canEdit,
+}: {
+  lancamento: Lancamento;
+  canEdit: boolean;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [action, setAction] = useState<string | null>(null);
@@ -179,6 +195,14 @@ function RowActions({ lancamento }: { lancamento: Lancamento }) {
 
   return (
     <div className="flex items-center gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+      {canEdit && lancamento.status !== "cancelado" && (
+        <Link
+          href={`/dashboard/financeiro/${lancamento.id}/editar`}
+          className="flex items-center gap-1 rounded-md bg-slate-50 px-2.5 py-1 font-body text-xs font-semibold text-slate-600 transition-colors duration-150 hover:bg-blue-50 hover:text-primary border border-border"
+        >
+          Editar
+        </Link>
+      )}
       {lancamento.status === "pendente" && (
         <button
           onClick={handlePago}
@@ -209,6 +233,7 @@ type Filter = "todos" | "entrada" | "saida" | "pessoal" | "pendente" | "pago";
 interface Props {
   lancamentos: Lancamento[];
   kpis: LancamentoKpis;
+  canEdit: boolean;
 }
 
 const PAGE_SIZE = 10;
@@ -222,7 +247,7 @@ const DATE_PRESETS: { key: DatePreset; label: string }[] = [
   { key: "custom", label: "Personalizado" },
 ];
 
-export default function FinanceiroContent({ lancamentos, kpis }: Props) {
+export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
   const [page, setPage] = useState(1);
@@ -230,8 +255,54 @@ export default function FinanceiroContent({ lancamentos, kpis }: Props) {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
 
-  const saldo = kpis.recebido - kpis.pago;
-  const folhaTotal = kpis.folhaPendente + kpis.folhaPaga;
+  // ── Resumo do mês corrente ──────────────────────────────────
+  const currentMonthSummary = useMemo(() => {
+    const now = new Date();
+    const yy = now.getFullYear();
+    const mm = now.getMonth();
+    const label = now.toLocaleDateString("pt-BR", {
+      month: "long",
+      year: "numeric",
+    });
+    let recebido = 0,
+      pago = 0;
+    for (const l of lancamentos) {
+      const d = parseDMY(l.data_vencimento);
+      if (
+        d.getFullYear() === yy &&
+        d.getMonth() === mm &&
+        l.status === "pago"
+      ) {
+        if (l.tipo === "entrada") recebido += l.valor;
+        else if (l.tipo === "saida") pago += l.valor;
+      }
+    }
+    return { recebido, pago, saldo: recebido - pago, label };
+  }, [lancamentos]);
+
+  // ── Dados do gráfico (últimos 12 meses) ────────────────────
+  const chartData = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+      const yy = d.getFullYear();
+      const mm = d.getMonth();
+      const month = d
+        .toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })
+        .replace(". ", "/")
+        .replace(".", "");
+      let receitas = 0,
+        despesas = 0;
+      for (const l of lancamentos) {
+        const ld = parseDMY(l.data_vencimento);
+        if (ld.getFullYear() === yy && ld.getMonth() === mm) {
+          if (l.tipo === "entrada") receitas += l.valor;
+          else if (l.tipo === "saida") despesas += l.valor;
+        }
+      }
+      return { month, receitas, despesas };
+    });
+  }, [lancamentos]);
 
   const dateRange = useMemo(() => {
     if (datePreset === "custom") {
@@ -242,6 +313,42 @@ export default function FinanceiroContent({ lancamentos, kpis }: Props) {
     }
     return getPresetRange(datePreset);
   }, [datePreset, customFrom, customTo]);
+
+  const dateFiltered = useMemo(() => {
+    return lancamentos.filter((l) => {
+      if (!dateRange.from && !dateRange.to) return true;
+      const venc = parseDMY(l.data_vencimento);
+      if (dateRange.from && venc < dateRange.from) return false;
+      if (dateRange.to && venc > dateRange.to) return false;
+      return true;
+    });
+  }, [lancamentos, dateRange]);
+
+  const filteredKpis = useMemo(() => {
+    let aReceber = 0,
+      recebido = 0,
+      aPagar = 0,
+      pago = 0;
+    let folhaPendente = 0,
+      folhaPaga = 0;
+    for (const l of dateFiltered) {
+      if (l.tipo === "entrada") {
+        if (l.status === "pendente") aReceber += l.valor;
+        else if (l.status === "pago") recebido += l.valor;
+      } else if (l.tipo === "saida") {
+        if (l.status === "pendente") aPagar += l.valor;
+        else if (l.status === "pago") pago += l.valor;
+        if (l.remuneracao_id !== null) {
+          if (l.status === "pendente") folhaPendente += l.valor;
+          else if (l.status === "pago") folhaPaga += l.valor;
+        }
+      }
+    }
+    return { aReceber, recebido, aPagar, pago, folhaPendente, folhaPaga };
+  }, [dateFiltered]);
+
+  const saldo = filteredKpis.recebido - filteredKpis.pago;
+  const folhaTotal = filteredKpis.folhaPendente + filteredKpis.folhaPaga;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -299,25 +406,25 @@ export default function FinanceiroContent({ lancamentos, kpis }: Props) {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard
           label="A Receber"
-          value={kpis.aReceber}
+          value={filteredKpis.aReceber}
           color="bg-blue-50 text-blue-600"
           icon={TrendUpIcon}
         />
         <KpiCard
           label="Recebido"
-          value={kpis.recebido}
+          value={filteredKpis.recebido}
           color="bg-emerald-50 text-emerald-600"
           icon={BanknotesIcon}
         />
         <KpiCard
           label="A Pagar"
-          value={kpis.aPagar}
+          value={filteredKpis.aPagar}
           color="bg-amber-50 text-amber-600"
           icon={TrendDownIcon}
         />
         <KpiCard
           label="Pago"
-          value={kpis.pago}
+          value={filteredKpis.pago}
           color="bg-slate-100 text-slate-500"
           icon={BanknotesIcon}
         />
@@ -343,14 +450,14 @@ export default function FinanceiroContent({ lancamentos, kpis }: Props) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard
           label="Folha — A Pagar"
-          value={kpis.folhaPendente}
+          value={filteredKpis.folhaPendente}
           sub="Remunerações pendentes"
           color="bg-purple-50 text-purple-600"
           icon={UsersIcon}
         />
         <KpiCard
           label="Folha — Pago"
-          value={kpis.folhaPaga}
+          value={filteredKpis.folhaPaga}
           sub="Remunerações quitadas"
           color="bg-purple-100 text-purple-700"
           icon={UsersIcon}
@@ -369,10 +476,130 @@ export default function FinanceiroContent({ lancamentos, kpis }: Props) {
           </p>
           <p className="mt-0.5 font-body text-xs text-muted">
             {fmt(
-              kpis.aPagar > 0 ? (kpis.folhaPendente / kpis.aPagar) * 100 : 0
+              filteredKpis.aPagar > 0
+                ? (filteredKpis.folhaPendente / filteredKpis.aPagar) * 100
+                : 0
             ).replace("R$ ", "")}
             % das despesas
           </p>
+        </div>
+      </div>
+
+      {/* ── Resumo do mês corrente ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
+          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-3 capitalize">
+            Recebido em {currentMonthSummary.label}
+          </p>
+          <p className="font-heading text-2xl font-semibold text-emerald-700">
+            {fmt(currentMonthSummary.recebido)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
+          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-3 capitalize">
+            Pago em {currentMonthSummary.label}
+          </p>
+          <p className="font-heading text-2xl font-semibold text-red-600">
+            {fmt(currentMonthSummary.pago)}
+          </p>
+        </div>
+        <div
+          className={`rounded-xl border bg-white p-5 shadow-sm ${
+            currentMonthSummary.saldo >= 0
+              ? "border-primary/30"
+              : "border-red-200"
+          }`}
+        >
+          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-3 capitalize">
+            Saldo {currentMonthSummary.label}
+          </p>
+          <p
+            className={`font-heading text-2xl font-semibold ${
+              currentMonthSummary.saldo >= 0 ? "text-primary" : "text-red-600"
+            }`}
+          >
+            {fmt(currentMonthSummary.saldo)}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Gráfico 12 meses ── */}
+      <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+        <p className="font-heading text-sm font-semibold text-fg mb-4">
+          Receitas e despesas por mês
+        </p>
+        <div style={{ height: 260 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              margin={{ top: 4, right: 8, left: 8, bottom: 0 }}
+              barCategoryGap="30%"
+              barGap={3}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#f0f0f0"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="month"
+                tick={{ fontFamily: "inherit", fontSize: 11, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tickFormatter={(v) =>
+                  v === 0
+                    ? "0"
+                    : v >= 1000
+                      ? `${(v / 1000).toFixed(0)}k`
+                      : String(v)
+                }
+                tick={{ fontFamily: "inherit", fontSize: 11, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+                width={40}
+              />
+              <Tooltip
+                formatter={(value) =>
+                  typeof value === "number"
+                    ? value.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })
+                    : String(value)
+                }
+                contentStyle={{
+                  borderRadius: 10,
+                  border: "1px solid #e2e8f0",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                }}
+                labelStyle={{ fontWeight: 600, marginBottom: 4 }}
+              />
+              <Legend
+                iconType="circle"
+                iconSize={8}
+                wrapperStyle={{
+                  fontFamily: "inherit",
+                  fontSize: 12,
+                  paddingTop: 8,
+                }}
+              />
+              <Bar
+                dataKey="receitas"
+                name="Receitas"
+                fill="#22c55e"
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey="despesas"
+                name="Despesas"
+                fill="#ef4444"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
@@ -595,7 +822,7 @@ export default function FinanceiroContent({ lancamentos, kpis }: Props) {
                         </td>
                         {/* Actions */}
                         <td className="px-5 py-3.5">
-                          <RowActions lancamento={l} />
+                          <RowActions lancamento={l} canEdit={canEdit} />
                         </td>
                       </tr>
                     );

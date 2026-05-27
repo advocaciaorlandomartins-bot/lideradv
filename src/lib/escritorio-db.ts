@@ -25,6 +25,8 @@ export interface EscritorioConfig {
   modelo_timbrado: string;
   // Background letterhead (base64 data URI — PNG, JPG or PDF)
   fundo_timbrado: string | null;
+  // Parâmetros financeiros
+  salario_minimo: number;
 }
 
 export async function getEscritorioConfig(): Promise<EscritorioConfig> {
@@ -37,7 +39,8 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
            margem_direita::float AS margem_direita,
            margem_inferior::float AS margem_inferior,
            margem_esquerda::float AS margem_esquerda,
-           modelo_timbrado, fundo_timbrado
+           modelo_timbrado, fundo_timbrado,
+           salario_minimo::float AS salario_minimo
     FROM escritorio_config
     LIMIT 1
   `;
@@ -51,6 +54,7 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
     margem_esquerda: 25,
     modelo_timbrado: "classico",
     fundo_timbrado: null,
+    salario_minimo: 1518.0,
   };
 
   if (rows.length === 0) {
@@ -93,5 +97,6 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
     margem_esquerda: r.margem_esquerda ?? DEFAULTS.margem_esquerda,
     modelo_timbrado: r.modelo_timbrado ?? DEFAULTS.modelo_timbrado,
     fundo_timbrado: r.fundo_timbrado ?? null,
+    salario_minimo: r.salario_minimo ?? DEFAULTS.salario_minimo,
   };
 }

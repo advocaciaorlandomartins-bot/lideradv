@@ -5,7 +5,50 @@ import { useActionState, useState } from "react";
 import { createClientAction, type ClientFormState } from "@/lib/client-actions";
 import { SpinnerIcon } from "@/components/icons";
 
-const ESTADOS = [
+const ESTADOS_CIVIS = [
+  "Solteiro(a)",
+  "Casado(a)",
+  "Divorciado(a)",
+  "Separado(a) de fato",
+  "Viúvo(a)",
+  "União Estável",
+];
+
+const GENEROS = [
+  "Feminino",
+  "Masculino",
+  "Homem trans",
+  "Mulher trans",
+  "Não binário",
+];
+
+const PARENTESCOS = [
+  "Pai",
+  "Mãe",
+  "Avô / Avó",
+  "Tutor Legal",
+  "Curador",
+  "Representante Legal",
+];
+
+function calcAge(dateStr: string): number {
+  const birth = new Date(dateStr + "T12:00:00");
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+function maskCPFSimple(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+
+const ESTADOS_UF = [
   "AC",
   "AL",
   "AP",
@@ -37,7 +80,8 @@ const ESTADOS = [
 
 const inputClass =
   "h-11 w-full rounded-lg border border-border bg-white px-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
-
+const selectClass =
+  "h-11 w-full cursor-pointer rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
 const labelClass = "block font-body text-sm font-semibold text-fg mb-1.5";
 
 function Field({
@@ -60,9 +104,18 @@ function Field({
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function EtapaTitle({
+  num,
+  children,
+}: {
+  num: number;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-3">
+      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary font-body text-xs font-bold text-white">
+        {num}
+      </span>
       <h2 className="font-heading text-base font-semibold text-fg">
         {children}
       </h2>
@@ -107,16 +160,24 @@ export default function NewClientForm() {
     FormData
   >(createClientAction, null);
 
+  // Etapa 1
   const [type, setType] = useState<"PF" | "PJ">("PF");
-  const [docValue, setDocValue] = useState("");
   const [nameValue, setNameValue] = useState("");
   const [tradeNameValue, setTradeNameValue] = useState("");
-  const [emailValue, setEmailValue] = useState("");
+  const [docValue, setDocValue] = useState("");
   const [phoneValue, setPhoneValue] = useState("");
+  const [emailValue, setEmailValue] = useState("");
+
+  // Etapa 2 (PF)
+  const [birthDate, setBirthDate] = useState("");
+  const [menorIncapaz, setMenorIncapaz] = useState(false);
+  const [respCpfValue, setRespCpfValue] = useState("");
+
+  // Etapa 4
   const [cepValue, setCepValue] = useState("");
+  const [street, setStreet] = useState("");
   const [numberValue, setNumberValue] = useState("");
   const [complementValue, setComplementValue] = useState("");
-  const [street, setStreet] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [city, setCity] = useState("");
   const [uf, setUf] = useState("");
@@ -147,7 +208,7 @@ export default function NewClientForm() {
       if (data.municipio) setCity(data.municipio);
       if (data.uf) setUf(data.uf);
     } catch {
-      // silently fail — user fills manually
+      // silently fail
     } finally {
       setCnpjLoading(false);
     }
@@ -178,15 +239,16 @@ export default function NewClientForm() {
         setUf(data.uf ?? "");
       }
     } catch {
-      // silently fail — user fills manually
+      // silently fail
     } finally {
       setCepLoading(false);
     }
   }
 
+  const disabled = isPending || cnpjLoading;
+
   return (
     <form action={formAction} className="space-y-8" noValidate>
-      {/* Error */}
       {state?.error && (
         <div
           role="alert"
@@ -196,10 +258,12 @@ export default function NewClientForm() {
         </div>
       )}
 
-      {/* ── Tipo de pessoa ── */}
-      <div>
-        <SectionTitle>Tipo de pessoa</SectionTitle>
-        <div className="mt-4 flex gap-3">
+      {/* ── Etapa 1 — Dados principais ── */}
+      <div className="space-y-4">
+        <EtapaTitle num={1}>Dados principais</EtapaTitle>
+
+        {/* Tipo de pessoa */}
+        <div className="flex gap-3">
           {(["PF", "PJ"] as const).map((t) => (
             <label
               key={t}
@@ -228,12 +292,9 @@ export default function NewClientForm() {
             </label>
           ))}
         </div>
-      </div>
 
-      {/* ── Identificação ── */}
-      <div className="space-y-4">
-        <SectionTitle>Identificação</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Nome / Razão social */}
           <div className="sm:col-span-2">
             <Field
               label={type === "PF" ? "Nome completo" : "Razão social"}
@@ -245,16 +306,34 @@ export default function NewClientForm() {
                 autoComplete="name"
                 required
                 placeholder={
-                  type === "PF" ? "Dr. João Roberto Silva" : "Empresa Ltda"
+                  type === "PF" ? "Nome completo do cliente" : "Razão social"
                 }
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
-                disabled={isPending || cnpjLoading}
+                disabled={disabled}
                 className={inputClass}
               />
             </Field>
           </div>
 
+          {/* Nome fantasia (PJ only) */}
+          {type === "PJ" && (
+            <div className="sm:col-span-2">
+              <Field label="Nome fantasia">
+                <input
+                  name="trade_name"
+                  type="text"
+                  placeholder="Nome fantasia"
+                  value={tradeNameValue}
+                  onChange={(e) => setTradeNameValue(e.target.value)}
+                  disabled={disabled}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+          )}
+
+          {/* CPF / CNPJ */}
           <Field label={type === "PF" ? "CPF" : "CNPJ"} required>
             <div className="relative">
               <input
@@ -276,69 +355,301 @@ export default function NewClientForm() {
             </div>
           </Field>
 
-          {type === "PF" ? (
-            <Field label="Data de nascimento">
-              <input
-                name="birth_date"
-                type="date"
-                disabled={isPending}
-                className={inputClass}
-              />
-            </Field>
-          ) : (
-            <Field label="Nome fantasia">
-              <input
-                name="trade_name"
-                type="text"
-                placeholder="Nome fantasia"
-                value={tradeNameValue}
-                onChange={(e) => setTradeNameValue(e.target.value)}
-                disabled={isPending || cnpjLoading}
-                className={inputClass}
-              />
-            </Field>
-          )}
-        </div>
-      </div>
-
-      {/* ── Contato ── */}
-      <div className="space-y-4">
-        <SectionTitle>Contato</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="E-mail" required>
-            <input
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              placeholder="email@exemplo.com.br"
-              value={emailValue}
-              onChange={(e) => setEmailValue(e.target.value)}
-              disabled={isPending || cnpjLoading}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Telefone / WhatsApp" required>
+          {/* Telefone */}
+          <Field label="Telefone principal" required>
             <input
               name="phone"
               type="tel"
               autoComplete="tel"
               required
-              placeholder="(11) 9 0000-0000"
+              placeholder="(82) 9 0000-0000"
               value={phoneValue}
               onChange={(e) => setPhoneValue(e.target.value)}
-              disabled={isPending || cnpjLoading}
+              disabled={disabled}
+              className={inputClass}
+            />
+          </Field>
+
+          {/* E-mail */}
+          <div className="sm:col-span-2">
+            <Field label="E-mail do cliente para contato" required>
+              <input
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="email@exemplo.com.br"
+                value={emailValue}
+                onChange={(e) => setEmailValue(e.target.value)}
+                disabled={disabled}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Etapa 2 — Dados complementares (PF only) ── */}
+      {type === "PF" && (
+        <div className="space-y-4">
+          <EtapaTitle num={2}>Dados complementares de pessoa física</EtapaTitle>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="RG">
+              <input
+                name="rg"
+                type="text"
+                placeholder="0000000"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Órgão Expedidor">
+              <input
+                name="rg_orgao"
+                type="text"
+                placeholder="SSP/AL"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Data de Nascimento">
+              <input
+                name="birth_date"
+                type="date"
+                value={birthDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBirthDate(val);
+                  if (val && calcAge(val) < 18) setMenorIncapaz(true);
+                }}
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Estado Civil">
+              <select
+                name="estado_civil"
+                defaultValue=""
+                disabled={isPending}
+                className={selectClass}
+              >
+                <option value="">— Selecione —</option>
+                {ESTADOS_CIVIS.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Gênero">
+              <select
+                name="genero"
+                defaultValue=""
+                disabled={isPending}
+                className={selectClass}
+              >
+                <option value="">— Selecione —</option>
+                {GENEROS.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Profissão">
+              <input
+                name="profissao"
+                type="text"
+                placeholder="Ex.: Enfermeiro(a), Agricultor(a)…"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <div className="sm:col-span-2">
+              <Field label="Nacionalidade">
+                <input
+                  name="nacionalidade"
+                  type="text"
+                  placeholder="Brasileira"
+                  defaultValue="Brasileira"
+                  disabled={isPending}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Responsável Legal (PF, menor/incapaz) ── */}
+      {type === "PF" && (
+        <div className="space-y-4">
+          <input
+            type="hidden"
+            name="menor_incapaz"
+            value={menorIncapaz ? "true" : "false"}
+          />
+
+          {/* Toggle */}
+          <label
+            className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3.5 transition-colors duration-150 ${
+              menorIncapaz
+                ? "border-amber-400 bg-amber-50"
+                : "border-border hover:border-slate-300"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={menorIncapaz}
+              onChange={(e) => setMenorIncapaz(e.target.checked)}
+              disabled={isPending}
+              className="h-4 w-4 cursor-pointer rounded accent-amber-500"
+            />
+            <div>
+              <p className="font-body text-sm font-semibold text-fg">
+                Menor de idade ou incapaz
+              </p>
+              <p className="font-body text-xs text-muted">
+                Preencha os dados do responsável legal — endereço não precisa
+                ser repetido
+              </p>
+            </div>
+          </label>
+
+          {menorIncapaz && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5 space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-heading text-sm font-semibold text-amber-800">
+                  Responsável Legal
+                </span>
+                <div className="flex-1 border-t border-amber-200" />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Field label="Nome completo do responsável" required>
+                    <input
+                      name="responsavel_nome"
+                      type="text"
+                      placeholder="Nome completo"
+                      disabled={isPending}
+                      className={inputClass}
+                    />
+                  </Field>
+                </div>
+
+                <Field label="CPF do responsável">
+                  <input
+                    name="responsavel_cpf"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="000.000.000-00"
+                    value={respCpfValue}
+                    onChange={(e) =>
+                      setRespCpfValue(maskCPFSimple(e.target.value))
+                    }
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Parentesco / Relação">
+                  <select
+                    name="responsavel_parentesco"
+                    defaultValue=""
+                    disabled={isPending}
+                    className={selectClass}
+                  >
+                    <option value="">— Selecione —</option>
+                    {PARENTESCOS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="RG do responsável">
+                  <input
+                    name="responsavel_rg"
+                    type="text"
+                    placeholder="0000000"
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Órgão Expedidor">
+                  <input
+                    name="responsavel_rg_orgao"
+                    type="text"
+                    placeholder="SSP/AL"
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="Telefone do responsável">
+                  <input
+                    name="responsavel_telefone"
+                    type="tel"
+                    placeholder="(82) 9 0000-0000"
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+
+                <Field label="E-mail do responsável">
+                  <input
+                    name="responsavel_email"
+                    type="email"
+                    placeholder="email@exemplo.com.br"
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Etapa 3 — Acesso e parceria ── */}
+      <div className="space-y-4">
+        <EtapaTitle num={type === "PF" ? 3 : 2}>Acesso e parceria</EtapaTitle>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Senha do cliente">
+            <input
+              name="senha_cliente"
+              type="text"
+              placeholder="Código de acesso do cliente"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Parceria / Origem">
+            <input
+              name="parceria"
+              type="text"
+              placeholder="Ex.: Indicação, Google, INSS…"
+              disabled={isPending}
               className={inputClass}
             />
           </Field>
         </div>
       </div>
 
-      {/* ── Endereço ── */}
+      {/* ── Etapa 4 — Endereço ── */}
       <div className="space-y-4">
-        <SectionTitle>Endereço</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6">
-          {/* CEP */}
+        <EtapaTitle num={type === "PF" ? 4 : 3}>Endereço</EtapaTitle>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
           <div className="sm:col-span-2">
             <Field label="CEP" required>
               <div className="relative">
@@ -352,7 +663,7 @@ export default function NewClientForm() {
                   value={cepValue}
                   onChange={(e) => setCepValue(maskCEP(e.target.value))}
                   onBlur={handleCepBlur}
-                  disabled={isPending || cnpjLoading}
+                  disabled={disabled}
                   className={`${inputClass} pr-10`}
                 />
                 {cepLoading && (
@@ -362,7 +673,6 @@ export default function NewClientForm() {
             </Field>
           </div>
 
-          {/* Logradouro */}
           <div className="sm:col-span-4">
             <Field label="Logradouro" required>
               <input
@@ -372,13 +682,12 @@ export default function NewClientForm() {
                 placeholder="Rua, Av., Travessa…"
                 value={street}
                 onChange={(e) => setStreet(e.target.value)}
-                disabled={isPending || cnpjLoading}
+                disabled={disabled}
                 className={inputClass}
               />
             </Field>
           </div>
 
-          {/* Número */}
           <div className="sm:col-span-2">
             <Field label="Número" required>
               <input
@@ -388,13 +697,12 @@ export default function NewClientForm() {
                 placeholder="123"
                 value={numberValue}
                 onChange={(e) => setNumberValue(e.target.value)}
-                disabled={isPending || cnpjLoading}
+                disabled={disabled}
                 className={inputClass}
               />
             </Field>
           </div>
 
-          {/* Complemento */}
           <div className="sm:col-span-4">
             <Field label="Complemento">
               <input
@@ -403,13 +711,12 @@ export default function NewClientForm() {
                 placeholder="Apto, Sala, Bloco…"
                 value={complementValue}
                 onChange={(e) => setComplementValue(e.target.value)}
-                disabled={isPending || cnpjLoading}
+                disabled={disabled}
                 className={inputClass}
               />
             </Field>
           </div>
 
-          {/* Bairro */}
           <div className="sm:col-span-3">
             <Field label="Bairro" required>
               <input
@@ -419,13 +726,12 @@ export default function NewClientForm() {
                 placeholder="Bairro"
                 value={neighborhood}
                 onChange={(e) => setNeighborhood(e.target.value)}
-                disabled={isPending || cnpjLoading}
+                disabled={disabled}
                 className={inputClass}
               />
             </Field>
           </div>
 
-          {/* Cidade */}
           <div className="sm:col-span-2">
             <Field label="Cidade" required>
               <input
@@ -435,27 +741,26 @@ export default function NewClientForm() {
                 placeholder="Cidade"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                disabled={isPending || cnpjLoading}
+                disabled={disabled}
                 className={inputClass}
               />
             </Field>
           </div>
 
-          {/* Estado */}
           <div className="sm:col-span-1">
-            <Field label="UF" required>
+            <Field label="Estado" required>
               <select
                 name="state"
                 required
                 value={uf}
                 onChange={(e) => setUf(e.target.value)}
-                disabled={isPending || cnpjLoading}
-                className="h-11 w-full cursor-pointer rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+                disabled={disabled}
+                className={selectClass}
               >
                 <option value="">UF</option>
-                {ESTADOS.map((estado) => (
-                  <option key={estado} value={estado}>
-                    {estado}
+                {ESTADOS_UF.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
                   </option>
                 ))}
               </select>
@@ -466,16 +771,19 @@ export default function NewClientForm() {
 
       {/* ── Observações ── */}
       <div>
-        <SectionTitle>Observações</SectionTitle>
-        <div className="mt-4">
-          <textarea
-            name="notes"
-            rows={3}
-            placeholder="Anotações internas sobre o cliente…"
-            disabled={isPending}
-            className="w-full rounded-lg border border-border bg-white px-4 py-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60 resize-none"
-          />
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="font-heading text-base font-semibold text-fg">
+            Observações
+          </h2>
+          <div className="flex-1 border-t border-border" />
         </div>
+        <textarea
+          name="notes"
+          rows={3}
+          placeholder="Anotações internas sobre o cliente…"
+          disabled={isPending}
+          className="w-full rounded-lg border border-border bg-white px-4 py-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60 resize-none"
+        />
       </div>
 
       {/* ── Actions ── */}
@@ -488,7 +796,7 @@ export default function NewClientForm() {
         </Link>
         <button
           type="submit"
-          disabled={isPending || cnpjLoading}
+          disabled={disabled}
           className="flex h-11 items-center gap-2 rounded-lg bg-cta px-6 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           {isPending ? (

@@ -15,7 +15,8 @@ export async function createLancamentoAction(
     | "saida";
   const categoria =
     ((formData.get("categoria") as string | null) ?? "").trim() || null;
-  const descricao = ((formData.get("descricao") as string | null) ?? "").trim();
+  const descricao =
+    ((formData.get("descricao") as string | null) ?? "").trim() || "Lançamento";
   const valorStr = ((formData.get("valor") as string | null) ?? "").trim();
   const valor = parseFloat(valorStr);
   const clientId =
@@ -40,7 +41,6 @@ export async function createLancamentoAction(
   const observacoes =
     ((formData.get("observacoes") as string | null) ?? "").trim() || null;
 
-  if (!descricao) return { error: "Informe a descrição." };
   if (!valorStr || isNaN(valor) || valor <= 0)
     return { error: "Informe um valor válido." };
   if (!dataVencimento) return { error: "Informe a data de vencimento." };
@@ -106,6 +106,103 @@ export async function createLancamentoAction(
   } catch (err) {
     console.error("createLancamentoAction DB error:", err);
     return { error: "Erro ao salvar lançamento. Tente novamente." };
+  }
+
+  redirect("/dashboard/financeiro");
+}
+
+export async function updateLancamentoAction(
+  id: string,
+  _prev: LancamentoFormState,
+  formData: FormData
+): Promise<LancamentoFormState> {
+  const tipo = ((formData.get("tipo") as string | null) ?? "entrada") as
+    | "entrada"
+    | "saida";
+  const categoria =
+    ((formData.get("categoria") as string | null) ?? "").trim() || null;
+  const descricao =
+    ((formData.get("descricao") as string | null) ?? "").trim() || "Lançamento";
+  const valorStr = ((formData.get("valor") as string | null) ?? "").trim();
+  const valor = parseFloat(valorStr);
+  const clientId =
+    ((formData.get("client_id") as string | null) ?? "").trim() || null;
+  const processoId =
+    ((formData.get("processo_id") as string | null) ?? "").trim() || null;
+  const status = (
+    (formData.get("status") as string | null) ?? "pendente"
+  ).trim();
+  const dataVencimento = (
+    (formData.get("data_vencimento") as string | null) ?? ""
+  ).trim();
+  const observacoes =
+    ((formData.get("observacoes") as string | null) ?? "").trim() || null;
+
+  if (!valorStr || isNaN(valor) || valor <= 0)
+    return { error: "Informe um valor válido." };
+  if (!dataVencimento) return { error: "Informe a data de vencimento." };
+
+  try {
+    const current = await sql`
+      SELECT status, remuneracao_id FROM lancamentos WHERE id = ${id}::uuid
+    `;
+    if (current.length === 0) return { error: "Lançamento não encontrado." };
+    const oldStatus = current[0].status as string;
+    const remuneracaoId = current[0].remuneracao_id as string | null;
+
+    if (status === "pago" && oldStatus !== "pago") {
+      await sql`
+        UPDATE lancamentos SET
+          tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
+          valor = ${valor},
+          client_id = ${clientId ? clientId : null}::uuid,
+          processo_id = ${processoId ? processoId : null}::uuid,
+          status = ${status}, data_vencimento = ${dataVencimento}::date,
+          data_pagamento = CURRENT_DATE, observacoes = ${observacoes}
+        WHERE id = ${id}::uuid
+      `;
+    } else if (status !== "pago") {
+      await sql`
+        UPDATE lancamentos SET
+          tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
+          valor = ${valor},
+          client_id = ${clientId ? clientId : null}::uuid,
+          processo_id = ${processoId ? processoId : null}::uuid,
+          status = ${status}, data_vencimento = ${dataVencimento}::date,
+          data_pagamento = NULL, observacoes = ${observacoes}
+        WHERE id = ${id}::uuid
+      `;
+    } else {
+      await sql`
+        UPDATE lancamentos SET
+          tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
+          valor = ${valor},
+          client_id = ${clientId ? clientId : null}::uuid,
+          processo_id = ${processoId ? processoId : null}::uuid,
+          status = ${status}, data_vencimento = ${dataVencimento}::date,
+          observacoes = ${observacoes}
+        WHERE id = ${id}::uuid
+      `;
+    }
+
+    if (remuneracaoId && status !== oldStatus) {
+      if (status === "pago") {
+        await sql`
+          UPDATE remuneracoes SET
+            status = ${status}, data_pagamento = CURRENT_DATE, updated_at = NOW()
+          WHERE id = ${remuneracaoId}::uuid
+        `;
+      } else {
+        await sql`
+          UPDATE remuneracoes SET
+            status = ${status}, data_pagamento = NULL, updated_at = NOW()
+          WHERE id = ${remuneracaoId}::uuid
+        `;
+      }
+    }
+  } catch (err) {
+    console.error("updateLancamentoAction DB error:", err);
+    return { error: "Erro ao atualizar lançamento. Tente novamente." };
   }
 
   redirect("/dashboard/financeiro");

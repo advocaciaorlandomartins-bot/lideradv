@@ -4,6 +4,8 @@ import { getAllRemuneracoes, getRemuneracaoKpis } from "@/lib/remuneracoes-db";
 import FinanceiroContent from "@/components/dashboard/financeiro/financeiro-content";
 import RemuneracoesContent from "@/components/dashboard/remuneracoes/remuneracoes-content";
 import { BanknotesIcon, CurrencyIcon } from "@/components/icons";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = {
   title: "Financeiro — AdvMartins",
@@ -18,6 +20,9 @@ export default async function FinanceiroPage({
 }) {
   const { tab } = await searchParams;
   const isRemuneracoes = tab === "remuneracoes";
+
+  const session = await getSession();
+  const canEdit = !!session && hasPermission(session, "financeiro", "editar");
 
   const [lancamentos, lancamentoKpis] = await Promise.all([
     getAllLancamentos(),
@@ -75,7 +80,11 @@ export default async function FinanceiroPage({
           kpis={remuneracaoKpis!}
         />
       ) : (
-        <FinanceiroContent lancamentos={lancamentos} kpis={lancamentoKpis} />
+        <FinanceiroContent
+          lancamentos={lancamentos}
+          kpis={lancamentoKpis}
+          canEdit={canEdit}
+        />
       )}
     </div>
   );

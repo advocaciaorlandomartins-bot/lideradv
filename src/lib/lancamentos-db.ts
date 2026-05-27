@@ -45,6 +45,38 @@ function mapRow(r: any): Lancamento {
   };
 }
 
+export async function getLancamentoById(
+  id: string
+): Promise<Lancamento | null> {
+  const rows = await sql`
+    SELECT
+      l.id::text,
+      l.tipo,
+      l.categoria,
+      l.descricao,
+      l.valor,
+      l.client_id::text,
+      c.name  AS client_name,
+      l.processo_id::text,
+      p.tipo_acao AS processo_tipo,
+      l.remuneracao_id::text,
+      l.status,
+      to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
+      to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento,
+      l.parcela_atual,
+      l.total_parcelas,
+      l.grupo_parcelas::text,
+      l.observacoes,
+      l.created_at
+    FROM lancamentos l
+    LEFT JOIN clients   c ON c.id = l.client_id
+    LEFT JOIN processos p ON p.id = l.processo_id
+    WHERE l.id = ${id}::uuid
+  `;
+  if (rows.length === 0) return null;
+  return mapRow(rows[0]);
+}
+
 export async function getAllLancamentos(): Promise<Lancamento[]> {
   const rows = await sql`
     SELECT

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAllClients } from "@/lib/clients-db";
 import { getAllProcessos } from "@/lib/processos-db";
+import { getEscritorioConfig } from "@/lib/escritorio-db";
 import NewLancamentoForm from "@/components/dashboard/financeiro/new-lancamento-form";
 import { ChevronRightIcon } from "@/components/icons";
 
@@ -11,12 +12,17 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function NovoLancamentoPage() {
-  const [clients, processos] = await Promise.all([
+  const [clients, processos, escritorioConfig] = await Promise.all([
     getAllClients(),
     getAllProcessos(),
+    getEscritorioConfig(),
   ]);
 
-  const clientOptions = clients.map((c) => ({ id: c.id, name: c.name }));
+  const clientOptions = clients.map((c) => ({
+    id: c.id,
+    name: c.name,
+    doc: c.doc,
+  }));
 
   const processoOptions = processos.map((p) => ({
     id: p.id,
@@ -55,6 +61,7 @@ export default async function NovoLancamentoPage() {
         <NewLancamentoForm
           clients={clientOptions}
           processos={processoOptions}
+          salarioMinimo={escritorioConfig.salario_minimo ?? 1518}
         />
       </div>
     </div>

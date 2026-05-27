@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useActionState, useState, useMemo, useRef, useEffect } from "react";
 import {
-  createLancamentoAction,
+  updateLancamentoAction,
   type LancamentoFormState,
 } from "@/lib/lancamento-actions";
+import type { Lancamento } from "@/lib/lancamentos-db";
 import { SpinnerIcon } from "@/components/icons";
 
-const CATEGORIAS = {
+const CATEGORIAS: Record<string, string[]> = {
   entrada: ["Honorários", "Reembolso de Despesas", "Adiantamento", "Outros"],
   saida: [
     "Custas Processuais",
@@ -62,8 +63,6 @@ function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// ── Currency mask helpers ──────────────────────────────────────
-
 function formatMoneyInput(raw: string): string {
   const commaIdx = raw.lastIndexOf(",");
   if (commaIdx !== -1) {
@@ -96,7 +95,11 @@ function parseMoney(display: string): string {
   return display.replace(/\./g, "").replace(",", ".");
 }
 
-// ── Client option ──────────────────────────────────────────────
+function ddmmyyyyToISO(s: string): string {
+  const [d, m, y] = s.split("/");
+  if (!d || !m || !y) return "";
+  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
 
 interface ClientOption {
   id: string;
@@ -113,30 +116,40 @@ interface ProcessoOption {
 }
 
 interface Props {
+  lancamento: Lancamento;
   clients: ClientOption[];
   processos: ProcessoOption[];
-  salarioMinimo: number;
 }
 
-export default function NewLancamentoForm({
+export default function EditLancamentoForm({
+  lancamento,
   clients,
   processos,
-  salarioMinimo,
 }: Props) {
+  const boundAction = updateLancamentoAction.bind(null, lancamento.id);
   const [state, formAction, isPending] = useActionState<
     LancamentoFormState,
     FormData
-  >(createLancamentoAction, null);
+  >(boundAction, null);
 
-  const [tipo, setTipo] = useState<"entrada" | "saida">("entrada");
+  // ── Tipo ───────────────────────────────────────────────────
+  const [tipo, setTipo] = useState<"entrada" | "saida">(lancamento.tipo);
 
   // ── Vinculação ─────────────────────────────────────────────
+  const initialClient = lancamento.client_id
+    ? (clients.find((c) => c.id === lancamento.client_id) ?? {
+        id: lancamento.client_id,
+        name: lancamento.client_name ?? "",
+        doc: "",
+      })
+    : null;
+
   const [clientSearch, setClientSearch] = useState("");
   const [clientDropOpen, setClientDropOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(
-    null
+    initialClient
   );
-  const [processoId, setProcessoId] = useState("");
+  const [processoId, setProcessoId] = useState(lancamento.processo_id ?? "");
   const clientDropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -178,9 +191,18 @@ export default function NewLancamentoForm({
     [processos, processoId]
   );
 
-  // ── Dados ─────────────────────────────────────────────────
-  const [categoria, setCategoria] = useState("");
-  const [categoriaCustom, setCategoriaCustom] = useState("");
+  // ── Categoria ──────────────────────────────────────────────
+  const isCustomCategoria =
+    lancamento.categoria !== null &&
+    lancamento.categoria !== "" &&
+    !CATEGORIAS[lancamento.tipo]?.includes(lancamento.categoria ?? "");
+
+  const [categoria, setCategoria] = useState(
+    isCustomCategoria ? "Outros" : (lancamento.categoria ?? "")
+  );
+  const [categoriaCustom, setCategoriaCustom] = useState(
+    isCustomCategoria ? (lancamento.categoria ?? "") : ""
+  );
 
   const finalCategoria = useMemo(
     () =>
@@ -190,50 +212,25 @@ export default function NewLancamentoForm({
     [categoria, categoriaCustom]
   );
 
-  // Auto-generate description from categoria + client name
   const autoDescricao = useMemo(() => {
     const cat = finalCategoria || (tipo === "entrada" ? "Entrada" : "Saída");
     return selectedClient ? `${cat} — ${selectedClient.name}` : cat;
   }, [finalCategoria, selectedClient, tipo]);
 
   // ── Valores ────────────────────────────────────────────────
-  const [valor, setValor] = useState("");
-  const [valorEntrada, setValorEntrada] = useState("");
-  const [totalParcelas, setTotalParcelas] = useState("2");
-  const [parcelado, setParcelado] = useState(false);
-  const [salarioMode, setSalarioMode] = useState(false);
-  const [numSalarios, setNumSalarios] = useState("1");
-
-  const salarioValor = useMemo(() => {
-    if (!salarioMode) return null;
-    const n = parseFloat(numSalarios) || 1;
-    return (salarioMinimo * n).toLocaleString("pt-BR", {
+  const [valor, setValor] = useState(
+    lancamento.valor.toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
-    });
-  }, [salarioMode, numSalarios, salarioMinimo]);
+      maximumFractionDigits: 2,
+    })
+  );
 
-  const effectiveValor = salarioMode ? (salarioValor ?? "") : valor;
-
-  const previewParcelas = useMemo(() => {
-    const v = parseFloat(parseMoney(effectiveValor));
-    const e = parseFloat(parseMoney(valorEntrada)) || 0;
-    const n = parseInt(totalParcelas) || 1;
-    if (!v || v <= 0) return null;
-    const restante = v - e;
-    if (restante <= 0) return null;
-    return { entrada: e, valorParcela: restante / n, n };
-  }, [effectiveValor, valorEntrada, totalParcelas]);
+  const isPessoal = lancamento.remuneracao_id !== null;
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
-      <input type="hidden" name="parcelado" value={String(parcelado)} />
       <input type="hidden" name="descricao" value={autoDescricao} />
-      <input type="hidden" name="valor" value={parseMoney(effectiveValor)} />
-      <input
-        type="hidden"
-        name="valor_entrada"
-        value={parseMoney(valorEntrada)}
-      />
+      <input type="hidden" name="valor" value={parseMoney(valor)} />
       <input type="hidden" name="categoria" value={finalCategoria} />
       <input type="hidden" name="client_id" value={selectedClient?.id ?? ""} />
 
@@ -243,6 +240,41 @@ export default function NewLancamentoForm({
           className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700"
         >
           {state.error}
+        </div>
+      )}
+
+      {/* Aviso de parcelamento */}
+      {lancamento.grupo_parcelas && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
+          <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-amber-400 font-body text-[11px] font-bold text-white">
+            !
+          </span>
+          <div>
+            <p className="font-body text-sm font-semibold text-amber-800">
+              Lançamento parcelado —{" "}
+              {lancamento.parcela_atual === 0
+                ? "Entrada"
+                : `Parcela ${lancamento.parcela_atual}/${lancamento.total_parcelas}`}
+            </p>
+            <p className="font-body text-xs text-amber-700 mt-0.5">
+              Apenas esta parcela será alterada. Para editar todas, exclua o
+              grupo e crie novamente.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Aviso de remuneração */}
+      {isPessoal && (
+        <div className="flex items-start gap-3 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3.5">
+          <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-400 font-body text-[11px] font-bold text-white">
+            R$
+          </span>
+          <p className="font-body text-sm text-purple-800">
+            Este lançamento está vinculado a uma{" "}
+            <strong>remuneração de pessoal</strong>. Alterações no status serão
+            refletidas no registro de remuneração correspondente.
+          </p>
         </div>
       )}
 
@@ -270,7 +302,6 @@ export default function NewLancamentoForm({
                   setTipo(t);
                   setCategoria("");
                   setCategoriaCustom("");
-                  setSalarioMode(false);
                 }}
                 className={
                   t === "entrada" ? "accent-emerald-600" : "accent-red-500"
@@ -291,7 +322,7 @@ export default function NewLancamentoForm({
         </div>
       </div>
 
-      {/* ── Vinculação (vem primeiro) ── */}
+      {/* ── Vinculação ── */}
       <div className="space-y-4">
         <SectionTitle>Vinculação ao cliente</SectionTitle>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -331,7 +362,6 @@ export default function NewLancamentoForm({
               )}
             </div>
 
-            {/* Dropdown */}
             {clientDropOpen && !selectedClient && (
               <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border bg-white shadow-xl">
                 <button
@@ -374,7 +404,6 @@ export default function NewLancamentoForm({
               </div>
             )}
 
-            {/* Selected client badge */}
             {selectedClient && (
               <p className="mt-1.5 font-body text-xs text-muted">
                 CPF/CNPJ: {selectedClient.doc}
@@ -420,7 +449,7 @@ export default function NewLancamentoForm({
       <div className="space-y-4">
         <SectionTitle>Dados</SectionTitle>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className={categoria === "Outros" ? "" : ""}>
+          <div>
             <Field label="Categoria">
               <select
                 value={categoria}
@@ -454,12 +483,13 @@ export default function NewLancamentoForm({
           <Field label="Status" required>
             <select
               name="status"
-              defaultValue="pendente"
+              defaultValue={lancamento.status}
               disabled={isPending}
               className={selectClass}
             >
               <option value="pendente">Pendente</option>
               <option value="pago">Pago</option>
+              <option value="cancelado">Cancelado</option>
             </select>
           </Field>
         </div>
@@ -469,58 +499,7 @@ export default function NewLancamentoForm({
       <div className="space-y-4">
         <SectionTitle>Valores e pagamento</SectionTitle>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Salário mínimo toggle */}
-          <div className="sm:col-span-2">
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-border px-4 py-3.5 transition-colors hover:border-slate-300">
-              <div
-                onClick={() => {
-                  setSalarioMode((v) => !v);
-                  if (salarioMode) setValor("");
-                }}
-                className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 cursor-pointer ${
-                  salarioMode ? "bg-emerald-500" : "bg-slate-300"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                    salarioMode ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </div>
-              <div>
-                <p className="font-body text-sm font-semibold text-fg">
-                  Baseado em salário mínimo vigente
-                </p>
-                <p className="font-body text-xs text-muted">
-                  SM atual: {fmt(salarioMinimo)} — calcular valor
-                  automaticamente
-                </p>
-              </div>
-            </label>
-          </div>
-
-          {salarioMode && (
-            <Field label="Quantidade de salários mínimos">
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={numSalarios}
-                  onChange={(e) =>
-                    setNumSalarios(e.target.value.replace(/[^0-9.,]/g, ""))
-                  }
-                  disabled={isPending}
-                  className={`${inputClass} max-w-[140px]`}
-                />
-                <span className="font-body text-sm text-muted">
-                  × {fmt(salarioMinimo)}
-                </span>
-              </div>
-            </Field>
-          )}
-
-          {/* Valor total */}
-          <Field label="Valor total" required>
+          <Field label="Valor" required>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
                 R$
@@ -529,16 +508,11 @@ export default function NewLancamentoForm({
                 type="text"
                 inputMode="decimal"
                 placeholder="0,00"
-                value={effectiveValor}
-                onChange={(e) => {
-                  if (!salarioMode) setValor(formatMoneyInput(e.target.value));
-                }}
-                onBlur={() => {
-                  if (!salarioMode) setValor(normalizeMoneyBlur(valor));
-                }}
-                readOnly={salarioMode}
+                value={valor}
+                onChange={(e) => setValor(formatMoneyInput(e.target.value))}
+                onBlur={() => setValor(normalizeMoneyBlur(valor))}
                 disabled={isPending}
-                className={`${inputClass} pl-10 ${salarioMode ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold" : ""}`}
+                className={`${inputClass} pl-10`}
               />
             </div>
           </Field>
@@ -548,108 +522,11 @@ export default function NewLancamentoForm({
               name="data_vencimento"
               type="date"
               required
+              defaultValue={ddmmyyyyToISO(lancamento.data_vencimento)}
               disabled={isPending}
               className={inputClass}
             />
           </Field>
-
-          {/* Parcelado toggle */}
-          <div className="sm:col-span-2">
-            <label className="flex cursor-pointer items-center gap-3">
-              <div
-                onClick={() => setParcelado((v) => !v)}
-                className={`relative h-6 w-11 rounded-full transition-colors duration-200 cursor-pointer ${
-                  parcelado ? "bg-primary" : "bg-slate-300"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                    parcelado ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </div>
-              <span className="font-body text-sm font-semibold text-fg">
-                Parcelado
-              </span>
-            </label>
-          </div>
-
-          {parcelado && (
-            <>
-              <Field label="Valor de entrada">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
-                    R$
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    value={valorEntrada}
-                    onChange={(e) =>
-                      setValorEntrada(formatMoneyInput(e.target.value))
-                    }
-                    onBlur={() =>
-                      setValorEntrada(normalizeMoneyBlur(valorEntrada))
-                    }
-                    disabled={isPending}
-                    className={`${inputClass} pl-10`}
-                  />
-                </div>
-              </Field>
-
-              <Field label="Número de parcelas">
-                <input
-                  name="total_parcelas"
-                  type="number"
-                  min="1"
-                  max="120"
-                  value={totalParcelas}
-                  onChange={(e) => setTotalParcelas(e.target.value)}
-                  disabled={isPending}
-                  className={inputClass}
-                />
-              </Field>
-
-              {previewParcelas && (
-                <div className="sm:col-span-2">
-                  <div className="rounded-lg border border-border bg-slate-50 px-4 py-3">
-                    <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-2">
-                      Resumo do parcelamento
-                    </p>
-                    <div className="flex flex-wrap gap-6">
-                      {previewParcelas.entrada > 0 && (
-                        <div>
-                          <span className="font-body text-xs text-muted">
-                            Entrada
-                          </span>
-                          <p className="font-heading text-base font-semibold text-fg">
-                            {fmt(previewParcelas.entrada)}
-                          </p>
-                        </div>
-                      )}
-                      <div>
-                        <span className="font-body text-xs text-muted">
-                          {previewParcelas.n}× parcelas
-                        </span>
-                        <p className="font-heading text-base font-semibold text-fg">
-                          {fmt(previewParcelas.valorParcela)}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="font-body text-xs text-muted">
-                          Total
-                        </span>
-                        <p className="font-heading text-base font-semibold text-primary">
-                          {fmt(parseFloat(parseMoney(effectiveValor)) || 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
         </div>
       </div>
 
@@ -660,6 +537,7 @@ export default function NewLancamentoForm({
           <textarea
             name="observacoes"
             rows={3}
+            defaultValue={lancamento.observacoes ?? ""}
             placeholder="Notas internas sobre este lançamento…"
             disabled={isPending}
             className="w-full rounded-lg border border-border bg-white px-4 py-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60 resize-none"
@@ -686,7 +564,7 @@ export default function NewLancamentoForm({
               Salvando…
             </>
           ) : (
-            "Salvar lançamento"
+            "Salvar alterações"
           )}
         </button>
       </div>

@@ -14,18 +14,37 @@ const VARIAVEIS = [
     vars: [
       { tag: "{{nome}}", desc: "Nome completo" },
       { tag: "{{cpf_cnpj}}", desc: "CPF ou CNPJ" },
-      { tag: "{{tipo}}", desc: "Pessoa Física / Jurídica" },
+      { tag: "{{tipo}}", desc: "PF / PJ" },
       { tag: "{{email}}", desc: "E-mail" },
       { tag: "{{telefone}}", desc: "Telefone" },
-      { tag: "{{data_nascimento}}", desc: "Data de nascimento (PF)" },
-      { tag: "{{nome_fantasia}}", desc: "Nome fantasia (PJ)" },
+      { tag: "{{data_nascimento}}", desc: "Nascimento" },
+      { tag: "{{nome_fantasia}}", desc: "Nome fantasia" },
+      { tag: "{{rg}}", desc: "RG" },
+      { tag: "{{rg_orgao}}", desc: "Órgão expedidor" },
+      { tag: "{{estado_civil}}", desc: "Estado civil" },
+      { tag: "{{genero}}", desc: "Gênero" },
+      { tag: "{{profissao}}", desc: "Profissão" },
+      { tag: "{{nacionalidade}}", desc: "Nacionalidade" },
+      { tag: "{{parceria}}", desc: "Parceria / Origem" },
+    ],
+  },
+  {
+    group: "Responsável",
+    vars: [
+      { tag: "{{responsavel_nome}}", desc: "Nome" },
+      { tag: "{{responsavel_cpf}}", desc: "CPF" },
+      { tag: "{{responsavel_rg}}", desc: "RG" },
+      { tag: "{{responsavel_rg_orgao}}", desc: "Órgão expedidor" },
+      { tag: "{{responsavel_telefone}}", desc: "Telefone" },
+      { tag: "{{responsavel_email}}", desc: "E-mail" },
+      { tag: "{{responsavel_parentesco}}", desc: "Parentesco" },
     ],
   },
   {
     group: "Endereço",
     vars: [
-      { tag: "{{endereco}}", desc: "Rua + número + complemento" },
-      { tag: "{{endereco_completo}}", desc: "Endereço completo com CEP" },
+      { tag: "{{endereco}}", desc: "Rua + nº + complemento" },
+      { tag: "{{endereco_completo}}", desc: "Endereço com CEP" },
       { tag: "{{bairro}}", desc: "Bairro" },
       { tag: "{{cidade}}", desc: "Cidade" },
       { tag: "{{estado}}", desc: "Estado (UF)" },
@@ -35,7 +54,7 @@ const VARIAVEIS = [
   {
     group: "Geral",
     vars: [
-      { tag: "{{data_hoje}}", desc: "Data de hoje por extenso" },
+      { tag: "{{data_hoje}}", desc: "Data por extenso" },
       { tag: "{{advogado}}", desc: "Nome do advogado" },
     ],
   },
@@ -219,14 +238,14 @@ export default function ModeloForm({ action, modelo }: Props) {
               Clique para inserir no cursor
             </p>
 
-            {/* Group tabs */}
-            <div className="flex gap-1 rounded-lg border border-border bg-slate-50 p-1 mb-3">
+            {/* Group tabs — 2 rows of 2 */}
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-slate-50 p-1 mb-3">
               {VARIAVEIS.map((g) => (
                 <button
                   key={g.group}
                   type="button"
                   onClick={() => setActiveGroup(g.group)}
-                  className={`flex-1 rounded-md py-1.5 font-body text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-md py-1.5 font-body text-[11px] font-semibold transition-colors cursor-pointer truncate px-1 ${
                     activeGroup === g.group
                       ? "bg-white text-primary shadow-sm"
                       : "text-muted hover:text-fg"
@@ -237,19 +256,19 @@ export default function ModeloForm({ action, modelo }: Props) {
               ))}
             </div>
 
-            {/* Variables list */}
-            <div className="space-y-1.5">
+            {/* Variables — 2 columns */}
+            <div className="grid grid-cols-2 gap-1.5">
               {VARIAVEIS.find((g) => g.group === activeGroup)?.vars.map((v) => (
                 <button
                   key={v.tag}
                   type="button"
                   onClick={() => insertVariable(v.tag)}
-                  className="w-full flex flex-col items-start rounded-lg border border-border bg-white px-3 py-2.5 text-left transition-all hover:border-primary hover:bg-blue-50 cursor-pointer group"
+                  className="flex flex-col items-start rounded-lg border border-border bg-white px-2.5 py-2 text-left transition-all hover:border-primary hover:bg-blue-50 cursor-pointer group"
                 >
-                  <span className="font-mono text-xs font-bold text-primary group-hover:text-primary">
+                  <span className="font-mono text-[11px] font-bold text-primary leading-tight break-all">
                     {v.tag}
                   </span>
-                  <span className="font-body text-[11px] text-muted mt-0.5">
+                  <span className="font-body text-[10px] text-muted mt-0.5 leading-tight">
                     {v.desc}
                   </span>
                 </button>

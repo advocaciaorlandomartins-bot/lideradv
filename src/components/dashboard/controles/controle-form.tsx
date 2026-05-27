@@ -374,8 +374,8 @@ export default function ControleForm({
             </>
           )}
 
-          {/* Descrição / Tipo-Título — oculto para perícias e implantados-data */}
-          {!isPericia && !isImplantadosData && (
+          {/* Descrição / Tipo-Título — oculto para perícias, implantados-data e dcb */}
+          {!isPericia && !isImplantadosData && !isDCB && (
             <div className="sm:col-span-2">
               <label className={labelCls}>
                 {isAudiencia

@@ -234,6 +234,7 @@ export async function createControleAction(
     tipo !== "audiencias" &&
     tipo !== "pericias" &&
     tipo !== "implantados-data" &&
+    tipo !== "dcb" &&
     !descricao
   )
     return { error: "Descrição é obrigatória." };
@@ -321,6 +322,7 @@ export async function updateControleAction(
     tipo !== "audiencias" &&
     tipo !== "pericias" &&
     tipo !== "implantados-data" &&
+    tipo !== "dcb" &&
     !descricao
   )
     return { error: "Descrição é obrigatória." };

@@ -8,7 +8,7 @@ import {
 } from "@/lib/lancamento-actions";
 import { SpinnerIcon } from "@/components/icons";
 
-const CATEGORIAS = {
+const CATEGORIAS: Record<string, string[]> = {
   entrada: ["Honorários", "Reembolso de Despesas", "Adiantamento", "Outros"],
   saida: [
     "Custas Processuais",
@@ -20,6 +20,14 @@ const CATEGORIAS = {
     "Outros",
   ],
 };
+
+const PERIODICIDADES = [
+  { key: "mensal", label: "Mensalmente" },
+  { key: "semanal", label: "Semanalmente" },
+  { key: "anual", label: "Anualmente" },
+];
+
+type PaymentMode = "avista" | "parcelado" | "recorrente";
 
 const inputClass =
   "h-11 w-full rounded-lg border border-border bg-white px-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
@@ -62,8 +70,6 @@ function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// ── Currency mask helpers ──────────────────────────────────────
-
 function formatMoneyInput(raw: string): string {
   const commaIdx = raw.lastIndexOf(",");
   if (commaIdx !== -1) {
@@ -95,8 +101,6 @@ function parseMoney(display: string): string {
   if (!display) return "";
   return display.replace(/\./g, "").replace(",", ".");
 }
-
-// ── Client option ──────────────────────────────────────────────
 
 interface ClientOption {
   id: string;
@@ -178,7 +182,7 @@ export default function NewLancamentoForm({
     [processos, processoId]
   );
 
-  // ── Dados ─────────────────────────────────────────────────
+  // ── Categoria ──────────────────────────────────────────────
   const [categoria, setCategoria] = useState("");
   const [categoriaCustom, setCategoriaCustom] = useState("");
 
@@ -190,19 +194,21 @@ export default function NewLancamentoForm({
     [categoria, categoriaCustom]
   );
 
-  // Auto-generate description from categoria + client name
   const autoDescricao = useMemo(() => {
     const cat = finalCategoria || (tipo === "entrada" ? "Entrada" : "Saída");
     return selectedClient ? `${cat} — ${selectedClient.name}` : cat;
   }, [finalCategoria, selectedClient, tipo]);
 
   // ── Valores ────────────────────────────────────────────────
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("avista");
   const [valor, setValor] = useState("");
   const [valorEntrada, setValorEntrada] = useState("");
   const [totalParcelas, setTotalParcelas] = useState("2");
-  const [parcelado, setParcelado] = useState(false);
+  const [periodicidade, setPeriodicidade] = useState("mensal");
+  const [numRecorrencias, setNumRecorrencias] = useState("12");
   const [salarioMode, setSalarioMode] = useState(false);
   const [numSalarios, setNumSalarios] = useState("1");
+  const [jaRecebida, setJaRecebida] = useState(false);
 
   const salarioValor = useMemo(() => {
     if (!salarioMode) return null;
@@ -215,6 +221,7 @@ export default function NewLancamentoForm({
   const effectiveValor = salarioMode ? (salarioValor ?? "") : valor;
 
   const previewParcelas = useMemo(() => {
+    if (paymentMode !== "parcelado") return null;
     const v = parseFloat(parseMoney(effectiveValor));
     const e = parseFloat(parseMoney(valorEntrada)) || 0;
     const n = parseInt(totalParcelas) || 1;
@@ -222,11 +229,29 @@ export default function NewLancamentoForm({
     const restante = v - e;
     if (restante <= 0) return null;
     return { entrada: e, valorParcela: restante / n, n };
-  }, [effectiveValor, valorEntrada, totalParcelas]);
+  }, [paymentMode, effectiveValor, valorEntrada, totalParcelas]);
+
+  const previewRecorrente = useMemo(() => {
+    if (paymentMode !== "recorrente") return null;
+    const v = parseFloat(parseMoney(effectiveValor));
+    const n = parseInt(numRecorrencias) || 12;
+    if (!v || v <= 0) return null;
+    return {
+      valorTotal: v * n,
+      n,
+      periodo: PERIODICIDADES.find((p) => p.key === periodicidade)?.label ?? "",
+    };
+  }, [paymentMode, effectiveValor, numRecorrencias, periodicidade]);
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
-      <input type="hidden" name="parcelado" value={String(parcelado)} />
+      {/* Hidden fields */}
+      <input type="hidden" name="payment_mode" value={paymentMode} />
+      <input
+        type="hidden"
+        name="parcelado"
+        value={String(paymentMode === "parcelado")}
+      />
       <input type="hidden" name="descricao" value={autoDescricao} />
       <input type="hidden" name="valor" value={parseMoney(effectiveValor)} />
       <input
@@ -236,6 +261,18 @@ export default function NewLancamentoForm({
       />
       <input type="hidden" name="categoria" value={finalCategoria} />
       <input type="hidden" name="client_id" value={selectedClient?.id ?? ""} />
+      <input
+        type="hidden"
+        name="status"
+        value={jaRecebida ? "pago" : "pendente"}
+      />
+      <input
+        type="hidden"
+        name="recorrente"
+        value={String(paymentMode === "recorrente")}
+      />
+      <input type="hidden" name="periodicidade" value={periodicidade} />
+      <input type="hidden" name="num_recorrencias" value={numRecorrencias} />
 
       {state?.error && (
         <div
@@ -271,6 +308,7 @@ export default function NewLancamentoForm({
                   setCategoria("");
                   setCategoriaCustom("");
                   setSalarioMode(false);
+                  setJaRecebida(false);
                 }}
                 className={
                   t === "entrada" ? "accent-emerald-600" : "accent-red-500"
@@ -291,7 +329,7 @@ export default function NewLancamentoForm({
         </div>
       </div>
 
-      {/* ── Vinculação (vem primeiro) ── */}
+      {/* ── Vinculação ── */}
       <div className="space-y-4">
         <SectionTitle>Vinculação ao cliente</SectionTitle>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -331,7 +369,6 @@ export default function NewLancamentoForm({
               )}
             </div>
 
-            {/* Dropdown */}
             {clientDropOpen && !selectedClient && (
               <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border bg-white shadow-xl">
                 <button
@@ -374,7 +411,6 @@ export default function NewLancamentoForm({
               </div>
             )}
 
-            {/* Selected client badge */}
             {selectedClient && (
               <p className="mt-1.5 font-body text-xs text-muted">
                 CPF/CNPJ: {selectedClient.doc}
@@ -420,7 +456,7 @@ export default function NewLancamentoForm({
       <div className="space-y-4">
         <SectionTitle>Dados</SectionTitle>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className={categoria === "Outros" ? "" : ""}>
+          <div>
             <Field label="Categoria">
               <select
                 value={categoria}
@@ -451,98 +487,6 @@ export default function NewLancamentoForm({
             )}
           </div>
 
-          <Field label="Status" required>
-            <select
-              name="status"
-              defaultValue="pendente"
-              disabled={isPending}
-              className={selectClass}
-            >
-              <option value="pendente">Pendente</option>
-              <option value="pago">Pago</option>
-            </select>
-          </Field>
-        </div>
-      </div>
-
-      {/* ── Valores e pagamento ── */}
-      <div className="space-y-4">
-        <SectionTitle>Valores e pagamento</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Salário mínimo toggle */}
-          <div className="sm:col-span-2">
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-border px-4 py-3.5 transition-colors hover:border-slate-300">
-              <div
-                onClick={() => {
-                  setSalarioMode((v) => !v);
-                  if (salarioMode) setValor("");
-                }}
-                className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 cursor-pointer ${
-                  salarioMode ? "bg-emerald-500" : "bg-slate-300"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                    salarioMode ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </div>
-              <div>
-                <p className="font-body text-sm font-semibold text-fg">
-                  Baseado em salário mínimo vigente
-                </p>
-                <p className="font-body text-xs text-muted">
-                  SM atual: {fmt(salarioMinimo)} — calcular valor
-                  automaticamente
-                </p>
-              </div>
-            </label>
-          </div>
-
-          {salarioMode && (
-            <Field label="Quantidade de salários mínimos">
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={numSalarios}
-                  onChange={(e) =>
-                    setNumSalarios(e.target.value.replace(/[^0-9.,]/g, ""))
-                  }
-                  disabled={isPending}
-                  className={`${inputClass} max-w-[140px]`}
-                />
-                <span className="font-body text-sm text-muted">
-                  × {fmt(salarioMinimo)}
-                </span>
-              </div>
-            </Field>
-          )}
-
-          {/* Valor total */}
-          <Field label="Valor total" required>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
-                R$
-              </span>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="0,00"
-                value={effectiveValor}
-                onChange={(e) => {
-                  if (!salarioMode) setValor(formatMoneyInput(e.target.value));
-                }}
-                onBlur={() => {
-                  if (!salarioMode) setValor(normalizeMoneyBlur(valor));
-                }}
-                readOnly={salarioMode}
-                disabled={isPending}
-                className={`${inputClass} pl-10 ${salarioMode ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold" : ""}`}
-              />
-            </div>
-          </Field>
-
           <Field label="Data de vencimento" required>
             <input
               name="data_vencimento"
@@ -552,104 +496,300 @@ export default function NewLancamentoForm({
               className={inputClass}
             />
           </Field>
+        </div>
+      </div>
 
-          {/* Parcelado toggle */}
-          <div className="sm:col-span-2">
-            <label className="flex cursor-pointer items-center gap-3">
-              <div
-                onClick={() => setParcelado((v) => !v)}
-                className={`relative h-6 w-11 rounded-full transition-colors duration-200 cursor-pointer ${
-                  parcelado ? "bg-primary" : "bg-slate-300"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                    parcelado ? "translate-x-5" : "translate-x-0"
+      {/* ── Valores e pagamento ── */}
+      <div className="space-y-4">
+        <SectionTitle>Valores e pagamento</SectionTitle>
+        <div className="mt-4 space-y-4">
+          {/* Modo de pagamento */}
+          <div>
+            <label className={labelClass}>Modo de pagamento</label>
+            <div className="flex gap-2">
+              {(
+                [
+                  { key: "avista", label: "À vista" },
+                  { key: "parcelado", label: "Parcelado" },
+                  { key: "recorrente", label: "Recorrente" },
+                ] as { key: PaymentMode; label: string }[]
+              ).map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setPaymentMode(m.key)}
+                  disabled={isPending}
+                  className={`flex-1 rounded-lg border-2 px-3 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                    paymentMode === m.key
+                      ? "border-primary bg-blue-50 text-primary"
+                      : "border-border text-muted hover:border-slate-300 hover:text-fg"
                   }`}
-                />
-              </div>
-              <span className="font-body text-sm font-semibold text-fg">
-                Parcelado
-              </span>
-            </label>
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {parcelado && (
-            <>
-              <Field label="Valor de entrada">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
-                    R$
-                  </span>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Salário mínimo toggle */}
+            <div className="sm:col-span-2">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-border px-4 py-3.5 transition-colors hover:border-slate-300">
+                <div
+                  onClick={() => {
+                    setSalarioMode((v) => !v);
+                    if (salarioMode) setValor("");
+                  }}
+                  className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 cursor-pointer ${
+                    salarioMode ? "bg-emerald-500" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                      salarioMode ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </div>
+                <div>
+                  <p className="font-body text-sm font-semibold text-fg">
+                    Baseado em salário mínimo vigente
+                  </p>
+                  <p className="font-body text-xs text-muted">
+                    SM atual: {fmt(salarioMinimo)} — calcular automaticamente
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {salarioMode && (
+              <Field label="Quantidade de salários mínimos">
+                <div className="flex gap-2 items-center">
                   <input
                     type="text"
                     inputMode="decimal"
-                    placeholder="0,00"
-                    value={valorEntrada}
+                    value={numSalarios}
                     onChange={(e) =>
-                      setValorEntrada(formatMoneyInput(e.target.value))
-                    }
-                    onBlur={() =>
-                      setValorEntrada(normalizeMoneyBlur(valorEntrada))
+                      setNumSalarios(e.target.value.replace(/[^0-9.,]/g, ""))
                     }
                     disabled={isPending}
-                    className={`${inputClass} pl-10`}
+                    className={`${inputClass} max-w-[140px]`}
                   />
+                  <span className="font-body text-sm text-muted">
+                    × {fmt(salarioMinimo)}
+                  </span>
                 </div>
               </Field>
+            )}
 
-              <Field label="Número de parcelas">
+            {/* Valor total */}
+            <Field label="Valor total" required>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                  R$
+                </span>
                 <input
-                  name="total_parcelas"
-                  type="number"
-                  min="1"
-                  max="120"
-                  value={totalParcelas}
-                  onChange={(e) => setTotalParcelas(e.target.value)}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={effectiveValor}
+                  onChange={(e) => {
+                    if (!salarioMode)
+                      setValor(formatMoneyInput(e.target.value));
+                  }}
+                  onBlur={() => {
+                    if (!salarioMode) setValor(normalizeMoneyBlur(valor));
+                  }}
+                  readOnly={salarioMode}
                   disabled={isPending}
-                  className={inputClass}
+                  className={`${inputClass} pl-10 ${salarioMode ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold" : ""}`}
                 />
-              </Field>
+              </div>
+            </Field>
 
-              {previewParcelas && (
-                <div className="sm:col-span-2">
-                  <div className="rounded-lg border border-border bg-slate-50 px-4 py-3">
-                    <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-2">
-                      Resumo do parcelamento
-                    </p>
-                    <div className="flex flex-wrap gap-6">
-                      {previewParcelas.entrada > 0 && (
+            {/* Parcelado */}
+            {paymentMode === "parcelado" && (
+              <>
+                <Field label="Valor de entrada">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                      R$
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={valorEntrada}
+                      onChange={(e) =>
+                        setValorEntrada(formatMoneyInput(e.target.value))
+                      }
+                      onBlur={() =>
+                        setValorEntrada(normalizeMoneyBlur(valorEntrada))
+                      }
+                      disabled={isPending}
+                      className={`${inputClass} pl-10`}
+                    />
+                  </div>
+                </Field>
+
+                <Field label="Número de parcelas">
+                  <input
+                    name="total_parcelas"
+                    type="number"
+                    min="2"
+                    max="120"
+                    value={totalParcelas}
+                    onChange={(e) => setTotalParcelas(e.target.value)}
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+
+                {previewParcelas && (
+                  <div className="sm:col-span-2">
+                    <div className="rounded-lg border border-border bg-slate-50 px-4 py-3">
+                      <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-2">
+                        Resumo do parcelamento
+                      </p>
+                      <div className="flex flex-wrap gap-6">
+                        {previewParcelas.entrada > 0 && (
+                          <div>
+                            <span className="font-body text-xs text-muted">
+                              Entrada
+                            </span>
+                            <p className="font-heading text-base font-semibold text-fg">
+                              {fmt(previewParcelas.entrada)}
+                            </p>
+                          </div>
+                        )}
                         <div>
                           <span className="font-body text-xs text-muted">
-                            Entrada
+                            {previewParcelas.n}× parcelas
                           </span>
                           <p className="font-heading text-base font-semibold text-fg">
-                            {fmt(previewParcelas.entrada)}
+                            {fmt(previewParcelas.valorParcela)}
                           </p>
                         </div>
-                      )}
-                      <div>
-                        <span className="font-body text-xs text-muted">
-                          {previewParcelas.n}× parcelas
-                        </span>
-                        <p className="font-heading text-base font-semibold text-fg">
-                          {fmt(previewParcelas.valorParcela)}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="font-body text-xs text-muted">
-                          Total
-                        </span>
-                        <p className="font-heading text-base font-semibold text-primary">
-                          {fmt(parseFloat(parseMoney(effectiveValor)) || 0)}
-                        </p>
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            Total
+                          </span>
+                          <p className="font-heading text-base font-semibold text-primary">
+                            {fmt(parseFloat(parseMoney(effectiveValor)) || 0)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </>
-          )}
+                )}
+              </>
+            )}
+
+            {/* Recorrente */}
+            {paymentMode === "recorrente" && (
+              <>
+                <Field label="Repetir a cada">
+                  <select
+                    value={periodicidade}
+                    onChange={(e) => setPeriodicidade(e.target.value)}
+                    disabled={isPending}
+                    className={selectClass}
+                  >
+                    {PERIODICIDADES.map((p) => (
+                      <option key={p.key} value={p.key}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Número de recorrências">
+                  <input
+                    type="number"
+                    min="2"
+                    max="120"
+                    value={numRecorrencias}
+                    onChange={(e) => setNumRecorrencias(e.target.value)}
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+
+                {previewRecorrente && (
+                  <div className="sm:col-span-2">
+                    <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                      <p className="font-body text-xs font-semibold uppercase tracking-wide text-blue-600 mb-2">
+                        Resumo da recorrência
+                      </p>
+                      <div className="flex flex-wrap gap-6">
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            Valor por período
+                          </span>
+                          <p className="font-heading text-base font-semibold text-fg">
+                            {fmt(parseFloat(parseMoney(effectiveValor)) || 0)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            {previewRecorrente.n}×{" "}
+                            {previewRecorrente.periodo.toLowerCase()}
+                          </span>
+                          <p className="font-heading text-base font-semibold text-fg">
+                            {previewRecorrente.n} lançamentos criados
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            Total previsto
+                          </span>
+                          <p className="font-heading text-base font-semibold text-primary">
+                            {fmt(previewRecorrente.valorTotal)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Já recebida / paga */}
+          <label
+            className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3.5 transition-colors duration-150 ${
+              jaRecebida
+                ? tipo === "entrada"
+                  ? "border-emerald-400 bg-emerald-50"
+                  : "border-red-300 bg-red-50"
+                : "border-border hover:border-slate-300"
+            }`}
+          >
+            <div
+              onClick={() => setJaRecebida((v) => !v)}
+              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 cursor-pointer ${
+                jaRecebida
+                  ? tipo === "entrada"
+                    ? "bg-emerald-500"
+                    : "bg-red-500"
+                  : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                  jaRecebida ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </div>
+            <div>
+              <p className="font-body text-sm font-semibold text-fg">
+                {tipo === "entrada" ? "Já recebida" : "Já paga"}
+              </p>
+              <p className="font-body text-xs text-muted">
+                Registrar este lançamento como{" "}
+                {tipo === "entrada" ? "recebido" : "pago"} na data de hoje
+              </p>
+            </div>
+          </label>
         </div>
       </div>
 

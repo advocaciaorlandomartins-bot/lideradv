@@ -18,6 +18,7 @@ import {
   markAsPagoAction,
   deleteLancamentoAction,
   deleteGrupoAction,
+  reagendarLancamentoAction,
 } from "@/lib/lancamento-actions";
 import {
   PlusIcon,
@@ -30,7 +31,7 @@ import {
   UsersIcon,
 } from "@/components/icons";
 
-// ── Helpers ────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -41,17 +42,34 @@ function parseDMY(ddmmyyyy: string): Date {
   return new Date(Number(y), Number(m) - 1, Number(d));
 }
 
+function ddmmyyyyToISO(dmy: string): string {
+  const [d, m, y] = dmy.split("/");
+  if (!d || !m || !y) return "";
+  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
+
+function matchesSearch(l: Lancamento, q: string): boolean {
+  if (!q) return true;
+  const lq = q.toLowerCase();
+  return (
+    l.descricao.toLowerCase().includes(lq) ||
+    (l.client_name ?? "").toLowerCase().includes(lq) ||
+    (l.categoria ?? "").toLowerCase().includes(lq)
+  );
+}
+
 type DatePreset = "todos" | "hoje" | "mes" | "mes_anterior" | "ano" | "custom";
+type MainTab = "pendentes" | "concluidas";
+type LancamentoWithSaldo = Lancamento & { saldoAcumulado: number };
 
 function getPresetRange(preset: DatePreset): {
   from: Date | null;
   to: Date | null;
 } {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = now.getDate();
-
+  const y = now.getFullYear(),
+    m = now.getMonth(),
+    d = now.getDate();
   if (preset === "hoje")
     return { from: new Date(y, m, d), to: new Date(y, m, d) };
   if (preset === "mes")
@@ -63,7 +81,16 @@ function getPresetRange(preset: DatePreset): {
   return { from: null, to: null };
 }
 
-// ── Subcomponents ──────────────────────────────────────────
+const DATE_PRESETS: { key: DatePreset; label: string }[] = [
+  { key: "todos", label: "Todos" },
+  { key: "hoje", label: "Hoje" },
+  { key: "mes", label: "Este mês" },
+  { key: "mes_anterior", label: "Mês anterior" },
+  { key: "ano", label: "Este ano" },
+  { key: "custom", label: "Personalizado" },
+];
+
+// ── Subcomponents ─────────────────────────────────────────────────────────────
 
 function KpiCard({
   label,
@@ -141,7 +168,40 @@ function TipoIndicator({
   );
 }
 
-// ── Row actions ────────────────────────────────────────────
+function SectionHeading({
+  title,
+  count,
+  accent = "slate",
+}: {
+  title: string;
+  count: number;
+  accent?: "red" | "blue" | "slate";
+}) {
+  const titleColor = {
+    red: "text-red-600",
+    blue: "text-primary",
+    slate: "text-fg",
+  }[accent];
+  const badgeStyle = {
+    red: "bg-red-50 text-red-600",
+    blue: "bg-blue-50 text-primary",
+    slate: "bg-slate-100 text-muted",
+  }[accent];
+  return (
+    <div className="flex items-center gap-2.5">
+      <h3 className={`font-heading text-sm font-semibold ${titleColor}`}>
+        {title}
+      </h3>
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${badgeStyle}`}
+      >
+        {count}
+      </span>
+    </div>
+  );
+}
+
+// ── RowActions ────────────────────────────────────────────────────────────────
 
 function RowActions({
   lancamento,
@@ -153,6 +213,10 @@ function RowActions({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [action, setAction] = useState<string | null>(null);
+  const [reagendando, setReagendando] = useState(false);
+  const [novaData, setNovaData] = useState(() =>
+    ddmmyyyyToISO(lancamento.data_vencimento)
+  );
 
   function handlePago() {
     setAction("pago");
@@ -163,10 +227,21 @@ function RowActions({
     });
   }
 
+  function handleReagendar() {
+    if (!novaData) return;
+    setAction("reagendar");
+    startTransition(async () => {
+      await reagendarLancamentoAction(lancamento.id, novaData);
+      router.refresh();
+      setAction(null);
+      setReagendando(false);
+    });
+  }
+
   function handleDelete() {
     if (lancamento.grupo_parcelas) {
       const choice = confirm(
-        `Este lançamento faz parte de um parcelamento.\n\n• OK = excluir TODAS as parcelas\n• Cancelar = excluir só esta parcela`
+        `Este lançamento faz parte de um grupo.\n\n• OK = excluir TODOS\n• Cancelar = excluir só este`
       );
       if (choice) {
         setAction("del");
@@ -179,7 +254,7 @@ function RowActions({
       }
     } else {
       const msg = lancamento.remuneracao_id
-        ? "Este lançamento é uma remuneração de pessoal. Excluir aqui também removerá o registro de remuneração. Confirmar?"
+        ? "Este lançamento é uma remuneração. Excluir também remove o registro. Confirmar?"
         : "Excluir este lançamento?";
       if (!confirm(msg)) return;
     }
@@ -194,31 +269,64 @@ function RowActions({
   const loading = isPending && action !== null;
 
   return (
-    <div className="flex items-center gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+    <div className="flex items-center gap-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+      {lancamento.status === "pendente" && (
+        <>
+          <button
+            onClick={handlePago}
+            disabled={loading}
+            className="flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 font-body text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 cursor-pointer"
+          >
+            {loading && action === "pago" ? (
+              <SpinnerIcon className="h-3 w-3" />
+            ) : null}
+            {lancamento.tipo === "entrada" ? "Recebi" : "Paguei"}
+          </button>
+          {!reagendando ? (
+            <button
+              onClick={() => setReagendando(true)}
+              className="flex items-center gap-1 rounded-md border border-border bg-slate-50 px-2.5 py-1 font-body text-xs font-semibold text-slate-600 transition-colors hover:bg-amber-50 hover:text-amber-700 cursor-pointer"
+            >
+              <CalendarIcon className="h-3 w-3" />
+              Reagendar
+            </button>
+          ) : (
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                value={novaData}
+                onChange={(e) => setNovaData(e.target.value)}
+                className="h-7 rounded border border-border bg-white px-2 font-body text-xs text-fg outline-none focus:border-primary"
+              />
+              <button
+                onClick={handleReagendar}
+                disabled={loading || !novaData}
+                className="rounded-md bg-primary px-2 py-1 font-body text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+              >
+                {loading && action === "reagendar" ? "…" : "OK"}
+              </button>
+              <button
+                onClick={() => setReagendando(false)}
+                className="rounded-md bg-slate-100 px-2 py-1 font-body text-xs text-muted hover:bg-slate-200 cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </>
+      )}
       {canEdit && lancamento.status !== "cancelado" && (
         <Link
           href={`/dashboard/financeiro/${lancamento.id}/editar`}
-          className="flex items-center gap-1 rounded-md bg-slate-50 px-2.5 py-1 font-body text-xs font-semibold text-slate-600 transition-colors duration-150 hover:bg-blue-50 hover:text-primary border border-border"
+          className="flex items-center gap-1 rounded-md border border-border bg-slate-50 px-2.5 py-1 font-body text-xs font-semibold text-slate-600 transition-colors hover:bg-blue-50 hover:text-primary"
         >
-          Editar
+          Abrir
         </Link>
-      )}
-      {lancamento.status === "pendente" && (
-        <button
-          onClick={handlePago}
-          disabled={loading}
-          className="flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 font-body text-xs font-semibold text-emerald-700 transition-colors duration-150 hover:bg-emerald-100 disabled:opacity-50 cursor-pointer"
-        >
-          {loading && action === "pago" ? (
-            <SpinnerIcon className="h-3 w-3" />
-          ) : null}
-          Marcar pago
-        </button>
       )}
       <button
         onClick={handleDelete}
         disabled={loading}
-        className="font-body text-xs font-semibold text-red-500 hover:text-red-700 transition-colors duration-150 disabled:opacity-40 cursor-pointer"
+        className="font-body text-xs font-semibold text-red-500 transition-colors hover:text-red-700 disabled:opacity-40 cursor-pointer"
       >
         {loading && action === "del" ? "…" : "Excluir"}
       </button>
@@ -226,9 +334,7 @@ function RowActions({
   );
 }
 
-// ── Main component ─────────────────────────────────────────
-
-type Filter = "todos" | "entrada" | "saida" | "pessoal" | "pendente" | "pago";
+// ── Main Component ────────────────────────────────────────────────────────────
 
 interface Props {
   lancamentos: Lancamento[];
@@ -238,28 +344,24 @@ interface Props {
 
 const PAGE_SIZE = 10;
 
-const DATE_PRESETS: { key: DatePreset; label: string }[] = [
-  { key: "todos", label: "Todos" },
-  { key: "hoje", label: "Hoje" },
-  { key: "mes", label: "Este mês" },
-  { key: "mes_anterior", label: "Mês anterior" },
-  { key: "ano", label: "Este ano" },
-  { key: "custom", label: "Personalizado" },
-];
-
 export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
+  const [mainTab, setMainTab] = useState<MainTab>("pendentes");
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<Filter>("todos");
-  const [page, setPage] = useState(1);
   const [datePreset, setDatePreset] = useState<DatePreset>("mes");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [saldoInicialStr, setSaldoInicialStr] = useState("0");
+  const [pageConcluidas, setPageConcluidas] = useState(1);
 
-  // ── Resumo do mês corrente ──────────────────────────────────
+  const today = useMemo(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  }, []);
+
   const currentMonthSummary = useMemo(() => {
     const now = new Date();
-    const yy = now.getFullYear();
-    const mm = now.getMonth();
+    const yy = now.getFullYear(),
+      mm = now.getMonth();
     const label = now.toLocaleDateString("pt-BR", {
       month: "long",
       year: "numeric",
@@ -280,13 +382,12 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     return { recebido, pago, saldo: recebido - pago, label };
   }, [lancamentos]);
 
-  // ── Dados do gráfico (últimos 12 meses) ────────────────────
   const chartData = useMemo(() => {
     const now = new Date();
     return Array.from({ length: 12 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
-      const yy = d.getFullYear();
-      const mm = d.getMonth();
+      const yy = d.getFullYear(),
+        mm = d.getMonth();
       const month = d
         .toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })
         .replace(". ", "/")
@@ -328,8 +429,8 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     let aReceber = 0,
       recebido = 0,
       aPagar = 0,
-      pago = 0;
-    let folhaPendente = 0,
+      pago = 0,
+      folhaPendente = 0,
       folhaPaga = 0;
     for (const l of dateFiltered) {
       if (l.tipo === "entrada") {
@@ -350,59 +451,73 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const saldo = filteredKpis.recebido - filteredKpis.pago;
   const folhaTotal = filteredKpis.folhaPendente + filteredKpis.folhaPaga;
 
-  const filtered = useMemo(() => {
+  const pendentes = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return lancamentos.filter((l) => {
-      const matchSearch =
-        !q ||
-        l.descricao.toLowerCase().includes(q) ||
-        (l.client_name ?? "").toLowerCase().includes(q) ||
-        (l.categoria ?? "").toLowerCase().includes(q);
+    return dateFiltered.filter(
+      (l) => l.status === "pendente" && matchesSearch(l, q)
+    );
+  }, [dateFiltered, search]);
 
-      let matchFilter: boolean;
-      if (filter === "pessoal") {
-        matchFilter = l.remuneracao_id !== null;
-      } else {
-        matchFilter =
-          filter === "todos" || filter === l.tipo || filter === l.status;
-      }
+  const pendentesVencidos = useMemo(() => {
+    return pendentes
+      .filter((l) => parseDMY(l.data_vencimento) <= today)
+      .sort(
+        (a, b) =>
+          parseDMY(a.data_vencimento).getTime() -
+          parseDMY(b.data_vencimento).getTime()
+      );
+  }, [pendentes, today]);
 
-      let matchDate = true;
-      if (dateRange.from || dateRange.to) {
-        const venc = parseDMY(l.data_vencimento);
-        if (dateRange.from && venc < dateRange.from) matchDate = false;
-        if (dateRange.to && venc > dateRange.to) matchDate = false;
-      }
+  const pendentesNaoVencidos = useMemo(() => {
+    return pendentes
+      .filter((l) => parseDMY(l.data_vencimento) > today)
+      .sort(
+        (a, b) =>
+          parseDMY(a.data_vencimento).getTime() -
+          parseDMY(b.data_vencimento).getTime()
+      );
+  }, [pendentes, today]);
 
-      return matchSearch && matchFilter && matchDate;
-    });
-  }, [lancamentos, search, filter, dateRange]);
+  const futuraWithSaldo = useMemo((): LancamentoWithSaldo[] => {
+    const base = parseFloat(saldoInicialStr) || 0;
+    return pendentesNaoVencidos.reduce(
+      (state: { items: LancamentoWithSaldo[]; running: number }, l) => {
+        const next =
+          state.running + (l.tipo === "entrada" ? l.valor : -l.valor);
+        return {
+          items: state.items.concat({ ...l, saldoAcumulado: next }),
+          running: next,
+        };
+      },
+      { items: [], running: base }
+    ).items;
+  }, [pendentesNaoVencidos, saldoInicialStr]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const concluidas = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return dateFiltered
+      .filter((l) => l.status !== "pendente" && matchesSearch(l, q))
+      .sort(
+        (a, b) =>
+          parseDMY(b.data_vencimento).getTime() -
+          parseDMY(a.data_vencimento).getTime()
+      );
+  }, [dateFiltered, search]);
 
-  function handleFilter(f: Filter) {
-    setFilter(f);
-    setPage(1);
-  }
+  const totalPagesConcluidas = Math.ceil(concluidas.length / PAGE_SIZE);
+  const paginatedConcluidas = concluidas.slice(
+    (pageConcluidas - 1) * PAGE_SIZE,
+    pageConcluidas * PAGE_SIZE
+  );
 
   function handleDatePreset(p: DatePreset) {
     setDatePreset(p);
-    setPage(1);
+    setPageConcluidas(1);
   }
-
-  const tabs: { key: Filter; label: string }[] = [
-    { key: "todos", label: "Todos" },
-    { key: "entrada", label: "Entradas" },
-    { key: "saida", label: "Saídas" },
-    { key: "pessoal", label: "Pessoal" },
-    { key: "pendente", label: "Pendentes" },
-    { key: "pago", label: "Pagos" },
-  ];
 
   return (
     <div className="space-y-5">
-      {/* KPI cards — row 1: receitas/despesas */}
+      {/* KPI row 1 */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard
           label="A Receber"
@@ -429,24 +544,20 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           icon={BanknotesIcon}
         />
         <div
-          className={`col-span-2 rounded-xl border bg-white p-5 shadow-sm lg:col-span-1 ${
-            saldo >= 0 ? "border-emerald-200" : "border-red-200"
-          }`}
+          className={`col-span-2 rounded-xl border bg-white p-5 shadow-sm lg:col-span-1 ${saldo >= 0 ? "border-emerald-200" : "border-red-200"}`}
         >
           <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
             Saldo
           </p>
           <p
-            className={`mt-3 font-heading text-2xl font-semibold ${
-              saldo >= 0 ? "text-emerald-700" : "text-red-600"
-            }`}
+            className={`mt-3 font-heading text-2xl font-semibold ${saldo >= 0 ? "text-emerald-700" : "text-red-600"}`}
           >
             {fmt(saldo)}
           </p>
         </div>
       </div>
 
-      {/* KPI cards — row 2: folha de pagamento */}
+      {/* KPI row 2: folha */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard
           label="Folha — A Pagar"
@@ -475,20 +586,21 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
             {fmt(folhaTotal)}
           </p>
           <p className="mt-0.5 font-body text-xs text-muted">
-            {fmt(
-              filteredKpis.aPagar > 0
-                ? (filteredKpis.folhaPendente / filteredKpis.aPagar) * 100
-                : 0
-            ).replace("R$ ", "")}
+            {filteredKpis.aPagar > 0
+              ? (
+                  (filteredKpis.folhaPendente / filteredKpis.aPagar) *
+                  100
+                ).toFixed(1)
+              : "0"}
             % das despesas
           </p>
         </div>
       </div>
 
-      {/* ── Resumo do mês corrente ── */}
+      {/* Month summary */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
-          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-3 capitalize">
+          <p className="mb-3 font-body text-xs font-semibold uppercase tracking-wide text-muted capitalize">
             Recebido em {currentMonthSummary.label}
           </p>
           <p className="font-heading text-2xl font-semibold text-emerald-700">
@@ -496,7 +608,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           </p>
         </div>
         <div className="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
-          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-3 capitalize">
+          <p className="mb-3 font-body text-xs font-semibold uppercase tracking-wide text-muted capitalize">
             Pago em {currentMonthSummary.label}
           </p>
           <p className="font-heading text-2xl font-semibold text-red-600">
@@ -504,28 +616,22 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           </p>
         </div>
         <div
-          className={`rounded-xl border bg-white p-5 shadow-sm ${
-            currentMonthSummary.saldo >= 0
-              ? "border-primary/30"
-              : "border-red-200"
-          }`}
+          className={`rounded-xl border bg-white p-5 shadow-sm ${currentMonthSummary.saldo >= 0 ? "border-primary/30" : "border-red-200"}`}
         >
-          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-3 capitalize">
+          <p className="mb-3 font-body text-xs font-semibold uppercase tracking-wide text-muted capitalize">
             Saldo {currentMonthSummary.label}
           </p>
           <p
-            className={`font-heading text-2xl font-semibold ${
-              currentMonthSummary.saldo >= 0 ? "text-primary" : "text-red-600"
-            }`}
+            className={`font-heading text-2xl font-semibold ${currentMonthSummary.saldo >= 0 ? "text-primary" : "text-red-600"}`}
           >
             {fmt(currentMonthSummary.saldo)}
           </p>
         </div>
       </div>
 
-      {/* ── Gráfico 12 meses ── */}
+      {/* Chart */}
       <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
-        <p className="font-heading text-sm font-semibold text-fg mb-4">
+        <p className="mb-4 font-heading text-sm font-semibold text-fg">
           Receitas e despesas por mês
         </p>
         <div style={{ height: 260 }}>
@@ -613,41 +719,40 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
-              setPage(1);
+              setPageConcluidas(1);
             }}
-            className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100"
+            className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
           />
         </div>
         <Link
           href="/dashboard/financeiro/novo"
-          className="flex h-10 items-center gap-2 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover"
+          className="flex h-10 items-center gap-2 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover"
         >
           <PlusIcon className="h-4 w-4" />
           Novo lançamento
         </Link>
       </div>
 
-      {/* Date filter */}
+      {/* Date presets */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-white p-1 w-fit">
           {DATE_PRESETS.map((p) => (
             <button
               key={p.key}
               onClick={() => handleDatePreset(p.key)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-body text-sm transition-colors duration-150 cursor-pointer ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-body text-sm transition-colors cursor-pointer ${
                 datePreset === p.key
                   ? "bg-primary text-white font-semibold"
                   : "text-muted hover:text-fg"
               }`}
             >
-              {p.key === "todos" || p.key === "custom" ? null : (
+              {p.key !== "todos" && p.key !== "custom" && (
                 <CalendarIcon className="h-3 w-3" />
               )}
               {p.label}
             </button>
           ))}
         </div>
-
         {datePreset === "custom" && (
           <div className="flex items-center gap-2">
             <input
@@ -655,9 +760,9 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
               value={customFrom}
               onChange={(e) => {
                 setCustomFrom(e.target.value);
-                setPage(1);
+                setPageConcluidas(1);
               }}
-              className="h-9 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100"
+              className="h-9 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
             />
             <span className="font-body text-sm text-muted">até</span>
             <input
@@ -665,13 +770,12 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
               value={customTo}
               onChange={(e) => {
                 setCustomTo(e.target.value);
-                setPage(1);
+                setPageConcluidas(1);
               }}
-              className="h-9 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100"
+              className="h-9 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
             />
           </div>
         )}
-
         {datePreset !== "todos" && datePreset !== "custom" && (
           <p className="font-body text-xs text-muted">
             {(() => {
@@ -683,235 +787,575 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-white p-1 w-fit">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => handleFilter(t.key)}
-            className={`rounded-md px-3 py-1.5 font-body text-sm transition-colors duration-150 cursor-pointer ${
-              filter === t.key
-                ? t.key === "pessoal"
-                  ? "bg-purple-600 text-white font-semibold"
-                  : "bg-primary text-white font-semibold"
-                : "text-muted hover:text-fg"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Main tabs */}
+      <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm">
+        <button
+          onClick={() => setMainTab("pendentes")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors cursor-pointer ${
+            mainTab === "pendentes"
+              ? "bg-primary text-white shadow-sm"
+              : "text-muted hover:text-fg"
+          }`}
+        >
+          A receber / A pagar
+          {pendentes.length > 0 && (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${
+                mainTab === "pendentes"
+                  ? "bg-white/20 text-white"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {pendentes.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setMainTab("concluidas")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors cursor-pointer ${
+            mainTab === "concluidas"
+              ? "bg-primary text-white shadow-sm"
+              : "text-muted hover:text-fg"
+          }`}
+        >
+          Recebidas e pagas
+          {concluidas.length > 0 && (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${
+                mainTab === "concluidas"
+                  ? "bg-white/20 text-white"
+                  : "bg-slate-100 text-muted"
+              }`}
+            >
+              {concluidas.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl border border-border bg-white shadow-sm">
-        {paginated.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <BanknotesIcon className="h-10 w-10 text-slate-300" />
-            <p className="font-body text-sm font-semibold text-muted">
-              Nenhum lançamento encontrado
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Desktop */}
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      Descrição
-                    </th>
-                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      Cliente
-                    </th>
-                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      Parcela
-                    </th>
-                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      Vencimento
-                    </th>
-                    <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      Valor
-                    </th>
-                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      Status
-                    </th>
-                    <th className="px-5 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paginated.map((l) => {
+      {/* ── Pendentes Tab ── */}
+      {mainTab === "pendentes" && (
+        <div className="space-y-6">
+          {/* Vencidos section */}
+          <div className="space-y-3">
+            <SectionHeading
+              title="Vencidos e hoje"
+              count={pendentesVencidos.length}
+              accent="red"
+            />
+            {pendentesVencidos.length === 0 ? (
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                <span className="font-body text-lg font-bold text-emerald-600">
+                  ✓
+                </span>
+                <p className="font-body text-sm font-semibold text-emerald-700">
+                  Nenhum vencimento pendente — tudo em dia!
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-red-100 bg-white shadow-sm">
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-red-50/40">
+                        <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Vencimento
+                        </th>
+                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Descrição
+                        </th>
+                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Cliente
+                        </th>
+                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Parcela
+                        </th>
+                        <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Valor
+                        </th>
+                        <th className="px-5 py-3" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {pendentesVencidos.map((l) => {
+                        const isPessoal = l.remuneracao_id !== null;
+                        const isToday =
+                          parseDMY(l.data_vencimento).getTime() ===
+                          today.getTime();
+                        return (
+                          <tr
+                            key={l.id}
+                            className="group transition-colors hover:bg-slate-50"
+                          >
+                            <td className="px-5 py-3.5">
+                              <span
+                                className={`flex items-center gap-1.5 font-body text-sm font-semibold ${isToday ? "text-amber-600" : "text-red-600"}`}
+                              >
+                                <CalendarIcon
+                                  className={`h-3.5 w-3.5 ${isToday ? "text-amber-400" : "text-red-400"}`}
+                                />
+                                {l.data_vencimento}
+                                {isToday && (
+                                  <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 font-body text-[10px] font-bold text-amber-700">
+                                    Hoje
+                                  </span>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-2.5">
+                                <TipoIndicator
+                                  tipo={l.tipo}
+                                  isPessoal={isPessoal}
+                                />
+                                <div className="min-w-0">
+                                  <p className="truncate font-body text-sm font-semibold text-fg max-w-[200px]">
+                                    {l.descricao}
+                                  </p>
+                                  {isPessoal ? (
+                                    <span className="inline-flex items-center rounded px-1.5 py-0.5 font-body text-[10px] font-bold bg-purple-50 text-purple-700">
+                                      Pessoal
+                                    </span>
+                                  ) : l.categoria ? (
+                                    <p className="font-body text-xs text-muted">
+                                      {l.categoria}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 font-body text-sm text-fg">
+                              {l.client_name ? (
+                                <Link
+                                  href={`/dashboard/clientes/${l.client_id}`}
+                                  className="hover:text-primary transition-colors truncate max-w-[140px] block"
+                                >
+                                  {l.client_name}
+                                </Link>
+                              ) : (
+                                <span className="text-muted">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 font-body text-sm text-muted">
+                              {l.parcela_atual != null
+                                ? l.parcela_atual === 0
+                                  ? "Entrada"
+                                  : `${l.parcela_atual}/${l.total_parcelas}`
+                                : "—"}
+                            </td>
+                            <td
+                              className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                            >
+                              {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <RowActions lancamento={l} canEdit={canEdit} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <ul className="divide-y divide-border md:hidden">
+                  {pendentesVencidos.map((l) => {
                     const isPessoal = l.remuneracao_id !== null;
                     return (
-                      <tr
+                      <li
                         key={l.id}
-                        className="group transition-colors duration-100 hover:bg-slate-50"
+                        className="flex items-center gap-3 px-4 py-4"
                       >
-                        {/* Descrição */}
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <TipoIndicator
-                              tipo={l.tipo}
-                              isPessoal={isPessoal}
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate font-body text-sm font-semibold text-fg max-w-[220px]">
-                                {l.descricao}
-                              </p>
-                              {isPessoal ? (
-                                <span className="inline-flex items-center rounded px-1.5 py-0.5 font-body text-[10px] font-bold bg-purple-50 text-purple-700">
-                                  Pessoal
-                                </span>
-                              ) : l.categoria ? (
-                                <p className="font-body text-xs text-muted">
-                                  {l.categoria}
-                                </p>
-                              ) : null}
-                            </div>
-                          </div>
-                        </td>
-                        {/* Cliente */}
-                        <td className="px-4 py-3.5 font-body text-sm text-fg">
-                          {l.client_name ? (
-                            <Link
-                              href={`/dashboard/clientes/${l.client_id}`}
-                              className="hover:text-primary transition-colors duration-150 truncate max-w-[140px] block"
-                            >
-                              {l.client_name}
-                            </Link>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
-                        {/* Parcela */}
-                        <td className="px-4 py-3.5 font-body text-sm text-muted">
-                          {l.parcela_atual != null
-                            ? l.parcela_atual === 0
-                              ? "Entrada"
-                              : `${l.parcela_atual}/${l.total_parcelas}`
-                            : "—"}
-                        </td>
-                        {/* Vencimento */}
-                        <td className="px-4 py-3.5">
-                          <span className="flex items-center gap-1.5 font-body text-sm text-fg">
-                            <CalendarIcon className="h-3.5 w-3.5 text-muted" />
+                        <TipoIndicator tipo={l.tipo} isPessoal={isPessoal} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-body text-sm font-semibold text-fg">
+                            {l.descricao}
+                          </p>
+                          <p className="font-body text-xs text-red-500 font-semibold">
                             {l.data_vencimento}
-                          </span>
-                          {l.data_pagamento && (
-                            <p className="font-body text-xs text-emerald-600 mt-0.5">
-                              Pago em {l.data_pagamento}
-                            </p>
-                          )}
-                        </td>
-                        {/* Valor */}
-                        <td
-                          className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${
-                            isPessoal
-                              ? "text-purple-700"
-                              : l.tipo === "entrada"
-                                ? "text-emerald-700"
-                                : "text-red-600"
-                          }`}
+                          </p>
+                        </div>
+                        <span
+                          className={`flex-shrink-0 font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
                         >
-                          {isPessoal ? "−" : l.tipo === "entrada" ? "+" : "−"}{" "}
-                          {fmt(l.valor)}
-                        </td>
-                        {/* Status */}
-                        <td className="px-4 py-3.5">
-                          <StatusBadge status={l.status} />
-                        </td>
-                        {/* Actions */}
-                        <td className="px-5 py-3.5">
-                          <RowActions lancamento={l} canEdit={canEdit} />
-                        </td>
-                      </tr>
+                          {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                        </span>
+                      </li>
                     );
                   })}
-                </tbody>
-              </table>
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Futuras section */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-4">
+              <SectionHeading
+                title="Próximos vencimentos"
+                count={pendentesNaoVencidos.length}
+                accent="blue"
+              />
+              <div className="ml-auto flex items-center gap-2">
+                <label className="font-body text-xs font-semibold text-muted">
+                  Saldo inicial (R$):
+                </label>
+                <input
+                  type="number"
+                  value={saldoInicialStr}
+                  onChange={(e) => setSaldoInicialStr(e.target.value)}
+                  placeholder="0"
+                  className="h-8 w-28 rounded-lg border border-border bg-white px-3 text-right font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
             </div>
-
-            {/* Mobile */}
-            <ul className="divide-y divide-border md:hidden">
-              {paginated.map((l) => {
-                const isPessoal = l.remuneracao_id !== null;
-                return (
-                  <li key={l.id} className="flex items-center gap-3 px-4 py-4">
-                    <TipoIndicator tipo={l.tipo} isPessoal={isPessoal} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-body text-sm font-semibold text-fg">
-                        {l.descricao}
-                      </p>
-                      <p className="font-body text-xs text-muted">
-                        {l.data_vencimento}
-                        {l.parcela_atual != null &&
-                          ` · ${l.parcela_atual === 0 ? "Entrada" : `${l.parcela_atual}/${l.total_parcelas}`}`}
-                        {isPessoal && " · Pessoal"}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span
-                        className={`font-body text-sm font-semibold tabular-nums ${
-                          isPessoal
-                            ? "text-purple-700"
-                            : l.tipo === "entrada"
-                              ? "text-emerald-700"
-                              : "text-red-600"
-                        }`}
-                      >
-                        − {fmt(l.valor)}
-                      </span>
-                      <StatusBadge status={l.status} />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-border px-5 py-3">
-                <p className="font-body text-xs text-muted">
-                  {(page - 1) * PAGE_SIZE + 1}–
-                  {Math.min(page * PAGE_SIZE, filtered.length)} de{" "}
-                  {filtered.length}
+            {pendentesNaoVencidos.length === 0 ? (
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-5 py-4">
+                <p className="font-body text-sm text-muted">
+                  Nenhum vencimento futuro no período selecionado.
                 </p>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                  >
-                    ‹
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (n) => (
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border bg-slate-50/50">
+                        <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Vencimento
+                        </th>
+                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Descrição
+                        </th>
+                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Cliente
+                        </th>
+                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Parcela
+                        </th>
+                        <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Valor
+                        </th>
+                        <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                          Saldo previsto
+                        </th>
+                        <th className="px-5 py-3" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {futuraWithSaldo.map((l) => {
+                        const isPessoal = l.remuneracao_id !== null;
+                        return (
+                          <tr
+                            key={l.id}
+                            className="group transition-colors hover:bg-slate-50"
+                          >
+                            <td className="px-5 py-3.5">
+                              <span className="flex items-center gap-1.5 font-body text-sm text-fg">
+                                <CalendarIcon className="h-3.5 w-3.5 text-muted" />
+                                {l.data_vencimento}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-2.5">
+                                <TipoIndicator
+                                  tipo={l.tipo}
+                                  isPessoal={isPessoal}
+                                />
+                                <div className="min-w-0">
+                                  <p className="truncate font-body text-sm font-semibold text-fg max-w-[200px]">
+                                    {l.descricao}
+                                  </p>
+                                  {isPessoal ? (
+                                    <span className="inline-flex items-center rounded px-1.5 py-0.5 font-body text-[10px] font-bold bg-purple-50 text-purple-700">
+                                      Pessoal
+                                    </span>
+                                  ) : l.categoria ? (
+                                    <p className="font-body text-xs text-muted">
+                                      {l.categoria}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 font-body text-sm text-fg">
+                              {l.client_name ? (
+                                <Link
+                                  href={`/dashboard/clientes/${l.client_id}`}
+                                  className="hover:text-primary transition-colors truncate max-w-[140px] block"
+                                >
+                                  {l.client_name}
+                                </Link>
+                              ) : (
+                                <span className="text-muted">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 font-body text-sm text-muted">
+                              {l.parcela_atual != null
+                                ? l.parcela_atual === 0
+                                  ? "Entrada"
+                                  : `${l.parcela_atual}/${l.total_parcelas}`
+                                : "—"}
+                            </td>
+                            <td
+                              className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                            >
+                              {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                            </td>
+                            <td
+                              className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${l.saldoAcumulado >= 0 ? "text-emerald-700" : "text-red-600"}`}
+                            >
+                              {fmt(l.saldoAcumulado)}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <RowActions lancamento={l} canEdit={canEdit} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <ul className="divide-y divide-border md:hidden">
+                  {futuraWithSaldo.map((l) => {
+                    const isPessoal = l.remuneracao_id !== null;
+                    return (
+                      <li
+                        key={l.id}
+                        className="flex items-center gap-3 px-4 py-4"
+                      >
+                        <TipoIndicator tipo={l.tipo} isPessoal={isPessoal} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-body text-sm font-semibold text-fg">
+                            {l.descricao}
+                          </p>
+                          <p className="font-body text-xs text-muted">
+                            {l.data_vencimento}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                          <span
+                            className={`font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                          >
+                            {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                          </span>
+                          <span
+                            className={`font-body text-xs font-semibold tabular-nums ${l.saldoAcumulado >= 0 ? "text-emerald-600" : "text-red-500"}`}
+                          >
+                            Saldo: {fmt(l.saldoAcumulado)}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Concluidas Tab ── */}
+      {mainTab === "concluidas" && (
+        <div className="space-y-3">
+          <SectionHeading
+            title="Recebidas e pagas"
+            count={concluidas.length}
+            accent="slate"
+          />
+          {concluidas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-white py-16 text-center shadow-sm">
+              <BanknotesIcon className="h-10 w-10 text-slate-300" />
+              <p className="font-body text-sm font-semibold text-muted">
+                Nenhum registro concluído no período
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border bg-slate-50/50">
+                      <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Vencimento
+                      </th>
+                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Descrição
+                      </th>
+                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Cliente
+                      </th>
+                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Parcela
+                      </th>
+                      <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Valor
+                      </th>
+                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Data pag.
+                      </th>
+                      <th className="px-5 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {paginatedConcluidas.map((l) => {
+                      const isPessoal = l.remuneracao_id !== null;
+                      return (
+                        <tr
+                          key={l.id}
+                          className="group transition-colors hover:bg-slate-50"
+                        >
+                          <td className="px-5 py-3.5">
+                            <span className="flex items-center gap-1.5 font-body text-sm text-fg">
+                              <CalendarIcon className="h-3.5 w-3.5 text-muted" />
+                              {l.data_vencimento}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2.5">
+                              <TipoIndicator
+                                tipo={l.tipo}
+                                isPessoal={isPessoal}
+                              />
+                              <div className="min-w-0">
+                                <p className="truncate font-body text-sm font-semibold text-fg max-w-[200px]">
+                                  {l.descricao}
+                                </p>
+                                {isPessoal ? (
+                                  <span className="inline-flex items-center rounded px-1.5 py-0.5 font-body text-[10px] font-bold bg-purple-50 text-purple-700">
+                                    Pessoal
+                                  </span>
+                                ) : l.categoria ? (
+                                  <p className="font-body text-xs text-muted">
+                                    {l.categoria}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 font-body text-sm text-fg">
+                            {l.client_name ? (
+                              <Link
+                                href={`/dashboard/clientes/${l.client_id}`}
+                                className="hover:text-primary transition-colors truncate max-w-[140px] block"
+                              >
+                                {l.client_name}
+                              </Link>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 font-body text-sm text-muted">
+                            {l.parcela_atual != null
+                              ? l.parcela_atual === 0
+                                ? "Entrada"
+                                : `${l.parcela_atual}/${l.total_parcelas}`
+                              : "—"}
+                          </td>
+                          <td
+                            className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                          >
+                            {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <StatusBadge status={l.status} />
+                          </td>
+                          <td className="px-4 py-3.5 font-body text-sm text-muted">
+                            {l.data_pagamento ?? "—"}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <RowActions lancamento={l} canEdit={canEdit} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <ul className="divide-y divide-border md:hidden">
+                {paginatedConcluidas.map((l) => {
+                  const isPessoal = l.remuneracao_id !== null;
+                  return (
+                    <li
+                      key={l.id}
+                      className="flex items-center gap-3 px-4 py-4"
+                    >
+                      <TipoIndicator tipo={l.tipo} isPessoal={isPessoal} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-body text-sm font-semibold text-fg">
+                          {l.descricao}
+                        </p>
+                        <p className="font-body text-xs text-muted">
+                          {l.data_vencimento}
+                          {l.data_pagamento && ` · Pago em ${l.data_pagamento}`}
+                          {isPessoal && " · Pessoal"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span
+                          className={`font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                        >
+                          {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                        </span>
+                        <StatusBadge status={l.status} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              {totalPagesConcluidas > 1 && (
+                <div className="flex items-center justify-between border-t border-border px-5 py-3">
+                  <p className="font-body text-xs text-muted">
+                    {(pageConcluidas - 1) * PAGE_SIZE + 1}–
+                    {Math.min(pageConcluidas * PAGE_SIZE, concluidas.length)} de{" "}
+                    {concluidas.length}
+                  </p>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() =>
+                        setPageConcluidas((p) => Math.max(1, p - 1))
+                      }
+                      disabled={pageConcluidas === 1}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    >
+                      ‹
+                    </button>
+                    {Array.from(
+                      { length: totalPagesConcluidas },
+                      (_, i) => i + 1
+                    ).map((n) => (
                       <button
                         key={n}
-                        onClick={() => setPage(n)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors duration-150 cursor-pointer ${
-                          page === n
+                        onClick={() => setPageConcluidas(n)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors cursor-pointer ${
+                          pageConcluidas === n
                             ? "bg-primary text-white font-semibold"
                             : "border border-border text-muted hover:border-primary hover:text-primary"
                         }`}
                       >
                         {n}
                       </button>
-                    )
-                  )}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                  >
-                    ›
-                  </button>
+                    ))}
+                    <button
+                      onClick={() =>
+                        setPageConcluidas((p) =>
+                          Math.min(totalPagesConcluidas, p + 1)
+                        )
+                      }
+                      disabled={pageConcluidas === totalPagesConcluidas}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    >
+                      ›
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

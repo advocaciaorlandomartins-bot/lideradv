@@ -29,7 +29,11 @@ export async function createLancamentoAction(
   const dataVencimento = (
     (formData.get("data_vencimento") as string | null) ?? ""
   ).trim();
-  const parcelado = formData.get("parcelado") === "true";
+  const paymentMode = (
+    (formData.get("payment_mode") as string | null) ?? "avista"
+  ).trim();
+  const parcelado = paymentMode === "parcelado";
+  const recorrente = paymentMode === "recorrente";
   const valorEntradaStr = (
     (formData.get("valor_entrada") as string | null) ?? ""
   ).trim();
@@ -38,6 +42,13 @@ export async function createLancamentoAction(
     (formData.get("total_parcelas") as string | null) ?? ""
   ).trim();
   const totalParcelas = totalParcelasStr ? parseInt(totalParcelasStr) : 1;
+  const periodicidade = (
+    (formData.get("periodicidade") as string | null) ?? "mensal"
+  ).trim();
+  const numRecorrenciasStr = (
+    (formData.get("num_recorrencias") as string | null) ?? "12"
+  ).trim();
+  const numRecorrencias = parseInt(numRecorrenciasStr) || 12;
   const observacoes =
     ((formData.get("observacoes") as string | null) ?? "").trim() || null;
 
@@ -46,7 +57,35 @@ export async function createLancamentoAction(
   if (!dataVencimento) return { error: "Informe a data de vencimento." };
 
   try {
-    if (!parcelado) {
+    if (recorrente) {
+      const grupoRecorrente = crypto.randomUUID();
+      const baseDate = new Date(`${dataVencimento}T12:00:00`);
+      for (let i = 0; i < numRecorrencias; i++) {
+        const entryDate = new Date(baseDate);
+        if (periodicidade === "semanal")
+          entryDate.setDate(entryDate.getDate() + 7 * i);
+        else if (periodicidade === "anual")
+          entryDate.setFullYear(entryDate.getFullYear() + i);
+        else entryDate.setMonth(entryDate.getMonth() + i);
+        const entryDateStr = entryDate.toISOString().split("T")[0];
+        const descEntry =
+          i === 0 ? descricao : `${descricao} (${i + 1}/${numRecorrencias})`;
+        const entryStatus = i === 0 ? status : "pendente";
+        await sql`
+          INSERT INTO lancamentos
+            (tipo, categoria, descricao, valor, client_id, processo_id,
+             status, data_vencimento, parcela_atual, total_parcelas,
+             grupo_parcelas, observacoes)
+          VALUES
+            (${tipo}, ${categoria}, ${descEntry}, ${valor},
+             ${clientId ? clientId : null}::uuid,
+             ${processoId ? processoId : null}::uuid,
+             ${entryStatus}, ${entryDateStr}::date,
+             ${i + 1}, ${numRecorrencias},
+             ${grupoRecorrente}::uuid, ${observacoes})
+        `;
+      }
+    } else if (!parcelado) {
       await sql`
         INSERT INTO lancamentos
           (tipo, categoria, descricao, valor, client_id, processo_id,
@@ -206,6 +245,23 @@ export async function updateLancamentoAction(
   }
 
   redirect("/dashboard/financeiro");
+}
+
+export async function reagendarLancamentoAction(
+  id: string,
+  novaData: string
+): Promise<void> {
+  if (!novaData) return;
+  try {
+    await sql`
+      UPDATE lancamentos
+      SET data_vencimento = ${novaData}::date
+      WHERE id = ${id}::uuid
+    `;
+  } catch (err) {
+    console.error("reagendarLancamentoAction DB error:", err);
+  }
+  revalidatePath("/dashboard/financeiro");
 }
 
 export async function markAsPagoAction(id: string): Promise<void> {

@@ -102,6 +102,7 @@ export default function ControleForm({
   const isAudiencia = tipo === "audiencias";
   const isPericia = tipo === "pericias";
   const isImplantadosData = tipo === "implantados-data";
+  const isDCB = tipo === "dcb";
   const hasHora = isAudiencia || isPericia;
 
   const processosDoCliente = clienteId
@@ -297,12 +298,20 @@ export default function ControleForm({
               />
               <button
                 type="button"
-                onClick={() => setPrazoInterno(addDays(dataEvento, 2))}
+                onClick={() =>
+                  setPrazoInterno(
+                    isDCB ? addDays(dataEvento, -15) : addDays(dataEvento, 2)
+                  )
+                }
                 disabled={!dataEvento}
-                title="Preencher com data do evento + 2 dias"
+                title={
+                  isDCB
+                    ? "Preencher com Prazo para PP − 15 dias"
+                    : "Preencher com data do evento + 2 dias"
+                }
                 className="shrink-0 h-10 rounded-lg border border-border px-3 font-body text-xs font-semibold text-fg hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                +2 dias
+                {isDCB ? "−15 dias" : "+2 dias"}
               </button>
             </div>
           </div>

@@ -263,63 +263,6 @@ export default function EditProcessoForm({ processo, clients }: Props) {
         </div>
       </div>
 
-      {/* ── Parte contrária ── */}
-      <div className="space-y-4">
-        <SectionTitle>Parte contrária</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Field label="Nome">
-              <input
-                name="parte_contraria"
-                type="text"
-                placeholder="Nome da parte contrária"
-                defaultValue={processo.parte_contraria ?? ""}
-                disabled={isPending}
-                className={inputClass}
-              />
-            </Field>
-          </div>
-          <Field label="CPF / CNPJ">
-            <input
-              name="parte_contraria_doc"
-              type="text"
-              placeholder="000.000.000-00"
-              defaultValue={processo.parte_contraria_doc ?? ""}
-              disabled={isPending}
-              className={inputClass}
-            />
-          </Field>
-        </div>
-      </div>
-
-      {/* ── Financeiro ── */}
-      <div className="space-y-4">
-        <SectionTitle>Financeiro</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Valor da causa (R$)">
-            <input
-              name="valor_causa"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              defaultValue={processo.valor_causa ?? ""}
-              disabled={isPending}
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Data de distribuição">
-            <input
-              name="data_distribuicao"
-              type="date"
-              defaultValue={processo.data_distribuicao_iso ?? ""}
-              disabled={isPending}
-              className={inputClass}
-            />
-          </Field>
-        </div>
-      </div>
-
       {/* ── Status ── */}
       <div>
         <SectionTitle>Status</SectionTitle>

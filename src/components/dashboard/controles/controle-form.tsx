@@ -53,30 +53,43 @@ export default function ControleForm({
   >(action, null);
 
   const [tipo, setTipo] = useState(controle?.tipo ?? tipoInicial);
+
+  // ── Autocomplete de cliente ──
+  const [clienteNome, setClienteNome] = useState(controle?.cliente_nome ?? "");
   const [clienteId, setClienteId] = useState(controle?.cliente_id ?? "");
-  const [search, setSearch] = useState("");
+  const [showDrop, setShowDrop] = useState(false);
+
+  const clienteMatches =
+    !clienteId && clienteNome.trim().length >= 1
+      ? clientes.filter((c) => {
+          const q = clienteNome.trim().toLowerCase();
+          const matchNome = c.nome.toLowerCase().includes(q);
+          const matchDoc =
+            q.replace(/\D/g, "").length > 0 &&
+            c.doc.replace(/\D/g, "").includes(q.replace(/\D/g, ""));
+          return matchNome || matchDoc;
+        })
+      : [];
+
+  // ── Local da audiência ──
+  const dadosAudiencia = controle?.dados ?? null;
+  const savedLocalId = dadosAudiencia?.local_id ?? null;
+  const savedLocalTitulo = dadosAudiencia?.local_titulo ?? null;
+  // "outro" quando há titulo mas não há ID (entrada manual anterior)
+  const initSelectedLocalId = savedLocalId
+    ? savedLocalId
+    : savedLocalTitulo && !savedLocalId
+      ? "outro"
+      : "";
+  const [selectedLocalId, setSelectedLocalId] = useState(initSelectedLocalId);
   const [localMode, setLocalMode] = useState<"existente" | "novo">("existente");
 
   const tipoConfig = getTipoConfig(tipo);
   const isAudiencia = tipo === "audiencias";
 
-  const filteredClientes =
-    search.trim() === ""
-      ? clientes
-      : clientes.filter((c) => {
-          const q = search.trim().toLowerCase();
-          const matchNome = c.nome.toLowerCase().includes(q);
-          const matchDoc =
-            c.doc.replace(/\D/g, "").includes(q.replace(/\D/g, "")) &&
-            q.replace(/\D/g, "").length > 0;
-          return matchNome || matchDoc;
-        });
-
   const processosDoCliente = clienteId
     ? processos.filter((p) => p.cliente_id === clienteId)
     : processos;
-
-  const dadosAudiencia = controle?.dados ?? null;
 
   if (state?.success && !isEdit) {
     router.push(`/dashboard/controles?tipo=${tipo}`);
@@ -103,40 +116,74 @@ export default function ControleForm({
         <h2 className="font-heading text-sm font-semibold text-fg">Vínculos</h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Busca de cliente */}
+          {/* Autocomplete de cliente */}
           <div className="sm:col-span-2">
-            <label className={labelCls}>Buscar cliente</label>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Nome ou CPF / CNPJ..."
-              className={inputCls}
-            />
-            {search.trim() !== "" && (
-              <p className="mt-1 font-body text-xs text-muted">
-                {filteredClientes.length} cliente(s) encontrado(s)
-              </p>
-            )}
-          </div>
-
-          {/* Cliente */}
-          <div>
             <label className={labelCls}>Cliente</label>
-            <select
-              name="cliente_id"
-              value={clienteId}
-              onChange={(e) => setClienteId(e.target.value)}
-              className={selectCls}
-            >
-              <option value="">— Nenhum —</option>
-              {filteredClientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                  {c.doc ? ` — ${c.doc}` : ""}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={clienteNome}
+                onChange={(e) => {
+                  setClienteNome(e.target.value);
+                  if (clienteId) setClienteId("");
+                  setShowDrop(true);
+                }}
+                onFocus={() => setShowDrop(true)}
+                onBlur={() => setTimeout(() => setShowDrop(false), 150)}
+                placeholder="Pesquisar por nome ou CPF / CNPJ..."
+                autoComplete="off"
+                className={inputCls + (clienteId ? " pr-8" : "")}
+              />
+              <input type="hidden" name="cliente_id" value={clienteId} />
+
+              {/* X para limpar */}
+              {clienteId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClienteId("");
+                    setClienteNome("");
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-lg leading-none"
+                  aria-label="Limpar cliente"
+                >
+                  ×
+                </button>
+              )}
+
+              {/* Dropdown de resultados */}
+              {showDrop && clienteMatches.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+                  {clienteMatches.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={() => {
+                        setClienteId(c.id);
+                        setClienteNome(c.nome);
+                        setShowDrop(false);
+                      }}
+                      className="w-full text-left px-3 py-2 font-body text-sm text-fg hover:bg-slate-50 border-b border-border/50 last:border-0"
+                    >
+                      <span className="font-medium">{c.nome}</span>
+                      {c.doc && (
+                        <span className="ml-2 text-muted text-xs">{c.doc}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Sem resultados */}
+              {showDrop &&
+                !clienteId &&
+                clienteNome.trim().length >= 1 &&
+                clienteMatches.length === 0 && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-muted shadow-lg">
+                    Nenhum cliente encontrado.
+                  </div>
+                )}
+            </div>
           </div>
 
           {/* Processo */}
@@ -292,18 +339,37 @@ export default function ControleForm({
               <input type="hidden" name="local_mode" value={localMode} />
 
               {localMode === "existente" ? (
-                <select
-                  name="local_id"
-                  defaultValue={dadosAudiencia?.local_id ?? ""}
-                  className={selectCls}
-                >
-                  <option value="">— Selecione um local —</option>
-                  {locais.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.titulo}
+                <div className="space-y-2">
+                  <select
+                    name="local_id"
+                    value={selectedLocalId}
+                    onChange={(e) => setSelectedLocalId(e.target.value)}
+                    className={selectCls}
+                  >
+                    <option value="">— Selecione um local —</option>
+                    {locais.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.titulo}
+                      </option>
+                    ))}
+                    <option value="outro">
+                      Outro (digitar manualmente)...
                     </option>
-                  ))}
-                </select>
+                  </select>
+
+                  {selectedLocalId === "outro" && (
+                    <input
+                      type="text"
+                      name="local_outro_texto"
+                      defaultValue={
+                        savedLocalId ? "" : (savedLocalTitulo ?? "")
+                      }
+                      placeholder="Digite o nome do local..."
+                      className={inputCls}
+                      autoFocus
+                    />
+                  )}
+                </div>
               ) : (
                 <div className="space-y-2">
                   <input

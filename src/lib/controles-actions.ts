@@ -30,6 +30,11 @@ async function buildDadosAudiencia(formData: FormData): Promise<string | null> {
       localId = String(rows[0].id);
       localTitulo = String(rows[0].titulo);
     }
+  } else if (localId === "outro") {
+    const outroTexto =
+      ((formData.get("local_outro_texto") as string) ?? "").trim() || null;
+    localTitulo = outroTexto;
+    localId = null;
   } else if (localId) {
     const rows = await sql`
       SELECT titulo FROM locais_audiencia WHERE id = ${localId}::uuid

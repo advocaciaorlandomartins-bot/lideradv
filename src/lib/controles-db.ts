@@ -180,6 +180,20 @@ export async function getUsuariosForControle(): Promise<UsuarioOption[]> {
   }));
 }
 
+export async function getLocaisPericia(): Promise<LocalAudiencia[]> {
+  const rows = await sql`
+    SELECT id::text, titulo, NULL AS endereco, NULL AS mapa_url
+    FROM locais_pericia
+    ORDER BY titulo ASC
+  `;
+  return rows.map((r) => ({
+    id: String(r.id),
+    titulo: String(r.titulo),
+    endereco: null,
+    mapa_url: null,
+  }));
+}
+
 export async function getLocaisAudiencia(): Promise<LocalAudiencia[]> {
   const rows = await sql`
     SELECT id::text, titulo, endereco, mapa_url

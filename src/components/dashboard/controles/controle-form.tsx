@@ -40,6 +40,7 @@ interface Props {
   processos: ProcessoOption[];
   usuarios: UsuarioOption[];
   locais: LocalAudiencia[];
+  locaisPericia: LocalAudiencia[];
 }
 
 export default function ControleForm({
@@ -49,6 +50,7 @@ export default function ControleForm({
   processos,
   usuarios,
   locais,
+  locaisPericia,
 }: Props) {
   const isEdit = !!controle;
   const router = useRouter();
@@ -78,11 +80,10 @@ export default function ControleForm({
         })
       : [];
 
-  // ── Local da audiência ──
-  const dadosAudiencia = controle?.dados ?? null;
-  const savedLocalId = dadosAudiencia?.local_id ?? null;
-  const savedLocalTitulo = dadosAudiencia?.local_titulo ?? null;
-  // "outro" quando há titulo mas não há ID (entrada manual anterior)
+  // ── Dados salvos (audiência ou perícia) ──
+  const savedDados = controle?.dados ?? null;
+  const savedLocalId = savedDados?.local_id ?? null;
+  const savedLocalTitulo = savedDados?.local_titulo ?? null;
   const initSelectedLocalId = savedLocalId
     ? savedLocalId
     : savedLocalTitulo && !savedLocalId
@@ -99,6 +100,8 @@ export default function ControleForm({
 
   const tipoConfig = getTipoConfig(tipo);
   const isAudiencia = tipo === "audiencias";
+  const isPericia = tipo === "pericias";
+  const hasHora = isAudiencia || isPericia;
 
   const processosDoCliente = clienteId
     ? processos.filter((p) => p.cliente_id === clienteId)
@@ -116,11 +119,6 @@ export default function ControleForm({
       {state?.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">
           {state.error}
-        </div>
-      )}
-      {state?.success && isEdit && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 font-body text-sm text-emerald-700">
-          Controle atualizado com sucesso.
         </div>
       )}
 
@@ -149,7 +147,6 @@ export default function ControleForm({
               />
               <input type="hidden" name="cliente_id" value={clienteId} />
 
-              {/* X para limpar */}
               {clienteId && (
                 <button
                   type="button"
@@ -164,7 +161,6 @@ export default function ControleForm({
                 </button>
               )}
 
-              {/* Dropdown de resultados */}
               {showDrop && clienteMatches.length > 0 && (
                 <div className="absolute z-20 left-0 right-0 mt-1 max-h-52 overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
                   {clienteMatches.map((c) => (
@@ -187,7 +183,6 @@ export default function ControleForm({
                 </div>
               )}
 
-              {/* Sem resultados */}
               {showDrop &&
                 !clienteId &&
                 clienteNome.trim().length >= 1 &&
@@ -277,21 +272,21 @@ export default function ControleForm({
             />
           </div>
 
-          {/* Hora — só audiências */}
-          {isAudiencia && (
+          {/* Hora — audiências e perícias */}
+          {hasHora && (
             <div>
               <label className={labelCls}>Hora</label>
               <input
                 type="time"
                 name="hora"
-                defaultValue={dadosAudiencia?.hora ?? ""}
+                defaultValue={savedDados?.hora ?? ""}
                 className={inputCls}
               />
             </div>
           )}
 
           {/* Prazo Interno — todos os tipos */}
-          <div className={isAudiencia ? "" : "sm:col-span-2"}>
+          <div className={hasHora ? "" : "sm:col-span-2"}>
             <label className={labelCls}>Prazo Interno</label>
             <div className="flex gap-2">
               <input
@@ -334,48 +329,122 @@ export default function ControleForm({
             />
           </div>
 
-          {/* Link virtual — só audiências */}
+          {/* ── Campos exclusivos: Audiências ── */}
           {isAudiencia && (
-            <div className="sm:col-span-2">
-              <label className={labelCls}>Link para participação virtual</label>
-              <input
-                type="url"
-                name="link_virtual"
-                defaultValue={dadosAudiencia?.link_virtual ?? ""}
-                placeholder="https://"
-                className={inputCls}
-              />
-              <p className="mt-1 font-body text-xs text-muted">
-                Preencha apenas quando houver participação remota.
-              </p>
-            </div>
-          )}
-
-          {/* Local da audiência — só audiências */}
-          {isAudiencia && (
-            <div className="sm:col-span-2">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="font-body text-sm font-semibold text-fg">
-                  Local
+            <>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>
+                  Link para participação virtual
                 </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLocalMode(
-                      localMode === "existente" ? "novo" : "existente"
-                    )
-                  }
-                  className="font-body text-xs text-primary hover:underline"
-                >
-                  {localMode === "existente"
-                    ? "+ Cadastrar novo local"
-                    : "← Selecionar da lista"}
-                </button>
+                <input
+                  type="url"
+                  name="link_virtual"
+                  defaultValue={savedDados?.link_virtual ?? ""}
+                  placeholder="https://"
+                  className={inputCls}
+                />
+                <p className="mt-1 font-body text-xs text-muted">
+                  Preencha apenas quando houver participação remota.
+                </p>
               </div>
 
-              <input type="hidden" name="local_mode" value={localMode} />
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-body text-sm font-semibold text-fg">
+                    Local
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLocalMode(
+                        localMode === "existente" ? "novo" : "existente"
+                      )
+                    }
+                    className="font-body text-xs text-primary hover:underline"
+                  >
+                    {localMode === "existente"
+                      ? "+ Cadastrar novo local"
+                      : "← Selecionar da lista"}
+                  </button>
+                </div>
 
-              {localMode === "existente" ? (
+                <input type="hidden" name="local_mode" value={localMode} />
+
+                {localMode === "existente" ? (
+                  <div className="space-y-2">
+                    <select
+                      name="local_id"
+                      value={selectedLocalId}
+                      onChange={(e) => setSelectedLocalId(e.target.value)}
+                      className={selectCls}
+                    >
+                      <option value="">— Selecione um local —</option>
+                      {locais.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.titulo}
+                        </option>
+                      ))}
+                      <option value="outro">
+                        Outro (digitar manualmente)...
+                      </option>
+                    </select>
+                    {selectedLocalId === "outro" && (
+                      <input
+                        type="text"
+                        name="local_outro_texto"
+                        defaultValue={
+                          savedLocalId ? "" : (savedLocalTitulo ?? "")
+                        }
+                        placeholder="Digite o nome do local..."
+                        className={inputCls}
+                        autoFocus
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      name="novo_local_titulo"
+                      placeholder="Título do local"
+                      className={inputCls}
+                    />
+                    <input
+                      type="text"
+                      name="novo_local_endereco"
+                      placeholder="Endereço completo"
+                      className={inputCls}
+                    />
+                    <input
+                      type="url"
+                      name="novo_local_mapa"
+                      placeholder="Link do mapa (Google Maps...)"
+                      className={inputCls}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── Campos exclusivos: Perícias ── */}
+          {isPericia && (
+            <>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Tipo de Perícia</label>
+                <select
+                  name="tipo_pericia"
+                  defaultValue={savedDados?.tipo_pericia ?? ""}
+                  className={selectCls}
+                >
+                  <option value="">— Selecione —</option>
+                  <option value="Perícia Médica">Perícia Médica</option>
+                  <option value="Avaliação Social">Avaliação Social</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Local</label>
                 <div className="space-y-2">
                   <select
                     name="local_id"
@@ -384,7 +453,7 @@ export default function ControleForm({
                     className={selectCls}
                   >
                     <option value="">— Selecione um local —</option>
-                    {locais.map((l) => (
+                    {locaisPericia.map((l) => (
                       <option key={l.id} value={l.id}>
                         {l.titulo}
                       </option>
@@ -393,7 +462,6 @@ export default function ControleForm({
                       Outro (digitar manualmente)...
                     </option>
                   </select>
-
                   {selectedLocalId === "outro" && (
                     <input
                       type="text"
@@ -407,29 +475,8 @@ export default function ControleForm({
                     />
                   )}
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    name="novo_local_titulo"
-                    placeholder="Título do local"
-                    className={inputCls}
-                  />
-                  <input
-                    type="text"
-                    name="novo_local_endereco"
-                    placeholder="Endereço completo"
-                    className={inputCls}
-                  />
-                  <input
-                    type="url"
-                    name="novo_local_mapa"
-                    placeholder="Link do mapa (Google Maps...)"
-                    className={inputCls}
-                  />
-                </div>
-              )}
-            </div>
+              </div>
+            </>
           )}
 
           {/* Tipo Demanda */}

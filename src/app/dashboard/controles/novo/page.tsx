@@ -5,6 +5,7 @@ import {
   getProcessosForControle,
   getUsuariosForControle,
   getLocaisAudiencia,
+  getLocaisPericia,
 } from "@/lib/controles-db";
 import { getTipoConfig } from "@/lib/controles-types";
 import ControleForm from "@/components/dashboard/controles/controle-form";
@@ -17,12 +18,14 @@ export default async function NovoControlePage({
   const { tipo = "audiencias" } = await searchParams;
   const tipoConfig = getTipoConfig(tipo);
 
-  const [clientes, processos, usuarios, locais] = await Promise.all([
-    getClientesForControle(),
-    getProcessosForControle(),
-    getUsuariosForControle(),
-    getLocaisAudiencia(),
-  ]);
+  const [clientes, processos, usuarios, locais, locaisPericia] =
+    await Promise.all([
+      getClientesForControle(),
+      getProcessosForControle(),
+      getUsuariosForControle(),
+      getLocaisAudiencia(),
+      getLocaisPericia(),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -62,6 +65,7 @@ export default async function NovoControlePage({
         processos={processos}
         usuarios={usuarios}
         locais={locais}
+        locaisPericia={locaisPericia}
       />
     </div>
   );

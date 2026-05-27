@@ -53,6 +53,36 @@ async function buildDadosAudiencia(formData: FormData): Promise<string | null> {
   return hasDados ? JSON.stringify(dados) : null;
 }
 
+async function buildDadosPericia(formData: FormData): Promise<string | null> {
+  const hora = ((formData.get("hora") as string) ?? "").trim() || null;
+  const tipoPericia =
+    ((formData.get("tipo_pericia") as string) ?? "").trim() || null;
+  let localId = ((formData.get("local_id") as string) ?? "").trim() || null;
+  let localTitulo: string | null = null;
+
+  if (localId === "outro") {
+    const outroTexto =
+      ((formData.get("local_outro_texto") as string) ?? "").trim() || null;
+    localTitulo = outroTexto;
+    localId = null;
+  } else if (localId) {
+    const rows = await sql`
+      SELECT titulo FROM locais_pericia WHERE id = ${localId}::uuid
+    `;
+    localTitulo = rows[0]?.titulo ? String(rows[0].titulo) : null;
+  }
+
+  const dados: Record<string, string | null> = {
+    hora,
+    tipo_pericia: tipoPericia,
+    local_id: localId,
+    local_titulo: localTitulo,
+  };
+
+  const hasDados = Object.values(dados).some((v) => v !== null);
+  return hasDados ? JSON.stringify(dados) : null;
+}
+
 export async function createControleAction(
   _prev: ControleFormState,
   formData: FormData
@@ -81,6 +111,7 @@ export async function createControleAction(
   let dadosJson: string | null = null;
   try {
     if (tipo === "audiencias") dadosJson = await buildDadosAudiencia(formData);
+    else if (tipo === "pericias") dadosJson = await buildDadosPericia(formData);
   } catch (err) {
     console.error("buildDadosAudiencia:", err);
     return { error: "Erro ao processar dados da audiência." };
@@ -155,6 +186,7 @@ export async function updateControleAction(
   let dadosJson: string | null = null;
   try {
     if (tipo === "audiencias") dadosJson = await buildDadosAudiencia(formData);
+    else if (tipo === "pericias") dadosJson = await buildDadosPericia(formData);
   } catch (err) {
     console.error("buildDadosAudiencia:", err);
     return { error: "Erro ao processar dados da audiência." };

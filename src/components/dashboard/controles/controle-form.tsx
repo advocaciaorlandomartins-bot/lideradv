@@ -101,6 +101,7 @@ export default function ControleForm({
   const tipoConfig = getTipoConfig(tipo);
   const isAudiencia = tipo === "audiencias";
   const isPericia = tipo === "pericias";
+  const isImplantadosData = tipo === "implantados-data";
   const hasHora = isAudiencia || isPericia;
 
   const processosDoCliente = clienteId
@@ -259,7 +260,7 @@ export default function ControleForm({
           )}
 
           {/* Data */}
-          <div className={hasHora ? "" : "sm:col-span-2"}>
+          <div className={hasHora || isImplantadosData ? "" : "sm:col-span-2"}>
             <label className={labelCls}>{tipoConfig.col_data}</label>
             <input
               type="date"
@@ -284,7 +285,7 @@ export default function ControleForm({
           )}
 
           {/* Prazo Interno — todos os tipos */}
-          <div className={hasHora ? "" : "sm:col-span-2"}>
+          <div className={hasHora || isImplantadosData ? "" : "sm:col-span-2"}>
             <label className={labelCls}>Prazo Interno</label>
             <div className="flex gap-2">
               <input
@@ -306,8 +307,66 @@ export default function ControleForm({
             </div>
           </div>
 
-          {/* Descrição / Tipo-Título — oculto para perícias */}
-          {!isPericia && (
+          {/* ── Campos exclusivos: Benefícios Implantados ── */}
+          {isImplantadosData && (
+            <>
+              <input
+                type="hidden"
+                name="implantados_id"
+                value={savedDados?.implantados_id ?? ""}
+              />
+              <input
+                type="hidden"
+                name="dcb_id"
+                value={savedDados?.dcb_id ?? ""}
+              />
+
+              <div>
+                <label className={labelCls}>Previsão do 1° pagamento</label>
+                <input
+                  type="date"
+                  name="data_1pag"
+                  defaultValue={savedDados?.data_1pag ?? ""}
+                  className={inputCls}
+                />
+                {!savedDados?.implantados_id && (
+                  <p className="mt-1 font-body text-xs text-blue-600">
+                    Ao preencher, cria automaticamente um registro em Benefícios
+                    Implantados (1° Pag.).
+                  </p>
+                )}
+                {savedDados?.implantados_id && (
+                  <p className="mt-1 font-body text-xs text-emerald-600">
+                    Registro de 1° Pag. já vinculado.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className={labelCls}>Data de Cessação</label>
+                <input
+                  type="date"
+                  name="data_cessacao"
+                  defaultValue={savedDados?.data_cessacao ?? ""}
+                  className={inputCls}
+                />
+                {!savedDados?.dcb_id && (
+                  <p className="mt-1 font-body text-xs text-blue-600">
+                    Ao preencher, cria automaticamente um registro de
+                    Prorrogação (DCB) com data 15 dias antes.
+                  </p>
+                )}
+                {savedDados?.dcb_id && (
+                  <p className="mt-1 font-body text-xs text-emerald-600">
+                    Registro de DCB já vinculado.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Descrição / Tipo-Título — oculto para perícias e implantados-data */}
+          {!isPericia && !isImplantadosData && (
             <div className="sm:col-span-2">
               <label className={labelCls}>
                 {isAudiencia

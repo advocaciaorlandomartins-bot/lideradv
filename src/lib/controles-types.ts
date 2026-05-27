@@ -44,7 +44,7 @@ export const TIPOS_CONTROLE = [
   {
     key: "implantados-data",
     label: "Benefícios Implantados",
-    col_data: "Data",
+    col_data: "Data de Implantação",
     col_evento: "Evento",
     label_novo: "Novo benefício",
   },

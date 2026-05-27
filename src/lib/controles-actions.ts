@@ -53,6 +53,131 @@ async function buildDadosAudiencia(formData: FormData): Promise<string | null> {
   return hasDados ? JSON.stringify(dados) : null;
 }
 
+function subtractDays(dateStr: string, days: number): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function insertOrUpdateLinkedControle(params: {
+  existingId: string | null;
+  tipo: string;
+  dataEvento: string;
+  descricao: string;
+  clienteId: string | null;
+  processoId: string | null;
+  responsavelId: string | null;
+  tipoDemanda: string | null;
+}): Promise<string> {
+  const {
+    existingId,
+    tipo,
+    dataEvento,
+    descricao,
+    clienteId,
+    processoId,
+    responsavelId,
+    tipoDemanda,
+  } = params;
+
+  if (existingId) {
+    await sql`UPDATE controles SET data_evento = ${dataEvento}::date, updated_at = NOW() WHERE id = ${existingId}::uuid`;
+    return existingId;
+  }
+
+  let rows;
+  if (clienteId && processoId && responsavelId) {
+    rows = await sql`
+      INSERT INTO controles (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda)
+      VALUES (${tipo}, ${dataEvento}::date, ${descricao}, ${clienteId}::uuid, ${processoId}::uuid, ${responsavelId}::uuid, ${tipoDemanda})
+      RETURNING id::text
+    `;
+  } else if (clienteId && processoId) {
+    rows = await sql`
+      INSERT INTO controles (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda)
+      VALUES (${tipo}, ${dataEvento}::date, ${descricao}, ${clienteId}::uuid, ${processoId}::uuid, ${tipoDemanda})
+      RETURNING id::text
+    `;
+  } else if (clienteId && responsavelId) {
+    rows = await sql`
+      INSERT INTO controles (tipo, data_evento, descricao, cliente_id, responsavel_id, tipo_demanda)
+      VALUES (${tipo}, ${dataEvento}::date, ${descricao}, ${clienteId}::uuid, ${responsavelId}::uuid, ${tipoDemanda})
+      RETURNING id::text
+    `;
+  } else if (clienteId) {
+    rows = await sql`
+      INSERT INTO controles (tipo, data_evento, descricao, cliente_id, tipo_demanda)
+      VALUES (${tipo}, ${dataEvento}::date, ${descricao}, ${clienteId}::uuid, ${tipoDemanda})
+      RETURNING id::text
+    `;
+  } else {
+    rows = await sql`
+      INSERT INTO controles (tipo, data_evento, descricao, tipo_demanda)
+      VALUES (${tipo}, ${dataEvento}::date, ${descricao}, ${tipoDemanda})
+      RETURNING id::text
+    `;
+  }
+  return String(rows[0].id);
+}
+
+async function buildDadosImplantadosData(
+  formData: FormData,
+  clienteId: string | null,
+  processoId: string | null,
+  responsavelId: string | null,
+  tipoDemanda: string | null,
+  descricao: string
+): Promise<string | null> {
+  const data1pag = ((formData.get("data_1pag") as string) ?? "").trim() || null;
+  const dataCessacao =
+    ((formData.get("data_cessacao") as string) ?? "").trim() || null;
+  const existingImplantadosId =
+    ((formData.get("implantados_id") as string) ?? "").trim() || null;
+  const existingDcbId =
+    ((formData.get("dcb_id") as string) ?? "").trim() || null;
+
+  let implantadosId: string | null = existingImplantadosId;
+  let dcbId: string | null = existingDcbId;
+
+  if (data1pag) {
+    implantadosId = await insertOrUpdateLinkedControle({
+      existingId: existingImplantadosId,
+      tipo: "implantados",
+      dataEvento: data1pag,
+      descricao: descricao || "Benefício implantado (1° Pagamento)",
+      clienteId,
+      processoId,
+      responsavelId,
+      tipoDemanda,
+    });
+  }
+
+  if (dataCessacao) {
+    const dcbData = subtractDays(dataCessacao, 15);
+    dcbId = await insertOrUpdateLinkedControle({
+      existingId: existingDcbId,
+      tipo: "dcb",
+      dataEvento: dcbData,
+      descricao: descricao || "DCB — Prorrogação automática",
+      clienteId,
+      processoId,
+      responsavelId,
+      tipoDemanda,
+    });
+  }
+
+  const dados: Record<string, string | null> = {
+    data_1pag: data1pag,
+    data_cessacao: dataCessacao,
+    implantados_id: implantadosId,
+    dcb_id: dcbId,
+  };
+
+  const hasDados = Object.values(dados).some((v) => v !== null);
+  return hasDados ? JSON.stringify(dados) : null;
+}
+
 async function buildDadosPericia(formData: FormData): Promise<string | null> {
   const hora = ((formData.get("hora") as string) ?? "").trim() || null;
   const tipoPericia =
@@ -105,16 +230,30 @@ export async function createControleAction(
     ((formData.get("observacoes") as string) ?? "").trim() || null;
 
   if (!tipo) return { error: "Tipo de controle obrigatório." };
-  if (tipo !== "audiencias" && tipo !== "pericias" && !descricao)
+  if (
+    tipo !== "audiencias" &&
+    tipo !== "pericias" &&
+    tipo !== "implantados-data" &&
+    !descricao
+  )
     return { error: "Descrição é obrigatória." };
 
   let dadosJson: string | null = null;
   try {
     if (tipo === "audiencias") dadosJson = await buildDadosAudiencia(formData);
     else if (tipo === "pericias") dadosJson = await buildDadosPericia(formData);
+    else if (tipo === "implantados-data")
+      dadosJson = await buildDadosImplantadosData(
+        formData,
+        clienteId,
+        processoId,
+        responsavelId,
+        tipoDemanda,
+        descricao
+      );
   } catch (err) {
-    console.error("buildDadosAudiencia:", err);
-    return { error: "Erro ao processar dados da audiência." };
+    console.error("buildDados:", err);
+    return { error: "Erro ao processar dados." };
   }
 
   try {
@@ -178,7 +317,12 @@ export async function updateControleAction(
 
   if (!id) return { error: "ID inválido." };
   if (!tipo) return { error: "Tipo obrigatório." };
-  if (tipo !== "audiencias" && tipo !== "pericias" && !descricao)
+  if (
+    tipo !== "audiencias" &&
+    tipo !== "pericias" &&
+    tipo !== "implantados-data" &&
+    !descricao
+  )
     return { error: "Descrição é obrigatória." };
 
   const dbStatus = status === "pendente" || !status ? null : status;
@@ -187,9 +331,18 @@ export async function updateControleAction(
   try {
     if (tipo === "audiencias") dadosJson = await buildDadosAudiencia(formData);
     else if (tipo === "pericias") dadosJson = await buildDadosPericia(formData);
+    else if (tipo === "implantados-data")
+      dadosJson = await buildDadosImplantadosData(
+        formData,
+        clienteId,
+        processoId,
+        responsavelId,
+        tipoDemanda,
+        descricao
+      );
   } catch (err) {
-    console.error("buildDadosAudiencia:", err);
-    return { error: "Erro ao processar dados da audiência." };
+    console.error("buildDados:", err);
+    return { error: "Erro ao processar dados." };
   }
 
   try {

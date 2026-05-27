@@ -242,26 +242,8 @@ export default function ControleForm({
         </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Tipo */}
-          <div>
-            <label className={labelCls}>
-              Tipo de controle <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-              className={selectCls}
-            >
-              {TIPOS_CONTROLE.map((t) => (
-                <option key={t.key} value={t.key}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Data */}
-          <div>
+          <div className={hasHora ? "" : "sm:col-span-2"}>
             <label className={labelCls}>{tipoConfig.col_data}</label>
             <input
               type="date"
@@ -308,26 +290,28 @@ export default function ControleForm({
             </div>
           </div>
 
-          {/* Descrição / Tipo-Título */}
-          <div className="sm:col-span-2">
-            <label className={labelCls}>
-              {isAudiencia
-                ? "Tipo / Título da audiência"
-                : tipoConfig.col_evento}
-              {!isAudiencia && <span className="text-red-500"> *</span>}
-            </label>
-            <textarea
-              name="descricao"
-              rows={isAudiencia ? 2 : 3}
-              defaultValue={controle?.descricao ?? ""}
-              placeholder={
-                isAudiencia
-                  ? "Ex.: Instrução e julgamento"
-                  : `Descreva ${tipoConfig.col_evento.toLowerCase()}...`
-              }
-              className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100 resize-none"
-            />
-          </div>
+          {/* Descrição / Tipo-Título — oculto para perícias */}
+          {!isPericia && (
+            <div className="sm:col-span-2">
+              <label className={labelCls}>
+                {isAudiencia
+                  ? "Tipo / Título da audiência"
+                  : tipoConfig.col_evento}
+                {!isAudiencia && <span className="text-red-500"> *</span>}
+              </label>
+              <textarea
+                name="descricao"
+                rows={isAudiencia ? 2 : 3}
+                defaultValue={controle?.descricao ?? ""}
+                placeholder={
+                  isAudiencia
+                    ? "Ex.: Instrução e julgamento"
+                    : `Descreva ${tipoConfig.col_evento.toLowerCase()}...`
+                }
+                className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100 resize-none"
+              />
+            </div>
+          )}
 
           {/* ── Campos exclusivos: Audiências ── */}
           {isAudiencia && (

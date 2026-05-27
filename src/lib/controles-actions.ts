@@ -105,7 +105,7 @@ export async function createControleAction(
     ((formData.get("observacoes") as string) ?? "").trim() || null;
 
   if (!tipo) return { error: "Tipo de controle obrigatório." };
-  if (tipo !== "audiencias" && !descricao)
+  if (tipo !== "audiencias" && tipo !== "pericias" && !descricao)
     return { error: "Descrição é obrigatória." };
 
   let dadosJson: string | null = null;
@@ -178,7 +178,7 @@ export async function updateControleAction(
 
   if (!id) return { error: "ID inválido." };
   if (!tipo) return { error: "Tipo obrigatório." };
-  if (tipo !== "audiencias" && !descricao)
+  if (tipo !== "audiencias" && tipo !== "pericias" && !descricao)
     return { error: "Descrição é obrigatória." };
 
   const dbStatus = status === "pendente" || !status ? null : status;

@@ -96,7 +96,15 @@ export interface Controle {
   responsavel_login: string | null;
   tipo_demanda: string | null;
   observacoes: string | null;
+  dados: Record<string, string | null> | null;
   created_at: string;
+}
+
+export interface LocalAudiencia {
+  id: string;
+  titulo: string;
+  endereco: string | null;
+  mapa_url: string | null;
 }
 
 export interface ClienteOption {

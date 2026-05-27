@@ -6,6 +6,7 @@ import {
   getClientesForControle,
   getProcessosForControle,
   getUsuariosForControle,
+  getLocaisAudiencia,
 } from "@/lib/controles-db";
 import { getTipoConfig } from "@/lib/controles-types";
 import ControleForm from "@/components/dashboard/controles/controle-form";
@@ -19,11 +20,12 @@ export default async function EditarControlePage({
 }) {
   const { id } = await params;
 
-  const [controle, clientes, processos, usuarios] = await Promise.all([
+  const [controle, clientes, processos, usuarios, locais] = await Promise.all([
     getControleById(id),
     getClientesForControle(),
     getProcessosForControle(),
     getUsuariosForControle(),
+    getLocaisAudiencia(),
   ]);
 
   if (!controle) notFound();
@@ -68,6 +70,7 @@ export default async function EditarControlePage({
         clientes={clientes}
         processos={processos}
         usuarios={usuarios}
+        locais={locais}
       />
     </div>
   );

@@ -17,6 +17,7 @@ import {
   type ClienteOption,
   type ProcessoOption,
   type UsuarioOption,
+  type LocalAudiencia,
 } from "@/lib/controles-types";
 
 const inputCls =
@@ -31,10 +32,7 @@ interface Props {
   clientes: ClienteOption[];
   processos: ProcessoOption[];
   usuarios: UsuarioOption[];
-}
-
-function normalizeSearch(s: string) {
-  return s.toLowerCase().replace(/\D/g, "") || s.toLowerCase();
+  locais: LocalAudiencia[];
 }
 
 export default function ControleForm({
@@ -43,6 +41,7 @@ export default function ControleForm({
   clientes,
   processos,
   usuarios,
+  locais,
 }: Props) {
   const isEdit = !!controle;
   const router = useRouter();
@@ -56,8 +55,10 @@ export default function ControleForm({
   const [tipo, setTipo] = useState(controle?.tipo ?? tipoInicial);
   const [clienteId, setClienteId] = useState(controle?.cliente_id ?? "");
   const [search, setSearch] = useState("");
+  const [localMode, setLocalMode] = useState<"existente" | "novo">("existente");
 
   const tipoConfig = getTipoConfig(tipo);
+  const isAudiencia = tipo === "audiencias";
 
   const filteredClientes =
     search.trim() === ""
@@ -74,6 +75,8 @@ export default function ControleForm({
   const processosDoCliente = clienteId
     ? processos.filter((p) => p.cliente_id === clienteId)
     : processos;
+
+  const dadosAudiencia = controle?.dados ?? null;
 
   if (state?.success && !isEdit) {
     router.push(`/dashboard/controles?tipo=${tipo}`);
@@ -213,19 +216,118 @@ export default function ControleForm({
             />
           </div>
 
-          {/* Descrição */}
-          <div className="sm:col-span-2">
+          {/* Hora — só audiências */}
+          {isAudiencia && (
+            <div>
+              <label className={labelCls}>Hora</label>
+              <input
+                type="time"
+                name="hora"
+                defaultValue={dadosAudiencia?.hora ?? ""}
+                className={inputCls}
+              />
+            </div>
+          )}
+
+          {/* Descrição / Tipo-Título */}
+          <div className={isAudiencia ? "" : "sm:col-span-2"}>
             <label className={labelCls}>
-              {tipoConfig.col_evento} <span className="text-red-500">*</span>
+              {isAudiencia
+                ? "Tipo / Título da audiência"
+                : tipoConfig.col_evento}
+              {!isAudiencia && <span className="text-red-500"> *</span>}
             </label>
             <textarea
               name="descricao"
-              rows={3}
+              rows={isAudiencia ? 2 : 3}
               defaultValue={controle?.descricao ?? ""}
-              placeholder={`Descreva ${tipoConfig.col_evento.toLowerCase()}...`}
+              placeholder={
+                isAudiencia
+                  ? "Ex.: Instrução e julgamento"
+                  : `Descreva ${tipoConfig.col_evento.toLowerCase()}...`
+              }
               className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100 resize-none"
             />
           </div>
+
+          {/* Link virtual — só audiências */}
+          {isAudiencia && (
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Link para participação virtual</label>
+              <input
+                type="url"
+                name="link_virtual"
+                defaultValue={dadosAudiencia?.link_virtual ?? ""}
+                placeholder="https://"
+                className={inputCls}
+              />
+              <p className="mt-1 font-body text-xs text-muted">
+                Preencha apenas quando houver participação remota.
+              </p>
+            </div>
+          )}
+
+          {/* Local da audiência — só audiências */}
+          {isAudiencia && (
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="font-body text-sm font-semibold text-fg">
+                  Local
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLocalMode(
+                      localMode === "existente" ? "novo" : "existente"
+                    )
+                  }
+                  className="font-body text-xs text-primary hover:underline"
+                >
+                  {localMode === "existente"
+                    ? "+ Cadastrar novo local"
+                    : "← Selecionar da lista"}
+                </button>
+              </div>
+
+              <input type="hidden" name="local_mode" value={localMode} />
+
+              {localMode === "existente" ? (
+                <select
+                  name="local_id"
+                  defaultValue={dadosAudiencia?.local_id ?? ""}
+                  className={selectCls}
+                >
+                  <option value="">— Selecione um local —</option>
+                  {locais.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.titulo}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    name="novo_local_titulo"
+                    placeholder="Título do local"
+                    className={inputCls}
+                  />
+                  <input
+                    type="text"
+                    name="novo_local_endereco"
+                    placeholder="Endereço completo"
+                    className={inputCls}
+                  />
+                  <input
+                    type="url"
+                    name="novo_local_mapa"
+                    placeholder="Link do mapa (Google Maps...)"
+                    className={inputCls}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tipo Demanda */}
           <div>

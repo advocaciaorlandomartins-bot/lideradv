@@ -5,6 +5,7 @@ import {
   type ClienteOption,
   type ProcessoOption,
   type UsuarioOption,
+  type LocalAudiencia,
 } from "./controles-types";
 
 export type {
@@ -12,6 +13,7 @@ export type {
   ClienteOption,
   ProcessoOption,
   UsuarioOption,
+  LocalAudiencia,
 } from "./controles-types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,13 +32,18 @@ function mapRow(r: any): Controle {
     responsavel_login: r.responsavel_login ? String(r.responsavel_login) : null,
     tipo_demanda: r.tipo_demanda ? String(r.tipo_demanda) : null,
     observacoes: r.observacoes ? String(r.observacoes) : null,
+    dados: r.dados
+      ? typeof r.dados === "object"
+        ? r.dados
+        : JSON.parse(String(r.dados))
+      : null,
     created_at: String(r.created_at),
   };
 }
 
 export interface GetControlesOptions {
   tipo: string;
-  status?: string | null; // 'pendente' | 'concluido' | 'cancelado' | null (all)
+  status?: string | null;
   inicio?: string | null;
   fim?: string | null;
   ordem?: "asc" | "desc";
@@ -71,7 +78,7 @@ export async function getControles(
       c.cliente_id::text,   cl.name AS cliente_nome,
       c.processo_id::text,  p.numero AS processo_numero,
       c.responsavel_id::text, u.login AS responsavel_login,
-      c.tipo_demanda, c.observacoes, c.created_at::text
+      c.tipo_demanda, c.observacoes, c.dados, c.created_at::text
     FROM controles c
     LEFT JOIN clients cl ON cl.id = c.cliente_id
     LEFT JOIN processos p  ON p.id  = c.processo_id
@@ -117,7 +124,7 @@ export async function getControleById(id: string): Promise<Controle | null> {
       c.cliente_id::text,   cl.name AS cliente_nome,
       c.processo_id::text,  p.numero AS processo_numero,
       c.responsavel_id::text, u.login AS responsavel_login,
-      c.tipo_demanda, c.observacoes, c.created_at::text
+      c.tipo_demanda, c.observacoes, c.dados, c.created_at::text
     FROM controles c
     LEFT JOIN clients cl ON cl.id = c.cliente_id
     LEFT JOIN processos p  ON p.id  = c.processo_id
@@ -167,5 +174,19 @@ export async function getUsuariosForControle(): Promise<UsuarioOption[]> {
     id: String(r.id),
     login: String(r.login),
     nome: String(r.nome),
+  }));
+}
+
+export async function getLocaisAudiencia(): Promise<LocalAudiencia[]> {
+  const rows = await sql`
+    SELECT id::text, titulo, endereco, mapa_url
+    FROM locais_audiencia
+    ORDER BY titulo ASC
+  `;
+  return rows.map((r) => ({
+    id: String(r.id),
+    titulo: String(r.titulo),
+    endereco: r.endereco ? String(r.endereco) : null,
+    mapa_url: r.mapa_url ? String(r.mapa_url) : null,
   }));
 }

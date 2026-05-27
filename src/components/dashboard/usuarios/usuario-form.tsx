@@ -8,7 +8,7 @@ import {
   updateUsuarioAction,
   type UsuarioFormState,
 } from "@/lib/usuarios-actions";
-import { CATEGORIAS, type Usuario } from "@/lib/usuarios-db";
+import { CATEGORIAS, type Usuario } from "@/lib/usuarios-types";
 
 const inputCls =
   "w-full h-10 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100";

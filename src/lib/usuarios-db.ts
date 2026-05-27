@@ -1,27 +1,12 @@
 import sql from "./db";
 
-export const MAX_USUARIOS = 3;
-
-export const CATEGORIAS = [
-  "Sócio(a)",
-  "Advogado(a)",
-  "Estagiário(a)",
-  "Colaborador(a)",
-  "Administrador(a)",
-] as const;
-
-export type Categoria = (typeof CATEGORIAS)[number];
-
-export interface Usuario {
-  id: string;
-  login: string;
-  nome: string;
-  categoria: string;
-  validade: string | null; // ISO date string
-  ultimo_acesso: string | null; // ISO timestamp string
-  ativo: boolean;
-  created_at: string;
-}
+export {
+  MAX_USUARIOS,
+  CATEGORIAS,
+  type Categoria,
+  type Usuario,
+} from "./usuarios-types";
+import type { Usuario } from "./usuarios-types";
 
 function mapRow(r: Record<string, unknown>): Usuario {
   return {
@@ -63,7 +48,6 @@ export async function countAtivos(): Promise<number> {
   return Number(rows[0]?.n ?? 0);
 }
 
-/** Returns the stored senha_hash for password verification */
 export async function getSenhaHash(id: string): Promise<string | null> {
   const rows =
     await sql`SELECT senha_hash FROM usuarios WHERE id = ${id}::uuid LIMIT 1`;

@@ -369,12 +369,10 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     let recebido = 0,
       pago = 0;
     for (const l of lancamentos) {
-      const d = parseDMY(l.data_vencimento);
-      if (
-        d.getFullYear() === yy &&
-        d.getMonth() === mm &&
-        l.status === "pago"
-      ) {
+      if (l.status !== "pago") continue;
+      const refStr = l.data_pagamento ?? l.data_vencimento;
+      const d = parseDMY(refStr);
+      if (d.getFullYear() === yy && d.getMonth() === mm) {
         if (l.tipo === "entrada") recebido += l.valor;
         else if (l.tipo === "saida") pago += l.valor;
       }
@@ -418,9 +416,14 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const dateFiltered = useMemo(() => {
     return lancamentos.filter((l) => {
       if (!dateRange.from && !dateRange.to) return true;
-      const venc = parseDMY(l.data_vencimento);
-      if (dateRange.from && venc < dateRange.from) return false;
-      if (dateRange.to && venc > dateRange.to) return false;
+      // Paid items: filter by payment date; pending/cancelled: filter by due date
+      const refStr =
+        l.status === "pago" && l.data_pagamento
+          ? l.data_pagamento
+          : l.data_vencimento;
+      const ref = parseDMY(refStr);
+      if (dateRange.from && ref < dateRange.from) return false;
+      if (dateRange.to && ref > dateRange.to) return false;
       return true;
     });
   }, [lancamentos, dateRange]);

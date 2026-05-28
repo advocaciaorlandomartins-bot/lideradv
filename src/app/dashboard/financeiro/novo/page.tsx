@@ -11,7 +11,15 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function NovoLancamentoPage() {
+export default async function NovoLancamentoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string }>;
+}) {
+  const { tipo } = await searchParams;
+  const defaultTipo: "entrada" | "saida" =
+    tipo === "saida" ? "saida" : "entrada";
+
   const [clients, processos, escritorioConfig] = await Promise.all([
     getAllClients(),
     getAllProcessos(),
@@ -62,6 +70,7 @@ export default async function NovoLancamentoPage() {
           clients={clientOptions}
           processos={processoOptions}
           salarioMinimo={escritorioConfig.salario_minimo ?? 1518}
+          defaultTipo={defaultTipo}
         />
       </div>
     </div>

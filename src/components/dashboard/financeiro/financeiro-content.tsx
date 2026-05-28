@@ -206,9 +206,11 @@ function SectionHeading({
 function RowActions({
   lancamento,
   canEdit,
+  singleDeleteOnly = false,
 }: {
   lancamento: Lancamento;
   canEdit: boolean;
+  singleDeleteOnly?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -239,7 +241,7 @@ function RowActions({
   }
 
   function handleDelete() {
-    if (lancamento.grupo_parcelas) {
+    if (!singleDeleteOnly && lancamento.grupo_parcelas) {
       const choice = confirm(
         `Este lançamento faz parte de um grupo.\n\n• OK = excluir TODOS\n• Cancelar = excluir só este`
       );
@@ -507,6 +509,18 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
       );
   }, [dateFiltered, search]);
 
+  const concluidasTotals = useMemo(() => {
+    let receitas = 0,
+      despesas = 0;
+    for (const l of concluidas) {
+      if (l.status === "pago") {
+        if (l.tipo === "entrada") receitas += l.valor;
+        else if (l.tipo === "saida") despesas += l.valor;
+      }
+    }
+    return { receitas, despesas, total: receitas - despesas };
+  }, [concluidas]);
+
   const totalPagesConcluidas = Math.ceil(concluidas.length / PAGE_SIZE);
   const paginatedConcluidas = concluidas.slice(
     (pageConcluidas - 1) * PAGE_SIZE,
@@ -520,6 +534,31 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
 
   return (
     <div className="space-y-5">
+      {/* ── Action buttons ── */}
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/dashboard/financeiro/novo?tipo=entrada"
+          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+        >
+          <PlusIcon className="h-4 w-4" />
+          Nova Receita
+        </Link>
+        <Link
+          href="/dashboard/financeiro/novo?tipo=saida"
+          className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700"
+        >
+          <PlusIcon className="h-4 w-4" />
+          Nova Despesa
+        </Link>
+        <Link
+          href="/dashboard/remuneracoes/nova"
+          className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-purple-700"
+        >
+          <PlusIcon className="h-4 w-4" />
+          Nova Remuneração
+        </Link>
+      </div>
+
       {/* KPI row 1 */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard
@@ -632,108 +671,19 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
-        <p className="mb-4 font-heading text-sm font-semibold text-fg">
-          Receitas e despesas por mês
-        </p>
-        <div style={{ height: 260 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              margin={{ top: 4, right: 8, left: 8, bottom: 0 }}
-              barCategoryGap="30%"
-              barGap={3}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#f0f0f0"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="month"
-                tick={{ fontFamily: "inherit", fontSize: 11, fill: "#94a3b8" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tickFormatter={(v) =>
-                  v === 0
-                    ? "0"
-                    : v >= 1000
-                      ? `${(v / 1000).toFixed(0)}k`
-                      : String(v)
-                }
-                tick={{ fontFamily: "inherit", fontSize: 11, fill: "#94a3b8" }}
-                axisLine={false}
-                tickLine={false}
-                width={40}
-              />
-              <Tooltip
-                formatter={(value) =>
-                  typeof value === "number"
-                    ? value.toLocaleString("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      })
-                    : String(value)
-                }
-                contentStyle={{
-                  borderRadius: 10,
-                  border: "1px solid #e2e8f0",
-                  fontFamily: "inherit",
-                  fontSize: 13,
-                }}
-                labelStyle={{ fontWeight: 600, marginBottom: 4 }}
-              />
-              <Legend
-                iconType="circle"
-                iconSize={8}
-                wrapperStyle={{
-                  fontFamily: "inherit",
-                  fontSize: 12,
-                  paddingTop: 8,
-                }}
-              />
-              <Bar
-                dataKey="receitas"
-                name="Receitas"
-                fill="#22c55e"
-                radius={[4, 4, 0, 0]}
-              />
-              <Bar
-                dataKey="despesas"
-                name="Despesas"
-                fill="#ef4444"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
-            type="search"
-            placeholder="Buscar por descrição, cliente…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPageConcluidas(1);
-            }}
-            className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
-        <Link
-          href="/dashboard/financeiro/novo"
-          className="flex h-10 items-center gap-2 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Novo lançamento
-        </Link>
+      {/* Toolbar (search only) */}
+      <div className="relative max-w-sm">
+        <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        <input
+          type="search"
+          placeholder="Buscar por descrição, cliente…"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPageConcluidas(1);
+          }}
+          className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
+        />
       </div>
 
       {/* Date presets */}
@@ -1165,6 +1115,41 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
             count={concluidas.length}
             accent="slate"
           />
+
+          {/* Summary totals */}
+          {concluidas.length > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm">
+                <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                  Receitas
+                </p>
+                <p className="mt-2 font-heading text-xl font-semibold text-emerald-700">
+                  {fmt(concluidasTotals.receitas)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
+                <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                  Despesas
+                </p>
+                <p className="mt-2 font-heading text-xl font-semibold text-red-600">
+                  −{fmt(concluidasTotals.despesas)}
+                </p>
+              </div>
+              <div
+                className={`rounded-xl border bg-white p-4 shadow-sm ${concluidasTotals.total >= 0 ? "border-emerald-200" : "border-red-200"}`}
+              >
+                <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                  Total
+                </p>
+                <p
+                  className={`mt-2 font-heading text-xl font-semibold ${concluidasTotals.total >= 0 ? "text-emerald-700" : "text-red-600"}`}
+                >
+                  {fmt(concluidasTotals.total)}
+                </p>
+              </div>
+            </div>
+          )}
+
           {concluidas.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-white py-16 text-center shadow-sm">
               <BanknotesIcon className="h-10 w-10 text-slate-300" />
@@ -1269,7 +1254,11 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
                             {l.data_pagamento ?? "—"}
                           </td>
                           <td className="px-5 py-3.5">
-                            <RowActions lancamento={l} canEdit={canEdit} />
+                            <RowActions
+                              lancamento={l}
+                              canEdit={canEdit}
+                              singleDeleteOnly
+                            />
                           </td>
                         </tr>
                       );
@@ -1359,6 +1348,86 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           )}
         </div>
       )}
+
+      {/* ── Chart (bottom) ── */}
+      <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+        <p className="mb-4 font-heading text-sm font-semibold text-fg">
+          Receitas e despesas por mês
+        </p>
+        <div style={{ height: 260 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              margin={{ top: 4, right: 8, left: 8, bottom: 0 }}
+              barCategoryGap="30%"
+              barGap={3}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#f0f0f0"
+                vertical={false}
+              />
+              <XAxis
+                dataKey="month"
+                tick={{ fontFamily: "inherit", fontSize: 11, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tickFormatter={(v) =>
+                  v === 0
+                    ? "0"
+                    : v >= 1000
+                      ? `${(v / 1000).toFixed(0)}k`
+                      : String(v)
+                }
+                tick={{ fontFamily: "inherit", fontSize: 11, fill: "#94a3b8" }}
+                axisLine={false}
+                tickLine={false}
+                width={40}
+              />
+              <Tooltip
+                formatter={(value) =>
+                  typeof value === "number"
+                    ? value.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })
+                    : String(value)
+                }
+                contentStyle={{
+                  borderRadius: 10,
+                  border: "1px solid #e2e8f0",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                }}
+                labelStyle={{ fontWeight: 600, marginBottom: 4 }}
+              />
+              <Legend
+                iconType="circle"
+                iconSize={8}
+                wrapperStyle={{
+                  fontFamily: "inherit",
+                  fontSize: 12,
+                  paddingTop: 8,
+                }}
+              />
+              <Bar
+                dataKey="receitas"
+                name="Receitas"
+                fill="#22c55e"
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey="despesas"
+                name="Despesas"
+                fill="#ef4444"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }

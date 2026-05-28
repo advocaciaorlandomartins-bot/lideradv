@@ -120,19 +120,21 @@ interface Props {
   clients: ClientOption[];
   processos: ProcessoOption[];
   salarioMinimo: number;
+  defaultTipo?: "entrada" | "saida";
 }
 
 export default function NewLancamentoForm({
   clients,
   processos,
   salarioMinimo,
+  defaultTipo = "entrada",
 }: Props) {
   const [state, formAction, isPending] = useActionState<
     LancamentoFormState,
     FormData
   >(createLancamentoAction, null);
 
-  const [tipo, setTipo] = useState<"entrada" | "saida">("entrada");
+  const [tipo, setTipo] = useState<"entrada" | "saida">(defaultTipo);
 
   // ── Vinculação ─────────────────────────────────────────────
   const [clientSearch, setClientSearch] = useState("");

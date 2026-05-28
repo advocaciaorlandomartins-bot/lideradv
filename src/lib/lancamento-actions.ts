@@ -6,6 +6,15 @@ import sql from "./db";
 
 export type LancamentoFormState = { error: string } | null;
 
+// Returns today's date as YYYY-MM-DD in the Brazil/Brasília timezone (UTC-3).
+// Using CURRENT_DATE in PostgreSQL would return the UTC date, which can be
+// one day ahead for users in Brazil after 21h local time.
+function todayBR(): string {
+  return new Date().toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
+}
+
 export async function createLancamentoAction(
   _prev: LancamentoFormState,
   formData: FormData
@@ -189,6 +198,7 @@ export async function updateLancamentoAction(
     const oldStatus = current[0].status as string;
     const remuneracaoId = current[0].remuneracao_id as string | null;
 
+    const hoje = todayBR();
     if (status === "pago" && oldStatus !== "pago") {
       await sql`
         UPDATE lancamentos SET
@@ -197,7 +207,7 @@ export async function updateLancamentoAction(
           client_id = ${clientId ? clientId : null}::uuid,
           processo_id = ${processoId ? processoId : null}::uuid,
           status = ${status}, data_vencimento = ${dataVencimento}::date,
-          data_pagamento = CURRENT_DATE, observacoes = ${observacoes}
+          data_pagamento = ${hoje}::date, observacoes = ${observacoes}
         WHERE id = ${id}::uuid
       `;
     } else if (status !== "pago") {
@@ -228,7 +238,7 @@ export async function updateLancamentoAction(
       if (status === "pago") {
         await sql`
           UPDATE remuneracoes SET
-            status = ${status}, data_pagamento = CURRENT_DATE, updated_at = NOW()
+            status = ${status}, data_pagamento = ${hoje}::date, updated_at = NOW()
           WHERE id = ${remuneracaoId}::uuid
         `;
       } else {
@@ -268,7 +278,7 @@ export async function markAsPagoAction(id: string): Promise<void> {
   try {
     const rows = await sql`
       UPDATE lancamentos
-      SET status = 'pago', data_pagamento = CURRENT_DATE
+      SET status = 'pago', data_pagamento = ${todayBR()}::date
       WHERE id = ${id}::uuid
       RETURNING remuneracao_id
     `;
@@ -276,7 +286,7 @@ export async function markAsPagoAction(id: string): Promise<void> {
     if (remuneracaoId) {
       await sql`
         UPDATE remuneracoes
-        SET status = 'pago', data_pagamento = CURRENT_DATE, updated_at = NOW()
+        SET status = 'pago', data_pagamento = ${todayBR()}::date, updated_at = NOW()
         WHERE id = ${remuneracaoId}::uuid
       `;
     }

@@ -17,12 +17,19 @@ import {
   DocumentTextIcon,
   ShieldCheckIcon,
   CogIcon,
+  ChartBarIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: HomeIcon, label: "Dashboard", modulo: null },
+  {
+    href: "/dashboard/gerenciador",
+    icon: ChartBarIcon,
+    label: "Gerenciador",
+    modulo: null,
+  },
   {
     href: "/dashboard/clientes",
     icon: UsersIcon,

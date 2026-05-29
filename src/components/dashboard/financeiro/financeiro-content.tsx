@@ -19,6 +19,7 @@ import {
   deleteLancamentoAction,
   deleteGrupoAction,
   reagendarLancamentoAction,
+  revertParaPendenteAction,
 } from "@/lib/lancamento-actions";
 import {
   PlusIcon,
@@ -59,8 +60,7 @@ function matchesSearch(l: Lancamento, q: string): boolean {
 }
 
 type DatePreset = "todos" | "hoje" | "mes" | "mes_anterior" | "ano" | "custom";
-type MainTab = "pendentes" | "concluidas";
-type LancamentoWithSaldo = Lancamento & { saldoAcumulado: number };
+type MainTab = "pendentes" | "concluidas" | "atrasados";
 
 function getPresetRange(preset: DatePreset): {
   from: Date | null;
@@ -150,14 +150,14 @@ function TipoIndicator({
 }) {
   if (isPessoal) {
     return (
-      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 font-body text-sm font-bold text-purple-700">
+      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 font-body text-[10px] font-bold text-purple-700">
         R$
       </span>
     );
   }
   return (
     <span
-      className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full font-body text-sm font-bold ${
+      className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full font-body text-[10px] font-bold ${
         tipo === "entrada"
           ? "bg-emerald-100 text-emerald-700"
           : "bg-red-100 text-red-600"
@@ -201,6 +201,88 @@ function SectionHeading({
   );
 }
 
+// ── PaginationBar ─────────────────────────────────────────────────────────────
+
+const PS_OPTIONS = [10, 20, 50];
+
+function PaginationBar({
+  page,
+  pageSize,
+  total,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (p: number) => void;
+  onPageSize: (s: number) => void;
+}) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (total === 0) return null;
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+      <div className="flex items-center gap-1">
+        <span className="font-body text-xs text-muted mr-1">Exibir:</span>
+        {PS_OPTIONS.map((s) => (
+          <button
+            key={s}
+            onClick={() => {
+              onPageSize(s);
+              onPage(1);
+            }}
+            className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${
+              pageSize === s
+                ? "bg-primary font-semibold text-white"
+                : "text-muted hover:text-fg"
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <p className="font-body text-xs text-muted">
+          {start}–{end} de {total}
+        </p>
+        {totalPages > 1 && (
+          <div className="flex gap-1">
+            <button
+              onClick={() => onPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                onClick={() => onPage(n)}
+                className={`flex h-7 w-7 items-center justify-center rounded font-body text-xs transition-colors cursor-pointer ${
+                  page === n
+                    ? "bg-primary font-semibold text-white"
+                    : "border border-border text-muted hover:border-primary hover:text-primary"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              onClick={() => onPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              ›
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── RowActions ────────────────────────────────────────────────────────────────
 
 function RowActions({
@@ -224,6 +306,16 @@ function RowActions({
     setAction("pago");
     startTransition(async () => {
       await markAsPagoAction(lancamento.id);
+      router.refresh();
+      setAction(null);
+    });
+  }
+
+  function handleDesfazer() {
+    if (!confirm("Reverter este lançamento para pendente?")) return;
+    setAction("desfazer");
+    startTransition(async () => {
+      await revertParaPendenteAction(lancamento.id);
       router.refresh();
       setAction(null);
     });
@@ -271,13 +363,25 @@ function RowActions({
   const loading = isPending && action !== null;
 
   return (
-    <div className="flex items-center gap-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+    <div className="flex items-center gap-1.5">
+      {lancamento.status === "pago" && (
+        <button
+          onClick={handleDesfazer}
+          disabled={loading}
+          className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-body text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50 cursor-pointer"
+        >
+          {loading && action === "desfazer" ? (
+            <SpinnerIcon className="h-3 w-3" />
+          ) : null}
+          Desfazer
+        </button>
+      )}
       {lancamento.status === "pendente" && (
         <>
           <button
             onClick={handlePago}
             disabled={loading}
-            className="flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 font-body text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 font-body text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 cursor-pointer"
           >
             {loading && action === "pago" ? (
               <SpinnerIcon className="h-3 w-3" />
@@ -287,7 +391,7 @@ function RowActions({
           {!reagendando ? (
             <button
               onClick={() => setReagendando(true)}
-              className="flex items-center gap-1 rounded-md border border-border bg-slate-50 px-2.5 py-1 font-body text-xs font-semibold text-slate-600 transition-colors hover:bg-amber-50 hover:text-amber-700 cursor-pointer"
+              className="flex items-center gap-1 rounded-md border border-border bg-slate-50 px-2 py-1 font-body text-[11px] font-semibold text-slate-600 transition-colors hover:bg-amber-50 hover:text-amber-700 cursor-pointer"
             >
               <CalendarIcon className="h-3 w-3" />
               Reagendar
@@ -298,18 +402,18 @@ function RowActions({
                 type="date"
                 value={novaData}
                 onChange={(e) => setNovaData(e.target.value)}
-                className="h-7 rounded border border-border bg-white px-2 font-body text-xs text-fg outline-none focus:border-primary"
+                className="h-6 rounded border border-border bg-white px-1.5 font-body text-[11px] text-fg outline-none focus:border-primary"
               />
               <button
                 onClick={handleReagendar}
                 disabled={loading || !novaData}
-                className="rounded-md bg-primary px-2 py-1 font-body text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                className="rounded-md bg-primary px-1.5 py-0.5 font-body text-[11px] font-semibold text-white hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
               >
                 {loading && action === "reagendar" ? "…" : "OK"}
               </button>
               <button
                 onClick={() => setReagendando(false)}
-                className="rounded-md bg-slate-100 px-2 py-1 font-body text-xs text-muted hover:bg-slate-200 cursor-pointer"
+                className="rounded-md bg-slate-100 px-1.5 py-0.5 font-body text-[11px] text-muted hover:bg-slate-200 cursor-pointer"
               >
                 ×
               </button>
@@ -317,10 +421,10 @@ function RowActions({
           )}
         </>
       )}
-      {canEdit && lancamento.status !== "cancelado" && (
+      {lancamento.status !== "cancelado" && (
         <Link
           href={`/dashboard/financeiro/${lancamento.id}/editar`}
-          className="flex items-center gap-1 rounded-md border border-border bg-slate-50 px-2.5 py-1 font-body text-xs font-semibold text-slate-600 transition-colors hover:bg-blue-50 hover:text-primary"
+          className="flex items-center gap-1 rounded-md border border-border bg-slate-50 px-2 py-1 font-body text-[11px] font-semibold text-slate-600 transition-colors hover:bg-blue-50 hover:text-primary"
         >
           Abrir
         </Link>
@@ -328,7 +432,7 @@ function RowActions({
       <button
         onClick={handleDelete}
         disabled={loading}
-        className="font-body text-xs font-semibold text-red-500 transition-colors hover:text-red-700 disabled:opacity-40 cursor-pointer"
+        className="font-body text-[11px] font-semibold text-red-500 transition-colors hover:text-red-700 disabled:opacity-40 cursor-pointer"
       >
         {loading && action === "del" ? "…" : "Excluir"}
       </button>
@@ -344,16 +448,18 @@ interface Props {
   canEdit: boolean;
 }
 
-const PAGE_SIZE = 10;
-
 export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [mainTab, setMainTab] = useState<MainTab>("pendentes");
   const [search, setSearch] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("mes");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  const [saldoInicialStr, setSaldoInicialStr] = useState("0");
+  const [pagePendentes, setPagePendentes] = useState(1);
+  const [pageSizePendentes, setPageSizePendentes] = useState(10);
+  const [pageAtrasados, setPageAtrasados] = useState(1);
+  const [pageSizeAtrasados, setPageSizeAtrasados] = useState(10);
   const [pageConcluidas, setPageConcluidas] = useState(1);
+  const [pageSizeConcluidas, setPageSizeConcluidas] = useState(10);
 
   const today = useMemo(() => {
     const n = new Date();
@@ -463,15 +569,22 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     );
   }, [dateFiltered, search]);
 
+  // Overdue items: always from the full list, never date-filtered
   const pendentesVencidos = useMemo(() => {
-    return pendentes
-      .filter((l) => parseDMY(l.data_vencimento) <= today)
+    const q = search.toLowerCase().trim();
+    return lancamentos
+      .filter(
+        (l) =>
+          l.status === "pendente" &&
+          parseDMY(l.data_vencimento) <= today &&
+          matchesSearch(l, q)
+      )
       .sort(
         (a, b) =>
           parseDMY(a.data_vencimento).getTime() -
           parseDMY(b.data_vencimento).getTime()
       );
-  }, [pendentes, today]);
+  }, [lancamentos, today, search]);
 
   const pendentesNaoVencidos = useMemo(() => {
     return pendentes
@@ -482,21 +595,6 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           parseDMY(b.data_vencimento).getTime()
       );
   }, [pendentes, today]);
-
-  const futuraWithSaldo = useMemo((): LancamentoWithSaldo[] => {
-    const base = parseFloat(saldoInicialStr) || 0;
-    return pendentesNaoVencidos.reduce(
-      (state: { items: LancamentoWithSaldo[]; running: number }, l) => {
-        const next =
-          state.running + (l.tipo === "entrada" ? l.valor : -l.valor);
-        return {
-          items: state.items.concat({ ...l, saldoAcumulado: next }),
-          running: next,
-        };
-      },
-      { items: [], running: base }
-    ).items;
-  }, [pendentesNaoVencidos, saldoInicialStr]);
 
   const concluidas = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -521,15 +619,37 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     return { receitas, despesas, total: receitas - despesas };
   }, [concluidas]);
 
-  const totalPagesConcluidas = Math.ceil(concluidas.length / PAGE_SIZE);
+  const totalPagesConcluidas = Math.ceil(
+    concluidas.length / pageSizeConcluidas
+  );
   const paginatedConcluidas = concluidas.slice(
-    (pageConcluidas - 1) * PAGE_SIZE,
-    pageConcluidas * PAGE_SIZE
+    (pageConcluidas - 1) * pageSizeConcluidas,
+    pageConcluidas * pageSizeConcluidas
+  );
+
+  const paginatedPendentes = useMemo(
+    () =>
+      pendentesNaoVencidos.slice(
+        (pagePendentes - 1) * pageSizePendentes,
+        pagePendentes * pageSizePendentes
+      ),
+    [pendentesNaoVencidos, pagePendentes, pageSizePendentes]
+  );
+
+  const paginatedAtrasados = useMemo(
+    () =>
+      pendentesVencidos.slice(
+        (pageAtrasados - 1) * pageSizeAtrasados,
+        pageAtrasados * pageSizeAtrasados
+      ),
+    [pendentesVencidos, pageAtrasados, pageSizeAtrasados]
   );
 
   function handleDatePreset(p: DatePreset) {
     setDatePreset(p);
     setPageConcluidas(1);
+    setPagePendentes(1);
+    setPageAtrasados(1);
   }
 
   return (
@@ -681,6 +801,8 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           onChange={(e) => {
             setSearch(e.target.value);
             setPageConcluidas(1);
+            setPagePendentes(1);
+            setPageAtrasados(1);
           }}
           className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
         />
@@ -751,7 +873,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           }`}
         >
           A receber / A pagar
-          {pendentes.length > 0 && (
+          {pendentesNaoVencidos.length > 0 && (
             <span
               className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${
                 mainTab === "pendentes"
@@ -759,7 +881,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
                   : "bg-amber-50 text-amber-700"
               }`}
             >
-              {pendentes.length}
+              {pendentesNaoVencidos.length}
             </span>
           )}
         </button>
@@ -784,326 +906,130 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setMainTab("atrasados")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors cursor-pointer ${
+            mainTab === "atrasados"
+              ? "bg-red-600 text-white shadow-sm"
+              : "text-muted hover:text-fg"
+          }`}
+        >
+          Pendentes
+          {pendentesVencidos.length > 0 && (
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${
+                mainTab === "atrasados"
+                  ? "bg-white/20 text-white"
+                  : "bg-red-50 text-red-700"
+              }`}
+            >
+              {pendentesVencidos.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* ── Pendentes Tab ── */}
+      {/* ── Pendentes Tab (próximos vencimentos) ── */}
       {mainTab === "pendentes" && (
-        <div className="space-y-6">
-          {/* Vencidos section */}
-          <div className="space-y-3">
-            <SectionHeading
-              title="Vencidos e hoje"
-              count={pendentesVencidos.length}
-              accent="red"
-            />
-            {pendentesVencidos.length === 0 ? (
-              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-                <span className="font-body text-lg font-bold text-emerald-600">
-                  ✓
-                </span>
-                <p className="font-body text-sm font-semibold text-emerald-700">
-                  Nenhum vencimento pendente — tudo em dia!
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-red-100 bg-white shadow-sm">
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border bg-red-50/40">
-                        <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Vencimento
-                        </th>
-                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Descrição
-                        </th>
-                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Cliente
-                        </th>
-                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Parcela
-                        </th>
-                        <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Valor
-                        </th>
-                        <th className="px-5 py-3" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {pendentesVencidos.map((l) => {
-                        const isPessoal = l.remuneracao_id !== null;
-                        const isToday =
-                          parseDMY(l.data_vencimento).getTime() ===
-                          today.getTime();
-                        return (
-                          <tr
-                            key={l.id}
-                            className="group transition-colors hover:bg-slate-50"
-                          >
-                            <td className="px-5 py-3.5">
-                              <span
-                                className={`flex items-center gap-1.5 font-body text-sm font-semibold ${isToday ? "text-amber-600" : "text-red-600"}`}
-                              >
-                                <CalendarIcon
-                                  className={`h-3.5 w-3.5 ${isToday ? "text-amber-400" : "text-red-400"}`}
-                                />
-                                {l.data_vencimento}
-                                {isToday && (
-                                  <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 font-body text-[10px] font-bold text-amber-700">
-                                    Hoje
-                                  </span>
-                                )}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <div className="flex items-center gap-2.5">
-                                <TipoIndicator
-                                  tipo={l.tipo}
-                                  isPessoal={isPessoal}
-                                />
-                                <div className="min-w-0">
-                                  <p className="truncate font-body text-sm font-semibold text-fg max-w-[200px]">
-                                    {l.descricao}
-                                  </p>
-                                  {isPessoal ? (
-                                    <span className="inline-flex items-center rounded px-1.5 py-0.5 font-body text-[10px] font-bold bg-purple-50 text-purple-700">
-                                      Pessoal
-                                    </span>
-                                  ) : l.categoria ? (
-                                    <p className="font-body text-xs text-muted">
-                                      {l.categoria}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5 font-body text-sm text-fg">
-                              {l.client_name ? (
-                                <Link
-                                  href={`/dashboard/clientes/${l.client_id}`}
-                                  className="hover:text-primary transition-colors truncate max-w-[140px] block"
-                                >
-                                  {l.client_name}
-                                </Link>
-                              ) : (
-                                <span className="text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3.5 font-body text-sm text-muted">
-                              {l.parcela_atual != null
-                                ? l.parcela_atual === 0
-                                  ? "Entrada"
-                                  : `${l.parcela_atual}/${l.total_parcelas}`
-                                : "—"}
-                            </td>
-                            <td
-                              className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
-                            >
-                              {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                            </td>
-                            <td className="px-5 py-3.5">
-                              <RowActions lancamento={l} canEdit={canEdit} />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <ul className="divide-y divide-border md:hidden">
-                  {pendentesVencidos.map((l) => {
+        <div className="space-y-3">
+          <SectionHeading
+            title="Próximos vencimentos"
+            count={pendentesNaoVencidos.length}
+            accent="blue"
+          />
+          {pendentesNaoVencidos.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-5 py-4">
+              <p className="font-body text-sm text-muted">
+                Nenhum vencimento futuro no período selecionado.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[90px]" />
+                  <col />
+                  <col className="w-[90px]" />
+                  <col className="w-[296px]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-border bg-slate-50/50">
+                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Vencimento
+                    </th>
+                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Descrição
+                    </th>
+                    <th className="px-3 py-2 text-right font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Valor
+                    </th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedPendentes.map((l) => {
                     const isPessoal = l.remuneracao_id !== null;
                     return (
-                      <li
+                      <tr
                         key={l.id}
-                        className="flex items-center gap-3 px-4 py-4"
+                        className="group transition-colors hover:bg-slate-50"
                       >
-                        <TipoIndicator tipo={l.tipo} isPessoal={isPessoal} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-body text-sm font-semibold text-fg">
-                            {l.descricao}
-                          </p>
-                          <p className="font-body text-xs text-red-500 font-semibold">
-                            {l.data_vencimento}
-                          </p>
-                        </div>
-                        <span
-                          className={`flex-shrink-0 font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-1 font-body text-[11px] text-fg">
+                            <CalendarIcon className="h-3 w-3 text-muted flex-shrink-0" />
+                            <span className="truncate">
+                              {l.data_vencimento}
+                            </span>
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <TipoIndicator
+                              tipo={l.tipo}
+                              isPessoal={isPessoal}
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate font-body text-xs font-semibold text-fg">
+                                {l.descricao}
+                              </p>
+                              <p className="truncate font-body text-[10px] text-muted">
+                                {[
+                                  l.client_name,
+                                  l.parcela_atual != null
+                                    ? l.parcela_atual === 0
+                                      ? "Entrada"
+                                      : `Parcela ${l.parcela_atual}/${l.total_parcelas}`
+                                    : null,
+                                  isPessoal ? "Pessoal" : l.categoria,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right font-body text-xs font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
                         >
                           {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* Futuras section */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-4">
-              <SectionHeading
-                title="Próximos vencimentos"
-                count={pendentesNaoVencidos.length}
-                accent="blue"
-              />
-              <div className="ml-auto flex items-center gap-2">
-                <label className="font-body text-xs font-semibold text-muted">
-                  Saldo inicial (R$):
-                </label>
-                <input
-                  type="number"
-                  value={saldoInicialStr}
-                  onChange={(e) => setSaldoInicialStr(e.target.value)}
-                  placeholder="0"
-                  className="h-8 w-28 rounded-lg border border-border bg-white px-3 text-right font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-            </div>
-            {pendentesNaoVencidos.length === 0 ? (
-              <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-5 py-4">
-                <p className="font-body text-sm text-muted">
-                  Nenhum vencimento futuro no período selecionado.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border bg-slate-50/50">
-                        <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Vencimento
-                        </th>
-                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Descrição
-                        </th>
-                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Cliente
-                        </th>
-                        <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Parcela
-                        </th>
-                        <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Valor
-                        </th>
-                        <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                          Saldo previsto
-                        </th>
-                        <th className="px-5 py-3" />
+                        </td>
+                        <td className="px-3 py-2">
+                          <RowActions lancamento={l} canEdit={canEdit} />
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {futuraWithSaldo.map((l) => {
-                        const isPessoal = l.remuneracao_id !== null;
-                        return (
-                          <tr
-                            key={l.id}
-                            className="group transition-colors hover:bg-slate-50"
-                          >
-                            <td className="px-5 py-3.5">
-                              <span className="flex items-center gap-1.5 font-body text-sm text-fg">
-                                <CalendarIcon className="h-3.5 w-3.5 text-muted" />
-                                {l.data_vencimento}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <div className="flex items-center gap-2.5">
-                                <TipoIndicator
-                                  tipo={l.tipo}
-                                  isPessoal={isPessoal}
-                                />
-                                <div className="min-w-0">
-                                  <p className="truncate font-body text-sm font-semibold text-fg max-w-[200px]">
-                                    {l.descricao}
-                                  </p>
-                                  {isPessoal ? (
-                                    <span className="inline-flex items-center rounded px-1.5 py-0.5 font-body text-[10px] font-bold bg-purple-50 text-purple-700">
-                                      Pessoal
-                                    </span>
-                                  ) : l.categoria ? (
-                                    <p className="font-body text-xs text-muted">
-                                      {l.categoria}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5 font-body text-sm text-fg">
-                              {l.client_name ? (
-                                <Link
-                                  href={`/dashboard/clientes/${l.client_id}`}
-                                  className="hover:text-primary transition-colors truncate max-w-[140px] block"
-                                >
-                                  {l.client_name}
-                                </Link>
-                              ) : (
-                                <span className="text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3.5 font-body text-sm text-muted">
-                              {l.parcela_atual != null
-                                ? l.parcela_atual === 0
-                                  ? "Entrada"
-                                  : `${l.parcela_atual}/${l.total_parcelas}`
-                                : "—"}
-                            </td>
-                            <td
-                              className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
-                            >
-                              {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                            </td>
-                            <td
-                              className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${l.saldoAcumulado >= 0 ? "text-emerald-700" : "text-red-600"}`}
-                            >
-                              {fmt(l.saldoAcumulado)}
-                            </td>
-                            <td className="px-5 py-3.5">
-                              <RowActions lancamento={l} canEdit={canEdit} />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <ul className="divide-y divide-border md:hidden">
-                  {futuraWithSaldo.map((l) => {
-                    const isPessoal = l.remuneracao_id !== null;
-                    return (
-                      <li
-                        key={l.id}
-                        className="flex items-center gap-3 px-4 py-4"
-                      >
-                        <TipoIndicator tipo={l.tipo} isPessoal={isPessoal} />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-body text-sm font-semibold text-fg">
-                            {l.descricao}
-                          </p>
-                          <p className="font-body text-xs text-muted">
-                            {l.data_vencimento}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                          <span
-                            className={`font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
-                          >
-                            {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                          </span>
-                          <span
-                            className={`font-body text-xs font-semibold tabular-nums ${l.saldoAcumulado >= 0 ? "text-emerald-600" : "text-red-500"}`}
-                          >
-                            Saldo: {fmt(l.saldoAcumulado)}
-                          </span>
-                        </div>
-                      </li>
                     );
                   })}
-                </ul>
-              </div>
-            )}
-          </div>
+                </tbody>
+              </table>
+              <PaginationBar
+                page={pagePendentes}
+                pageSize={pageSizePendentes}
+                total={pendentesNaoVencidos.length}
+                onPage={setPagePendentes}
+                onPageSize={setPageSizePendentes}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -1159,191 +1085,216 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-slate-50/50">
-                      <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                        Vencimento
-                      </th>
-                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                        Descrição
-                      </th>
-                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                        Cliente
-                      </th>
-                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                        Parcela
-                      </th>
-                      <th className="px-4 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                        Valor
-                      </th>
-                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                        Data pag.
-                      </th>
-                      <th className="px-5 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {paginatedConcluidas.map((l) => {
-                      const isPessoal = l.remuneracao_id !== null;
-                      return (
-                        <tr
-                          key={l.id}
-                          className="group transition-colors hover:bg-slate-50"
-                        >
-                          <td className="px-5 py-3.5">
-                            <span className="flex items-center gap-1.5 font-body text-sm text-fg">
-                              <CalendarIcon className="h-3.5 w-3.5 text-muted" />
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[90px]" />
+                  <col />
+                  <col className="w-[90px]" />
+                  <col className="w-[90px]" />
+                  <col className="w-[200px]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-border bg-slate-50/50">
+                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Vencimento
+                    </th>
+                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Descrição
+                    </th>
+                    <th className="px-3 py-2 text-right font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Valor
+                    </th>
+                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Pago em
+                    </th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedConcluidas.map((l) => {
+                    const isPessoal = l.remuneracao_id !== null;
+                    return (
+                      <tr
+                        key={l.id}
+                        className="group transition-colors hover:bg-slate-50"
+                      >
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-1 font-body text-[11px] text-fg">
+                            <CalendarIcon className="h-3 w-3 text-muted flex-shrink-0" />
+                            <span className="truncate">
                               {l.data_vencimento}
                             </span>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-2.5">
-                              <TipoIndicator
-                                tipo={l.tipo}
-                                isPessoal={isPessoal}
-                              />
-                              <div className="min-w-0">
-                                <p className="truncate font-body text-sm font-semibold text-fg max-w-[200px]">
-                                  {l.descricao}
-                                </p>
-                                {isPessoal ? (
-                                  <span className="inline-flex items-center rounded px-1.5 py-0.5 font-body text-[10px] font-bold bg-purple-50 text-purple-700">
-                                    Pessoal
-                                  </span>
-                                ) : l.categoria ? (
-                                  <p className="font-body text-xs text-muted">
-                                    {l.categoria}
-                                  </p>
-                                ) : null}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5 font-body text-sm text-fg">
-                            {l.client_name ? (
-                              <Link
-                                href={`/dashboard/clientes/${l.client_id}`}
-                                className="hover:text-primary transition-colors truncate max-w-[140px] block"
-                              >
-                                {l.client_name}
-                              </Link>
-                            ) : (
-                              <span className="text-muted">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 font-body text-sm text-muted">
-                            {l.parcela_atual != null
-                              ? l.parcela_atual === 0
-                                ? "Entrada"
-                                : `${l.parcela_atual}/${l.total_parcelas}`
-                              : "—"}
-                          </td>
-                          <td
-                            className={`px-4 py-3.5 text-right font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
-                          >
-                            {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <StatusBadge status={l.status} />
-                          </td>
-                          <td className="px-4 py-3.5 font-body text-sm text-muted">
-                            {l.data_pagamento ?? "—"}
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <RowActions
-                              lancamento={l}
-                              canEdit={canEdit}
-                              singleDeleteOnly
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <TipoIndicator
+                              tipo={l.tipo}
+                              isPessoal={isPessoal}
                             />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <ul className="divide-y divide-border md:hidden">
-                {paginatedConcluidas.map((l) => {
-                  const isPessoal = l.remuneracao_id !== null;
-                  return (
-                    <li
-                      key={l.id}
-                      className="flex items-center gap-3 px-4 py-4"
-                    >
-                      <TipoIndicator tipo={l.tipo} isPessoal={isPessoal} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-body text-sm font-semibold text-fg">
-                          {l.descricao}
-                        </p>
-                        <p className="font-body text-xs text-muted">
-                          {l.data_vencimento}
-                          {l.data_pagamento && ` · Pago em ${l.data_pagamento}`}
-                          {isPessoal && " · Pessoal"}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span
-                          className={`font-body text-sm font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                            <div className="min-w-0">
+                              <p className="truncate font-body text-xs font-semibold text-fg">
+                                {l.descricao}
+                              </p>
+                              <p className="truncate font-body text-[10px] text-muted">
+                                {[
+                                  l.client_name,
+                                  l.parcela_atual != null
+                                    ? l.parcela_atual === 0
+                                      ? "Entrada"
+                                      : `Parcela ${l.parcela_atual}/${l.total_parcelas}`
+                                    : null,
+                                  isPessoal ? "Pessoal" : l.categoria,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right font-body text-xs font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
                         >
                           {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                        </span>
-                        <StatusBadge status={l.status} />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-              {totalPagesConcluidas > 1 && (
-                <div className="flex items-center justify-between border-t border-border px-5 py-3">
-                  <p className="font-body text-xs text-muted">
-                    {(pageConcluidas - 1) * PAGE_SIZE + 1}–
-                    {Math.min(pageConcluidas * PAGE_SIZE, concluidas.length)} de{" "}
-                    {concluidas.length}
-                  </p>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() =>
-                        setPageConcluidas((p) => Math.max(1, p - 1))
-                      }
-                      disabled={pageConcluidas === 1}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                    >
-                      ‹
-                    </button>
-                    {Array.from(
-                      { length: totalPagesConcluidas },
-                      (_, i) => i + 1
-                    ).map((n) => (
-                      <button
-                        key={n}
-                        onClick={() => setPageConcluidas(n)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors cursor-pointer ${
-                          pageConcluidas === n
-                            ? "bg-primary text-white font-semibold"
-                            : "border border-border text-muted hover:border-primary hover:text-primary"
-                        }`}
+                        </td>
+                        <td className="px-3 py-2 font-body text-[11px] text-muted truncate">
+                          {l.data_pagamento ?? "—"}
+                        </td>
+                        <td className="px-3 py-2">
+                          <RowActions
+                            lancamento={l}
+                            canEdit={canEdit}
+                            singleDeleteOnly
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <PaginationBar
+                page={pageConcluidas}
+                pageSize={pageSizeConcluidas}
+                total={concluidas.length}
+                onPage={setPageConcluidas}
+                onPageSize={setPageSizeConcluidas}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Atrasados Tab ── */}
+      {mainTab === "atrasados" && (
+        <div className="space-y-3">
+          <SectionHeading
+            title="Vencidos em aberto"
+            count={pendentesVencidos.length}
+            accent="red"
+          />
+          {pendentesVencidos.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+              <span className="font-body text-lg font-bold text-emerald-600">
+                ✓
+              </span>
+              <p className="font-body text-sm font-semibold text-emerald-700">
+                Nenhum vencimento em atraso — tudo em dia!
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-red-100 bg-white shadow-sm">
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[90px]" />
+                  <col />
+                  <col className="w-[90px]" />
+                  <col className="w-[296px]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-border bg-red-50/40">
+                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Vencimento
+                    </th>
+                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Descrição
+                    </th>
+                    <th className="px-3 py-2 text-right font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      Valor
+                    </th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedAtrasados.map((l) => {
+                    const isPessoal = l.remuneracao_id !== null;
+                    const isToday =
+                      parseDMY(l.data_vencimento).getTime() === today.getTime();
+                    return (
+                      <tr
+                        key={l.id}
+                        className="group transition-colors hover:bg-slate-50"
                       >
-                        {n}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() =>
-                        setPageConcluidas((p) =>
-                          Math.min(totalPagesConcluidas, p + 1)
-                        )
-                      }
-                      disabled={pageConcluidas === totalPagesConcluidas}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                    >
-                      ›
-                    </button>
-                  </div>
-                </div>
-              )}
+                        <td className="px-3 py-2">
+                          <span
+                            className={`flex items-center gap-1 font-body text-[11px] font-semibold ${isToday ? "text-amber-600" : "text-red-600"}`}
+                          >
+                            <CalendarIcon className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">
+                              {l.data_vencimento}
+                            </span>
+                            {isToday && (
+                              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-body text-[10px] font-bold text-amber-700 flex-shrink-0">
+                                Hoje
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <TipoIndicator
+                              tipo={l.tipo}
+                              isPessoal={isPessoal}
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate font-body text-xs font-semibold text-fg">
+                                {l.descricao}
+                              </p>
+                              <p className="truncate font-body text-[10px] text-muted">
+                                {[
+                                  l.client_name,
+                                  l.parcela_atual != null
+                                    ? l.parcela_atual === 0
+                                      ? "Entrada"
+                                      : `Parcela ${l.parcela_atual}/${l.total_parcelas}`
+                                    : null,
+                                  isPessoal ? "Pessoal" : l.categoria,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right font-body text-xs font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                        >
+                          {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <RowActions lancamento={l} canEdit={canEdit} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <PaginationBar
+                page={pageAtrasados}
+                pageSize={pageSizeAtrasados}
+                total={pendentesVencidos.length}
+                onPage={setPageAtrasados}
+                onPageSize={setPageSizeAtrasados}
+              />
             </div>
           )}
         </div>

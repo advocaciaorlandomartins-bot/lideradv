@@ -315,3 +315,13 @@ export function CogIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function ChartBarIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="12" width="4" height="9" rx="1" />
+      <rect x="10" y="7" width="4" height="14" rx="1" />
+      <rect x="17" y="3" width="4" height="18" rx="1" />
+    </Icon>
+  );
+}

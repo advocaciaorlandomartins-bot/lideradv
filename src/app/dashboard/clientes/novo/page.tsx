@@ -1,12 +1,16 @@
 import Link from "next/link";
 import NewClientForm from "@/components/dashboard/clients/new-client-form";
 import { ChevronRightIcon } from "@/components/icons";
+import { getAllColaboradores } from "@/lib/colaboradores-db";
 
 export const metadata = {
   title: "Novo Cliente — AdvMartins",
 };
 
-export default function NovoClientePage() {
+export const dynamic = "force-dynamic";
+
+export default async function NovoClientePage() {
+  const colaboradores = await getAllColaboradores();
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -33,7 +37,7 @@ export default function NovoClientePage() {
 
       {/* Form card */}
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:p-8">
-        <NewClientForm />
+        <NewClientForm colaboradores={colaboradores} />
       </div>
     </div>
   );

@@ -29,6 +29,7 @@ export interface VencidoItem {
   tipo: "entrada" | "saida";
   data_vencimento: string;
   client_name: string | null;
+  client_id: string | null;
   dias_atraso: number;
 }
 
@@ -40,6 +41,8 @@ export interface ControleProximo {
   descricao: string;
   cliente_nome: string | null;
   processo_numero: string | null;
+  cliente_id: string | null;
+  processo_id: string | null;
   dias_restantes: number;
 }
 
@@ -52,6 +55,7 @@ export interface Counts {
 }
 
 export interface TopCliente {
+  id: string;
   name: string;
   receita: number;
 }
@@ -214,6 +218,7 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
         l.tipo,
         to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
         c.name AS client_name,
+        l.client_id::text AS client_id,
         (CURRENT_DATE - l.data_vencimento)::int AS dias_atraso
       FROM lancamentos l
       LEFT JOIN clients c ON c.id = l.client_id
@@ -231,7 +236,9 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
         c.data_evento::text,
         c.descricao,
         cl.name AS cliente_nome,
+        cl.id::text AS cliente_id,
         p.numero  AS processo_numero,
+        p.id::text AS processo_id,
         (c.data_evento - CURRENT_DATE)::int AS dias_restantes
       FROM controles c
       LEFT JOIN clients   cl ON cl.id = c.cliente_id
@@ -260,7 +267,7 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
 
     // 6. Top 5 clientes por receita recebida
     sql`
-      SELECT cl.name, SUM(l.valor)::numeric AS receita
+      SELECT cl.id::text AS id, cl.name, SUM(l.valor)::numeric AS receita
       FROM lancamentos l
       JOIN clients cl ON cl.id = l.client_id
       WHERE l.tipo = 'entrada' AND l.status = 'pago'
@@ -349,6 +356,7 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
       tipo: r.tipo as "entrada" | "saida",
       data_vencimento: String(r.data_vencimento),
       client_name: r.client_name ? String(r.client_name) : null,
+      client_id: r.client_id ? String(r.client_id) : null,
       dias_atraso: Number(r.dias_atraso),
     })),
     proximosControles: proximosRows.map((r) => ({
@@ -359,10 +367,13 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
       descricao: String(r.descricao),
       cliente_nome: r.cliente_nome ? String(r.cliente_nome) : null,
       processo_numero: r.processo_numero ? String(r.processo_numero) : null,
+      cliente_id: r.cliente_id ? String(r.cliente_id) : null,
+      processo_id: r.processo_id ? String(r.processo_id) : null,
       dias_restantes: Number(r.dias_restantes),
     })),
     counts,
     topClientes: topClientesRows.map((r) => ({
+      id: String(r.id),
       name: String(r.name),
       receita: Number(r.receita),
     })),

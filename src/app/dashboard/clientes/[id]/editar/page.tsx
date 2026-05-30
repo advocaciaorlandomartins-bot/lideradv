@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getClientFull } from "@/lib/clients-db";
 import EditClientForm from "@/components/dashboard/clients/edit-client-form";
 import { ChevronRightIcon } from "@/components/icons";
+import { getAllColaboradores } from "@/lib/colaboradores-db";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,10 @@ export default async function EditarClientePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const client = await getClientFull(id);
+  const [client, colaboradores] = await Promise.all([
+    getClientFull(id),
+    getAllColaboradores(),
+  ]);
   if (!client) notFound();
 
   return (
@@ -48,7 +52,7 @@ export default async function EditarClientePage({
 
       {/* Form card */}
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:p-8">
-        <EditClientForm client={client} />
+        <EditClientForm client={client} colaboradores={colaboradores} />
       </div>
     </div>
   );

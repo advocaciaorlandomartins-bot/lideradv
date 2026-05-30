@@ -60,15 +60,45 @@ export async function createLancamentoAction(
   const numRecorrencias = parseInt(numRecorrenciasStr) || 12;
   const observacoes =
     ((formData.get("observacoes") as string | null) ?? "").trim() || null;
+  const indicadorId =
+    ((formData.get("indicador_id") as string | null) ?? "").trim() || null;
+  const comissaoTipo =
+    ((formData.get("comissao_tipo") as string | null) ?? "").trim() || null;
+  const comissaoValorConfigStr = (
+    (formData.get("comissao_valor_config") as string | null) ?? ""
+  ).trim();
+  const comissaoValorConfig = comissaoValorConfigStr
+    ? parseFloat(comissaoValorConfigStr)
+    : null;
 
   if (!valorStr || isNaN(valor) || valor <= 0)
     return { error: "Informe um valor válido." };
-  if (!dataVencimento) return { error: "Informe a data de vencimento." };
+
+  // Calculate commission if applicable
+  const shouldCreateComissao =
+    tipo === "entrada" &&
+    indicadorId &&
+    comissaoTipo &&
+    comissaoValorConfig != null &&
+    !isNaN(comissaoValorConfig) &&
+    comissaoValorConfig > 0;
+
+  const comissaoValorFinal = shouldCreateComissao
+    ? comissaoTipo === "percentual"
+      ? Math.round(valor * (comissaoValorConfig! / 100) * 100) / 100
+      : comissaoValorConfig!
+    : 0;
+
+  const baseDateStr = dataVencimento || todayBR();
 
   try {
+    let firstLancamentoId: string | null = null;
+    // For parcelado: track each parcela ID so commission is split per installment
+    const parcelaLancamentoIds: string[] = [];
+
     if (recorrente) {
       const grupoRecorrente = crypto.randomUUID();
-      const baseDate = new Date(`${dataVencimento}T12:00:00`);
+      const baseDate = new Date(`${baseDateStr}T12:00:00`);
       for (let i = 0; i < numRecorrencias; i++) {
         const entryDate = new Date(baseDate);
         if (periodicidade === "semanal")
@@ -80,7 +110,7 @@ export async function createLancamentoAction(
         const descEntry =
           i === 0 ? descricao : `${descricao} (${i + 1}/${numRecorrencias})`;
         const entryStatus = i === 0 ? status : "pendente";
-        await sql`
+        const rows = await sql`
           INSERT INTO lancamentos
             (tipo, categoria, descricao, valor, client_id, processo_id,
              status, data_vencimento, parcela_atual, total_parcelas,
@@ -92,10 +122,13 @@ export async function createLancamentoAction(
              ${entryStatus}, ${entryDateStr}::date,
              ${i + 1}, ${numRecorrencias},
              ${grupoRecorrente}::uuid, ${observacoes})
+          RETURNING id
         `;
+        if (i === 0) firstLancamentoId = rows[0].id as string;
       }
     } else if (!parcelado) {
-      await sql`
+      const dataVenc = dataVencimento || null;
+      const rows = await sql`
         INSERT INTO lancamentos
           (tipo, categoria, descricao, valor, client_id, processo_id,
            status, data_vencimento, observacoes)
@@ -103,8 +136,10 @@ export async function createLancamentoAction(
           (${tipo}, ${categoria}, ${descricao}, ${valor},
            ${clientId ? clientId : null}::uuid,
            ${processoId ? processoId : null}::uuid,
-           ${status}, ${dataVencimento}::date, ${observacoes})
+           ${status}, ${dataVenc ? dataVenc : null}::date, ${observacoes})
+        RETURNING id
       `;
+      firstLancamentoId = rows[0].id as string;
     } else {
       const grupoParcelas = crypto.randomUUID();
       const valorRestante = valor - valorEntrada;
@@ -113,10 +148,10 @@ export async function createLancamentoAction(
           ? Math.round((valorRestante / totalParcelas) * 100) / 100
           : valorRestante;
 
-      // Entrada (down payment)
+      // Entrada (down payment) — not tracked for commission split
       if (valorEntrada > 0) {
         const descEntrada = `${descricao} — Entrada`;
-        await sql`
+        const rows = await sql`
           INSERT INTO lancamentos
             (tipo, categoria, descricao, valor, client_id, processo_id,
              status, data_vencimento, parcela_atual, total_parcelas,
@@ -125,19 +160,21 @@ export async function createLancamentoAction(
             (${tipo}, ${categoria}, ${descEntrada}, ${valorEntrada},
              ${clientId ? clientId : null}::uuid,
              ${processoId ? processoId : null}::uuid,
-             ${status}, ${dataVencimento}::date, 0, ${totalParcelas},
+             ${status}, ${baseDateStr}::date, 0, ${totalParcelas},
              ${grupoParcelas}::uuid, ${observacoes})
+          RETURNING id
         `;
+        firstLancamentoId = rows[0].id as string;
       }
 
       // Parcelas mensais
-      const baseDate = new Date(`${dataVencimento}T12:00:00`);
+      const baseDate = new Date(`${baseDateStr}T12:00:00`);
       for (let i = 1; i <= totalParcelas; i++) {
         const parcDate = new Date(baseDate);
         parcDate.setMonth(parcDate.getMonth() + i);
         const parcDateStr = parcDate.toISOString().split("T")[0];
         const descParcela = `${descricao} — Parcela ${i}/${totalParcelas}`;
-        await sql`
+        const rows = await sql`
           INSERT INTO lancamentos
             (tipo, categoria, descricao, valor, client_id, processo_id,
              status, data_vencimento, parcela_atual, total_parcelas,
@@ -148,6 +185,59 @@ export async function createLancamentoAction(
              ${processoId ? processoId : null}::uuid,
              'pendente', ${parcDateStr}::date, ${i}, ${totalParcelas},
              ${grupoParcelas}::uuid, ${observacoes})
+          RETURNING id
+        `;
+        if (!firstLancamentoId) firstLancamentoId = rows[0].id as string;
+        parcelaLancamentoIds.push(rows[0].id as string);
+      }
+    }
+
+    // Auto-create commission remuneração(ões) when applicable
+    if (shouldCreateComissao && comissaoValorFinal > 0) {
+      const descComissao = `Comissão — ${descricao}`;
+
+      if (parcelado && parcelaLancamentoIds.length > 0) {
+        // One commission remuneração per installment, linked to each lancamento
+        const commPerParcela =
+          Math.round((comissaoValorFinal / parcelaLancamentoIds.length) * 100) /
+          100;
+        for (let i = 0; i < parcelaLancamentoIds.length; i++) {
+          const descParc =
+            parcelaLancamentoIds.length > 1
+              ? `${descComissao} (${i + 1}/${parcelaLancamentoIds.length})`
+              : descComissao;
+          const remRows = await sql`
+            INSERT INTO remuneracoes
+              (colaborador_id, tipo, valor, status, descricao, processo_id, client_id)
+            VALUES
+              (${indicadorId}::uuid, 'comissao', ${commPerParcela},
+               'pendente', ${descParc},
+               ${processoId ? processoId : null}::uuid,
+               ${clientId ? clientId : null}::uuid)
+            RETURNING id
+          `;
+          const remuneracaoId = remRows[0].id as string;
+          await sql`
+            UPDATE lancamentos SET remuneracao_id = ${remuneracaoId}::uuid
+            WHERE id = ${parcelaLancamentoIds[i]}::uuid
+          `;
+        }
+      } else if (firstLancamentoId) {
+        // Single commission for avista / recorrente
+        const remRows = await sql`
+          INSERT INTO remuneracoes
+            (colaborador_id, tipo, valor, status, descricao, processo_id, client_id)
+          VALUES
+            (${indicadorId}::uuid, 'comissao', ${comissaoValorFinal},
+             'pendente', ${descComissao},
+             ${processoId ? processoId : null}::uuid,
+             ${clientId ? clientId : null}::uuid)
+          RETURNING id
+        `;
+        const remuneracaoId = remRows[0].id as string;
+        await sql`
+          UPDATE lancamentos SET remuneracao_id = ${remuneracaoId}::uuid
+          WHERE id = ${firstLancamentoId}::uuid
         `;
       }
     }
@@ -188,7 +278,6 @@ export async function updateLancamentoAction(
 
   if (!valorStr || isNaN(valor) || valor <= 0)
     return { error: "Informe um valor válido." };
-  if (!dataVencimento) return { error: "Informe a data de vencimento." };
 
   try {
     const current = await sql`
@@ -310,6 +399,28 @@ export async function deleteLancamentoAction(id: string): Promise<void> {
     }
   } catch (err) {
     console.error("deleteLancamentoAction DB error:", err);
+  }
+  revalidatePath("/dashboard/financeiro");
+}
+
+export async function revertParaPendenteAction(id: string): Promise<void> {
+  try {
+    const rows = await sql`
+      UPDATE lancamentos
+      SET status = 'pendente', data_pagamento = NULL
+      WHERE id = ${id}::uuid
+      RETURNING remuneracao_id
+    `;
+    const remuneracaoId = rows[0]?.remuneracao_id as string | null;
+    if (remuneracaoId) {
+      await sql`
+        UPDATE remuneracoes
+        SET status = 'pendente', data_pagamento = NULL, updated_at = NOW()
+        WHERE id = ${remuneracaoId}::uuid
+      `;
+    }
+  } catch (err) {
+    console.error("revertParaPendenteAction DB error:", err);
   }
   revalidatePath("/dashboard/financeiro");
 }

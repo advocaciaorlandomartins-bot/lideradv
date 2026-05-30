@@ -11,10 +11,153 @@ import {
   TIPOS_CONTROLE,
   STATUS_CONTROLE,
   getTipoConfig,
-  urgencyClass,
   type Controle,
   type StatusControle,
 } from "@/lib/controles-types";
+
+// ── Cores por tipo ────────────────────────────────────────────────────────────
+
+const TIPO_STYLE: Record<
+  string,
+  { bg: string; text: string; border: string; dot: string }
+> = {
+  audiencias: {
+    bg: "bg-violet-50",
+    text: "text-violet-700",
+    border: "border-violet-400",
+    dot: "bg-violet-500",
+  },
+  prazos: {
+    bg: "bg-red-50",
+    text: "text-red-700",
+    border: "border-red-400",
+    dot: "bg-red-500",
+  },
+  pericias: {
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
+    border: "border-cyan-400",
+    dot: "bg-cyan-500",
+  },
+  dcb: {
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    border: "border-orange-400",
+    dot: "bg-orange-500",
+  },
+  beneficios: {
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    border: "border-emerald-400",
+    dot: "bg-emerald-500",
+  },
+  implantados: {
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    border: "border-blue-400",
+    dot: "bg-blue-500",
+  },
+  "implantados-data": {
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    border: "border-blue-400",
+    dot: "bg-blue-500",
+  },
+  alvaras: {
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    border: "border-amber-400",
+    dot: "bg-amber-500",
+  },
+};
+
+function getTipoStyle(tipo: string) {
+  return (
+    TIPO_STYLE[tipo] ?? {
+      bg: "bg-slate-50",
+      text: "text-slate-700",
+      border: "border-slate-400",
+      dot: "bg-slate-400",
+    }
+  );
+}
+
+// ── Urgência ──────────────────────────────────────────────────────────────────
+
+function getDaysRemaining(dataEvento: string | null): number | null {
+  if (!dataEvento) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dataEvento + "T00:00:00");
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
+function UrgencyBadge({
+  dataEvento,
+  status,
+}: {
+  dataEvento: string | null;
+  status: StatusControle;
+}) {
+  if (status !== "pendente" || !dataEvento) return null;
+  const days = getDaysRemaining(dataEvento);
+  if (days === null) return null;
+
+  let cls = "";
+  let label = "";
+
+  if (days < 0) {
+    cls = "bg-red-100 text-red-700 border-red-300";
+    label = `Vencido ${Math.abs(days)}d`;
+  } else if (days === 0) {
+    cls = "bg-red-100 text-red-700 border-red-300";
+    label = "Hoje!";
+  } else if (days === 1) {
+    cls = "bg-orange-100 text-orange-700 border-orange-300";
+    label = "Amanhã";
+  } else if (days <= 3) {
+    cls = "bg-amber-100 text-amber-700 border-amber-300";
+    label = `${days}d`;
+  } else if (days <= 7) {
+    cls = "bg-blue-100 text-blue-700 border-blue-300";
+    label = `${days}d`;
+  } else if (days <= 30) {
+    cls = "bg-slate-100 text-slate-600 border-slate-300";
+    label = `${days}d`;
+  } else {
+    return null;
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-bold ${cls}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function urgencyRowBorder(
+  dataEvento: string | null,
+  status: StatusControle
+): string {
+  if (status !== "pendente") return "border-l-2 border-l-transparent";
+  const days = getDaysRemaining(dataEvento);
+  if (days === null) return "border-l-2 border-l-transparent";
+  if (days < 0) return "border-l-4 border-l-red-500";
+  if (days <= 1) return "border-l-4 border-l-red-400";
+  if (days <= 3) return "border-l-4 border-l-amber-400";
+  if (days <= 7) return "border-l-4 border-l-blue-400";
+  return "border-l-2 border-l-transparent";
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 const STATUS_OPTIONS: { key: StatusControle | "todos"; label: string }[] = [
   { key: "pendente", label: "Aguardando" },
@@ -23,47 +166,7 @@ const STATUS_OPTIONS: { key: StatusControle | "todos"; label: string }[] = [
   { key: "todos", label: "Todos" },
 ];
 
-interface Props {
-  controles: Controle[];
-  total: number;
-  tipo: string;
-  status: string;
-  ordem: string;
-  pagina: number;
-  rpp: number;
-  inicio: string;
-  fim: string;
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function DcbCountdown({ dataEvento }: { dataEvento: string | null }) {
-  if (!dataEvento) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(dataEvento + "T00:00:00");
-  const days = Math.round((target.getTime() - today.getTime()) / 86400000);
-  if (days > 5) return null;
-
-  const label =
-    days < 0
-      ? `Vencido há ${Math.abs(days)} dia${Math.abs(days) !== 1 ? "s" : ""}`
-      : days === 0
-        ? "Vence hoje!"
-        : days === 1
-          ? "Vence amanhã"
-          : `${days} dias restantes`;
-
-  return (
-    <span className="mt-1 inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2 py-0.5 font-body text-[11px] font-semibold text-red-700">
-      ⚠ {label}
-    </span>
-  );
-}
+// ── Ações por linha ───────────────────────────────────────────────────────────
 
 function RowActions({ controle }: { controle: Controle }) {
   const [pending, startTransition] = useTransition();
@@ -82,57 +185,85 @@ function RowActions({ controle }: { controle: Controle }) {
     });
   }
 
-  const isCompleted = controle.status === "concluido";
-  const isCancelled = controle.status === "cancelado";
   const isPending = controle.status === "pendente";
+  const isCancelled = controle.status === "cancelado";
+  const isCompleted = controle.status === "concluido";
 
   return (
-    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="flex items-center justify-end gap-1.5">
       {isPending && (
         <button
-          onClick={() => handleStatus("concluido")}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleStatus("concluido");
+          }}
           disabled={pending}
           title="Concluir"
-          className="h-7 rounded-md bg-emerald-50 border border-emerald-200 px-2 font-body text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50 cursor-pointer"
+          className="h-7 rounded-md bg-emerald-50 border border-emerald-200 px-2.5 font-body text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
         >
-          Concluir
-        </button>
-      )}
-      {!isCancelled && (
-        <button
-          onClick={() => handleStatus("cancelado")}
-          disabled={pending}
-          title="Cancelar"
-          className="h-7 rounded-md bg-slate-50 border border-slate-200 px-2 font-body text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          Cancelar
+          ✓ Concluir
         </button>
       )}
       {(isCompleted || isCancelled) && (
         <button
-          onClick={() => handleStatus("pendente")}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleStatus("pendente");
+          }}
           disabled={pending}
           title="Reabrir"
-          className="h-7 rounded-md bg-amber-50 border border-amber-200 px-2 font-body text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50 cursor-pointer"
+          className="h-7 rounded-md bg-amber-50 border border-amber-200 px-2.5 font-body text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
         >
-          Reabrir
+          ↺ Reabrir
+        </button>
+      )}
+      {!isCancelled && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleStatus("cancelado");
+          }}
+          disabled={pending}
+          title="Cancelar"
+          className="h-7 rounded-md bg-slate-50 border border-slate-200 px-2.5 font-body text-[11px] font-semibold text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
+        >
+          Cancelar
         </button>
       )}
       <Link
         href={`/dashboard/controles/${controle.id}/editar?tipo=${controle.tipo}`}
-        className="h-7 rounded-md border border-border px-2 font-body text-[11px] font-semibold text-fg hover:border-primary hover:text-primary transition-colors flex items-center"
+        onClick={(e) => e.stopPropagation()}
+        className="h-7 rounded-md border border-border bg-white px-2.5 font-body text-[11px] font-semibold text-fg hover:border-primary hover:text-primary transition-colors flex items-center whitespace-nowrap"
       >
         Editar
       </Link>
       <button
-        onClick={handleDelete}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDelete();
+        }}
         disabled={pending}
-        className="h-7 rounded-md border border-red-200 px-2 font-body text-[11px] font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 cursor-pointer"
+        title="Excluir"
+        className="h-7 rounded-md border border-red-200 px-2.5 font-body text-[11px] font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 cursor-pointer"
       >
-        Excluir
+        ✕
       </button>
     </div>
   );
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
+
+interface Props {
+  controles: Controle[];
+  total: number;
+  tipo: string;
+  status: string;
+  ordem: string;
+  pagina: number;
+  rpp: number;
+  inicio: string;
+  fim: string;
 }
 
 export default function ControlesContent({
@@ -150,7 +281,23 @@ export default function ControlesContent({
   const sp = useSearchParams();
   const [showFilter, setShowFilter] = useState(false);
   const tipoConfig = getTipoConfig(tipo);
+  const tipoStyle = getTipoStyle(tipo);
   const totalPages = Math.ceil(total / rpp);
+
+  // Contagens rápidas da página atual (aproximado)
+  const countAguardando = controles.filter(
+    (c) => c.status === "pendente"
+  ).length;
+  const countConcluido = controles.filter(
+    (c) => c.status === "concluido"
+  ).length;
+  const countCancelado = controles.filter(
+    (c) => c.status === "cancelado"
+  ).length;
+  const countUrgente = controles.filter((c) => {
+    const d = getDaysRemaining(c.data_evento);
+    return c.status === "pendente" && d !== null && d <= 3;
+  }).length;
 
   function buildUrl(overrides: Record<string, string | number>) {
     const params = new URLSearchParams(sp.toString());
@@ -179,103 +326,135 @@ export default function ControlesContent({
 
   return (
     <div className="space-y-4">
-      {/* ── Type tabs ── */}
-      <div className="flex overflow-x-auto gap-0.5 rounded-xl border border-border bg-slate-50 p-1">
+      {/* ── Abas de tipo ─────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:flex-wrap lg:gap-1.5">
         {TIPOS_CONTROLE.map((t) => {
           const isActive = t.key === tipo;
+          const st = getTipoStyle(t.key);
           return (
             <Link
               key={t.key}
               href={buildUrl({ tipo: t.key, pagina: 1 })}
-              className={`flex-shrink-0 rounded-lg px-3 py-1.5 font-body text-xs font-semibold transition-colors whitespace-nowrap ${
-                isActive
-                  ? "bg-white text-primary shadow-sm border border-border"
-                  : "text-muted hover:text-fg"
-              }`}
+              className={`
+                flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 transition-all duration-150
+                font-body text-xs font-semibold whitespace-nowrap
+                ${
+                  isActive
+                    ? `${st.bg} ${st.text} ${st.border} shadow-sm`
+                    : "border-border bg-white text-muted hover:border-gray-300 hover:text-fg hover:shadow-sm"
+                }
+              `}
             >
+              <span
+                className={`h-2 w-2 flex-shrink-0 rounded-full ${isActive ? st.dot : "bg-slate-300"}`}
+              />
               {t.label}
             </Link>
           );
         })}
       </div>
 
-      {/* ── Toolbar ── */}
-      <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-border">
-          {/* Left: counter + active tags */}
-          <div className="flex flex-col gap-1.5">
-            <p className="font-body text-sm text-muted">
-              Resultados: <strong className="text-fg">{total}</strong>
-              <span className="ml-2 text-xs">({rpp} por página)</span>
-            </p>
-            <div className="flex flex-wrap gap-1.5">
+      {/* ── Painel principal ─────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+        {/* Cabeçalho do painel */}
+        <div className={`border-b border-border px-5 py-4 ${tipoStyle.bg}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Título + badges de contagem */}
+            <div className="flex flex-wrap items-center gap-3">
+              <h2
+                className={`font-heading text-base font-semibold ${tipoStyle.text}`}
+              >
+                {tipoConfig.label}
+              </h2>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-200 px-2.5 py-0.5 font-body text-[11px] font-semibold text-amber-800">
+                  {countAguardando} aguardando
+                </span>
+                {countUrgente > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-100 border border-red-200 px-2.5 py-0.5 font-body text-[11px] font-semibold text-red-700">
+                    ⚠ {countUrgente} urgente{countUrgente !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {countConcluido > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 font-body text-[11px] font-semibold text-emerald-800">
+                    {countConcluido} concluído{countConcluido !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Controles da toolbar */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Tags de filtro ativo */}
               {status !== "pendente" && (
                 <Link
                   href={buildUrl({ status: "pendente", pagina: 1 })}
-                  className="inline-flex items-center gap-1 rounded-full border border-border bg-slate-50 px-2.5 py-0.5 font-body text-xs font-semibold text-fg hover:bg-slate-100"
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-2.5 py-0.5 font-body text-xs font-semibold text-fg hover:bg-slate-50"
                 >
-                  Situação:{" "}
-                  {STATUS_OPTIONS.find((s) => s.key === status)?.label ??
-                    status}{" "}
-                  ×
+                  {STATUS_OPTIONS.find((s) => s.key === status)?.label} ×
                 </Link>
               )}
               {inicio && (
                 <Link
                   href={buildUrl({ inicio: "", pagina: 1 })}
-                  className="inline-flex items-center gap-1 rounded-full border border-border bg-slate-50 px-2.5 py-0.5 font-body text-xs font-semibold text-fg hover:bg-slate-100"
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-2.5 py-0.5 font-body text-xs font-semibold text-fg hover:bg-slate-50"
                 >
-                  Desde: {formatDate(inicio)} ×
+                  Desde {formatDate(inicio)} ×
                 </Link>
               )}
               {fim && (
                 <Link
                   href={buildUrl({ fim: "", pagina: 1 })}
-                  className="inline-flex items-center gap-1 rounded-full border border-border bg-slate-50 px-2.5 py-0.5 font-body text-xs font-semibold text-fg hover:bg-slate-100"
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-2.5 py-0.5 font-body text-xs font-semibold text-fg hover:bg-slate-50"
                 >
-                  Até: {formatDate(fim)} ×
+                  Até {formatDate(fim)} ×
                 </Link>
               )}
+
+              {/* Ordenação */}
+              <select
+                value={ordem}
+                onChange={(e) =>
+                  router.push(buildUrl({ ordem: e.target.value, pagina: 1 }))
+                }
+                className="h-8 cursor-pointer rounded-lg border border-border bg-white px-2 font-body text-xs text-fg outline-none focus:border-primary"
+              >
+                <option value="asc">Mais próximos</option>
+                <option value="desc">Mais distantes</option>
+              </select>
+
+              {/* Filtros */}
+              <button
+                onClick={() => setShowFilter((v) => !v)}
+                className={`h-8 rounded-lg border px-3 font-body text-xs font-semibold transition-colors cursor-pointer ${
+                  showFilter
+                    ? "border-primary bg-white text-primary"
+                    : "border-border bg-white text-fg hover:border-primary hover:text-primary"
+                }`}
+              >
+                {showFilter ? "✕ Fechar" : "⚙ Filtros"}
+              </button>
+
+              {/* Novo */}
+              <Link
+                href={`/dashboard/controles/novo?tipo=${tipo}`}
+                className="h-8 flex items-center gap-1.5 rounded-lg bg-cta px-3 font-body text-xs font-semibold text-white hover:bg-cta-hover transition-colors whitespace-nowrap"
+              >
+                + {tipoConfig.label_novo}
+              </Link>
             </div>
           </div>
 
-          {/* Right: buttons */}
-          <div className="flex items-center gap-2">
-            {/* Sort */}
-            <select
-              value={ordem}
-              onChange={(e) =>
-                router.push(buildUrl({ ordem: e.target.value, pagina: 1 }))
-              }
-              className="h-8 cursor-pointer rounded-lg border border-border bg-white px-2 font-body text-xs text-fg outline-none focus:border-primary"
-            >
-              <option value="desc">Mais recentes</option>
-              <option value="asc">Mais antigos</option>
-            </select>
-
-            {/* Filter */}
-            <button
-              onClick={() => setShowFilter((v) => !v)}
-              className={`h-8 rounded-lg border px-3 font-body text-xs font-semibold transition-colors cursor-pointer ${
-                showFilter
-                  ? "border-primary bg-blue-50 text-primary"
-                  : "border-border bg-white text-fg hover:border-primary hover:text-primary"
-              }`}
-            >
-              Filtros
-            </button>
-
-            {/* New */}
-            <Link
-              href={`/dashboard/controles/novo?tipo=${tipo}`}
-              className="h-8 flex items-center gap-1.5 rounded-lg bg-cta px-3 font-body text-xs font-semibold text-white hover:bg-cta-hover transition-colors"
-            >
-              + {tipoConfig.label_novo}
-            </Link>
-          </div>
+          {/* Total */}
+          <p className="mt-2 font-body text-xs text-muted">
+            {total} registro{total !== 1 ? "s" : ""} encontrado
+            {total !== 1 ? "s" : ""}
+            {" · "}
+            {rpp} por página
+          </p>
         </div>
 
-        {/* Filter panel */}
+        {/* Painel de filtros */}
         {showFilter && (
           <form
             onSubmit={applyFilter}
@@ -328,7 +507,7 @@ export default function ControlesContent({
               </button>
               <Link
                 href={`/dashboard/controles?tipo=${tipo}`}
-                className="h-9 flex items-center rounded-lg border border-border px-3 font-body text-sm text-muted hover:text-fg transition-colors"
+                className="h-9 flex items-center rounded-lg border border-border bg-white px-3 font-body text-sm text-muted hover:text-fg transition-colors"
               >
                 Limpar
               </Link>
@@ -336,38 +515,56 @@ export default function ControlesContent({
           </form>
         )}
 
-        {/* Table */}
+        {/* Tabela / Empty state */}
         {controles.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <p className="font-heading text-base font-semibold text-fg">
-              Nenhum controle encontrado
-            </p>
-            <p className="font-body text-sm text-muted">
-              Ajuste os filtros ou crie um novo registro.
-            </p>
-            <Link
-              href={`/dashboard/controles/novo?tipo=${tipo}`}
-              className="mt-1 flex items-center gap-1.5 rounded-lg bg-primary px-4 h-9 font-body text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+          <div className="flex flex-col items-center gap-3 py-20 text-center">
+            <div
+              className={`flex h-14 w-14 items-center justify-center rounded-full ${tipoStyle.bg}`}
             >
-              + {tipoConfig.label_novo}
-            </Link>
+              <span className={`text-2xl ${tipoStyle.dot}`}>📋</span>
+            </div>
+            <p className="font-heading text-base font-semibold text-fg">
+              Nenhum registro encontrado
+            </p>
+            <p className="font-body text-sm text-muted max-w-xs">
+              Nenhum controle de <strong>{tipoConfig.label}</strong> com os
+              filtros selecionados.
+            </p>
+            <div className="flex gap-2 mt-1">
+              <Link
+                href={`/dashboard/controles?tipo=${tipo}`}
+                className="h-9 flex items-center rounded-lg border border-border px-4 font-body text-sm text-muted hover:text-fg transition-colors"
+              >
+                Limpar filtros
+              </Link>
+              <Link
+                href={`/dashboard/controles/novo?tipo=${tipo}`}
+                className="h-9 flex items-center gap-1.5 rounded-lg bg-primary px-4 font-body text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+              >
+                + {tipoConfig.label_novo}
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
-                <tr className="border-b border-border bg-slate-50">
-                  <th className="w-2 px-3 py-3" />
-                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted whitespace-nowrap">
+                <tr className="border-b border-border bg-slate-50/80">
+                  <th className="w-1 px-0 py-0" />{" "}
+                  {/* borda esquerda urgência */}
+                  <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted whitespace-nowrap">
                     {tipoConfig.col_data}
                   </th>
-                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                  <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
                     {tipoConfig.col_evento}
                   </th>
-                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                  <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
                     Cliente / Processo
                   </th>
-                  <th className="px-4 py-3 text-center font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                  <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Responsável
+                  </th>
+                  <th className="px-4 py-3 text-center font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
                     Status
                   </th>
                   <th className="px-4 py-3" />
@@ -377,46 +574,71 @@ export default function ControlesContent({
                 {controles.map((c) => (
                   <tr
                     key={c.id}
-                    className="group hover:bg-slate-50 transition-colors"
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/controles/${c.id}/editar?tipo=${c.tipo}`
+                      )
+                    }
+                    className={`group cursor-pointer hover:bg-primary/5 transition-colors ${urgencyRowBorder(c.data_evento, c.status)}`}
                   >
-                    {/* Urgency dot */}
-                    <td className="px-3 py-3">
-                      <span
-                        title={c.data_evento ?? "Sem data"}
-                        className={`inline-block h-2.5 w-2.5 rounded-full ${urgencyClass(c.data_evento)}`}
-                      />
+                    {/* Borda urgência (visual) — a coluna vazia recebe a cor via border-left na tr */}
+                    <td className="w-0 p-0" />
+
+                    {/* Data + urgência */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="font-body text-sm font-semibold text-fg">
+                        {formatDate(c.data_evento)}
+                      </p>
+                      <div className="mt-0.5">
+                        <UrgencyBadge
+                          dataEvento={c.data_evento}
+                          status={c.status}
+                        />
+                      </div>
                     </td>
-                    {/* Date */}
-                    <td className="px-4 py-3 font-body text-sm text-fg whitespace-nowrap">
-                      {formatDate(c.data_evento)}
-                      {c.tipo === "dcb" && c.status === "pendente" && (
-                        <div>
-                          <DcbCountdown dataEvento={c.data_evento} />
-                        </div>
-                      )}
-                    </td>
+
                     {/* Descrição */}
-                    <td className="px-4 py-3 font-body text-sm text-fg max-w-xs">
-                      <span className="line-clamp-2">{c.descricao}</span>
+                    <td className="px-4 py-3 max-w-xs">
+                      <p className="font-body text-sm text-fg line-clamp-2 group-hover:text-primary transition-colors">
+                        {c.descricao}
+                      </p>
                       {c.tipo_demanda && (
-                        <span className="mt-0.5 block font-body text-[11px] text-muted">
+                        <span className="mt-0.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 font-body text-[10px] font-medium text-slate-600">
                           {c.tipo_demanda}
                         </span>
                       )}
                     </td>
+
                     {/* Cliente / Processo */}
                     <td className="px-4 py-3">
-                      <div className="font-body text-sm text-fg font-medium">
-                        {c.cliente_nome ?? (
-                          <span className="text-muted">—</span>
-                        )}
-                      </div>
+                      {c.cliente_nome ? (
+                        <p className="font-body text-sm font-medium text-fg">
+                          {c.cliente_nome}
+                        </p>
+                      ) : (
+                        <p className="font-body text-sm text-muted">—</p>
+                      )}
                       {c.processo_numero && (
-                        <div className="font-body text-xs text-muted">
+                        <p className="font-body text-xs text-muted mt-0.5">
                           {c.processo_numero}
-                        </div>
+                        </p>
                       )}
                     </td>
+
+                    {/* Responsável */}
+                    <td className="px-4 py-3">
+                      {c.responsavel_login ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 font-body text-xs font-medium text-slate-700">
+                          <span className="h-4 w-4 flex-shrink-0 rounded-full bg-primary/20 text-center font-heading text-[9px] font-bold text-primary leading-4">
+                            {c.responsavel_login.charAt(0).toUpperCase()}
+                          </span>
+                          {c.responsavel_login}
+                        </span>
+                      ) : (
+                        <span className="font-body text-xs text-muted">—</span>
+                      )}
+                    </td>
+
                     {/* Status */}
                     <td className="px-4 py-3 text-center">
                       <span
@@ -425,7 +647,8 @@ export default function ControlesContent({
                         {STATUS_CONTROLE[c.status].label}
                       </span>
                     </td>
-                    {/* Actions */}
+
+                    {/* Ações */}
                     <td className="px-4 py-3">
                       <RowActions controle={c} />
                     </td>
@@ -436,41 +659,71 @@ export default function ControlesContent({
           </div>
         )}
 
-        {/* Pagination */}
+        {/* Paginação */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-1 border-t border-border px-5 py-3">
-            {pagina > 1 && (
+          <div className="flex items-center justify-between border-t border-border px-5 py-3">
+            <p className="font-body text-xs text-muted">
+              {(pagina - 1) * rpp + 1}–{Math.min(pagina * rpp, total)} de{" "}
+              {total}
+            </p>
+            <div className="flex items-center gap-1">
               <Link
-                href={buildUrl({ pagina: pagina - 1 })}
-                className="h-8 w-8 flex items-center justify-center rounded-lg border border-border font-body text-sm text-muted hover:border-primary hover:text-primary transition-colors"
+                href={buildUrl({ pagina: 1 })}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === 1 ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
+              >
+                «
+              </Link>
+              <Link
+                href={buildUrl({ pagina: Math.max(1, pagina - 1) })}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === 1 ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
               >
                 ‹
               </Link>
-            )}
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-              const p = i + 1;
-              return (
-                <Link
-                  key={p}
-                  href={buildUrl({ pagina: p })}
-                  className={`h-8 w-8 flex items-center justify-center rounded-lg font-body text-sm transition-colors ${
-                    p === pagina
-                      ? "bg-primary text-white"
-                      : "border border-border text-muted hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  {p}
-                </Link>
-              );
-            })}
-            {pagina < totalPages && (
+              {(() => {
+                const pages: (number | "…")[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  const left = Math.max(2, pagina - 2);
+                  const right = Math.min(totalPages - 1, pagina + 2);
+                  pages.push(1);
+                  if (left > 2) pages.push("…");
+                  for (let i = left; i <= right; i++) pages.push(i);
+                  if (right < totalPages - 1) pages.push("…");
+                  pages.push(totalPages);
+                }
+                return pages.map((p, i) =>
+                  p === "…" ? (
+                    <span
+                      key={`ellipsis-${i}`}
+                      className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <Link
+                      key={p}
+                      href={buildUrl({ pagina: p })}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors ${p === pagina ? "bg-primary text-white font-semibold" : "border border-border text-muted hover:border-primary hover:text-primary"}`}
+                    >
+                      {p}
+                    </Link>
+                  )
+                );
+              })()}
               <Link
-                href={buildUrl({ pagina: pagina + 1 })}
-                className="h-8 w-8 flex items-center justify-center rounded-lg border border-border font-body text-sm text-muted hover:border-primary hover:text-primary transition-colors"
+                href={buildUrl({ pagina: Math.min(totalPages, pagina + 1) })}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === totalPages ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
               >
                 ›
               </Link>
-            )}
+              <Link
+                href={buildUrl({ pagina: totalPages })}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === totalPages ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
+              >
+                »
+              </Link>
+            </div>
           </div>
         )}
       </div>

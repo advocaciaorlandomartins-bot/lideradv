@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { createClientAction, type ClientFormState } from "@/lib/client-actions";
 import { SpinnerIcon } from "@/components/icons";
+import type { Colaborador } from "@/lib/colaboradores-db";
 
 const ESTADOS_CIVIS = [
   "Solteiro(a)",
@@ -154,7 +155,54 @@ function formatPhone(raw: string) {
   return `(${ddd}) ${num.slice(0, num.length - 4)}-${num.slice(-4)}`;
 }
 
-export default function NewClientForm() {
+function formatMoneyInput(raw: string): string {
+  const commaIdx = raw.lastIndexOf(",");
+  if (commaIdx !== -1) {
+    const intDigits = raw.slice(0, commaIdx).replace(/\D/g, "");
+    const decDigits = raw
+      .slice(commaIdx + 1)
+      .replace(/\D/g, "")
+      .slice(0, 2);
+    const intNum = intDigits ? parseInt(intDigits, 10) : 0;
+    return `${intNum.toLocaleString("pt-BR")},${decDigits}`;
+  }
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  return parseInt(digits, 10).toLocaleString("pt-BR");
+}
+
+function normalizeMoneyBlur(v: string): string {
+  if (!v) return "";
+  const commaIdx = v.indexOf(",");
+  if (commaIdx === -1) return v + ",00";
+  const dec = v
+    .slice(commaIdx + 1)
+    .padEnd(2, "0")
+    .slice(0, 2);
+  return v.slice(0, commaIdx + 1) + dec;
+}
+
+function parseMoney(display: string): string {
+  if (!display) return "";
+  return display.replace(/\./g, "").replace(",", ".");
+}
+
+const CARGO_LABELS: Record<string, string> = {
+  advogado: "Advogado(a)",
+  advogado_associado: "Advogado(a) Assoc.",
+  estagiario: "Estagiário(a)",
+  recepcao: "Recepção",
+  agente: "Agente",
+  comercial: "Comercial",
+};
+
+const ADVOGADO_CARGOS = new Set(["advogado", "advogado_associado"]);
+
+export default function NewClientForm({
+  colaboradores,
+}: {
+  colaboradores: Colaborador[];
+}) {
   const [state, formAction, isPending] = useActionState<
     ClientFormState,
     FormData
@@ -172,6 +220,15 @@ export default function NewClientForm() {
   const [birthDate, setBirthDate] = useState("");
   const [menorIncapaz, setMenorIncapaz] = useState(false);
   const [respCpfValue, setRespCpfValue] = useState("");
+
+  // Etapa 3 — Origem
+  const [origemTipo, setOrigemTipo] = useState("");
+  const [origemTexto, setOrigemTexto] = useState("");
+  const [indicadorId, setIndicadorId] = useState("");
+  const [indicadorCargo, setIndicadorCargo] = useState("");
+  const [indicadorTipoTrabalho, setIndicadorTipoTrabalho] = useState("");
+  const [comissaoTipo, setComissaoTipo] = useState("");
+  const [comissaoValor, setComissaoValor] = useState("");
 
   // Etapa 4
   const [cepValue, setCepValue] = useState("");
@@ -372,12 +429,11 @@ export default function NewClientForm() {
 
           {/* E-mail */}
           <div className="sm:col-span-2">
-            <Field label="E-mail do cliente para contato" required>
+            <Field label="E-mail do cliente para contato">
               <input
                 name="email"
                 type="email"
                 autoComplete="email"
-                required
                 placeholder="email@exemplo.com.br"
                 value={emailValue}
                 onChange={(e) => setEmailValue(e.target.value)}
@@ -623,6 +679,27 @@ export default function NewClientForm() {
       {/* ── Etapa 3 — Acesso e parceria ── */}
       <div className="space-y-4">
         <EtapaTitle num={type === "PF" ? 3 : 2}>Acesso e parceria</EtapaTitle>
+
+        {/* Hidden fields for new structured origin */}
+        <input type="hidden" name="origem_tipo" value={origemTipo} />
+        <input type="hidden" name="origem_texto" value={origemTexto} />
+        <input type="hidden" name="indicador_id" value={indicadorId} />
+        <input
+          type="hidden"
+          name="indicador_tipo_trabalho"
+          value={indicadorTipoTrabalho}
+        />
+        <input type="hidden" name="comissao_tipo" value={comissaoTipo} />
+        <input
+          type="hidden"
+          name="comissao_valor"
+          value={
+            comissaoTipo === "valor"
+              ? parseMoney(comissaoValor)
+              : comissaoValor.replace(",", ".")
+          }
+        />
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Senha do cliente">
             <input
@@ -634,15 +711,154 @@ export default function NewClientForm() {
             />
           </Field>
 
-          <Field label="Parceria / Origem">
-            <input
-              name="parceria"
-              type="text"
-              placeholder="Ex.: Indicação, Google, INSS…"
+          <Field label="Origem / Parceria">
+            <select
+              value={origemTipo}
+              onChange={(e) => {
+                setOrigemTipo(e.target.value);
+                setOrigemTexto("");
+                setIndicadorId("");
+                setIndicadorCargo("");
+                setIndicadorTipoTrabalho("");
+                setComissaoTipo("");
+                setComissaoValor("");
+              }}
               disabled={isPending}
-              className={inputClass}
-            />
+              className={selectClass}
+            >
+              <option value="">— Selecione a origem —</option>
+              <option value="escritorio">Escritório</option>
+              <option value="rede_social">Rede Social</option>
+              <option value="indicacao">Indicação</option>
+              <option value="trafego_pago">Tráfego Pago</option>
+              <option value="outros">Outros</option>
+            </select>
           </Field>
+
+          {origemTipo === "outros" && (
+            <div className="sm:col-span-2">
+              <Field label="Descreva a origem">
+                <input
+                  type="text"
+                  value={origemTexto}
+                  onChange={(e) => setOrigemTexto(e.target.value)}
+                  placeholder="Ex.: Indicação de parceiro externo, panfleto…"
+                  disabled={isPending}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+          )}
+
+          {origemTipo === "indicacao" && (
+            <>
+              <div className="sm:col-span-2">
+                <Field label="Colaborador indicador">
+                  <select
+                    value={indicadorId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setIndicadorId(id);
+                      const col = colaboradores.find((c) => c.id === id);
+                      setIndicadorCargo(col?.cargo ?? "");
+                      setIndicadorTipoTrabalho("");
+                    }}
+                    disabled={isPending}
+                    className={selectClass}
+                  >
+                    <option value="">— Selecione o colaborador —</option>
+                    {colaboradores.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} — {CARGO_LABELS[c.cargo] ?? c.cargo}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              {indicadorId && ADVOGADO_CARGOS.has(indicadorCargo) && (
+                <div className="sm:col-span-2">
+                  <Field label="Tipo de trabalho do indicador">
+                    <select
+                      value={indicadorTipoTrabalho}
+                      onChange={(e) => setIndicadorTipoTrabalho(e.target.value)}
+                      disabled={isPending}
+                      className={selectClass}
+                    >
+                      <option value="">— Selecione —</option>
+                      <option value="administrativo">Administrativo</option>
+                      <option value="judicial">Judicial</option>
+                      <option value="ambos">
+                        Ambos (Administrativo + Judicial)
+                      </option>
+                    </select>
+                  </Field>
+                </div>
+              )}
+
+              <Field label="Tipo de comissão">
+                <select
+                  value={comissaoTipo}
+                  onChange={(e) => {
+                    setComissaoTipo(e.target.value);
+                    setComissaoValor("");
+                  }}
+                  disabled={isPending}
+                  className={selectClass}
+                >
+                  <option value="">— Selecione —</option>
+                  <option value="percentual">Percentual (%)</option>
+                  <option value="valor">Valor fixo (R$)</option>
+                </select>
+              </Field>
+
+              {comissaoTipo === "percentual" && (
+                <Field label="Percentual (%)">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={comissaoValor}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9,]/g, "");
+                        setComissaoValor(v);
+                      }}
+                      placeholder="10,00"
+                      disabled={isPending}
+                      className={`${inputClass} pr-9`}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted">
+                      %
+                    </span>
+                  </div>
+                </Field>
+              )}
+
+              {comissaoTipo === "valor" && (
+                <Field label="Valor da comissão (R$)">
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted">
+                      R$
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={comissaoValor}
+                      onChange={(e) =>
+                        setComissaoValor(formatMoneyInput(e.target.value))
+                      }
+                      onBlur={(e) =>
+                        setComissaoValor(normalizeMoneyBlur(e.target.value))
+                      }
+                      placeholder="0,00"
+                      disabled={isPending}
+                      className={`${inputClass} pl-10`}
+                    />
+                  </div>
+                </Field>
+              )}
+            </>
+          )}
         </div>
       </div>
 

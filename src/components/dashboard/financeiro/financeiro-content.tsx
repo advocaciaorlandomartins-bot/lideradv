@@ -125,22 +125,6 @@ function KpiCard({
   );
 }
 
-function StatusBadge({ status }: { status: Lancamento["status"] }) {
-  const styles = {
-    pendente: "bg-amber-50 text-amber-700",
-    pago: "bg-emerald-50 text-emerald-700",
-    cancelado: "bg-slate-100 text-slate-500",
-  };
-  const labels = { pendente: "Pendente", pago: "Pago", cancelado: "Cancelado" };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-body text-xs font-semibold ${styles[status]}`}
-    >
-      {labels[status]}
-    </span>
-  );
-}
-
 function TipoIndicator({
   tipo,
   isPessoal,
@@ -157,53 +141,14 @@ function TipoIndicator({
   }
   return (
     <span
-      className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full font-body text-[10px] font-bold ${
-        tipo === "entrada"
-          ? "bg-emerald-100 text-emerald-700"
-          : "bg-red-100 text-red-600"
-      }`}
+      className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full font-body text-[10px] font-bold ${tipo === "entrada" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}
     >
       {tipo === "entrada" ? "+" : "−"}
     </span>
   );
 }
 
-function SectionHeading({
-  title,
-  count,
-  accent = "slate",
-}: {
-  title: string;
-  count: number;
-  accent?: "red" | "blue" | "slate";
-}) {
-  const titleColor = {
-    red: "text-red-600",
-    blue: "text-primary",
-    slate: "text-fg",
-  }[accent];
-  const badgeStyle = {
-    red: "bg-red-50 text-red-600",
-    blue: "bg-blue-50 text-primary",
-    slate: "bg-slate-100 text-muted",
-  }[accent];
-  return (
-    <div className="flex items-center gap-2.5">
-      <h3 className={`font-heading text-sm font-semibold ${titleColor}`}>
-        {title}
-      </h3>
-      <span
-        className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${badgeStyle}`}
-      >
-        {count}
-      </span>
-    </div>
-  );
-}
-
 // ── PaginationBar ─────────────────────────────────────────────────────────────
-
-const PS_OPTIONS = [10, 20, 50];
 
 function PaginationBar({
   page,
@@ -218,37 +163,54 @@ function PaginationBar({
   onPage: (p: number) => void;
   onPageSize: (s: number) => void;
 }) {
-  const totalPages = Math.ceil(total / pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   if (total === 0) return null;
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, total);
+
+  function pageWindow(): (number | "…")[] {
+    if (totalPages <= 7)
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const left = Math.max(2, page - 2);
+    const right = Math.min(totalPages - 1, page + 2);
+    const acc: (number | "…")[] = [1];
+    if (left > 2) acc.push("…");
+    for (let i = left; i <= right; i++) acc.push(i);
+    if (right < totalPages - 1) acc.push("…");
+    acc.push(totalPages);
+    return acc;
+  }
+  const pages = pageWindow();
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
       <div className="flex items-center gap-1">
-        <span className="font-body text-xs text-muted mr-1">Exibir:</span>
-        {PS_OPTIONS.map((s) => (
+        <span className="mr-1 font-body text-xs text-muted">Exibir:</span>
+        {[10, 20, 50].map((s) => (
           <button
             key={s}
             onClick={() => {
               onPageSize(s);
               onPage(1);
             }}
-            className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${
-              pageSize === s
-                ? "bg-primary font-semibold text-white"
-                : "text-muted hover:text-fg"
-            }`}
+            className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
           >
             {s}
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-2">
-        <p className="font-body text-xs text-muted">
-          {start}–{end} de {total}
+      <div className="flex items-center gap-1.5">
+        <p className="mr-1 font-body text-xs text-muted">
+          {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de{" "}
+          {total}
         </p>
         {totalPages > 1 && (
           <div className="flex gap-1">
+            <button
+              onClick={() => onPage(1)}
+              disabled={page === 1}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-xs text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              «
+            </button>
             <button
               onClick={() => onPage(Math.max(1, page - 1))}
               disabled={page === 1}
@@ -256,25 +218,37 @@ function PaginationBar({
             >
               ‹
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                onClick={() => onPage(n)}
-                className={`flex h-7 w-7 items-center justify-center rounded font-body text-xs transition-colors cursor-pointer ${
-                  page === n
-                    ? "bg-primary font-semibold text-white"
-                    : "border border-border text-muted hover:border-primary hover:text-primary"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+            {pages.map((n, i) =>
+              n === "…" ? (
+                <span
+                  key={`ellipsis-${i}`}
+                  className="flex h-7 w-7 items-center justify-center font-body text-xs text-muted"
+                >
+                  …
+                </span>
+              ) : (
+                <button
+                  key={n}
+                  onClick={() => onPage(n)}
+                  className={`flex h-7 w-7 items-center justify-center rounded font-body text-xs transition-colors cursor-pointer ${page === n ? "bg-primary font-semibold text-white" : "border border-border text-muted hover:border-primary hover:text-primary"}`}
+                >
+                  {n}
+                </button>
+              )
+            )}
             <button
               onClick={() => onPage(Math.min(totalPages, page + 1))}
               disabled={page === totalPages}
               className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
             >
               ›
+            </button>
+            <button
+              onClick={() => onPage(totalPages)}
+              disabled={page === totalPages}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-xs text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              »
             </button>
           </div>
         )}
@@ -440,6 +414,85 @@ function RowActions({
   );
 }
 
+// ── LancamentoRow (shared by all tabs) ───────────────────────────────────────
+
+function LancamentoRow({
+  l,
+  canEdit,
+  singleDeleteOnly = false,
+  showPagoEm = false,
+  highlightOverdue = false,
+}: {
+  l: Lancamento;
+  canEdit: boolean;
+  singleDeleteOnly?: boolean;
+  showPagoEm?: boolean;
+  highlightOverdue?: boolean;
+}) {
+  const isPessoal = l.remuneracao_id !== null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isToday = parseDMY(l.data_vencimento).getTime() === today.getTime();
+
+  return (
+    <tr className="group transition-colors hover:bg-primary/5">
+      <td className="px-3 py-2">
+        <span
+          className={`flex items-center gap-1 font-body text-[11px] font-semibold ${highlightOverdue ? (isToday ? "text-amber-600" : "text-red-600") : "text-fg"}`}
+        >
+          <CalendarIcon className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">{l.data_vencimento}</span>
+          {highlightOverdue && isToday && (
+            <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 font-body text-[10px] font-bold text-amber-700">
+              Hoje
+            </span>
+          )}
+        </span>
+      </td>
+      <td className="min-w-0 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <TipoIndicator tipo={l.tipo} isPessoal={isPessoal} />
+          <div className="min-w-0">
+            <p className="truncate font-body text-xs font-semibold text-fg">
+              {l.descricao}
+            </p>
+            <p className="truncate font-body text-[10px] text-muted">
+              {[
+                l.client_name,
+                l.parcela_atual != null
+                  ? l.parcela_atual === 0
+                    ? "Entrada"
+                    : `Parcela ${l.parcela_atual}/${l.total_parcelas}`
+                  : null,
+                isPessoal ? "Pessoal" : l.categoria,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+        </div>
+      </td>
+      <td
+        className={`px-3 py-2 text-right font-body text-xs font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+      >
+        {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+      </td>
+      {showPagoEm && (
+        <td className="truncate px-3 py-2 font-body text-[11px] text-muted">
+          {l.data_pagamento ?? "—"}
+        </td>
+      )}
+      <td className="px-3 py-2">
+        <RowActions
+          lancamento={l}
+          canEdit={canEdit}
+          singleDeleteOnly={singleDeleteOnly}
+        />
+      </td>
+    </tr>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 interface Props {
@@ -524,7 +577,6 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const dateFiltered = useMemo(() => {
     return lancamentos.filter((l) => {
       if (!dateRange.from && !dateRange.to) return true;
-      // Paid items: filter by payment date; pending/cancelled: filter by due date
       const refStr =
         l.status === "pago" && l.data_pagamento
           ? l.data_pagamento
@@ -562,14 +614,6 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const saldo = filteredKpis.recebido - filteredKpis.pago;
   const folhaTotal = filteredKpis.folhaPendente + filteredKpis.folhaPaga;
 
-  const pendentes = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    return dateFiltered.filter(
-      (l) => l.status === "pendente" && matchesSearch(l, q)
-    );
-  }, [dateFiltered, search]);
-
-  // Overdue items: always from the full list, never date-filtered
   const pendentesVencidos = useMemo(() => {
     const q = search.toLowerCase().trim();
     return lancamentos
@@ -587,14 +631,20 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   }, [lancamentos, today, search]);
 
   const pendentesNaoVencidos = useMemo(() => {
-    return pendentes
-      .filter((l) => parseDMY(l.data_vencimento) > today)
+    const q = search.toLowerCase().trim();
+    return dateFiltered
+      .filter(
+        (l) =>
+          l.status === "pendente" &&
+          parseDMY(l.data_vencimento) > today &&
+          matchesSearch(l, q)
+      )
       .sort(
         (a, b) =>
           parseDMY(a.data_vencimento).getTime() -
           parseDMY(b.data_vencimento).getTime()
       );
-  }, [pendentes, today]);
+  }, [dateFiltered, today, search]);
 
   const concluidas = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -619,30 +669,17 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     return { receitas, despesas, total: receitas - despesas };
   }, [concluidas]);
 
-  const totalPagesConcluidas = Math.ceil(
-    concluidas.length / pageSizeConcluidas
+  const paginatedPendentes = pendentesNaoVencidos.slice(
+    (pagePendentes - 1) * pageSizePendentes,
+    pagePendentes * pageSizePendentes
+  );
+  const paginatedAtrasados = pendentesVencidos.slice(
+    (pageAtrasados - 1) * pageSizeAtrasados,
+    pageAtrasados * pageSizeAtrasados
   );
   const paginatedConcluidas = concluidas.slice(
     (pageConcluidas - 1) * pageSizeConcluidas,
     pageConcluidas * pageSizeConcluidas
-  );
-
-  const paginatedPendentes = useMemo(
-    () =>
-      pendentesNaoVencidos.slice(
-        (pagePendentes - 1) * pageSizePendentes,
-        pagePendentes * pageSizePendentes
-      ),
-    [pendentesNaoVencidos, pagePendentes, pageSizePendentes]
-  );
-
-  const paginatedAtrasados = useMemo(
-    () =>
-      pendentesVencidos.slice(
-        (pageAtrasados - 1) * pageSizeAtrasados,
-        pageAtrasados * pageSizeAtrasados
-      ),
-    [pendentesVencidos, pageAtrasados, pageSizeAtrasados]
   );
 
   function handleDatePreset(p: DatePreset) {
@@ -652,34 +689,47 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     setPageAtrasados(1);
   }
 
+  function handleSearch(v: string) {
+    setSearch(v);
+    setPageConcluidas(1);
+    setPagePendentes(1);
+    setPageAtrasados(1);
+  }
+
+  const dateRangeLabel = (() => {
+    if (datePreset === "todos" || datePreset === "custom") return null;
+    const r = getPresetRange(datePreset);
+    if (!r.from || !r.to) return null;
+    return `${r.from.toLocaleDateString("pt-BR")} — ${r.to.toLocaleDateString("pt-BR")}`;
+  })();
+
+  // ── Shared table column layout ──────────────────────────────────────────────
+
+  const colsPendentes = (
+    <colgroup>
+      <col className="w-[90px]" />
+      <col />
+      <col className="w-[90px]" />
+      <col className="w-[296px]" />
+    </colgroup>
+  );
+
+  const colsConcluidas = (
+    <colgroup>
+      <col className="w-[90px]" />
+      <col />
+      <col className="w-[90px]" />
+      <col className="w-[90px]" />
+      <col className="w-[200px]" />
+    </colgroup>
+  );
+
+  const thBase =
+    "px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted";
+
   return (
     <div className="space-y-5">
-      {/* ── Action buttons ── */}
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/dashboard/financeiro/novo?tipo=entrada"
-          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Nova Receita
-        </Link>
-        <Link
-          href="/dashboard/financeiro/novo?tipo=saida"
-          className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Nova Despesa
-        </Link>
-        <Link
-          href="/dashboard/remuneracoes/nova"
-          className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-purple-700"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Nova Remuneração
-        </Link>
-      </div>
-
-      {/* KPI row 1 */}
+      {/* ── KPI row 1 ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard
           label="A Receber"
@@ -719,7 +769,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         </div>
       </div>
 
-      {/* KPI row 2: folha */}
+      {/* ── KPI row 2: folha ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard
           label="Folha — A Pagar"
@@ -759,7 +809,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         </div>
       </div>
 
-      {/* Month summary */}
+      {/* ── Month summary ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
           <p className="mb-3 font-body text-xs font-semibold uppercase tracking-wide text-muted capitalize">
@@ -791,137 +841,91 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         </div>
       </div>
 
-      {/* Toolbar (search only) */}
-      <div className="relative max-w-sm">
-        <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-        <input
-          type="search"
-          placeholder="Buscar por descrição, cliente…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPageConcluidas(1);
-            setPagePendentes(1);
-            setPageAtrasados(1);
-          }}
-          className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
-        />
-      </div>
-
-      {/* Date presets */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-white p-1 w-fit">
-          {DATE_PRESETS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => handleDatePreset(p.key)}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-body text-sm transition-colors cursor-pointer ${
-                datePreset === p.key
-                  ? "bg-primary text-white font-semibold"
-                  : "text-muted hover:text-fg"
-              }`}
-            >
-              {p.key !== "todos" && p.key !== "custom" && (
-                <CalendarIcon className="h-3 w-3" />
-              )}
-              {p.label}
-            </button>
-          ))}
-        </div>
-        {datePreset === "custom" && (
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={customFrom}
-              onChange={(e) => {
-                setCustomFrom(e.target.value);
-                setPageConcluidas(1);
-              }}
-              className="h-9 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
-            />
-            <span className="font-body text-sm text-muted">até</span>
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => {
-                setCustomTo(e.target.value);
-                setPageConcluidas(1);
-              }}
-              className="h-9 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-        )}
-        {datePreset !== "todos" && datePreset !== "custom" && (
-          <p className="font-body text-xs text-muted">
-            {(() => {
-              const r = getPresetRange(datePreset);
-              if (!r.from || !r.to) return "";
-              return `${r.from.toLocaleDateString("pt-BR")} — ${r.to.toLocaleDateString("pt-BR")}`;
-            })()}
-          </p>
-        )}
-      </div>
-
-      {/* Main tabs */}
-      <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm">
+      {/* ── Main tab cards ────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {/* Pendentes */}
         <button
           onClick={() => setMainTab("pendentes")}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors cursor-pointer ${
-            mainTab === "pendentes"
-              ? "bg-primary text-white shadow-sm"
-              : "text-muted hover:text-fg"
-          }`}
+          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all duration-150 cursor-pointer ${mainTab === "pendentes" ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-white hover:border-primary/40 hover:bg-slate-50"}`}
         >
-          A receber / A pagar
+          <div
+            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${mainTab === "pendentes" ? "bg-primary text-white" : "bg-amber-50 text-amber-600"}`}
+          >
+            <BanknotesIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p
+              className={`font-body text-sm font-semibold ${mainTab === "pendentes" ? "text-primary" : "text-fg"}`}
+            >
+              A receber / A pagar
+            </p>
+            <p className="font-body text-xs text-muted">
+              {pendentesNaoVencidos.length} vencimentos futuros
+            </p>
+          </div>
           {pendentesNaoVencidos.length > 0 && (
             <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${
-                mainTab === "pendentes"
-                  ? "bg-white/20 text-white"
-                  : "bg-amber-50 text-amber-700"
-              }`}
+              className={`flex-shrink-0 rounded-full px-2 py-0.5 font-body text-xs font-bold ${mainTab === "pendentes" ? "bg-primary text-white" : "bg-amber-50 text-amber-700"}`}
             >
               {pendentesNaoVencidos.length}
             </span>
           )}
         </button>
+
+        {/* Concluídas */}
         <button
           onClick={() => setMainTab("concluidas")}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors cursor-pointer ${
-            mainTab === "concluidas"
-              ? "bg-primary text-white shadow-sm"
-              : "text-muted hover:text-fg"
-          }`}
+          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all duration-150 cursor-pointer ${mainTab === "concluidas" ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-white hover:border-primary/40 hover:bg-slate-50"}`}
         >
-          Recebidas e pagas
+          <div
+            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${mainTab === "concluidas" ? "bg-primary text-white" : "bg-emerald-50 text-emerald-600"}`}
+          >
+            <TrendUpIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p
+              className={`font-body text-sm font-semibold ${mainTab === "concluidas" ? "text-primary" : "text-fg"}`}
+            >
+              Recebidas e pagas
+            </p>
+            <p className="font-body text-xs text-muted">
+              {concluidas.length} registros concluídos
+            </p>
+          </div>
           {concluidas.length > 0 && (
             <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${
-                mainTab === "concluidas"
-                  ? "bg-white/20 text-white"
-                  : "bg-slate-100 text-muted"
-              }`}
+              className={`flex-shrink-0 rounded-full px-2 py-0.5 font-body text-xs font-bold ${mainTab === "concluidas" ? "bg-primary text-white" : "bg-slate-100 text-muted"}`}
             >
               {concluidas.length}
             </span>
           )}
         </button>
+
+        {/* Atrasados */}
         <button
           onClick={() => setMainTab("atrasados")}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors cursor-pointer ${
-            mainTab === "atrasados"
-              ? "bg-red-600 text-white shadow-sm"
-              : "text-muted hover:text-fg"
-          }`}
+          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all duration-150 cursor-pointer ${mainTab === "atrasados" ? "border-red-500 bg-red-50 shadow-sm" : pendentesVencidos.length > 0 ? "border-red-200 bg-white hover:border-red-400 hover:bg-red-50/40" : "border-border bg-white hover:border-primary/40 hover:bg-slate-50"}`}
         >
-          Pendentes
+          <div
+            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${mainTab === "atrasados" ? "bg-red-500 text-white" : pendentesVencidos.length > 0 ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-400"}`}
+          >
+            <TrendDownIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p
+              className={`font-body text-sm font-semibold ${mainTab === "atrasados" ? "text-red-600" : pendentesVencidos.length > 0 ? "text-red-600" : "text-fg"}`}
+            >
+              Vencidos em aberto
+            </p>
+            <p className="font-body text-xs text-muted">
+              {pendentesVencidos.length === 0
+                ? "Tudo em dia!"
+                : `${pendentesVencidos.length} em atraso`}
+            </p>
+          </div>
           {pendentesVencidos.length > 0 && (
             <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-xs font-semibold ${
-                mainTab === "atrasados"
-                  ? "bg-white/20 text-white"
-                  : "bg-red-50 text-red-700"
-              }`}
+              className={`flex-shrink-0 rounded-full px-2 py-0.5 font-body text-xs font-bold ${mainTab === "atrasados" ? "bg-red-600 text-white" : "bg-red-50 text-red-700"}`}
             >
               {pendentesVencidos.length}
             </span>
@@ -929,378 +933,280 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         </button>
       </div>
 
-      {/* ── Pendentes Tab (próximos vencimentos) ── */}
-      {mainTab === "pendentes" && (
-        <div className="space-y-3">
-          <SectionHeading
-            title="Próximos vencimentos"
-            count={pendentesNaoVencidos.length}
-            accent="blue"
-          />
-          {pendentesNaoVencidos.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-white px-5 py-4">
-              <p className="font-body text-sm text-muted">
-                Nenhum vencimento futuro no período selecionado.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-              <table className="w-full table-fixed">
-                <colgroup>
-                  <col className="w-[90px]" />
-                  <col />
-                  <col className="w-[90px]" />
-                  <col className="w-[296px]" />
-                </colgroup>
-                <thead>
-                  <tr className="border-b border-border bg-slate-50/50">
-                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Vencimento
-                    </th>
-                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Descrição
-                    </th>
-                    <th className="px-3 py-2 text-right font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Valor
-                    </th>
-                    <th className="px-3 py-2" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paginatedPendentes.map((l) => {
-                    const isPessoal = l.remuneracao_id !== null;
-                    return (
-                      <tr
-                        key={l.id}
-                        className="group transition-colors hover:bg-slate-50"
-                      >
-                        <td className="px-3 py-2">
-                          <span className="flex items-center gap-1 font-body text-[11px] text-fg">
-                            <CalendarIcon className="h-3 w-3 text-muted flex-shrink-0" />
-                            <span className="truncate">
-                              {l.data_vencimento}
-                            </span>
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <TipoIndicator
-                              tipo={l.tipo}
-                              isPessoal={isPessoal}
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate font-body text-xs font-semibold text-fg">
-                                {l.descricao}
-                              </p>
-                              <p className="truncate font-body text-[10px] text-muted">
-                                {[
-                                  l.client_name,
-                                  l.parcela_atual != null
-                                    ? l.parcela_atual === 0
-                                      ? "Entrada"
-                                      : `Parcela ${l.parcela_atual}/${l.total_parcelas}`
-                                    : null,
-                                  isPessoal ? "Pessoal" : l.categoria,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-right font-body text-xs font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
-                        >
-                          {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                        </td>
-                        <td className="px-3 py-2">
-                          <RowActions lancamento={l} canEdit={canEdit} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <PaginationBar
-                page={pagePendentes}
-                pageSize={pageSizePendentes}
-                total={pendentesNaoVencidos.length}
-                onPage={setPagePendentes}
-                onPageSize={setPageSizePendentes}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Concluidas Tab ── */}
-      {mainTab === "concluidas" && (
-        <div className="space-y-3">
-          <SectionHeading
-            title="Recebidas e pagas"
-            count={concluidas.length}
-            accent="slate"
-          />
-
-          {/* Summary totals */}
-          {concluidas.length > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm">
-                <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                  Receitas
-                </p>
-                <p className="mt-2 font-heading text-xl font-semibold text-emerald-700">
-                  {fmt(concluidasTotals.receitas)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
-                <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                  Despesas
-                </p>
-                <p className="mt-2 font-heading text-xl font-semibold text-red-600">
-                  −{fmt(concluidasTotals.despesas)}
-                </p>
-              </div>
+      {/* ── Active tab panel ──────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+        {/* Panel header */}
+        <div className="space-y-3 border-b border-border bg-slate-50 px-5 py-4">
+          {/* Row 1: title + action buttons */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
               <div
-                className={`rounded-xl border bg-white p-4 shadow-sm ${concluidasTotals.total >= 0 ? "border-emerald-200" : "border-red-200"}`}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg ${mainTab === "atrasados" ? "bg-red-50" : "bg-primary/10"}`}
               >
-                <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                  Total
-                </p>
-                <p
-                  className={`mt-2 font-heading text-xl font-semibold ${concluidasTotals.total >= 0 ? "text-emerald-700" : "text-red-600"}`}
+                {mainTab === "atrasados" ? (
+                  <TrendDownIcon className="h-5 w-5 text-red-500" />
+                ) : mainTab === "concluidas" ? (
+                  <TrendUpIcon className="h-5 w-5 text-primary" />
+                ) : (
+                  <BanknotesIcon className="h-5 w-5 text-primary" />
+                )}
+              </div>
+              <div>
+                <h2
+                  className={`font-heading text-sm font-bold ${mainTab === "atrasados" ? "text-red-600" : "text-fg"}`}
                 >
-                  {fmt(concluidasTotals.total)}
+                  {mainTab === "pendentes"
+                    ? "Próximos vencimentos"
+                    : mainTab === "concluidas"
+                      ? "Recebidas e pagas"
+                      : "Vencidos em aberto"}
+                </h2>
+                <p className="font-body text-xs text-muted">
+                  {mainTab === "pendentes"
+                    ? `${pendentesNaoVencidos.length} lançamentos`
+                    : mainTab === "concluidas"
+                      ? `${concluidas.length} lançamentos`
+                      : pendentesVencidos.length === 0
+                        ? "Nenhum vencimento em atraso"
+                        : `${pendentesVencidos.length} lançamentos em atraso`}
+                  {search ? ` · busca: "${search}"` : ""}
                 </p>
               </div>
             </div>
-          )}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+                <input
+                  type="search"
+                  placeholder="Buscar descrição, cliente…"
+                  value={search}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="h-9 w-44 rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100 lg:w-52"
+                />
+              </div>
+              {mainTab !== "concluidas" && (
+                <>
+                  <Link
+                    href="/dashboard/financeiro/novo?tipo=entrada"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    Nova Receita
+                  </Link>
+                  <Link
+                    href="/dashboard/financeiro/novo?tipo=saida"
+                    className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    Nova Despesa
+                  </Link>
+                </>
+              )}
+              {mainTab === "concluidas" && (
+                <Link
+                  href="/dashboard/remuneracoes/nova"
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-purple-700 whitespace-nowrap"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Nova Remuneração
+                </Link>
+              )}
+            </div>
+          </div>
 
-          {concluidas.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-white py-16 text-center shadow-sm">
-              <BanknotesIcon className="h-10 w-10 text-slate-300" />
-              <p className="font-body text-sm font-semibold text-muted">
-                Nenhum registro concluído no período
+          {/* Row 2: date presets (not shown on atrasados — those always show all overdue) */}
+          {mainTab !== "atrasados" && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex flex-wrap gap-1">
+                {DATE_PRESETS.map((p) => (
+                  <button
+                    key={p.key}
+                    onClick={() => handleDatePreset(p.key)}
+                    className={`flex items-center gap-1 rounded-md px-2.5 py-1 font-body text-xs font-semibold transition-colors cursor-pointer ${
+                      datePreset === p.key
+                        ? "bg-primary text-white"
+                        : "border border-border bg-white text-muted hover:border-primary/40 hover:text-fg"
+                    }`}
+                  >
+                    {p.key !== "todos" && p.key !== "custom" && (
+                      <CalendarIcon className="h-3 w-3" />
+                    )}
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {datePreset === "custom" && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => {
+                      setCustomFrom(e.target.value);
+                      setPageConcluidas(1);
+                    }}
+                    className="h-8 rounded-lg border border-border bg-white px-2 font-body text-sm text-fg outline-none focus:border-primary"
+                  />
+                  <span className="font-body text-xs text-muted">até</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => {
+                      setCustomTo(e.target.value);
+                      setPageConcluidas(1);
+                    }}
+                    className="h-8 rounded-lg border border-border bg-white px-2 font-body text-sm text-fg outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+              {dateRangeLabel && (
+                <p className="font-body text-xs text-muted">{dateRangeLabel}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Concluídas: summary mini-cards ── */}
+        {mainTab === "concluidas" && concluidas.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 border-b border-border bg-slate-50/40 px-5 py-3">
+            <div className="rounded-lg border border-emerald-200 bg-white p-3 text-center shadow-sm">
+              <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Receitas
+              </p>
+              <p className="mt-1 font-heading text-base font-semibold text-emerald-700">
+                {fmt(concluidasTotals.receitas)}
               </p>
             </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+            <div className="rounded-lg border border-red-200 bg-white p-3 text-center shadow-sm">
+              <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Despesas
+              </p>
+              <p className="mt-1 font-heading text-base font-semibold text-red-600">
+                −{fmt(concluidasTotals.despesas)}
+              </p>
+            </div>
+            <div
+              className={`rounded-lg border bg-white p-3 text-center shadow-sm ${concluidasTotals.total >= 0 ? "border-emerald-200" : "border-red-200"}`}
+            >
+              <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Saldo
+              </p>
+              <p
+                className={`mt-1 font-heading text-base font-semibold ${concluidasTotals.total >= 0 ? "text-emerald-700" : "text-red-600"}`}
+              >
+                {fmt(concluidasTotals.total)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Table for active tab ── */}
+        {mainTab === "atrasados" && pendentesVencidos.length === 0 ? (
+          <div className="flex items-center gap-3 px-5 py-8">
+            <span className="font-body text-2xl font-bold text-emerald-600">
+              ✓
+            </span>
+            <p className="font-body text-sm font-semibold text-emerald-700">
+              Nenhum vencimento em atraso — tudo em dia!
+            </p>
+          </div>
+        ) : (mainTab === "pendentes" && pendentesNaoVencidos.length === 0) ||
+          (mainTab === "concluidas" && concluidas.length === 0) ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <BanknotesIcon className="h-10 w-10 text-slate-300" />
+            <p className="font-body text-sm font-semibold text-muted">
+              {mainTab === "pendentes"
+                ? "Nenhum vencimento futuro no período"
+                : "Nenhum registro concluído no período"}
+            </p>
+            {search && (
+              <button
+                onClick={() => handleSearch("")}
+                className="cursor-pointer font-body text-sm font-semibold text-primary hover:underline"
+              >
+                Limpar busca
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
               <table className="w-full table-fixed">
-                <colgroup>
-                  <col className="w-[90px]" />
-                  <col />
-                  <col className="w-[90px]" />
-                  <col className="w-[90px]" />
-                  <col className="w-[200px]" />
-                </colgroup>
+                {mainTab === "concluidas" ? colsConcluidas : colsPendentes}
                 <thead>
-                  <tr className="border-b border-border bg-slate-50/50">
-                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Vencimento
-                    </th>
-                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Descrição
-                    </th>
-                    <th className="px-3 py-2 text-right font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Valor
-                    </th>
-                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Pago em
-                    </th>
+                  <tr
+                    className={`border-b border-border ${mainTab === "atrasados" ? "bg-red-50/40" : "bg-slate-50/50"}`}
+                  >
+                    <th className={thBase}>Vencimento</th>
+                    <th className={thBase}>Descrição</th>
+                    <th className={`${thBase} text-right`}>Valor</th>
+                    {mainTab === "concluidas" && (
+                      <th className={thBase}>Pago em</th>
+                    )}
                     <th className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {paginatedConcluidas.map((l) => {
-                    const isPessoal = l.remuneracao_id !== null;
-                    return (
-                      <tr
-                        key={l.id}
-                        className="group transition-colors hover:bg-slate-50"
-                      >
-                        <td className="px-3 py-2">
-                          <span className="flex items-center gap-1 font-body text-[11px] text-fg">
-                            <CalendarIcon className="h-3 w-3 text-muted flex-shrink-0" />
-                            <span className="truncate">
-                              {l.data_vencimento}
-                            </span>
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <TipoIndicator
-                              tipo={l.tipo}
-                              isPessoal={isPessoal}
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate font-body text-xs font-semibold text-fg">
-                                {l.descricao}
-                              </p>
-                              <p className="truncate font-body text-[10px] text-muted">
-                                {[
-                                  l.client_name,
-                                  l.parcela_atual != null
-                                    ? l.parcela_atual === 0
-                                      ? "Entrada"
-                                      : `Parcela ${l.parcela_atual}/${l.total_parcelas}`
-                                    : null,
-                                  isPessoal ? "Pessoal" : l.categoria,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-right font-body text-xs font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
-                        >
-                          {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                        </td>
-                        <td className="px-3 py-2 font-body text-[11px] text-muted truncate">
-                          {l.data_pagamento ?? "—"}
-                        </td>
-                        <td className="px-3 py-2">
-                          <RowActions
-                            lancamento={l}
-                            canEdit={canEdit}
-                            singleDeleteOnly
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {(mainTab === "pendentes"
+                    ? paginatedPendentes
+                    : mainTab === "concluidas"
+                      ? paginatedConcluidas
+                      : paginatedAtrasados
+                  ).map((l) => (
+                    <LancamentoRow
+                      key={l.id}
+                      l={l}
+                      canEdit={canEdit}
+                      singleDeleteOnly={mainTab === "concluidas"}
+                      showPagoEm={mainTab === "concluidas"}
+                      highlightOverdue={mainTab === "atrasados"}
+                    />
+                  ))}
                 </tbody>
               </table>
-              <PaginationBar
-                page={pageConcluidas}
-                pageSize={pageSizeConcluidas}
-                total={concluidas.length}
-                onPage={setPageConcluidas}
-                onPageSize={setPageSizeConcluidas}
-              />
             </div>
-          )}
-        </div>
-      )}
+            <PaginationBar
+              page={
+                mainTab === "pendentes"
+                  ? pagePendentes
+                  : mainTab === "concluidas"
+                    ? pageConcluidas
+                    : pageAtrasados
+              }
+              pageSize={
+                mainTab === "pendentes"
+                  ? pageSizePendentes
+                  : mainTab === "concluidas"
+                    ? pageSizeConcluidas
+                    : pageSizeAtrasados
+              }
+              total={
+                mainTab === "pendentes"
+                  ? pendentesNaoVencidos.length
+                  : mainTab === "concluidas"
+                    ? concluidas.length
+                    : pendentesVencidos.length
+              }
+              onPage={
+                mainTab === "pendentes"
+                  ? setPagePendentes
+                  : mainTab === "concluidas"
+                    ? setPageConcluidas
+                    : setPageAtrasados
+              }
+              onPageSize={
+                mainTab === "pendentes"
+                  ? setPageSizePendentes
+                  : mainTab === "concluidas"
+                    ? setPageSizeConcluidas
+                    : setPageSizeAtrasados
+              }
+            />
+          </>
+        )}
+      </div>
 
-      {/* ── Atrasados Tab ── */}
-      {mainTab === "atrasados" && (
-        <div className="space-y-3">
-          <SectionHeading
-            title="Vencidos em aberto"
-            count={pendentesVencidos.length}
-            accent="red"
-          />
-          {pendentesVencidos.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-              <span className="font-body text-lg font-bold text-emerald-600">
-                ✓
-              </span>
-              <p className="font-body text-sm font-semibold text-emerald-700">
-                Nenhum vencimento em atraso — tudo em dia!
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-red-100 bg-white shadow-sm">
-              <table className="w-full table-fixed">
-                <colgroup>
-                  <col className="w-[90px]" />
-                  <col />
-                  <col className="w-[90px]" />
-                  <col className="w-[296px]" />
-                </colgroup>
-                <thead>
-                  <tr className="border-b border-border bg-red-50/40">
-                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Vencimento
-                    </th>
-                    <th className="px-3 py-2 text-left font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Descrição
-                    </th>
-                    <th className="px-3 py-2 text-right font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-                      Valor
-                    </th>
-                    <th className="px-3 py-2" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paginatedAtrasados.map((l) => {
-                    const isPessoal = l.remuneracao_id !== null;
-                    const isToday =
-                      parseDMY(l.data_vencimento).getTime() === today.getTime();
-                    return (
-                      <tr
-                        key={l.id}
-                        className="group transition-colors hover:bg-slate-50"
-                      >
-                        <td className="px-3 py-2">
-                          <span
-                            className={`flex items-center gap-1 font-body text-[11px] font-semibold ${isToday ? "text-amber-600" : "text-red-600"}`}
-                          >
-                            <CalendarIcon className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">
-                              {l.data_vencimento}
-                            </span>
-                            {isToday && (
-                              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-body text-[10px] font-bold text-amber-700 flex-shrink-0">
-                                Hoje
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <TipoIndicator
-                              tipo={l.tipo}
-                              isPessoal={isPessoal}
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate font-body text-xs font-semibold text-fg">
-                                {l.descricao}
-                              </p>
-                              <p className="truncate font-body text-[10px] text-muted">
-                                {[
-                                  l.client_name,
-                                  l.parcela_atual != null
-                                    ? l.parcela_atual === 0
-                                      ? "Entrada"
-                                      : `Parcela ${l.parcela_atual}/${l.total_parcelas}`
-                                    : null,
-                                  isPessoal ? "Pessoal" : l.categoria,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-right font-body text-xs font-semibold tabular-nums ${isPessoal ? "text-purple-700" : l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
-                        >
-                          {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                        </td>
-                        <td className="px-3 py-2">
-                          <RowActions lancamento={l} canEdit={canEdit} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <PaginationBar
-                page={pageAtrasados}
-                pageSize={pageSizeAtrasados}
-                total={pendentesVencidos.length}
-                onPage={setPageAtrasados}
-                onPageSize={setPageSizeAtrasados}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Chart (bottom) ── */}
+      {/* ── Chart ─────────────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
         <p className="mb-4 font-heading text-sm font-semibold text-fg">
           Receitas e despesas por mês

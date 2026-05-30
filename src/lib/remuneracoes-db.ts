@@ -17,6 +17,8 @@ export interface Remuneracao {
   descricao: string | null;
   processo_id: string | null;
   processo_tipo: string | null;
+  client_id: string | null;
+  client_nome: string | null;
   created_at_formatted: string;
 }
 
@@ -44,6 +46,8 @@ function mapRow(r: any): Remuneracao {
     descricao: r.descricao ?? null,
     processo_id: r.processo_id ?? null,
     processo_tipo: r.processo_tipo ?? null,
+    client_id: r.client_id ?? null,
+    client_nome: r.client_nome ?? null,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
   };
 }
@@ -64,10 +68,13 @@ export async function getAllRemuneracoes(): Promise<Remuneracao[]> {
       r.descricao,
       r.processo_id::text,
       p.tipo_acao          AS processo_tipo,
+      r.client_id::text,
+      cl.name              AS client_nome,
       r.created_at
     FROM remuneracoes r
     JOIN colaboradores co ON co.id = r.colaborador_id
-    LEFT JOIN processos p ON p.id = r.processo_id
+    LEFT JOIN processos p  ON p.id  = r.processo_id
+    LEFT JOIN clients   cl ON cl.id = r.client_id
     ORDER BY r.created_at DESC
   `;
   return rows.map(mapRow);
@@ -91,4 +98,125 @@ export async function getRemuneracaoKpis(): Promise<RemuneracaoKpis> {
     comissoes: Number(r.comissoes),
     bonificacoes: Number(r.bonificacoes),
   };
+}
+
+export interface ContaColaboradorItem {
+  id: string;
+  tipo: TipoRemuneracao;
+  descricao: string | null;
+  valor: number;
+  status: StatusRemuneracao;
+  competencia: string | null;
+  data_pagamento: string | null;
+}
+
+export interface ContaColaborador {
+  colaborador_id: string;
+  colaborador_nome: string;
+  colaborador_cargo: string;
+  totalPendente: number;
+  totalPago: number;
+  items: ContaColaboradorItem[];
+}
+
+export async function getColaboradorContaPagar(
+  colaboradorId: string
+): Promise<ContaColaborador | null> {
+  const rows = await sql`
+    SELECT
+      co.id::text      AS colaborador_id,
+      co.nome          AS colaborador_nome,
+      co.cargo         AS colaborador_cargo,
+      r.id::text,
+      r.tipo,
+      r.descricao,
+      r.valor,
+      r.status,
+      to_char(r.competencia,    'MM/YYYY')    AS competencia,
+      to_char(r.data_pagamento, 'DD/MM/YYYY') AS data_pagamento
+    FROM remuneracoes r
+    JOIN colaboradores co ON co.id = r.colaborador_id
+    WHERE r.colaborador_id = ${colaboradorId}::uuid
+      AND r.status != 'cancelado'
+    ORDER BY r.created_at DESC
+  `;
+
+  if (rows.length === 0) return null;
+
+  const first = rows[0];
+  const conta: ContaColaborador = {
+    colaborador_id: first.colaborador_id,
+    colaborador_nome: first.colaborador_nome,
+    colaborador_cargo: first.colaborador_cargo,
+    totalPendente: 0,
+    totalPago: 0,
+    items: [],
+  };
+
+  for (const r of rows) {
+    const valor = Number(r.valor);
+    if (r.status === "pago") conta.totalPago += valor;
+    else conta.totalPendente += valor;
+    conta.items.push({
+      id: r.id,
+      tipo: r.tipo as TipoRemuneracao,
+      descricao: r.descricao ?? null,
+      valor,
+      status: r.status as StatusRemuneracao,
+      competencia: r.competencia ?? null,
+      data_pagamento: r.data_pagamento ?? null,
+    });
+  }
+
+  return conta;
+}
+
+export async function getContasAPagar(): Promise<ContaColaborador[]> {
+  const rows = await sql`
+    SELECT
+      co.id::text      AS colaborador_id,
+      co.nome          AS colaborador_nome,
+      co.cargo         AS colaborador_cargo,
+      r.id::text,
+      r.tipo,
+      r.descricao,
+      r.valor,
+      r.status,
+      to_char(r.competencia,    'MM/YYYY')    AS competencia,
+      to_char(r.data_pagamento, 'DD/MM/YYYY') AS data_pagamento
+    FROM remuneracoes r
+    JOIN colaboradores co ON co.id = r.colaborador_id
+    WHERE r.status != 'cancelado'
+    ORDER BY co.nome, r.created_at DESC
+  `;
+
+  const map = new Map<string, ContaColaborador>();
+  for (const r of rows) {
+    if (!map.has(r.colaborador_id)) {
+      map.set(r.colaborador_id, {
+        colaborador_id: r.colaborador_id,
+        colaborador_nome: r.colaborador_nome,
+        colaborador_cargo: r.colaborador_cargo,
+        totalPendente: 0,
+        totalPago: 0,
+        items: [],
+      });
+    }
+    const conta = map.get(r.colaborador_id)!;
+    const valor = Number(r.valor);
+    if (r.status === "pago") conta.totalPago += valor;
+    else conta.totalPendente += valor;
+    conta.items.push({
+      id: r.id,
+      tipo: r.tipo as TipoRemuneracao,
+      descricao: r.descricao ?? null,
+      valor,
+      status: r.status as StatusRemuneracao,
+      competencia: r.competencia ?? null,
+      data_pagamento: r.data_pagamento ?? null,
+    });
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => b.totalPendente - a.totalPendente
+  );
 }

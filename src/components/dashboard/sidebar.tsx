@@ -10,14 +10,13 @@ import {
   BanknotesIcon,
   ClipboardListIcon,
   UserPlusIcon,
-  LockClosedIcon,
-  MagnifyingGlassIcon,
   LogoutIcon,
   XMarkIcon,
   DocumentTextIcon,
   ShieldCheckIcon,
   CogIcon,
   ChartBarIcon,
+  PrinterIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -67,15 +66,9 @@ const NAV_ITEMS = [
     modulo: "colaboradores",
   },
   {
-    href: "/dashboard/senhas",
-    icon: LockClosedIcon,
-    label: "Cofre de Senhas",
-    modulo: null,
-  },
-  {
-    href: "/dashboard/oab",
-    icon: MagnifyingGlassIcon,
-    label: "Busca OAB",
+    href: "/dashboard/relatorios",
+    icon: PrinterIcon,
+    label: "Relatórios",
     modulo: null,
   },
   {

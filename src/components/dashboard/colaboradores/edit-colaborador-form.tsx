@@ -8,7 +8,9 @@ import {
   type ColaboradorFormState,
 } from "@/lib/colaborador-actions";
 import type { ColaboradorFull } from "@/lib/colaboradores-db";
-import { CARGO_LABELS, type CargoColaborador } from "@/lib/colaboradores-types";
+import { CARGO_LABELS } from "@/lib/colaboradores-types";
+import type { CargoColaborador } from "@/lib/colaboradores-types";
+import { PlusIcon } from "@/components/icons";
 import { SpinnerIcon } from "@/components/icons";
 
 const inputClass =
@@ -76,14 +78,22 @@ export default function EditColaboradorForm({ colaborador }: Props) {
     FormData
   >(boundAction, null);
 
-  const [selectedCargo, setSelectedCargo] = useState<CargoColaborador>(
-    colaborador.cargo
+  const isKnownCargo = CARGO_LIST.includes(
+    colaborador.cargo as CargoColaborador
+  );
+  const [selectedCargo, setSelectedCargo] = useState<string>(
+    isKnownCargo ? colaborador.cargo : "__custom__"
+  );
+  const [customCargo, setCustomCargo] = useState(
+    isKnownCargo ? "" : colaborador.cargo
   );
   const [selectedStatus, setSelectedStatus] = useState<"ativo" | "inativo">(
     colaborador.status
   );
 
-  const showOab = CARGOS_COM_OAB.includes(selectedCargo);
+  const isCustom = selectedCargo === "__custom__";
+  const cargoValue = isCustom ? customCargo.trim() : selectedCargo;
+  const showOab = CARGOS_COM_OAB.includes(selectedCargo as CargoColaborador);
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
@@ -99,7 +109,7 @@ export default function EditColaboradorForm({ colaborador }: Props) {
       {/* ── Cargo ── */}
       <div className="space-y-4">
         <SectionTitle>Cargo</SectionTitle>
-        <input type="hidden" name="cargo" value={selectedCargo} />
+        <input type="hidden" name="cargo" value={cargoValue} />
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {CARGO_LIST.map((cargo) => (
             <button
@@ -118,7 +128,45 @@ export default function EditColaboradorForm({ colaborador }: Props) {
               </p>
             </button>
           ))}
+
+          {/* Novo cargo personalizado */}
+          <button
+            type="button"
+            onClick={() => setSelectedCargo("__custom__")}
+            disabled={isPending}
+            className={`rounded-xl border-2 p-4 text-left transition-all duration-150 cursor-pointer ${
+              isCustom
+                ? "border-violet-400 bg-violet-50"
+                : "border-dashed border-border bg-white hover:border-slate-400"
+            }`}
+          >
+            <p className="font-body text-sm font-semibold text-fg flex items-center gap-1.5">
+              <PlusIcon className="h-4 w-4 text-muted" />
+              Outro cargo
+            </p>
+            <p className="mt-1 font-body text-xs text-muted">
+              Defina um cargo personalizado
+            </p>
+          </button>
         </div>
+
+        {/* Input para cargo personalizado */}
+        {isCustom && (
+          <div className="mt-3">
+            <label className={labelClass}>
+              Nome do cargo<span className="ml-0.5 text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: Paralegal, Perito, Coordenador…"
+              value={customCargo}
+              onChange={(e) => setCustomCargo(e.target.value)}
+              disabled={isPending}
+              autoFocus
+              className={inputClass}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Dados pessoais ── */}

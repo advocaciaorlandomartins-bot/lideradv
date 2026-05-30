@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BarChart,
   Bar,
@@ -16,11 +18,15 @@ import {
 } from "recharts";
 import type { GerenciadorData } from "@/lib/gerenciador-db";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 type Tab = "operacional" | "tatico" | "estrategico" | "analitico";
 
 interface Props {
   data: GerenciadorData;
 }
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const PIE_COLORS = [
   "#6366f1",
@@ -33,27 +39,88 @@ const PIE_COLORS = [
   "#f97316",
 ];
 
+const TIPO_COLORS: Record<string, string> = {
+  audiencias: "#6366f1",
+  prazos: "#ef4444",
+  pericias: "#f59e0b",
+  dcb: "#22c55e",
+  beneficios: "#3b82f6",
+  implantados: "#ec4899",
+  "implantados-data": "#14b8a6",
+  alvaras: "#f97316",
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+
+function fmtDate(iso: string) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("pt-BR");
+}
+
+interface UrgencyConfig {
+  label: string;
+  badgeCls: string;
+  rowCls: string;
+}
+
+function urgencyConfig(dias: number): UrgencyConfig {
+  if (dias <= 0)
+    return {
+      label: "Hoje",
+      badgeCls: "bg-red-100 text-red-700 border border-red-200",
+      rowCls: "bg-red-50",
+    };
+  if (dias === 1)
+    return {
+      label: "Amanhã",
+      badgeCls: "bg-orange-100 text-orange-700 border border-orange-200",
+      rowCls: "bg-orange-50",
+    };
+  if (dias <= 3)
+    return {
+      label: `${dias}d`,
+      badgeCls: "bg-amber-100 text-amber-700 border border-amber-200",
+      rowCls: "",
+    };
+  if (dias <= 7)
+    return {
+      label: `${dias}d`,
+      badgeCls: "bg-blue-100 text-blue-700 border border-blue-200",
+      rowCls: "",
+    };
+  return {
+    label: `${dias}d`,
+    badgeCls: "bg-slate-100 text-slate-600 border border-slate-200",
+    rowCls: "",
+  };
+}
+
+function atrasoBadge(dias: number): string {
+  if (dias > 30) return "bg-red-100 text-red-700 border border-red-200";
+  if (dias > 7) return "bg-orange-100 text-orange-700 border border-orange-200";
+  return "bg-amber-100 text-amber-700 border border-amber-200";
+}
+
+// ── KpiCard ───────────────────────────────────────────────────────────────────
 
 function KpiCard({
   label,
   value,
   sub,
   alert,
+  href,
 }: {
   label: string;
   value: string;
   sub?: string;
   alert?: boolean;
+  href?: string;
 }) {
-  return (
-    <div
-      className={`rounded-xl border bg-white p-4 ${
-        alert ? "border-red-200" : "border-gray-200"
-      }`}
-    >
+  const inner = (
+    <>
       <p className="font-body text-xs font-medium uppercase tracking-wide text-gray-500">
         {label}
       </p>
@@ -65,187 +132,279 @@ function KpiCard({
         {value}
       </p>
       {sub && <p className="mt-1 font-body text-xs text-gray-500">{sub}</p>}
+      {href && (
+        <p className="mt-2 font-body text-[10px] text-gray-400 transition-colors group-hover:text-gray-600">
+          Ver detalhes →
+        </p>
+      )}
+    </>
+  );
+
+  const cls = `group rounded-xl border bg-white p-4 shadow-sm transition-all ${
+    alert
+      ? "border-red-200 bg-red-50 hover:border-red-300"
+      : "border-gray-200 hover:border-gray-300 hover:shadow-md"
+  }`;
+
+  if (href) {
+    return (
+      <Link href={href} className={cls}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return <div className={cls}>{inner}</div>;
+}
+
+// ── ClickableRow ──────────────────────────────────────────────────────────────
+
+function ClickableRow({
+  href,
+  children,
+  highlight,
+}: {
+  href: string;
+  children: React.ReactNode;
+  highlight?: string;
+}) {
+  const router = useRouter();
+  return (
+    <tr
+      onClick={() => router.push(href)}
+      className={`cursor-pointer border-b border-gray-50 last:border-0 transition-colors hover:bg-primary/5 ${highlight ?? ""}`}
+    >
+      {children}
+    </tr>
+  );
+}
+
+// ── SectionCard ───────────────────────────────────────────────────────────────
+
+function SectionCard({
+  title,
+  children,
+  noPad,
+}: {
+  title: string;
+  children: React.ReactNode;
+  noPad?: boolean;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-4 py-3">
+        <h3 className="font-heading text-sm font-semibold text-gray-800">
+          {title}
+        </h3>
+      </div>
+      <div className={noPad ? "" : "p-4"}>{children}</div>
     </div>
   );
 }
 
+function EmptyState({ msg }: { msg: string }) {
+  return (
+    <p className="px-4 py-8 text-center font-body text-sm text-gray-400">
+      {msg}
+    </p>
+  );
+}
+
+// ── Aba Operacional ───────────────────────────────────────────────────────────
+
 function OperacionalTab({ data }: { data: GerenciadorData }) {
   const { kpis, counts, proximosControles, vencidos } = data;
 
+  const controlesHojeAmanha = proximosControles.filter(
+    (c) => c.dias_restantes <= 1
+  ).length;
+
   return (
     <div className="space-y-6">
+      {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
-          label="Controles (7 dias)"
-          value={String(counts.controlesProximos)}
-          sub="próximos eventos"
-          alert={counts.controlesProximos > 0}
+          label="Controles Hoje/Amanhã"
+          value={String(controlesHojeAmanha)}
+          sub="eventos urgentes"
+          alert={controlesHojeAmanha > 0}
+          href="/dashboard/controles"
         />
         <KpiCard
           label="Vencidos"
           value={String(counts.vencidosCount)}
           sub="lançamentos em atraso"
           alert={counts.vencidosCount > 0}
+          href="/dashboard/financeiro"
         />
         <KpiCard
           label="Total Vencido"
           value={fmt(kpis.vencidosValor)}
           sub="valor em atraso"
           alert={kpis.vencidosValor > 0}
+          href="/dashboard/financeiro"
         />
         <KpiCard
           label="A Receber"
           value={fmt(kpis.aReceber)}
           sub="pendente de recebimento"
+          href="/dashboard/financeiro"
         />
       </div>
 
+      {/* Tabelas */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-100 px-4 py-3">
-            <h3 className="font-heading text-sm font-semibold text-gray-800">
-              Próximos Controles{" "}
-              <span className="font-normal text-gray-400">(14 dias)</span>
-            </h3>
-          </div>
+        {/* Próximos Controles */}
+        <SectionCard title="Próximos Controles (14 dias)" noPad>
           {proximosControles.length === 0 ? (
-            <p className="px-4 py-6 text-center font-body text-sm text-gray-400">
-              Nenhum controle próximo
-            </p>
+            <EmptyState msg="Nenhum controle próximo" />
           ) : (
-            <table className="w-full table-fixed font-body text-xs">
-              <colgroup>
-                <col className="w-[90px]" />
-                <col />
-                <col className="w-[80px]" />
-                <col className="w-[44px]" />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
-                    Data
-                  </th>
-                  <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
-                    Descrição
-                  </th>
-                  <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
-                    Tipo
-                  </th>
-                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-gray-500">
-                    Dias
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {proximosControles.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="border-b border-gray-50 last:border-0 hover:bg-gray-50"
-                  >
-                    <td className="px-3 py-2 text-gray-700">
-                      {new Date(c.data_evento + "T00:00:00").toLocaleDateString(
-                        "pt-BR"
-                      )}
-                    </td>
-                    <td className="truncate px-3 py-2 text-gray-700">
-                      {c.descricao}
-                    </td>
-                    <td className="truncate px-3 py-2 text-gray-500">
-                      {c.tipo_label}
-                    </td>
-                    <td
-                      className={`px-3 py-2 text-right font-semibold ${
-                        c.dias_restantes <= 3
-                          ? "text-red-600"
-                          : c.dias_restantes <= 7
-                            ? "text-amber-600"
-                            : "text-gray-600"
-                      }`}
-                    >
-                      {c.dias_restantes}d
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full font-body text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Data
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Tipo
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Descrição
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Cliente
+                    </th>
+                    <th className="px-3 py-2 text-center font-semibold uppercase tracking-wide text-gray-500">
+                      Urgência
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {proximosControles.map((c) => {
+                    const urg = urgencyConfig(c.dias_restantes);
+                    const href = `/dashboard/controles/${c.id}`;
+                    return (
+                      <ClickableRow
+                        key={c.id}
+                        href={href}
+                        highlight={urg.rowCls}
+                      >
+                        <td className="whitespace-nowrap px-3 py-2 text-gray-700">
+                          {fmtDate(c.data_evento)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                            style={{
+                              backgroundColor: TIPO_COLORS[c.tipo] ?? "#6b7280",
+                            }}
+                          >
+                            {c.tipo_label}
+                          </span>
+                        </td>
+                        <td className="max-w-[160px] truncate px-3 py-2 font-medium text-gray-800">
+                          {c.descricao}
+                        </td>
+                        <td className="max-w-[120px] truncate px-3 py-2 text-gray-500">
+                          {c.cliente_nome ?? "—"}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${urg.badgeCls}`}
+                          >
+                            {urg.label}
+                          </span>
+                        </td>
+                      </ClickableRow>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </SectionCard>
 
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-100 px-4 py-3">
-            <h3 className="font-heading text-sm font-semibold text-gray-800">
-              Lançamentos Vencidos
-            </h3>
-          </div>
+        {/* Lançamentos Vencidos */}
+        <SectionCard title="Lançamentos Vencidos" noPad>
           {vencidos.length === 0 ? (
-            <p className="px-4 py-6 text-center font-body text-sm text-gray-400">
-              Nenhum vencido
-            </p>
+            <EmptyState msg="Nenhum vencido" />
           ) : (
-            <table className="w-full table-fixed font-body text-xs">
-              <colgroup>
-                <col />
-                <col className="w-[90px]" />
-                <col className="w-[80px]" />
-                <col className="w-[44px]" />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
-                    Descrição
-                  </th>
-                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-gray-500">
-                    Valor
-                  </th>
-                  <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
-                    Vencto
-                  </th>
-                  <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-gray-500">
-                    Atraso
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {vencidos.slice(0, 10).map((v) => (
-                  <tr
-                    key={v.id}
-                    className="border-b border-gray-50 last:border-0 hover:bg-gray-50"
-                  >
-                    <td className="truncate px-3 py-2 text-gray-700">
-                      {v.descricao}
-                    </td>
-                    <td
-                      className={`px-3 py-2 text-right font-semibold ${
-                        v.tipo === "entrada" ? "text-green-600" : "text-red-600"
-                      }`}
-                    >
-                      {fmt(v.valor)}
-                    </td>
-                    <td className="px-3 py-2 text-gray-500">
-                      {v.data_vencimento}
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold text-red-600">
-                      {v.dias_atraso}d
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full font-body text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Descrição
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Cliente
+                    </th>
+                    <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-gray-500">
+                      Valor
+                    </th>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Vencto
+                    </th>
+                    <th className="px-3 py-2 text-center font-semibold uppercase tracking-wide text-gray-500">
+                      Atraso
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {vencidos.slice(0, 15).map((v) => {
+                    const href = v.client_id
+                      ? `/dashboard/clientes/${v.client_id}`
+                      : "/dashboard/financeiro";
+                    return (
+                      <ClickableRow key={v.id} href={href}>
+                        <td className="max-w-[140px] truncate px-3 py-2 font-medium text-gray-800">
+                          {v.descricao}
+                        </td>
+                        <td className="max-w-[100px] truncate px-3 py-2 text-gray-500">
+                          {v.client_name ?? "—"}
+                        </td>
+                        <td
+                          className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${
+                            v.tipo === "entrada"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {fmt(v.valor)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-gray-500">
+                          {v.data_vencimento}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${atrasoBadge(v.dias_atraso)}`}
+                          >
+                            {v.dias_atraso}d
+                          </span>
+                        </td>
+                      </ClickableRow>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </SectionCard>
       </div>
     </div>
   );
 }
 
+// ── Aba Tático ────────────────────────────────────────────────────────────────
+
 function TaticoTab({ data }: { data: GerenciadorData }) {
-  const {
-    kpis,
-    counts,
-    receitasPorMes,
-    controlesPorTipo,
-    novosClientesPorMes,
-  } = data;
+  const { kpis, receitasPorMes, controlesPorTipo, novosClientesPorMes } = data;
+
+  const novosClientesUltimo =
+    novosClientesPorMes.length > 0
+      ? novosClientesPorMes[novosClientesPorMes.length - 1].count
+      : 0;
 
   const barData = receitasPorMes.map((m) => ({
     mes: m.mesLabel,
@@ -260,6 +419,7 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
 
   return (
     <div className="space-y-6">
+      {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Recebido (mês)" value={fmt(kpis.recebidoMes)} />
         <KpiCard label="Pago (mês)" value={fmt(kpis.pagoMes)} />
@@ -269,30 +429,33 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
           alert={kpis.saldoMes < 0}
         />
         <KpiCard
-          label="Controles Pendentes"
-          value={String(counts.controlesProximos)}
-          sub="nos próximos 7 dias"
+          label="Novos Clientes (mês)"
+          value={String(novosClientesUltimo)}
+          sub="no mês atual"
         />
       </div>
 
+      {/* Gráficos principais */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 lg:col-span-2">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-2">
           <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
             Receitas vs Despesas — 12 meses
           </h3>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart
               data={barData}
-              margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#9ca3af" }} />
               <YAxis
                 tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}K`}
                 tick={{ fontSize: 10, fill: "#9ca3af" }}
-                width={50}
+                width={52}
               />
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Tooltip
+                formatter={(v) => (typeof v === "number" ? fmt(v) : v)}
+              />
               <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Receitas" fill="#22c55e" radius={[2, 2, 0, 0]} />
               <Bar dataKey="Despesas" fill="#ef4444" radius={[2, 2, 0, 0]} />
@@ -300,16 +463,14 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
           </ResponsiveContainer>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
-            Controles Pendentes
+            Controles Pendentes por Tipo
           </h3>
           {controlesPorTipo.length === 0 ? (
-            <p className="py-10 text-center font-body text-sm text-gray-400">
-              Sem controles
-            </p>
+            <EmptyState msg="Sem controles" />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
                   data={controlesPorTipo}
@@ -317,13 +478,17 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
                   nameKey="label"
                   cx="50%"
                   cy="50%"
-                  outerRadius={65}
+                  outerRadius={70}
                 >
                   {controlesPorTipo.map((_, i) => (
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => `${v} controles`} />
+                <Tooltip
+                  formatter={(v) =>
+                    typeof v === "number" ? `${v} controles` : v
+                  }
+                />
                 <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
               </PieChart>
             </ResponsiveContainer>
@@ -331,14 +496,15 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
+      {/* Novos clientes */}
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
           Novos Clientes — últimos 6 meses
         </h3>
-        <ResponsiveContainer width="100%" height={120}>
+        <ResponsiveContainer width="100%" height={130}>
           <BarChart
             data={clientesData}
-            margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#9ca3af" }} />
@@ -356,12 +522,18 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
   );
 }
 
+// ── Aba Estratégico ───────────────────────────────────────────────────────────
+
 function EstrategicoTab({ data }: { data: GerenciadorData }) {
   const { kpis, counts, topClientes, receitasPorMes } = data;
 
+  const saldoAnual = kpis.recebidoAno - kpis.pagoAno;
+
   const topData = topClientes.map((c) => ({
     name: c.name.length > 18 ? c.name.slice(0, 16) + "…" : c.name,
+    fullName: c.name,
     Receita: c.receita,
+    id: c.id,
   }));
 
   const evolucaoData = receitasPorMes.map((m) => ({
@@ -369,142 +541,165 @@ function EstrategicoTab({ data }: { data: GerenciadorData }) {
     Receitas: m.receitas,
   }));
 
-  const saldoAnual = kpis.recebidoAno - kpis.pagoAno;
-
   return (
     <div className="space-y-6">
+      {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Recebido (ano)" value={fmt(kpis.recebidoAno)} />
         <KpiCard label="Pago (ano)" value={fmt(kpis.pagoAno)} />
-        <KpiCard label="Total Clientes" value={String(counts.totalClientes)} />
         <KpiCard
-          label="Total Processos"
-          value={String(counts.totalProcessos)}
+          label="Saldo Anual"
+          value={fmt(saldoAnual)}
+          alert={saldoAnual < 0}
+        />
+        <KpiCard
+          label="Total Clientes"
+          value={String(counts.totalClientes)}
+          href="/dashboard/clientes"
         />
       </div>
 
+      {/* Gráficos principais */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
-            Top 5 Clientes por Receita
-          </h3>
-          {topData.length === 0 ? (
-            <p className="py-10 text-center font-body text-sm text-gray-400">
-              Sem dados
-            </p>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart
-                data={topData}
-                layout="vertical"
-                margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#f0f0f0"
-                  vertical={false}
-                />
-                <XAxis
-                  type="number"
-                  tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}K`}
-                  tick={{ fontSize: 10, fill: "#9ca3af" }}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 10, fill: "#6b7280" }}
-                  width={90}
-                  interval={0}
-                />
-                <Tooltip formatter={(v: number) => fmt(v)} />
-                <Bar dataKey="Receita" fill="#a855f7" radius={[0, 2, 2, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+        {/* Top clientes */}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-4 py-3">
+            <h3 className="font-heading text-sm font-semibold text-gray-800">
+              Top 5 Clientes por Receita
+            </h3>
+          </div>
+          <div className="p-4">
+            {topData.length === 0 ? (
+              <EmptyState msg="Sem dados" />
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart
+                    data={topData}
+                    layout="vertical"
+                    margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f0f0f0"
+                      vertical={false}
+                    />
+                    <XAxis
+                      type="number"
+                      tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}K`}
+                      tick={{ fontSize: 10, fill: "#9ca3af" }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      tick={{ fontSize: 10, fill: "#6b7280" }}
+                      width={90}
+                      interval={0}
+                    />
+                    <Tooltip
+                      formatter={(v) => (typeof v === "number" ? fmt(v) : v)}
+                    />
+                    <Bar
+                      dataKey="Receita"
+                      fill="#a855f7"
+                      radius={[0, 2, 2, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+
+                {/* Tabela clicável abaixo do chart */}
+                <table className="mt-3 w-full font-body text-xs">
+                  <tbody>
+                    {topClientes.map((c, i) => (
+                      <tr
+                        key={c.id}
+                        className="border-t border-gray-50 first:border-0"
+                      >
+                        <td className="py-1.5 pr-2 text-gray-400 font-semibold w-6">
+                          {i + 1}
+                        </td>
+                        <td className="py-1.5">
+                          <Link
+                            href={`/dashboard/clientes/${c.id}`}
+                            className="font-medium text-gray-800 hover:text-purple-600 hover:underline transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {c.name}
+                          </Link>
+                        </td>
+                        <td className="py-1.5 text-right font-semibold text-purple-700">
+                          {fmt(c.receita)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
+        {/* Evolução de receitas */}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
             Evolução de Receitas — 12 meses
           </h3>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={220}>
             <BarChart
               data={evolucaoData}
-              margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#9ca3af" }} />
               <YAxis
                 tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}K`}
                 tick={{ fontSize: 10, fill: "#9ca3af" }}
-                width={50}
+                width={52}
               />
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Tooltip
+                formatter={(v) => (typeof v === "number" ? fmt(v) : v)}
+              />
               <Bar dataKey="Receitas" fill="#a855f7" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
+      {/* Cards de métricas extras */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          {
-            label: "Colaboradores",
-            value: String(counts.totalColaboradores),
-            href: "/dashboard/colaboradores",
-          },
-          {
-            label: "A Receber",
-            value: fmt(kpis.aReceber),
-            href: "/dashboard/financeiro",
-          },
-          {
-            label: "A Pagar",
-            value: fmt(kpis.aPagar),
-            href: "/dashboard/financeiro",
-          },
-          {
-            label: "Saldo Anual",
-            value: fmt(saldoAnual),
-            href: "/dashboard/financeiro",
-            alert: saldoAnual < 0,
-          },
-        ].map((item) => (
-          <a
-            key={item.label}
-            href={item.href}
-            className={`rounded-xl border p-4 transition-colors ${
-              item.alert
-                ? "border-red-100 bg-red-50 hover:bg-red-100"
-                : "border-purple-100 bg-purple-50 hover:bg-purple-100"
-            }`}
-          >
-            <p
-              className={`font-body text-xs font-medium uppercase tracking-wide ${
-                item.alert ? "text-red-600" : "text-purple-600"
-              }`}
-            >
-              {item.label}
-            </p>
-            <p
-              className={`mt-1 font-heading text-lg font-bold ${
-                item.alert ? "text-red-900" : "text-purple-900"
-              }`}
-            >
-              {item.value}
-            </p>
-          </a>
-        ))}
+        <KpiCard
+          label="A Receber"
+          value={fmt(kpis.aReceber)}
+          href="/dashboard/financeiro"
+        />
+        <KpiCard
+          label="A Pagar"
+          value={fmt(kpis.aPagar)}
+          href="/dashboard/financeiro"
+        />
+        <KpiCard
+          label="Total Processos"
+          value={String(counts.totalProcessos)}
+          href="/dashboard/processos"
+        />
+        <KpiCard
+          label="Total Colaboradores"
+          value={String(counts.totalColaboradores)}
+          href="/dashboard/colaboradores"
+        />
       </div>
     </div>
   );
 }
+
+// ── Aba Analítico ─────────────────────────────────────────────────────────────
 
 function AnaliticoTab({ data }: { data: GerenciadorData }) {
   const { receitasPorCategoria, processosPorTipo, controlesPorTipo, vencidos } =
     data;
 
   const totalControles = controlesPorTipo.reduce((s, t) => s + t.count, 0);
+  const totalCategorias = receitasPorCategoria.reduce((s, c) => s + c.total, 0);
 
   const catData = receitasPorCategoria.map((c) => ({
     name: c.categoria,
@@ -518,45 +713,107 @@ function AnaliticoTab({ data }: { data: GerenciadorData }) {
 
   return (
     <div className="space-y-6">
+      {/* Receitas por Categoria + tabela */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
-            Receitas Recebidas por Categoria
-          </h3>
-          {catData.length === 0 ? (
-            <p className="py-10 text-center font-body text-sm text-gray-400">
-              Sem dados
-            </p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={catData}
-                  dataKey="Valor"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={75}
-                >
-                  {catData.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => fmt(v)} />
-                <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-4 py-3">
+            <h3 className="font-heading text-sm font-semibold text-gray-800">
+              Receitas Recebidas por Categoria
+            </h3>
+          </div>
+          <div className="p-4">
+            {catData.length === 0 ? (
+              <EmptyState msg="Sem dados" />
+            ) : (
+              <div className="flex flex-col gap-4 lg:flex-row">
+                <div className="flex-shrink-0">
+                  <ResponsiveContainer width={180} height={180}>
+                    <PieChart>
+                      <Pie
+                        data={catData}
+                        dataKey="Valor"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                      >
+                        {catData.map((_, i) => (
+                          <Cell
+                            key={i}
+                            fill={PIE_COLORS[i % PIE_COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v) => (typeof v === "number" ? fmt(v) : v)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="min-w-0 flex-1 overflow-x-auto">
+                  <table className="w-full font-body text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="pb-2 text-left font-semibold text-gray-500 uppercase tracking-wide">
+                          Categoria
+                        </th>
+                        <th className="pb-2 text-right font-semibold text-gray-500 uppercase tracking-wide">
+                          Valor
+                        </th>
+                        <th className="pb-2 text-right font-semibold text-gray-500 uppercase tracking-wide">
+                          %
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {receitasPorCategoria.map((c, i) => (
+                        <tr
+                          key={c.categoria}
+                          className="border-b border-gray-50 last:border-0"
+                        >
+                          <td className="py-1.5 pr-2">
+                            <span className="flex items-center gap-1.5">
+                              <span
+                                className="inline-block h-2 w-2 flex-shrink-0 rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    PIE_COLORS[i % PIE_COLORS.length],
+                                }}
+                              />
+                              <Link
+                                href="/dashboard/financeiro"
+                                className="text-gray-700 hover:text-indigo-600 hover:underline transition-colors"
+                              >
+                                {c.categoria}
+                              </Link>
+                            </span>
+                          </td>
+                          <td className="py-1.5 text-right font-semibold text-gray-800">
+                            {fmt(c.total)}
+                          </td>
+                          <td className="py-1.5 text-right text-gray-500">
+                            {totalCategorias > 0
+                              ? ((c.total / totalCategorias) * 100).toFixed(1)
+                              : "0"}
+                            %
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
+        {/* Processos por Tipo */}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
             Processos por Tipo de Ação
           </h3>
           {tipoData.length === 0 ? (
-            <p className="py-10 text-center font-body text-sm text-gray-400">
-              Sem dados
-            </p>
+            <EmptyState msg="Sem dados" />
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart
@@ -589,93 +846,121 @@ function AnaliticoTab({ data }: { data: GerenciadorData }) {
         </div>
       </div>
 
+      {/* Controles pendentes por tipo + Inadimplência */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4">
+        {/* Progress bars */}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <h3 className="mb-4 font-heading text-sm font-semibold text-gray-800">
             Controles Pendentes por Tipo
           </h3>
           {controlesPorTipo.length === 0 ? (
-            <p className="py-6 text-center font-body text-sm text-gray-400">
-              Sem controles
-            </p>
+            <EmptyState msg="Sem controles" />
           ) : (
             <div className="space-y-3">
-              {controlesPorTipo.map((t, i) => (
-                <div key={t.label}>
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="font-body text-xs text-gray-700">
-                      {t.label}
-                    </span>
-                    <span className="font-body text-xs font-semibold text-gray-900">
-                      {t.count}
-                    </span>
+              {controlesPorTipo.map((t, i) => {
+                const pct =
+                  totalControles > 0 ? (t.count / totalControles) * 100 : 0;
+                return (
+                  <div key={t.label}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="font-body text-xs text-gray-700">
+                        {t.label}
+                      </span>
+                      <span className="font-body text-xs font-semibold text-gray-900">
+                        {t.count}{" "}
+                        <span className="font-normal text-gray-400">
+                          ({pct.toFixed(0)}%)
+                        </span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-2 rounded-full transition-all"
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{
-                        width:
-                          totalControles > 0
-                            ? `${(t.count / totalControles) * 100}%`
-                            : "0%",
-                        backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-100 px-4 py-3">
-            <h3 className="font-heading text-sm font-semibold text-gray-800">
-              Inadimplência Detalhada
-            </h3>
-          </div>
+        {/* Inadimplência completa */}
+        <SectionCard title="Inadimplência Completa" noPad>
           {vencidos.length === 0 ? (
-            <p className="px-4 py-6 text-center font-body text-sm text-gray-400">
-              Sem vencidos
-            </p>
+            <EmptyState msg="Sem vencidos" />
           ) : (
-            <div className="max-h-[260px] overflow-y-auto">
-              {vencidos.map((v) => (
-                <div
-                  key={v.id}
-                  className="flex items-center justify-between border-b border-gray-50 px-4 py-2.5 last:border-0"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-body text-xs font-medium text-gray-800">
-                      {v.descricao}
-                    </p>
-                    {v.client_name && (
-                      <p className="font-body text-[10px] text-gray-400">
-                        {v.client_name}
-                      </p>
-                    )}
-                  </div>
-                  <div className="ml-3 flex flex-col items-end">
-                    <span
-                      className={`font-body text-xs font-semibold ${
-                        v.tipo === "entrada" ? "text-green-600" : "text-red-600"
-                      }`}
-                    >
-                      {fmt(v.valor)}
-                    </span>
-                    <span className="font-body text-[10px] text-red-400">
-                      {v.dias_atraso}d atraso
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full font-body text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Descrição
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Cliente
+                    </th>
+                    <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide text-gray-500">
+                      Valor
+                    </th>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Vencto
+                    </th>
+                    <th className="px-3 py-2 text-center font-semibold uppercase tracking-wide text-gray-500">
+                      Atraso
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vencidos.map((v) => {
+                    const href = v.client_id
+                      ? `/dashboard/clientes/${v.client_id}`
+                      : "/dashboard/financeiro";
+                    return (
+                      <ClickableRow key={v.id} href={href}>
+                        <td className="max-w-[130px] truncate px-3 py-2 font-medium text-gray-800">
+                          {v.descricao}
+                        </td>
+                        <td className="max-w-[90px] truncate px-3 py-2 text-gray-500">
+                          {v.client_name ?? "—"}
+                        </td>
+                        <td
+                          className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${
+                            v.tipo === "entrada"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {fmt(v.valor)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-gray-500">
+                          {v.data_vencimento}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${atrasoBadge(v.dias_atraso)}`}
+                          >
+                            {v.dias_atraso}d
+                          </span>
+                        </td>
+                      </ClickableRow>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
+        </SectionCard>
       </div>
     </div>
   );
 }
+
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function GerenciadorContent({ data }: Props) {
   const [tab, setTab] = useState<Tab>("operacional");
@@ -734,6 +1019,7 @@ export default function GerenciadorContent({ data }: Props) {
 
   return (
     <div>
+      {/* Tab Buttons */}
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tabs.map((t) => {
           const isActive = tab === t.key;
@@ -771,6 +1057,7 @@ export default function GerenciadorContent({ data }: Props) {
         })}
       </div>
 
+      {/* Tab Content */}
       {tab === "operacional" && <OperacionalTab data={data} />}
       {tab === "tatico" && <TaticoTab data={data} />}
       {tab === "estrategico" && <EstrategicoTab data={data} />}

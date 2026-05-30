@@ -4,7 +4,51 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { updateClientAction, type ClientFormState } from "@/lib/client-actions";
 import type { ClientFull } from "@/lib/clients-db";
+import type { Colaborador } from "@/lib/colaboradores-db";
 import { SpinnerIcon } from "@/components/icons";
+
+function formatMoneyInput(raw: string): string {
+  const commaIdx = raw.lastIndexOf(",");
+  if (commaIdx !== -1) {
+    const intDigits = raw.slice(0, commaIdx).replace(/\D/g, "");
+    const decDigits = raw
+      .slice(commaIdx + 1)
+      .replace(/\D/g, "")
+      .slice(0, 2);
+    const intNum = intDigits ? parseInt(intDigits, 10) : 0;
+    return `${intNum.toLocaleString("pt-BR")},${decDigits}`;
+  }
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  return parseInt(digits, 10).toLocaleString("pt-BR");
+}
+
+function normalizeMoneyBlur(v: string): string {
+  if (!v) return "";
+  const commaIdx = v.indexOf(",");
+  if (commaIdx === -1) return v + ",00";
+  const dec = v
+    .slice(commaIdx + 1)
+    .padEnd(2, "0")
+    .slice(0, 2);
+  return v.slice(0, commaIdx + 1) + dec;
+}
+
+function parseMoney(display: string): string {
+  if (!display) return "";
+  return display.replace(/\./g, "").replace(",", ".");
+}
+
+const CARGO_LABELS: Record<string, string> = {
+  advogado: "Advogado(a)",
+  advogado_associado: "Advogado(a) Assoc.",
+  estagiario: "Estagiário(a)",
+  recepcao: "Recepção",
+  agente: "Agente",
+  comercial: "Comercial",
+};
+
+const ADVOGADO_CARGOS = new Set(["advogado", "advogado_associado"]);
 
 const ESTADOS_CIVIS = [
   "Solteiro(a)",
@@ -158,7 +202,13 @@ function maskCEP(v: string) {
   return d.replace(/(\d{5})(\d{1,3})$/, "$1-$2");
 }
 
-export default function EditClientForm({ client }: { client: ClientFull }) {
+export default function EditClientForm({
+  client,
+  colaboradores,
+}: {
+  client: ClientFull;
+  colaboradores: Colaborador[];
+}) {
   const boundAction = updateClientAction.bind(null, client.id);
   const [state, formAction, isPending] = useActionState<
     ClientFormState,
@@ -183,6 +233,28 @@ export default function EditClientForm({ client }: { client: ClientFull }) {
   const [respCpfValue, setRespCpfValue] = useState(
     client.responsavel_cpf ?? ""
   );
+
+  // Etapa 3 — Origem
+  const [origemTipo, setOrigemTipo] = useState(client.origem_tipo ?? "");
+  const [origemTexto, setOrigemTexto] = useState(client.origem_texto ?? "");
+  const [indicadorId, setIndicadorId] = useState(client.indicador_id ?? "");
+  const [indicadorCargo, setIndicadorCargo] = useState(
+    client.indicador_cargo ?? ""
+  );
+  const [indicadorTipoTrabalho, setIndicadorTipoTrabalho] = useState(
+    client.indicador_tipo_trabalho ?? ""
+  );
+  const [comissaoTipo, setComissaoTipo] = useState(client.comissao_tipo ?? "");
+  const [comissaoValor, setComissaoValor] = useState(() => {
+    if (client.comissao_valor == null) return "";
+    if (client.comissao_tipo === "valor") {
+      return client.comissao_valor.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+    return String(client.comissao_valor);
+  });
 
   // Etapa 4
   const [cepValue, setCepValue] = useState(client.cep);
@@ -339,12 +411,11 @@ export default function EditClientForm({ client }: { client: ClientFull }) {
 
           {/* E-mail */}
           <div className="sm:col-span-2">
-            <Field label="E-mail do cliente para contato" required>
+            <Field label="E-mail do cliente para contato">
               <input
                 name="email"
                 type="email"
                 autoComplete="email"
-                required
                 value={emailValue}
                 onChange={(e) => setEmailValue(e.target.value)}
                 disabled={isPending}
@@ -596,37 +667,9 @@ export default function EditClientForm({ client }: { client: ClientFull }) {
         </div>
       )}
 
-      {/* ── Etapa 3 — Acesso e parceria ── */}
+      {/* ── Etapa 3 — Endereço ── */}
       <div className="space-y-4">
-        <EtapaTitle num={type === "PF" ? 3 : 2}>Acesso e parceria</EtapaTitle>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Senha do cliente">
-            <input
-              name="senha_cliente"
-              type="text"
-              placeholder="Código de acesso do cliente"
-              defaultValue={client.senha_cliente ?? ""}
-              disabled={isPending}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field label="Parceria / Origem">
-            <input
-              name="parceria"
-              type="text"
-              placeholder="Ex.: Indicação, Google, INSS…"
-              defaultValue={client.parceria ?? ""}
-              disabled={isPending}
-              className={inputClass}
-            />
-          </Field>
-        </div>
-      </div>
-
-      {/* ── Etapa 4 — Endereço ── */}
-      <div className="space-y-4">
-        <EtapaTitle num={type === "PF" ? 4 : 3}>Endereço</EtapaTitle>
+        <EtapaTitle num={type === "PF" ? 3 : 2}>Endereço</EtapaTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
           <div className="sm:col-span-2">
             <Field label="CEP" required>
@@ -770,6 +813,192 @@ export default function EditClientForm({ client }: { client: ClientFull }) {
               </span>
             </label>
           ))}
+        </div>
+      </div>
+
+      {/* ── Acesso e parceria ── */}
+      <div className="space-y-4">
+        <EtapaTitle num={type === "PF" ? 4 : 3}>Acesso e parceria</EtapaTitle>
+
+        <input type="hidden" name="origem_tipo" value={origemTipo} />
+        <input type="hidden" name="origem_texto" value={origemTexto} />
+        <input type="hidden" name="indicador_id" value={indicadorId} />
+        <input
+          type="hidden"
+          name="indicador_tipo_trabalho"
+          value={indicadorTipoTrabalho}
+        />
+        <input type="hidden" name="comissao_tipo" value={comissaoTipo} />
+        <input
+          type="hidden"
+          name="comissao_valor"
+          value={
+            comissaoTipo === "valor"
+              ? parseMoney(comissaoValor)
+              : comissaoValor.replace(",", ".")
+          }
+        />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Senha do cliente">
+            <input
+              name="senha_cliente"
+              type="text"
+              placeholder="Código de acesso do cliente"
+              defaultValue={client.senha_cliente ?? ""}
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Origem / Parceria">
+            <select
+              value={origemTipo}
+              onChange={(e) => {
+                setOrigemTipo(e.target.value);
+                setOrigemTexto("");
+                setIndicadorId("");
+                setIndicadorCargo("");
+                setIndicadorTipoTrabalho("");
+                setComissaoTipo("");
+                setComissaoValor("");
+              }}
+              disabled={isPending}
+              className={selectClass}
+            >
+              <option value="">— Selecione a origem —</option>
+              <option value="escritorio">Escritório</option>
+              <option value="rede_social">Rede Social</option>
+              <option value="indicacao">Indicação</option>
+              <option value="trafego_pago">Tráfego Pago</option>
+              <option value="outros">Outros</option>
+            </select>
+          </Field>
+
+          {origemTipo === "outros" && (
+            <div className="sm:col-span-2">
+              <Field label="Descreva a origem">
+                <input
+                  type="text"
+                  value={origemTexto}
+                  onChange={(e) => setOrigemTexto(e.target.value)}
+                  placeholder="Ex.: Indicação de parceiro externo, panfleto…"
+                  disabled={isPending}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+          )}
+
+          {origemTipo === "indicacao" && (
+            <>
+              <div className="sm:col-span-2">
+                <Field label="Colaborador indicador">
+                  <select
+                    value={indicadorId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setIndicadorId(id);
+                      const col = colaboradores.find((c) => c.id === id);
+                      setIndicadorCargo(col?.cargo ?? "");
+                      setIndicadorTipoTrabalho("");
+                    }}
+                    disabled={isPending}
+                    className={selectClass}
+                  >
+                    <option value="">— Selecione o colaborador —</option>
+                    {colaboradores.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} — {CARGO_LABELS[c.cargo] ?? c.cargo}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              {indicadorId && ADVOGADO_CARGOS.has(indicadorCargo) && (
+                <div className="sm:col-span-2">
+                  <Field label="Tipo de trabalho do indicador">
+                    <select
+                      value={indicadorTipoTrabalho}
+                      onChange={(e) => setIndicadorTipoTrabalho(e.target.value)}
+                      disabled={isPending}
+                      className={selectClass}
+                    >
+                      <option value="">— Selecione —</option>
+                      <option value="administrativo">Administrativo</option>
+                      <option value="judicial">Judicial</option>
+                      <option value="ambos">
+                        Ambos (Administrativo + Judicial)
+                      </option>
+                    </select>
+                  </Field>
+                </div>
+              )}
+
+              <Field label="Tipo de comissão">
+                <select
+                  value={comissaoTipo}
+                  onChange={(e) => {
+                    setComissaoTipo(e.target.value);
+                    setComissaoValor("");
+                  }}
+                  disabled={isPending}
+                  className={selectClass}
+                >
+                  <option value="">— Selecione —</option>
+                  <option value="percentual">Percentual (%)</option>
+                  <option value="valor">Valor fixo (R$)</option>
+                </select>
+              </Field>
+
+              {comissaoTipo === "percentual" && (
+                <Field label="Percentual (%)">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={comissaoValor}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9,]/g, "");
+                        setComissaoValor(v);
+                      }}
+                      placeholder="10,00"
+                      disabled={isPending}
+                      className={`${inputClass} pr-9`}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted">
+                      %
+                    </span>
+                  </div>
+                </Field>
+              )}
+
+              {comissaoTipo === "valor" && (
+                <Field label="Valor da comissão (R$)">
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted">
+                      R$
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={comissaoValor}
+                      onChange={(e) =>
+                        setComissaoValor(formatMoneyInput(e.target.value))
+                      }
+                      onBlur={(e) =>
+                        setComissaoValor(normalizeMoneyBlur(e.target.value))
+                      }
+                      placeholder="0,00"
+                      disabled={isPending}
+                      className={`${inputClass} pl-10`}
+                    />
+                  </div>
+                </Field>
+              )}
+            </>
+          )}
         </div>
       </div>
 

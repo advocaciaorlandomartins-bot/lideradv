@@ -214,7 +214,15 @@ export default function RemuneracoesContent({ remuneracoes, kpis }: Props) {
 
       {/* Tipo filter */}
       <div className="flex flex-wrap gap-2">
-        {(["todos", "salario", "comissao", "bonificacao"] as const).map((t) => (
+        {(
+          [
+            "todos",
+            "salario",
+            "comissao",
+            "bonificacao",
+            "adiantamento",
+          ] as const
+        ).map((t) => (
           <button
             key={t}
             onClick={() => reset(() => setTipoFilter(t))}

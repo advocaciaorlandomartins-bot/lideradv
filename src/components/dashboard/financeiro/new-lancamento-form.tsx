@@ -106,6 +106,11 @@ interface ClientOption {
   id: string;
   name: string;
   doc: string;
+  origem_tipo?: string | null;
+  indicador_id?: string | null;
+  indicador_nome?: string | null;
+  comissao_tipo?: string | null;
+  comissao_valor?: number | null;
 }
 
 interface ProcessoOption {
@@ -121,6 +126,8 @@ interface Props {
   processos: ProcessoOption[];
   salarioMinimo: number;
   defaultTipo?: "entrada" | "saida";
+  defaultClientId?: string;
+  defaultProcessoId?: string;
 }
 
 export default function NewLancamentoForm({
@@ -128,6 +135,8 @@ export default function NewLancamentoForm({
   processos,
   salarioMinimo,
   defaultTipo = "entrada",
+  defaultClientId,
+  defaultProcessoId,
 }: Props) {
   const [state, formAction, isPending] = useActionState<
     LancamentoFormState,
@@ -137,12 +146,15 @@ export default function NewLancamentoForm({
   const [tipo, setTipo] = useState<"entrada" | "saida">(defaultTipo);
 
   // ── Vinculação ─────────────────────────────────────────────
-  const [clientSearch, setClientSearch] = useState("");
+  const initialClient = defaultClientId
+    ? (clients.find((c) => c.id === defaultClientId) ?? null)
+    : null;
+  const [clientSearch, setClientSearch] = useState(initialClient?.name ?? "");
   const [clientDropOpen, setClientDropOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(
-    null
+    initialClient
   );
-  const [processoId, setProcessoId] = useState("");
+  const [processoId, setProcessoId] = useState(defaultProcessoId ?? "");
   const clientDropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -197,7 +209,7 @@ export default function NewLancamentoForm({
   );
 
   const autoDescricao = useMemo(() => {
-    const cat = finalCategoria || (tipo === "entrada" ? "Entrada" : "Saída");
+    const cat = finalCategoria || (tipo === "entrada" ? "Receita" : "Despesa");
     return selectedClient ? `${cat} — ${selectedClient.name}` : cat;
   }, [finalCategoria, selectedClient, tipo]);
 
@@ -245,6 +257,30 @@ export default function NewLancamentoForm({
     };
   }, [paymentMode, effectiveValor, numRecorrencias, periodicidade]);
 
+  // Commission auto-fill: only when tipo=entrada + process selected + client has indicador
+  const commissionInfo = useMemo(() => {
+    if (tipo !== "entrada") return null;
+    if (!processoId) return null;
+    if (!selectedClient?.indicador_id) return null;
+    if (!selectedClient.comissao_tipo || selectedClient.comissao_valor == null)
+      return null;
+    const baseValor = parseFloat(parseMoney(effectiveValor)) || 0;
+    let comissaoValorCalculado = 0;
+    if (selectedClient.comissao_tipo === "percentual") {
+      comissaoValorCalculado =
+        baseValor * (selectedClient.comissao_valor / 100);
+    } else {
+      comissaoValorCalculado = selectedClient.comissao_valor;
+    }
+    return {
+      indicador_id: selectedClient.indicador_id,
+      indicador_nome: selectedClient.indicador_nome ?? "",
+      comissao_tipo: selectedClient.comissao_tipo,
+      comissao_valor_config: selectedClient.comissao_valor,
+      comissao_calculada: comissaoValorCalculado,
+    };
+  }, [tipo, processoId, selectedClient, effectiveValor]);
+
   return (
     <form action={formAction} className="space-y-8" noValidate>
       {/* Hidden fields */}
@@ -275,6 +311,25 @@ export default function NewLancamentoForm({
       />
       <input type="hidden" name="periodicidade" value={periodicidade} />
       <input type="hidden" name="num_recorrencias" value={numRecorrencias} />
+      <input
+        type="hidden"
+        name="indicador_id"
+        value={commissionInfo?.indicador_id ?? ""}
+      />
+      <input
+        type="hidden"
+        name="comissao_tipo"
+        value={commissionInfo?.comissao_tipo ?? ""}
+      />
+      <input
+        type="hidden"
+        name="comissao_valor_config"
+        value={
+          commissionInfo?.comissao_valor_config != null
+            ? String(commissionInfo.comissao_valor_config)
+            : ""
+        }
+      />
 
       {state?.error && (
         <div
@@ -318,7 +373,7 @@ export default function NewLancamentoForm({
               />
               <div>
                 <p className="font-body text-sm font-semibold text-fg">
-                  {t === "entrada" ? "Entrada" : "Saída"}
+                  {t === "entrada" ? "Receita" : "Despesa"}
                 </p>
                 <p className="font-body text-xs text-muted">
                   {t === "entrada"
@@ -451,6 +506,68 @@ export default function NewLancamentoForm({
               </div>
             </div>
           )}
+
+          {commissionInfo && (
+            <div className="sm:col-span-2">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1.5">
+                <p className="font-body text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  Comissão do indicador — será criada automaticamente
+                  {paymentMode === "parcelado" && totalParcelas
+                    ? ` (${totalParcelas}× parcelas)`
+                    : ""}
+                </p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div>
+                    <span className="font-body text-xs text-amber-600">
+                      Indicador
+                    </span>
+                    <p className="font-body text-sm font-semibold text-fg">
+                      {commissionInfo.indicador_nome}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-body text-xs text-amber-600">
+                      Regra
+                    </span>
+                    <p className="font-body text-sm font-semibold text-fg">
+                      {commissionInfo.comissao_tipo === "percentual"
+                        ? `${commissionInfo.comissao_valor_config}%`
+                        : fmt(commissionInfo.comissao_valor_config)}
+                    </p>
+                  </div>
+                  {commissionInfo.comissao_calculada > 0 && (
+                    <>
+                      <div>
+                        <span className="font-body text-xs text-amber-600">
+                          Total da comissão
+                        </span>
+                        <p className="font-heading text-base font-semibold text-amber-800">
+                          {fmt(commissionInfo.comissao_calculada)}
+                        </p>
+                      </div>
+                      {paymentMode === "parcelado" &&
+                        parseInt(totalParcelas) > 1 && (
+                          <div>
+                            <span className="font-body text-xs text-amber-600">
+                              Por parcela
+                            </span>
+                            <p className="font-heading text-sm font-semibold text-amber-700">
+                              {fmt(
+                                Math.round(
+                                  (commissionInfo.comissao_calculada /
+                                    parseInt(totalParcelas)) *
+                                    100
+                                ) / 100
+                              )}
+                            </p>
+                          </div>
+                        )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -489,11 +606,10 @@ export default function NewLancamentoForm({
             )}
           </div>
 
-          <Field label="Data de vencimento" required>
+          <Field label="Data de vencimento">
             <input
               name="data_vencimento"
               type="date"
-              required
               disabled={isPending}
               className={inputClass}
             />
@@ -534,36 +650,38 @@ export default function NewLancamentoForm({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* Salário mínimo toggle */}
-            <div className="sm:col-span-2">
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-border px-4 py-3.5 transition-colors hover:border-slate-300">
-                <div
-                  onClick={() => {
-                    setSalarioMode((v) => !v);
-                    if (salarioMode) setValor("");
-                  }}
-                  className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 cursor-pointer ${
-                    salarioMode ? "bg-emerald-500" : "bg-slate-300"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                      salarioMode ? "translate-x-5" : "translate-x-0"
+            {/* Salário mínimo toggle — only for entrada */}
+            {tipo === "entrada" && (
+              <div className="sm:col-span-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-border px-4 py-3.5 transition-colors hover:border-slate-300">
+                  <div
+                    onClick={() => {
+                      setSalarioMode((v) => !v);
+                      if (salarioMode) setValor("");
+                    }}
+                    className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 cursor-pointer ${
+                      salarioMode ? "bg-emerald-500" : "bg-slate-300"
                     }`}
-                  />
-                </div>
-                <div>
-                  <p className="font-body text-sm font-semibold text-fg">
-                    Baseado em salário mínimo vigente
-                  </p>
-                  <p className="font-body text-xs text-muted">
-                    SM atual: {fmt(salarioMinimo)} — calcular automaticamente
-                  </p>
-                </div>
-              </label>
-            </div>
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                        salarioMode ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <p className="font-body text-sm font-semibold text-fg">
+                      Baseado em salário mínimo vigente
+                    </p>
+                    <p className="font-body text-xs text-muted">
+                      SM atual: {fmt(salarioMinimo)} — calcular automaticamente
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
 
-            {salarioMode && (
+            {tipo === "entrada" && salarioMode && (
               <Field label="Quantidade de salários mínimos">
                 <div className="flex gap-2 items-center">
                   <input

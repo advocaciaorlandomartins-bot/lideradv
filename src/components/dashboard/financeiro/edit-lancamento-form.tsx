@@ -213,7 +213,7 @@ export default function EditLancamentoForm({
   );
 
   const autoDescricao = useMemo(() => {
-    const cat = finalCategoria || (tipo === "entrada" ? "Entrada" : "Saída");
+    const cat = finalCategoria || (tipo === "entrada" ? "Receita" : "Despesa");
     return selectedClient ? `${cat} — ${selectedClient.name}` : cat;
   }, [finalCategoria, selectedClient, tipo]);
 
@@ -309,7 +309,7 @@ export default function EditLancamentoForm({
               />
               <div>
                 <p className="font-body text-sm font-semibold text-fg">
-                  {t === "entrada" ? "Entrada" : "Saída"}
+                  {t === "entrada" ? "Receita" : "Despesa"}
                 </p>
                 <p className="font-body text-xs text-muted">
                   {t === "entrada"

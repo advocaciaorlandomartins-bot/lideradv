@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
 import { getAllProcessos } from "@/lib/processos-db";
+import { getAllClients } from "@/lib/clients-db";
 import NewRemuneracaoForm from "@/components/dashboard/remuneracoes/new-remuneracao-form";
 import { ChevronRightIcon } from "@/components/icons";
 
@@ -17,9 +18,10 @@ export default async function NovaRemuneracaoPage({
 }) {
   const { colaborador: defaultColaboradorId, tipo: defaultTipo } =
     await searchParams;
-  const [colaboradores, processos] = await Promise.all([
+  const [colaboradores, processos, clients] = await Promise.all([
     getAllColaboradores(),
     getAllProcessos(),
+    getAllClients(),
   ]);
 
   const colaboradorOptions = colaboradores.map((c) => ({
@@ -34,6 +36,12 @@ export default async function NovaRemuneracaoPage({
     client_id: p.client_id,
     tipo_acao: p.tipo_acao,
     numero: p.numero,
+  }));
+
+  const clientOptions = clients.map((c) => ({
+    id: c.id,
+    name: c.name,
+    doc: c.doc,
   }));
 
   return (
@@ -72,6 +80,7 @@ export default async function NovaRemuneracaoPage({
         <NewRemuneracaoForm
           colaboradores={colaboradorOptions}
           processos={processoOptions}
+          clients={clientOptions}
           defaultColaboradorId={defaultColaboradorId}
           defaultTipo={defaultTipo}
         />

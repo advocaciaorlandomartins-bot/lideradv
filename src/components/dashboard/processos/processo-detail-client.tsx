@@ -1810,7 +1810,6 @@ export default function ProcessoDetailClient({
             </div>
           </div>
           <div className="flex flex-wrap gap-2 items-start">
-            <NovoDropdown processo={processo} />
             <Link
               href={`/dashboard/processos/${processo.id}/editar`}
               className={btnOutline}
@@ -1818,7 +1817,7 @@ export default function ProcessoDetailClient({
               Editar
             </Link>
             <Link
-              href={`/dashboard/financeiro/novo?processo=${processo.id}`}
+              href={`/dashboard/financeiro/novo?client_id=${processo.client_id}&processo_id=${processo.id}`}
               className={btnOutline}
             >
               Financeiro

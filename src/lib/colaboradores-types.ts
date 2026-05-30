@@ -23,3 +23,14 @@ export const CARGO_COLORS: Record<CargoColaborador, string> = {
   advogado_associado: "bg-indigo-50 text-indigo-700",
   comercial: "bg-teal-50 text-teal-700",
 };
+
+export function cargoColor(cargo: string): string {
+  return (
+    (CARGO_COLORS as Record<string, string>)[cargo] ??
+    "bg-slate-100 text-slate-600"
+  );
+}
+
+export function cargoLabel(cargo: string): string {
+  return (CARGO_LABELS as Record<string, string>)[cargo] ?? cargo;
+}

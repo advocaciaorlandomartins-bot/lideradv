@@ -137,3 +137,134 @@ export async function getLancamentoKpis(): Promise<LancamentoKpis> {
     folhaPaga: Number(r.folha_paga),
   };
 }
+
+export interface ClientSaidaItem {
+  id: string;
+  tipo: "entrada" | "saida";
+  descricao: string;
+  categoria: string | null;
+  valor: number;
+  status: string;
+  data_vencimento: string | null;
+  data_pagamento: string | null;
+}
+
+export interface ClientDebito {
+  totalPendente: number;
+  totalPago: number;
+  items: ClientSaidaItem[];
+}
+
+export async function getClientDebito(clientId: string): Promise<ClientDebito> {
+  const rows = await sql`
+    SELECT
+      l.id::text,
+      l.tipo,
+      l.descricao,
+      l.categoria,
+      l.valor,
+      l.status,
+      to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
+      to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento
+    FROM lancamentos l
+    WHERE l.client_id = ${clientId}::uuid
+      AND l.status != 'cancelado'
+    ORDER BY l.data_vencimento ASC NULLS LAST, l.created_at DESC
+  `;
+
+  let totalPendente = 0;
+  let totalPago = 0;
+  const items: ClientSaidaItem[] = rows.map((r) => {
+    const val = Number(r.valor);
+    if (r.status === "pago") totalPago += val;
+    else totalPendente += val;
+    return {
+      id: r.id,
+      tipo: r.tipo as "entrada" | "saida",
+      descricao: r.descricao,
+      categoria: r.categoria ?? null,
+      valor: val,
+      status: r.status,
+      data_vencimento: r.data_vencimento ?? null,
+      data_pagamento: r.data_pagamento ?? null,
+    };
+  });
+
+  return { totalPendente, totalPago, items };
+}
+
+export interface ContaClienteItem {
+  id: string;
+  tipo: "entrada" | "saida";
+  descricao: string;
+  categoria: string | null;
+  valor: number;
+  status: string;
+  data_vencimento: string | null;
+  data_pagamento: string | null;
+  processo_id: string | null;
+}
+
+export interface ContaCliente {
+  client_id: string;
+  client_name: string;
+  client_doc: string;
+  totalPendente: number;
+  totalPago: number;
+  items: ContaClienteItem[];
+}
+
+export async function getContasAReceber(): Promise<ContaCliente[]> {
+  const rows = await sql`
+    SELECT
+      c.id::text      AS client_id,
+      c.name          AS client_name,
+      c.doc           AS client_doc,
+      l.id::text,
+      l.tipo,
+      l.descricao,
+      l.categoria,
+      l.valor,
+      l.status,
+      to_char(l.data_vencimento, 'DD/MM/YYYY')  AS data_vencimento,
+      to_char(l.data_pagamento,  'DD/MM/YYYY')  AS data_pagamento,
+      l.processo_id::text
+    FROM lancamentos l
+    JOIN clients c ON c.id = l.client_id
+    WHERE l.client_id IS NOT NULL
+      AND l.status != 'cancelado'
+    ORDER BY c.name, l.data_vencimento ASC NULLS LAST, l.created_at DESC
+  `;
+
+  const map = new Map<string, ContaCliente>();
+  for (const r of rows) {
+    if (!map.has(r.client_id)) {
+      map.set(r.client_id, {
+        client_id: r.client_id,
+        client_name: r.client_name,
+        client_doc: r.client_doc,
+        totalPendente: 0,
+        totalPago: 0,
+        items: [],
+      });
+    }
+    const conta = map.get(r.client_id)!;
+    const valor = Number(r.valor);
+    if (r.status === "pago") conta.totalPago += valor;
+    else conta.totalPendente += valor;
+    conta.items.push({
+      id: r.id,
+      tipo: r.tipo as "entrada" | "saida",
+      descricao: r.descricao,
+      categoria: r.categoria ?? null,
+      valor,
+      status: r.status,
+      data_vencimento: r.data_vencimento ?? null,
+      data_pagamento: r.data_pagamento ?? null,
+      processo_id: r.processo_id ?? null,
+    });
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => b.totalPendente - a.totalPendente
+  );
+}

@@ -1,8 +1,15 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getColaboradorFull } from "@/lib/colaboradores-db";
-import { CARGO_LABELS, CARGO_COLORS } from "@/lib/colaboradores-types";
+import { getColaboradorContaPagar } from "@/lib/remuneracoes-db";
+import {
+  CARGO_LABELS,
+  CARGO_COLORS,
+  cargoColor,
+  cargoLabel,
+} from "@/lib/colaboradores-types";
 import DeleteColaboradorButton from "@/components/dashboard/colaboradores/delete-colaborador-button";
+import ColaboradorRemuneracoes from "@/components/dashboard/colaboradores/colaborador-remuneracoes";
 import {
   ChevronRightIcon,
   UserPlusIcon,
@@ -28,7 +35,10 @@ export default async function ColaboradorDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const colaborador = await getColaboradorFull(id);
+  const [colaborador, conta] = await Promise.all([
+    getColaboradorFull(id),
+    getColaboradorContaPagar(id),
+  ]);
   if (!colaborador) notFound();
 
   return (
@@ -60,9 +70,9 @@ export default async function ColaboradorDetailPage({
                   {colaborador.nome}
                 </h1>
                 <span
-                  className={`rounded px-1.5 py-0.5 font-body text-[11px] font-bold ${CARGO_COLORS[colaborador.cargo]}`}
+                  className={`rounded px-1.5 py-0.5 font-body text-[11px] font-bold ${cargoColor(colaborador.cargo)}`}
                 >
-                  {CARGO_LABELS[colaborador.cargo]}
+                  {cargoLabel(colaborador.cargo)}
                 </span>
                 {colaborador.status === "ativo" ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-body text-xs font-semibold bg-emerald-50 text-emerald-700">
@@ -103,7 +113,7 @@ export default async function ColaboradorDetailPage({
           Informações
         </h2>
         <div className="space-y-4">
-          <InfoRow label="Cargo" value={CARGO_LABELS[colaborador.cargo]} />
+          <InfoRow label="Cargo" value={cargoLabel(colaborador.cargo)} />
           {colaborador.email && (
             <InfoRow label="E-mail" value={colaborador.email} />
           )}
@@ -125,7 +135,7 @@ export default async function ColaboradorDetailPage({
             {
               icon: UserPlusIcon,
               label: "Cargo",
-              value: CARGO_LABELS[colaborador.cargo],
+              value: cargoLabel(colaborador.cargo),
             },
             {
               icon: CalendarIcon,
@@ -166,6 +176,9 @@ export default async function ColaboradorDetailPage({
           </p>
         </div>
       )}
+
+      {/* Remunerações */}
+      <ColaboradorRemuneracoes colaboradorId={colaborador.id} conta={conta} />
     </div>
   );
 }

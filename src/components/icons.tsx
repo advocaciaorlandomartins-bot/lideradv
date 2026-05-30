@@ -325,3 +325,23 @@ export function ChartBarIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function PrinterIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <polyline points="6 9 6 2 18 2 18 9" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </Icon>
+  );
+}
+
+export function PercentIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <line x1="19" y1="5" x2="5" y2="19" />
+      <circle cx="6.5" cy="6.5" r="2.5" />
+      <circle cx="17.5" cy="17.5" r="2.5" />
+    </Icon>
+  );
+}

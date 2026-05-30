@@ -1,9 +1,22 @@
 import Link from "next/link";
-import { getAllLancamentos, getLancamentoKpis } from "@/lib/lancamentos-db";
-import { getAllRemuneracoes, getRemuneracaoKpis } from "@/lib/remuneracoes-db";
+import {
+  getAllLancamentos,
+  getLancamentoKpis,
+  getContasAReceber,
+} from "@/lib/lancamentos-db";
+import {
+  getAllRemuneracoes,
+  getRemuneracaoKpis,
+  getContasAPagar,
+} from "@/lib/remuneracoes-db";
 import FinanceiroContent from "@/components/dashboard/financeiro/financeiro-content";
 import RemuneracoesContent from "@/components/dashboard/remuneracoes/remuneracoes-content";
-import { BanknotesIcon, CurrencyIcon } from "@/components/icons";
+import ContasContent from "@/components/dashboard/financeiro/contas-content";
+import {
+  BanknotesIcon,
+  CurrencyIcon,
+  ClipboardListIcon,
+} from "@/components/icons";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
@@ -20,6 +33,7 @@ export default async function FinanceiroPage({
 }) {
   const { tab } = await searchParams;
   const isRemuneracoes = tab === "remuneracoes";
+  const isContas = tab === "contas";
 
   const session = await getSession();
   const canEdit = !!session && hasPermission(session, "financeiro", "editar");
@@ -31,6 +45,10 @@ export default async function FinanceiroPage({
 
   const [remuneracoes, remuneracaoKpis] = isRemuneracoes
     ? await Promise.all([getAllRemuneracoes(), getRemuneracaoKpis()])
+    : [null, null];
+
+  const [contasReceber, contasPagar] = isContas
+    ? await Promise.all([getContasAReceber(), getContasAPagar()])
     : [null, null];
 
   const total = lancamentos.length;
@@ -52,7 +70,7 @@ export default async function FinanceiroPage({
         <Link
           href="/dashboard/financeiro"
           className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 ${
-            !isRemuneracoes
+            !isRemuneracoes && !isContas
               ? "bg-primary text-white shadow-sm"
               : "text-muted hover:text-fg"
           }`}
@@ -71,6 +89,17 @@ export default async function FinanceiroPage({
           <CurrencyIcon className="h-4 w-4" />
           Remunerações
         </Link>
+        <Link
+          href="/dashboard/financeiro?tab=contas"
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 ${
+            isContas
+              ? "bg-primary text-white shadow-sm"
+              : "text-muted hover:text-fg"
+          }`}
+        >
+          <ClipboardListIcon className="h-4 w-4" />
+          Contas
+        </Link>
       </div>
 
       {/* Content */}
@@ -78,6 +107,11 @@ export default async function FinanceiroPage({
         <RemuneracoesContent
           remuneracoes={remuneracoes!}
           kpis={remuneracaoKpis!}
+        />
+      ) : isContas ? (
+        <ContasContent
+          contasReceber={contasReceber!}
+          contasPagar={contasPagar!}
         />
       ) : (
         <FinanceiroContent

@@ -27,6 +27,8 @@ function getFields(formData: FormData) {
       ((formData.get("descricao") as string | null) ?? "").trim() || null,
     processoId:
       ((formData.get("processo_id") as string | null) ?? "").trim() || null,
+    clientId:
+      ((formData.get("client_id") as string | null) ?? "").trim() || null,
   };
 }
 
@@ -53,7 +55,7 @@ export async function createRemuneracaoAction(
     const remRows = await sql`
       INSERT INTO remuneracoes (
         colaborador_id, tipo, valor,
-        competencia, data_pagamento, status, descricao, processo_id
+        competencia, data_pagamento, status, descricao, processo_id, client_id
       ) VALUES (
         ${f.colaboradorId}::uuid,
         ${f.tipo},
@@ -62,7 +64,8 @@ export async function createRemuneracaoAction(
         ${f.dataPagamento ? f.dataPagamento : null}::date,
         ${f.status},
         ${f.descricao},
-        ${f.processoId ? f.processoId : null}::uuid
+        ${f.processoId ? f.processoId : null}::uuid,
+        ${f.clientId ? f.clientId : null}::uuid
       )
       RETURNING id
     `;

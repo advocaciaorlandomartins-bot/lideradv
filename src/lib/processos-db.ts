@@ -12,7 +12,7 @@ export interface Processo {
   comarca: string | null;
   parte_contraria: string | null;
   valor_causa: number | null;
-  status: "ativo" | "arquivado" | "encerrado";
+  status: "ativo" | "em_andamento" | "arquivado" | "encerrado";
   data_distribuicao: string | null;
   created_at_formatted: string;
 }

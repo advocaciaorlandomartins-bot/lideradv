@@ -7,8 +7,8 @@
 ---
 
 **Project:** AdvMartins
-**Generated:** 2026-05-14 18:51:50
-**Category:** Micro SaaS
+**Generated:** 2026-05-14 19:20:40
+**Category:** Job Board/Recruitment
 
 ---
 
@@ -16,13 +16,13 @@
 
 ### Color Palette
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#1E3A8A` | `--color-primary` |
-| Secondary | `#1E40AF` | `--color-secondary` |
-| CTA/Accent | `#B45309` | `--color-cta` |
+| Role       | Hex       | CSS Variable         |
+| ---------- | --------- | -------------------- |
+| Primary    | `#1E3A8A` | `--color-primary`    |
+| Secondary  | `#1E40AF` | `--color-secondary`  |
+| CTA/Accent | `#B45309` | `--color-cta`        |
 | Background | `#F8FAFC` | `--color-background` |
-| Text | `#0F172A` | `--color-text` |
+| Text       | `#0F172A` | `--color-text`       |
 
 **Color Notes:** Authority navy + trust gold
 
@@ -34,29 +34,30 @@
 - **Google Fonts:** [EB Garamond + Lato](https://fonts.google.com/share?selection.family=EB+Garamond:wght@400;500;600;700|Lato:wght@300;400;700)
 
 **CSS Import:**
+
 ```css
-@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap");
 ```
 
 ### Spacing Variables
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `4px` / `0.25rem` | Tight gaps |
-| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |
-| `--space-md` | `16px` / `1rem` | Standard padding |
-| `--space-lg` | `24px` / `1.5rem` | Section padding |
-| `--space-xl` | `32px` / `2rem` | Large gaps |
-| `--space-2xl` | `48px` / `3rem` | Section margins |
-| `--space-3xl` | `64px` / `4rem` | Hero padding |
+| Token         | Value             | Usage                     |
+| ------------- | ----------------- | ------------------------- |
+| `--space-xs`  | `4px` / `0.25rem` | Tight gaps                |
+| `--space-sm`  | `8px` / `0.5rem`  | Icon gaps, inline spacing |
+| `--space-md`  | `16px` / `1rem`   | Standard padding          |
+| `--space-lg`  | `24px` / `1.5rem` | Section padding           |
+| `--space-xl`  | `32px` / `2rem`   | Large gaps                |
+| `--space-2xl` | `48px` / `3rem`   | Section margins           |
+| `--space-3xl` | `64px` / `4rem`   | Hero padding              |
 
 ### Shadow Depths
 
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
+| Level         | Value                          | Usage                       |
+| ------------- | ------------------------------ | --------------------------- |
+| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)`   | Subtle lift                 |
+| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)`    | Cards, buttons              |
+| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)`  | Modals, dropdowns           |
 | `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
 
 ---
@@ -68,7 +69,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #B45309;
+  background: #b45309;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -85,8 +86,8 @@
 /* Secondary Button */
 .btn-secondary {
   background: transparent;
-  color: #1E3A8A;
-  border: 2px solid #1E3A8A;
+  color: #1e3a8a;
+  border: 2px solid #1e3a8a;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -99,7 +100,7 @@
 
 ```css
 .card {
-  background: #F8FAFC;
+  background: #f8fafc;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -118,16 +119,16 @@
 ```css
 .input {
   padding: 12px 16px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 16px;
   transition: border-color 200ms ease;
 }
 
 .input:focus {
-  border-color: #1E3A8A;
+  border-color: #1e3a8a;
   outline: none;
-  box-shadow: 0 0 0 3px #1E3A8A20;
+  box-shadow: 0 0 0 3px #1e3a8a20;
 }
 ```
 
@@ -163,18 +164,18 @@
 
 ### Page Pattern
 
-**Pattern Name:** Lead Magnet + Form
+**Pattern Name:** Marketplace / Directory
 
-- **Conversion Strategy:** Form fields ≤ 3 for best conversion. Offer valuable lead magnet preview. Show form submission progress.
-- **CTA Placement:** Form CTA: Submit button
-- **Section Order:** 1. Hero (benefit headline), 2. Lead magnet preview (ebook cover, checklist, etc), 3. Form (minimal fields), 4. CTA submit
+- **Conversion Strategy:** map hover pins, card carousel, Search bar is the CTA. Reduce friction to search. Popular searches suggestions.
+- **CTA Placement:** Hero Search Bar + Navbar 'List your item'
+- **Section Order:** 1. Hero (Search focused), 2. Categories, 3. Featured Listings, 4. Trust/Safety, 5. CTA (Become a host/seller)
 
 ---
 
 ## Anti-Patterns (Do NOT Use)
 
-- ❌ Complex onboarding flow
-- ❌ Cluttered layout
+- ❌ Outdated forms
+- ❌ Hidden filters
 
 ### Additional Forbidden Patterns
 

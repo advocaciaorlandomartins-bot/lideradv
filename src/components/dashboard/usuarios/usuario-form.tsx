@@ -18,6 +18,7 @@ import {
   ACOES,
   DEFAULTS_POR_CATEGORIA,
   resolvePermissoes,
+  isSubModulo,
   type Permissoes,
 } from "@/lib/permissoes";
 
@@ -64,23 +65,53 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
   function togglePerm(mod: string, acao: string) {
     setPerms((prev) => {
       const current = prev[mod] ?? [];
-      const next = current.includes(acao)
-        ? current.filter((a) => a !== acao)
-        : [...current, acao];
-      return { ...prev, [mod]: next };
+      const willHave = !current.includes(acao);
+      const next = willHave
+        ? [...current, acao]
+        : current.filter((a) => a !== acao);
+      const updated: Permissoes = { ...prev, [mod]: next };
+
+      // Quando altera VER de um módulo pai: cascateia para os sub-módulos
+      if (acao === "ver") {
+        for (const { key, parent } of MODULOS) {
+          if (parent === mod) {
+            const sub = prev[key] ?? [];
+            updated[key] = willHave
+              ? sub.includes("ver")
+                ? sub
+                : ["ver"]
+              : sub.filter((a) => a !== "ver");
+          }
+        }
+      }
+      return updated;
     });
   }
 
   function setModuleAll(mod: string, checked: boolean) {
-    setPerms((prev) => ({
-      ...prev,
-      [mod]: checked ? ACOES.map((a) => a.key) : [],
-    }));
+    setPerms((prev) => {
+      const updated: Permissoes = {
+        ...prev,
+        [mod]: checked ? ACOES.map((a) => a.key) : [],
+      };
+      // Cascateia VER para sub-módulos
+      for (const { key, parent } of MODULOS) {
+        if (parent === mod) {
+          const sub = prev[key] ?? [];
+          updated[key] = checked
+            ? sub.includes("ver")
+              ? sub
+              : ["ver"]
+            : sub.filter((a) => a !== "ver");
+        }
+      }
+      return updated;
+    });
   }
 
   function resetToDefaults() {
     if (!categoria) return;
-    setPerms(DEFAULTS_POR_CATEGORIA[categoria] ?? {});
+    setPerms(resolvePermissoes(categoria, null));
   }
 
   if (state?.success && !isEdit) {
@@ -93,8 +124,10 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
       <input type="hidden" name="ativo" value={String(ativo)} />
 
       {/* hidden permissoes fields */}
-      {MODULOS.map(({ key: mod }) =>
-        ACOES.map(({ key: acao }) =>
+      {MODULOS.map(({ key: mod, parent }) => {
+        // Sub-módulos só têm VER; módulos pai têm todas as ações
+        const acoes = parent !== null ? [{ key: "ver" }] : ACOES;
+        return acoes.map(({ key: acao }) =>
           (perms[mod] ?? []).includes(acao) ? (
             <input
               key={`${mod}_${acao}`}
@@ -103,8 +136,8 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
               value="on"
             />
           ) : null
-        )
-      )}
+        );
+      })}
 
       {state?.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">
@@ -228,7 +261,6 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
         </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Colaborador */}
           <div className="sm:col-span-2">
             <label className={labelCls}>Colaborador vinculado</label>
             <select
@@ -307,9 +339,15 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
       {/* ── Permissões ── */}
       <div className="rounded-xl border border-border bg-white p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-heading text-sm font-semibold text-fg">
-            Permissões de acesso
-          </h2>
+          <div>
+            <h2 className="font-heading text-sm font-semibold text-fg">
+              Permissões de acesso
+            </h2>
+            <p className="mt-0.5 font-body text-xs text-muted">
+              Sub-itens indentados controlam seções específicas dentro do
+              módulo.
+            </p>
+          </div>
           <button
             type="button"
             onClick={resetToDefaults}
@@ -323,8 +361,8 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="pb-2 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted w-40">
-                  Módulo
+                <th className="pb-2 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted w-52">
+                  Módulo / Seção
                 </th>
                 {ACOES.map(({ label }) => (
                   <th
@@ -339,15 +377,61 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {MODULOS.map(({ key: mod, label: modLabel }) => {
+            <tbody>
+              {MODULOS.map(({ key: mod, label: modLabel, parent }) => {
                 const modPerms = perms[mod] ?? [];
+                const isSub = parent !== null;
+
+                if (isSub) {
+                  return (
+                    <tr
+                      key={mod}
+                      className="bg-slate-50/60 hover:bg-slate-100/60"
+                    >
+                      <td className="py-1.5 pl-7 pr-4">
+                        <span className="flex items-center gap-1.5 font-body text-xs text-muted">
+                          <span className="select-none text-slate-300 font-mono">
+                            └
+                          </span>
+                          {modLabel}
+                        </span>
+                      </td>
+                      {/* VER */}
+                      <td className="py-1.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={modPerms.includes("ver")}
+                          onChange={() => togglePerm(mod, "ver")}
+                          className="h-4 w-4 cursor-pointer rounded border-border text-primary accent-primary"
+                          title={`Controlar visibilidade de "${modLabel}"`}
+                        />
+                      </td>
+                      {/* Criar / Editar / Excluir / Todos — desabilitados para sub-módulos */}
+                      <td className="py-1.5 text-center">
+                        <span className="inline-block h-4 w-4 rounded border border-dashed border-slate-200" />
+                      </td>
+                      <td className="py-1.5 text-center">
+                        <span className="inline-block h-4 w-4 rounded border border-dashed border-slate-200" />
+                      </td>
+                      <td className="py-1.5 text-center">
+                        <span className="inline-block h-4 w-4 rounded border border-dashed border-slate-200" />
+                      </td>
+                      <td className="py-1.5" />
+                    </tr>
+                  );
+                }
+
+                // Módulo pai
                 const allChecked = ACOES.every(({ key: a }) =>
                   modPerms.includes(a)
                 );
+                const hasSubModulos = MODULOS.some((m) => m.parent === mod);
                 return (
-                  <tr key={mod} className="hover:bg-slate-50">
-                    <td className="py-2.5 font-body text-sm text-fg font-medium">
+                  <tr
+                    key={mod}
+                    className={`hover:bg-slate-50 border-t border-border ${hasSubModulos ? "bg-white" : ""}`}
+                  >
+                    <td className="py-2.5 font-body text-sm text-fg font-semibold">
                       {modLabel}
                     </td>
                     {ACOES.map(({ key: acao }) => (
@@ -374,6 +458,19 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
             </tbody>
           </table>
         </div>
+
+        <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3">
+          <span className="mt-0.5 text-blue-500 flex-shrink-0 font-bold text-xs">
+            ℹ
+          </span>
+          <p className="font-body text-xs text-blue-700 leading-relaxed">
+            Sub-itens (indentados) controlam seções específicas do módulo pai.
+            Marcar/desmarcar <strong>VER</strong> no módulo pai cascateia
+            automaticamente para todos os sub-itens. Usuários precisam sair e
+            entrar novamente para que as alterações de permissão tenham efeito.
+          </p>
+        </div>
+
         <p className="font-body text-xs text-muted">
           Ao mudar a categoria, as permissões são redefinidas para o padrão
           dela.

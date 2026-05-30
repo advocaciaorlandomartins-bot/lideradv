@@ -3,9 +3,11 @@ import Link from "next/link";
 import { getClientById } from "@/lib/clients-db";
 import { getProcessosByClientId } from "@/lib/processos-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
+import { getClientDebito } from "@/lib/lancamentos-db";
 import DeleteClientButton from "@/components/dashboard/clients/delete-client-button";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import GerarDocumentoButton from "@/components/dashboard/clients/gerar-documento-button";
+import ClientDebitsSection from "@/components/dashboard/clients/client-debits-section";
 import {
   ChevronRightIcon,
   FolderOpenIcon,
@@ -52,10 +54,11 @@ export default async function ClienteDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [client, processes, documentos] = await Promise.all([
+  const [client, processes, documentos, debito] = await Promise.all([
     getClientById(id),
     getProcessosByClientId(id),
     getDocumentosByEntityId("cliente", id),
+    getClientDebito(id),
   ]);
   if (!client) notFound();
 
@@ -158,15 +161,30 @@ export default async function ClienteDetailPage({
                 label: "Processos",
                 value: String(processes.length),
               },
-              { icon: BanknotesIcon, label: "Em aberto", value: "R$ 0" },
+              {
+                icon: BanknotesIcon,
+                label: "Dívida",
+                value:
+                  debito.totalPendente > 0
+                    ? debito.totalPendente.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })
+                    : "R$ 0",
+                highlight: debito.totalPendente > 0,
+              },
               { icon: CalendarIcon, label: "Audiências", value: "0" },
-            ].map(({ icon: Icon, label, value }) => (
+            ].map(({ icon: Icon, label, value, highlight }) => (
               <div
                 key={label}
                 className="flex flex-col items-center gap-1 py-3"
               >
-                <Icon className="h-4 w-4 text-muted" />
-                <span className="font-heading text-lg font-semibold text-fg">
+                <Icon
+                  className={`h-4 w-4 ${highlight ? "text-red-500" : "text-muted"}`}
+                />
+                <span
+                  className={`font-heading text-lg font-semibold ${highlight ? "text-red-600" : "text-fg"}`}
+                >
                   {value}
                 </span>
                 <span className="font-body text-[11px] text-muted">
@@ -253,6 +271,9 @@ export default async function ClienteDetailPage({
           )}
         </div>
       </div>
+
+      {/* Débitos / Despesas vinculadas */}
+      <ClientDebitsSection clientId={client.id} debito={debito} />
 
       {/* Documentos */}
       <DocumentsSection

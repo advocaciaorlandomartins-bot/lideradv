@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getAllClients } from "@/lib/clients-db";
+import { getAllClientsWithOrigin } from "@/lib/clients-db";
 import { getAllProcessos } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import NewLancamentoForm from "@/components/dashboard/financeiro/new-lancamento-form";
@@ -14,14 +14,18 @@ export const dynamic = "force-dynamic";
 export default async function NovoLancamentoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tipo?: string }>;
+  searchParams: Promise<{
+    tipo?: string;
+    client_id?: string;
+    processo_id?: string;
+  }>;
 }) {
-  const { tipo } = await searchParams;
+  const { tipo, client_id, processo_id } = await searchParams;
   const defaultTipo: "entrada" | "saida" =
     tipo === "saida" ? "saida" : "entrada";
 
   const [clients, processos, escritorioConfig] = await Promise.all([
-    getAllClients(),
+    getAllClientsWithOrigin(),
     getAllProcessos(),
     getEscritorioConfig(),
   ]);
@@ -30,6 +34,11 @@ export default async function NovoLancamentoPage({
     id: c.id,
     name: c.name,
     doc: c.doc,
+    origem_tipo: c.origem_tipo,
+    indicador_id: c.indicador_id,
+    indicador_nome: c.indicador_nome,
+    comissao_tipo: c.comissao_tipo,
+    comissao_valor: c.comissao_valor,
   }));
 
   const processoOptions = processos.map((p) => ({
@@ -71,6 +80,8 @@ export default async function NovoLancamentoPage({
           processos={processoOptions}
           salarioMinimo={escritorioConfig.salario_minimo ?? 1518}
           defaultTipo={defaultTipo}
+          defaultClientId={client_id}
+          defaultProcessoId={processo_id}
         />
       </div>
     </div>

@@ -1,15 +1,39 @@
 import type { SessionUser } from "./session";
 
 export const MODULOS = [
-  { key: "clientes", label: "Clientes" },
-  { key: "processos", label: "Processos" },
-  { key: "financeiro", label: "Financeiro" },
-  { key: "controles", label: "Controles" },
-  { key: "colaboradores", label: "Colaboradores" },
-  { key: "remuneracoes", label: "Remunerações" },
-  { key: "modelos", label: "Modelos" },
-  { key: "configuracoes", label: "Configurações" },
-  { key: "usuarios", label: "Usuários" },
+  { key: "clientes", label: "Clientes", parent: null },
+  { key: "processos", label: "Processos", parent: null },
+  { key: "financeiro", label: "Financeiro", parent: null },
+  {
+    key: "financeiro_entradas",
+    label: "Receitas / Honorários",
+    parent: "financeiro",
+  },
+  {
+    key: "financeiro_saidas",
+    label: "Despesas / Saídas",
+    parent: "financeiro",
+  },
+  { key: "controles", label: "Controles", parent: null },
+  { key: "colaboradores", label: "Colaboradores", parent: null },
+  { key: "remuneracoes", label: "Remunerações", parent: null },
+  { key: "modelos", label: "Modelos", parent: null },
+  { key: "relatorios", label: "Relatórios", parent: null },
+  { key: "relatorios_extrato", label: "Extrato Geral", parent: "relatorios" },
+  { key: "relatorios_clientes", label: "Por Cliente", parent: "relatorios" },
+  {
+    key: "relatorios_folha",
+    label: "Folha de Pagamento",
+    parent: "relatorios",
+  },
+  { key: "relatorios_fluxo", label: "Fluxo de Caixa", parent: "relatorios" },
+  {
+    key: "relatorios_recibo",
+    label: "Recibo ao Cliente",
+    parent: "relatorios",
+  },
+  { key: "configuracoes", label: "Configurações", parent: null },
+  { key: "usuarios", label: "Usuários", parent: null },
 ] as const;
 
 export const ACOES = [
@@ -27,6 +51,15 @@ const FULL: string[] = ["ver", "criar", "editar", "excluir"];
 const VER: string[] = ["ver"];
 const NONE: string[] = [];
 
+// Sub-módulos que existem apenas para controle de VER (sem CRUD próprio)
+const SUB_MODULOS = new Set<string>(
+  MODULOS.filter((m) => m.parent !== null).map((m) => m.key)
+);
+
+export function isSubModulo(key: string): boolean {
+  return SUB_MODULOS.has(key);
+}
+
 export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
   "Administrador(a)": {
     clientes: FULL,
@@ -36,6 +69,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     colaboradores: FULL,
     remuneracoes: FULL,
     modelos: FULL,
+    relatorios: FULL,
     configuracoes: FULL,
     usuarios: FULL,
   },
@@ -47,6 +81,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     colaboradores: FULL,
     remuneracoes: FULL,
     modelos: FULL,
+    relatorios: FULL,
     configuracoes: VER,
     usuarios: VER,
   },
@@ -56,8 +91,11 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     financeiro: VER,
     controles: FULL,
     colaboradores: VER,
-    remuneracoes: VER,
+    remuneracoes: NONE,
     modelos: ["ver", "criar", "editar"],
+    relatorios: VER,
+    // Folha de pagamento bloqueada por padrão para advogados
+    relatorios_folha: NONE,
     configuracoes: NONE,
     usuarios: NONE,
   },
@@ -69,6 +107,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     colaboradores: VER,
     remuneracoes: NONE,
     modelos: VER,
+    relatorios: NONE,
     configuracoes: NONE,
     usuarios: NONE,
   },
@@ -80,6 +119,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     colaboradores: VER,
     remuneracoes: NONE,
     modelos: VER,
+    relatorios: NONE,
     configuracoes: NONE,
     usuarios: NONE,
   },
@@ -90,12 +130,27 @@ export function resolvePermissoes(
   stored: Permissoes | null
 ): Permissoes {
   const defaults = DEFAULTS_POR_CATEGORIA[categoria] ?? {};
-  if (!stored) return defaults;
-  // merge: stored overrides defaults module by module
   const result: Permissoes = {};
-  for (const { key } of MODULOS) {
-    result[key] = stored[key] ?? defaults[key] ?? NONE;
+
+  for (const { key, parent } of MODULOS) {
+    if (stored && key in stored) {
+      // Valor explicitamente armazenado (inclui arrays vazios = sem acesso)
+      result[key] = stored[key];
+    } else if (key in defaults) {
+      // Padrão da categoria
+      result[key] = defaults[key];
+    } else if (parent !== null) {
+      // Sub-módulo sem valor explícito: herda "ver" do módulo pai
+      const parentPerms =
+        stored && parent in stored
+          ? stored[parent]
+          : (defaults[parent] ?? NONE);
+      result[key] = parentPerms.includes("ver") ? VER : NONE;
+    } else {
+      result[key] = NONE;
+    }
   }
+
   return result;
 }
 
@@ -104,5 +159,12 @@ export function hasPermission(
   modulo: string,
   acao: string
 ): boolean {
-  return (user.permissoes[modulo] ?? []).includes(acao);
+  const perms = user.permissoes[modulo];
+  if (perms !== undefined) return perms.includes(acao);
+
+  // Sub-módulo não presente na sessão (sessões antigas): herda do pai
+  const parent = MODULOS.find((m) => m.key === modulo)?.parent;
+  if (parent) return (user.permissoes[parent] ?? []).includes(acao);
+
+  return false;
 }

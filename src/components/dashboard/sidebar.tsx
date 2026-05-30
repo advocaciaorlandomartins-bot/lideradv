@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTransition } from "react";
 import {
   ScalesIcon,
   HomeIcon,
@@ -21,6 +22,7 @@ import {
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
+import { logoutAction } from "@/lib/auth-actions";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: HomeIcon, label: "Dashboard", modulo: null },
@@ -100,6 +102,13 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose, user }: SidebarProps) {
   const pathname = usePathname();
+  const [, startTransition] = useTransition();
+
+  function handleLogout() {
+    startTransition(async () => {
+      await logoutAction();
+    });
+  }
 
   const visibleItems = NAV_ITEMS.filter(
     ({ modulo }) => modulo === null || hasPermission(user, modulo, "ver")
@@ -184,13 +193,13 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
 
         {/* Logout */}
         <div className="mx-3 mb-4 border-t border-white/15 pt-4">
-          <Link
-            href="/"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 font-body text-sm text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 font-body text-sm text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
           >
             <LogoutIcon className="h-5 w-5 flex-shrink-0" />
             Sair
-          </Link>
+          </button>
         </div>
       </aside>
     </>

@@ -1,0 +1,288 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import sql from "./db";
+
+export type CrmFormState = { error?: string; success?: boolean } | null;
+
+// ── Leads ─────────────────────────────────────────────────────────────────────
+
+export async function createLeadAction(
+  _prev: CrmFormState,
+  formData: FormData
+): Promise<CrmFormState> {
+  const nome = ((formData.get("nome") as string) ?? "").trim();
+  const email = ((formData.get("email") as string) ?? "").trim() || null;
+  const telefone = ((formData.get("telefone") as string) ?? "").trim() || null;
+  const tipo = ((formData.get("tipo") as string) ?? "PF").trim();
+  const empresa = ((formData.get("empresa") as string) ?? "").trim() || null;
+  const areaInteresse =
+    ((formData.get("area_interesse") as string) ?? "").trim() || null;
+  const estagio = (
+    (formData.get("estagio") as string) ?? "novo_contato"
+  ).trim();
+  const origem = ((formData.get("origem") as string) ?? "").trim() || null;
+  const responsavelId =
+    ((formData.get("responsavel_id") as string) ?? "").trim() || null;
+  const notas = ((formData.get("notas") as string) ?? "").trim() || null;
+
+  if (!nome) return { error: "Nome é obrigatório." };
+
+  try {
+    if (responsavelId) {
+      await sql`
+        INSERT INTO crm_leads (nome, email, telefone, tipo, empresa, area_interesse, estagio, origem, responsavel_id, notas)
+        VALUES (${nome}, ${email}, ${telefone}, ${tipo}, ${empresa}, ${areaInteresse}, ${estagio}, ${origem}, ${responsavelId}::uuid, ${notas})
+      `;
+    } else {
+      await sql`
+        INSERT INTO crm_leads (nome, email, telefone, tipo, empresa, area_interesse, estagio, origem, notas)
+        VALUES (${nome}, ${email}, ${telefone}, ${tipo}, ${empresa}, ${areaInteresse}, ${estagio}, ${origem}, ${notas})
+      `;
+    }
+  } catch (err) {
+    console.error("createLeadAction:", err);
+    return { error: "Erro ao criar lead." };
+  }
+
+  revalidatePath("/dashboard/crm");
+  return { success: true };
+}
+
+export async function updateLeadAction(
+  _prev: CrmFormState,
+  formData: FormData
+): Promise<CrmFormState> {
+  const id = ((formData.get("id") as string) ?? "").trim();
+  const nome = ((formData.get("nome") as string) ?? "").trim();
+  const email = ((formData.get("email") as string) ?? "").trim() || null;
+  const telefone = ((formData.get("telefone") as string) ?? "").trim() || null;
+  const tipo = ((formData.get("tipo") as string) ?? "PF").trim();
+  const empresa = ((formData.get("empresa") as string) ?? "").trim() || null;
+  const areaInteresse =
+    ((formData.get("area_interesse") as string) ?? "").trim() || null;
+  const estagio = (
+    (formData.get("estagio") as string) ?? "novo_contato"
+  ).trim();
+  const origem = ((formData.get("origem") as string) ?? "").trim() || null;
+  const responsavelId =
+    ((formData.get("responsavel_id") as string) ?? "").trim() || null;
+  const notas = ((formData.get("notas") as string) ?? "").trim() || null;
+
+  if (!id) return { error: "ID inválido." };
+  if (!nome) return { error: "Nome é obrigatório." };
+
+  try {
+    if (responsavelId) {
+      await sql`
+        UPDATE crm_leads SET
+          nome = ${nome}, email = ${email}, telefone = ${telefone}, tipo = ${tipo},
+          empresa = ${empresa}, area_interesse = ${areaInteresse}, estagio = ${estagio},
+          origem = ${origem}, responsavel_id = ${responsavelId}::uuid, notas = ${notas},
+          updated_at = NOW()
+        WHERE id = ${id}::uuid
+      `;
+    } else {
+      await sql`
+        UPDATE crm_leads SET
+          nome = ${nome}, email = ${email}, telefone = ${telefone}, tipo = ${tipo},
+          empresa = ${empresa}, area_interesse = ${areaInteresse}, estagio = ${estagio},
+          origem = ${origem}, responsavel_id = NULL, notas = ${notas},
+          updated_at = NOW()
+        WHERE id = ${id}::uuid
+      `;
+    }
+  } catch (err) {
+    console.error("updateLeadAction:", err);
+    return { error: "Erro ao atualizar lead." };
+  }
+
+  revalidatePath("/dashboard/crm");
+  revalidatePath(`/dashboard/crm/leads/${id}`);
+  return { success: true };
+}
+
+export async function moveLeadEstagioAction(
+  id: string,
+  estagio: string
+): Promise<void> {
+  await sql`
+    UPDATE crm_leads SET estagio = ${estagio}, updated_at = NOW()
+    WHERE id = ${id}::uuid
+  `;
+  revalidatePath("/dashboard/crm");
+  revalidatePath(`/dashboard/crm/leads/${id}`);
+}
+
+export async function deleteLeadAction(id: string): Promise<void> {
+  await sql`DELETE FROM crm_leads WHERE id = ${id}::uuid`;
+  revalidatePath("/dashboard/crm");
+}
+
+export async function convertLeadToClientAction(
+  leadId: string
+): Promise<{ error?: string; clientId?: string }> {
+  const rows = await sql`
+    SELECT nome, email, telefone, tipo, empresa FROM crm_leads WHERE id = ${leadId}::uuid
+  `;
+  if (rows.length === 0) return { error: "Lead não encontrado." };
+
+  const lead = rows[0];
+
+  try {
+    const clientRows = await sql`
+      INSERT INTO clients (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+      VALUES (
+        ${lead.tipo},
+        ${lead.nome},
+        '',
+        ${lead.email ?? ""},
+        ${lead.telefone ?? ""},
+        '', '', '', '', '', '', 'ativo'
+      )
+      RETURNING id::text
+    `;
+    const clientId = clientRows[0].id;
+
+    await sql`
+      UPDATE crm_leads SET client_id = ${clientId}::uuid, estagio = 'fechado', updated_at = NOW()
+      WHERE id = ${leadId}::uuid
+    `;
+
+    revalidatePath("/dashboard/crm");
+    revalidatePath("/dashboard/clientes");
+    return { clientId };
+  } catch (err) {
+    console.error("convertLeadToClientAction:", err);
+    return { error: "Erro ao converter lead." };
+  }
+}
+
+// ── Atividades ────────────────────────────────────────────────────────────────
+
+export async function createAtividadeAction(
+  _prev: CrmFormState,
+  formData: FormData
+): Promise<CrmFormState> {
+  const leadId = ((formData.get("lead_id") as string) ?? "").trim();
+  const tipo = ((formData.get("tipo") as string) ?? "").trim();
+  const titulo = ((formData.get("titulo") as string) ?? "").trim();
+  const descricao =
+    ((formData.get("descricao") as string) ?? "").trim() || null;
+  const dataHora = ((formData.get("data_hora") as string) ?? "").trim() || null;
+  const responsavelId =
+    ((formData.get("responsavel_id") as string) ?? "").trim() || null;
+
+  if (!leadId) return { error: "Lead inválido." };
+  if (!tipo) return { error: "Tipo é obrigatório." };
+  if (!titulo) return { error: "Título é obrigatório." };
+
+  try {
+    if (responsavelId && dataHora) {
+      await sql`
+        INSERT INTO crm_atividades (lead_id, tipo, titulo, descricao, data_hora, responsavel_id)
+        VALUES (${leadId}::uuid, ${tipo}, ${titulo}, ${descricao}, ${dataHora}::timestamptz, ${responsavelId}::uuid)
+      `;
+    } else if (responsavelId) {
+      await sql`
+        INSERT INTO crm_atividades (lead_id, tipo, titulo, descricao, responsavel_id)
+        VALUES (${leadId}::uuid, ${tipo}, ${titulo}, ${descricao}, ${responsavelId}::uuid)
+      `;
+    } else if (dataHora) {
+      await sql`
+        INSERT INTO crm_atividades (lead_id, tipo, titulo, descricao, data_hora)
+        VALUES (${leadId}::uuid, ${tipo}, ${titulo}, ${descricao}, ${dataHora}::timestamptz)
+      `;
+    } else {
+      await sql`
+        INSERT INTO crm_atividades (lead_id, tipo, titulo, descricao)
+        VALUES (${leadId}::uuid, ${tipo}, ${titulo}, ${descricao})
+      `;
+    }
+  } catch (err) {
+    console.error("createAtividadeAction:", err);
+    return { error: "Erro ao registrar atividade." };
+  }
+
+  revalidatePath(`/dashboard/crm/leads/${leadId}`);
+  revalidatePath("/dashboard/crm");
+  return { success: true };
+}
+
+export async function deleteAtividadeAction(
+  id: string,
+  leadId: string
+): Promise<void> {
+  await sql`DELETE FROM crm_atividades WHERE id = ${id}::uuid`;
+  revalidatePath(`/dashboard/crm/leads/${leadId}`);
+}
+
+// ── Tarefas ───────────────────────────────────────────────────────────────────
+
+export async function createTarefaAction(
+  _prev: CrmFormState,
+  formData: FormData
+): Promise<CrmFormState> {
+  const leadId = ((formData.get("lead_id") as string) ?? "").trim();
+  const titulo = ((formData.get("titulo") as string) ?? "").trim();
+  const descricao =
+    ((formData.get("descricao") as string) ?? "").trim() || null;
+  const dataVencimento =
+    ((formData.get("data_vencimento") as string) ?? "").trim() || null;
+  const responsavelId =
+    ((formData.get("responsavel_id") as string) ?? "").trim() || null;
+
+  if (!leadId) return { error: "Lead inválido." };
+  if (!titulo) return { error: "Título é obrigatório." };
+
+  try {
+    if (responsavelId && dataVencimento) {
+      await sql`
+        INSERT INTO crm_tarefas (lead_id, titulo, descricao, data_vencimento, responsavel_id)
+        VALUES (${leadId}::uuid, ${titulo}, ${descricao}, ${dataVencimento}::date, ${responsavelId}::uuid)
+      `;
+    } else if (responsavelId) {
+      await sql`
+        INSERT INTO crm_tarefas (lead_id, titulo, descricao, responsavel_id)
+        VALUES (${leadId}::uuid, ${titulo}, ${descricao}, ${responsavelId}::uuid)
+      `;
+    } else if (dataVencimento) {
+      await sql`
+        INSERT INTO crm_tarefas (lead_id, titulo, descricao, data_vencimento)
+        VALUES (${leadId}::uuid, ${titulo}, ${descricao}, ${dataVencimento}::date)
+      `;
+    } else {
+      await sql`
+        INSERT INTO crm_tarefas (lead_id, titulo, descricao)
+        VALUES (${leadId}::uuid, ${titulo}, ${descricao})
+      `;
+    }
+  } catch (err) {
+    console.error("createTarefaAction:", err);
+    return { error: "Erro ao criar tarefa." };
+  }
+
+  revalidatePath(`/dashboard/crm/leads/${leadId}`);
+  return { success: true };
+}
+
+export async function toggleTarefaAction(
+  id: string,
+  leadId: string,
+  concluida: boolean
+): Promise<void> {
+  await sql`
+    UPDATE crm_tarefas SET concluida = ${concluida}, updated_at = NOW()
+    WHERE id = ${id}::uuid
+  `;
+  revalidatePath(`/dashboard/crm/leads/${leadId}`);
+  revalidatePath("/dashboard/crm");
+}
+
+export async function deleteTarefaAction(
+  id: string,
+  leadId: string
+): Promise<void> {
+  await sql`DELETE FROM crm_tarefas WHERE id = ${id}::uuid`;
+  revalidatePath(`/dashboard/crm/leads/${leadId}`);
+}

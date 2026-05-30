@@ -345,3 +345,66 @@ export function PercentIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function FunnelIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </Icon>
+  );
+}
+
+export function PhoneIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.36 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.5a16 16 0 0 0 6.29 6.29l.91-.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </Icon>
+  );
+}
+
+export function MailIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+      <polyline points="22,6 12,13 2,6" />
+    </Icon>
+  );
+}
+
+export function ArrowRightIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </Icon>
+  );
+}
+
+export function CheckCircleIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </Icon>
+  );
+}
+
+export function TrashIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </Icon>
+  );
+}
+
+export function TagIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </Icon>
+  );
+}

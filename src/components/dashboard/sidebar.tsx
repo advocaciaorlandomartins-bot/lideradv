@@ -17,6 +17,7 @@ import {
   CogIcon,
   ChartBarIcon,
   PrinterIcon,
+  FunnelIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -28,6 +29,12 @@ const NAV_ITEMS = [
     icon: ChartBarIcon,
     label: "Gerenciador",
     modulo: null,
+  },
+  {
+    href: "/dashboard/crm",
+    icon: FunnelIcon,
+    label: "CRM",
+    modulo: "crm",
   },
   {
     href: "/dashboard/clientes",

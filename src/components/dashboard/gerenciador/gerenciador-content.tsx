@@ -213,7 +213,7 @@ function EmptyState({ msg }: { msg: string }) {
 // ── Aba Operacional ───────────────────────────────────────────────────────────
 
 function OperacionalTab({ data }: { data: GerenciadorData }) {
-  const { kpis, counts, proximosControles, vencidos } = data;
+  const { kpis, counts, proximosControles, vencidos, crm } = data;
 
   const controlesHojeAmanha = proximosControles.filter(
     (c) => c.dias_restantes <= 1
@@ -221,7 +221,7 @@ function OperacionalTab({ data }: { data: GerenciadorData }) {
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
+      {/* KPIs financeiros + CRM */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
           label="Controles Hoje/Amanhã"
@@ -238,22 +238,91 @@ function OperacionalTab({ data }: { data: GerenciadorData }) {
           href="/dashboard/financeiro"
         />
         <KpiCard
-          label="Total Vencido"
-          value={fmt(kpis.vencidosValor)}
-          sub="valor em atraso"
-          alert={kpis.vencidosValor > 0}
-          href="/dashboard/financeiro"
+          label="Leads Ativos"
+          value={String(crm.leadsAtivos)}
+          sub="no funil de vendas"
+          href="/dashboard/crm"
         />
         <KpiCard
-          label="A Receber"
-          value={fmt(kpis.aReceber)}
-          sub="pendente de recebimento"
-          href="/dashboard/financeiro"
+          label="Tarefas CRM Vencidas"
+          value={String(crm.tarefasVencidas)}
+          sub="follow-ups atrasados"
+          alert={crm.tarefasVencidas > 0}
+          href="/dashboard/crm"
         />
       </div>
 
       {/* Tabelas */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Tarefas CRM */}
+        <SectionCard title="Tarefas CRM — Próximas e Vencidas" noPad>
+          {crm.tarefasProximas.length === 0 ? (
+            <EmptyState msg="Nenhuma tarefa pendente" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full font-body text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Tarefa
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+                      Lead
+                    </th>
+                    <th className="px-3 py-2 text-center font-semibold uppercase tracking-wide text-gray-500">
+                      Prazo
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {crm.tarefasProximas.map((t) => {
+                    const vencida = t.dias_restantes < 0;
+                    const hoje = t.dias_restantes === 0;
+                    const rowCls = vencida
+                      ? "bg-red-50"
+                      : hoje
+                        ? "bg-orange-50"
+                        : "";
+                    const badgeCls = vencida
+                      ? "bg-red-100 text-red-700 border border-red-200"
+                      : hoje
+                        ? "bg-orange-100 text-orange-700 border border-orange-200"
+                        : t.dias_restantes <= 3
+                          ? "bg-amber-100 text-amber-700 border border-amber-200"
+                          : "bg-blue-100 text-blue-700 border border-blue-200";
+                    const badgeLabel = vencida
+                      ? `${Math.abs(t.dias_restantes)}d atraso`
+                      : hoje
+                        ? "Hoje"
+                        : `${t.dias_restantes}d`;
+                    return (
+                      <ClickableRow
+                        key={t.id}
+                        href={`/dashboard/crm/leads/${t.lead_id}`}
+                        highlight={rowCls}
+                      >
+                        <td className="max-w-[140px] truncate px-3 py-2 font-medium text-gray-800">
+                          {t.titulo}
+                        </td>
+                        <td className="max-w-[120px] truncate px-3 py-2 text-gray-500">
+                          {t.lead_nome}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${badgeCls}`}
+                          >
+                            {badgeLabel}
+                          </span>
+                        </td>
+                      </ClickableRow>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionCard>
+
         {/* Próximos Controles */}
         <SectionCard title="Próximos Controles (14 dias)" noPad>
           {proximosControles.length === 0 ? (
@@ -399,7 +468,8 @@ function OperacionalTab({ data }: { data: GerenciadorData }) {
 // ── Aba Tático ────────────────────────────────────────────────────────────────
 
 function TaticoTab({ data }: { data: GerenciadorData }) {
-  const { kpis, receitasPorMes, controlesPorTipo, novosClientesPorMes } = data;
+  const { kpis, receitasPorMes, controlesPorTipo, novosClientesPorMes, crm } =
+    data;
 
   const novosClientesUltimo =
     novosClientesPorMes.length > 0
@@ -432,6 +502,30 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
           label="Novos Clientes (mês)"
           value={String(novosClientesUltimo)}
           sub="no mês atual"
+        />
+        <KpiCard
+          label="Novos Leads (mês)"
+          value={String(crm.leadsMes)}
+          sub="entradas no CRM"
+          href="/dashboard/crm"
+        />
+        <KpiCard
+          label="Leads em Andamento"
+          value={String(crm.leadsAtivos)}
+          sub="no funil ativo"
+          href="/dashboard/crm"
+        />
+        <KpiCard
+          label="Leads Fechados"
+          value={String(crm.leadsFechados)}
+          sub="convertidos em cliente"
+          href="/dashboard/crm"
+        />
+        <KpiCard
+          label="Taxa de Conversão"
+          value={`${crm.taxaConversao.toFixed(0)}%`}
+          sub="fechados / (fechados + perdidos)"
+          href="/dashboard/crm"
         />
       </div>
 
@@ -496,27 +590,69 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
         </div>
       </div>
 
-      {/* Novos clientes */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
-          Novos Clientes — últimos 6 meses
-        </h3>
-        <ResponsiveContainer width="100%" height={130}>
-          <BarChart
-            data={clientesData}
-            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
-              width={30}
-              allowDecimals={false}
-            />
-            <Tooltip />
-            <Bar dataKey="Clientes" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+      {/* Novos clientes + Funil CRM */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
+            Novos Clientes — últimos 6 meses
+          </h3>
+          <ResponsiveContainer width="100%" height={130}>
+            <BarChart
+              data={clientesData}
+              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#9ca3af" }} />
+              <YAxis
+                tick={{ fontSize: 10, fill: "#9ca3af" }}
+                width={30}
+                allowDecimals={false}
+              />
+              <Tooltip />
+              <Bar dataKey="Clientes" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
+            Funil de Vendas CRM — por Estágio
+          </h3>
+          {crm.leadsPorEstagio.length === 0 ? (
+            <EmptyState msg="Nenhum lead cadastrado" />
+          ) : (
+            <ResponsiveContainer width="100%" height={130}>
+              <BarChart
+                data={crm.leadsPorEstagio.map((e) => ({
+                  name: e.label,
+                  Leads: e.count,
+                }))}
+                layout="vertical"
+                margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#f0f0f0"
+                  vertical={false}
+                />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 9, fill: "#6b7280" }}
+                  width={110}
+                  interval={0}
+                />
+                <Tooltip />
+                <Bar dataKey="Leads" fill="#6366f1" radius={[0, 2, 2, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -525,7 +661,7 @@ function TaticoTab({ data }: { data: GerenciadorData }) {
 // ── Aba Estratégico ───────────────────────────────────────────────────────────
 
 function EstrategicoTab({ data }: { data: GerenciadorData }) {
-  const { kpis, counts, topClientes, receitasPorMes } = data;
+  const { kpis, counts, topClientes, receitasPorMes, crm } = data;
 
   const saldoAnual = kpis.recebidoAno - kpis.pagoAno;
 
@@ -687,6 +823,29 @@ function EstrategicoTab({ data }: { data: GerenciadorData }) {
           value={String(counts.totalColaboradores)}
           href="/dashboard/colaboradores"
         />
+        <KpiCard
+          label="Total Leads (CRM)"
+          value={String(crm.leadsTotal)}
+          href="/dashboard/crm"
+        />
+        <KpiCard
+          label="Leads Convertidos"
+          value={String(crm.leadsFechados)}
+          sub="fechados como clientes"
+          href="/dashboard/crm"
+        />
+        <KpiCard
+          label="Taxa de Conversão"
+          value={`${crm.taxaConversao.toFixed(1)}%`}
+          sub="fechados / (fechados + perdidos)"
+          href="/dashboard/crm"
+        />
+        <KpiCard
+          label="Leads Perdidos"
+          value={String(crm.leadsTotal - crm.leadsAtivos - crm.leadsFechados)}
+          alert={crm.leadsTotal - crm.leadsAtivos - crm.leadsFechados > 0}
+          href="/dashboard/crm"
+        />
       </div>
     </div>
   );
@@ -695,8 +854,13 @@ function EstrategicoTab({ data }: { data: GerenciadorData }) {
 // ── Aba Analítico ─────────────────────────────────────────────────────────────
 
 function AnaliticoTab({ data }: { data: GerenciadorData }) {
-  const { receitasPorCategoria, processosPorTipo, controlesPorTipo, vencidos } =
-    data;
+  const {
+    receitasPorCategoria,
+    processosPorTipo,
+    controlesPorTipo,
+    vencidos,
+    crm,
+  } = data;
 
   const totalControles = controlesPorTipo.reduce((s, t) => s + t.count, 0);
   const totalCategorias = receitasPorCategoria.reduce((s, c) => s + c.total, 0);
@@ -886,6 +1050,96 @@ function AnaliticoTab({ data }: { data: GerenciadorData }) {
                 );
               })}
             </div>
+          )}
+        </div>
+
+        {/* CRM — Funil por estágio */}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-4 font-heading text-sm font-semibold text-gray-800">
+            CRM — Funil de Vendas por Estágio
+          </h3>
+          {crm.leadsPorEstagio.length === 0 ? (
+            <EmptyState msg="Nenhum lead cadastrado" />
+          ) : (
+            <div className="space-y-3">
+              {crm.leadsPorEstagio.map((e, i) => {
+                const pct =
+                  crm.leadsTotal > 0 ? (e.count / crm.leadsTotal) * 100 : 0;
+                const ESTAGIO_COLORS: Record<string, string> = {
+                  novo_contato: "#3b82f6",
+                  consulta_agendada: "#f59e0b",
+                  em_analise: "#f97316",
+                  proposta_enviada: "#8b5cf6",
+                  fechado: "#22c55e",
+                  perdido: "#94a3b8",
+                };
+                const color =
+                  ESTAGIO_COLORS[e.estagio] ??
+                  PIE_COLORS[i % PIE_COLORS.length];
+                return (
+                  <div key={e.estagio}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="font-body text-xs text-gray-700">
+                        {e.label}
+                      </span>
+                      <span className="font-body text-xs font-semibold text-gray-900">
+                        {e.count}{" "}
+                        <span className="font-normal text-gray-400">
+                          ({pct.toFixed(0)}%)
+                        </span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-2 rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: color }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* CRM — Leads por área */}
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 font-heading text-sm font-semibold text-gray-800">
+            CRM — Leads por Área de Interesse
+          </h3>
+          {crm.leadsPorArea.length === 0 ? (
+            <EmptyState msg="Nenhum lead com área definida" />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart
+                data={crm.leadsPorArea.map((a) => ({
+                  name: a.area,
+                  Leads: a.count,
+                }))}
+                layout="vertical"
+                margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#f0f0f0"
+                  vertical={false}
+                />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 10, fill: "#6b7280" }}
+                  width={100}
+                  interval={0}
+                />
+                <Tooltip />
+                <Bar dataKey="Leads" fill="#6366f1" radius={[0, 2, 2, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
 

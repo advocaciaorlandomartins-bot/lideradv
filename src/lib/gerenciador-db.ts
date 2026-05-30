@@ -76,6 +76,29 @@ export interface NovoClienteMes {
   count: number;
 }
 
+export interface CrmTarefaProxima {
+  id: string;
+  titulo: string;
+  lead_id: string;
+  lead_nome: string;
+  data_vencimento: string;
+  dias_restantes: number;
+  responsavel_nome: string | null;
+}
+
+export interface CrmStats {
+  leadsTotal: number;
+  leadsAtivos: number;
+  leadsMes: number;
+  leadsFechados: number;
+  taxaConversao: number;
+  tarefasVencidas: number;
+  tarefasProximas7d: number;
+  leadsPorEstagio: Array<{ estagio: string; label: string; count: number }>;
+  tarefasProximas: CrmTarefaProxima[];
+  leadsPorArea: Array<{ area: string; count: number }>;
+}
+
 export interface GerenciadorData {
   kpis: FinanceiroKpis;
   receitasPorMes: MesData[];
@@ -87,6 +110,7 @@ export interface GerenciadorData {
   controlesPorTipo: TipoCount[];
   receitasPorCategoria: CategoriaTotal[];
   novosClientesPorMes: NovoClienteMes[];
+  crm: CrmStats;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -168,6 +192,10 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
     controlesTipoRows,
     categoriasRows,
     novosClientesRows,
+    crmCountsRows,
+    crmEstagioRows,
+    crmTarefasRows,
+    crmAreaRows,
   ] = await Promise.all([
     // 1. KPIs financeiros
     sql`
@@ -316,6 +344,65 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
       GROUP BY mes
       ORDER BY mes ASC
     `,
+
+    // 11. CRM — contagens gerais
+    sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE estagio NOT IN ('fechado','perdido'))::int AS ativos,
+        COUNT(*) FILTER (WHERE estagio = 'fechado')::int AS fechados,
+        COUNT(*) FILTER (WHERE estagio = 'perdido')::int AS perdidos,
+        COUNT(*) FILTER (
+          WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
+        )::int AS leads_mes,
+        (SELECT COUNT(*)::int FROM crm_tarefas
+         WHERE concluida = FALSE AND data_vencimento < CURRENT_DATE) AS tarefas_vencidas,
+        (SELECT COUNT(*)::int FROM crm_tarefas
+         WHERE concluida = FALSE
+           AND data_vencimento >= CURRENT_DATE
+           AND data_vencimento <= CURRENT_DATE + 7) AS tarefas_proximas_7d
+      FROM crm_leads
+    `,
+
+    // 12. CRM — leads por estágio
+    sql`
+      SELECT estagio, COUNT(*)::int AS count
+      FROM crm_leads
+      GROUP BY estagio
+      ORDER BY count DESC
+    `,
+
+    // 13. CRM — tarefas próximas + vencidas (próximos 7 dias + atrasadas)
+    sql`
+      SELECT
+        t.id::text,
+        t.titulo,
+        t.lead_id::text,
+        l.nome AS lead_nome,
+        to_char(t.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
+        (t.data_vencimento - CURRENT_DATE)::int AS dias_restantes,
+        col.nome AS responsavel_nome
+      FROM crm_tarefas t
+      JOIN crm_leads l ON l.id = t.lead_id
+      LEFT JOIN colaboradores col ON col.id = t.responsavel_id
+      WHERE t.concluida = FALSE
+        AND t.data_vencimento IS NOT NULL
+        AND t.data_vencimento <= CURRENT_DATE + 7
+      ORDER BY t.data_vencimento ASC
+      LIMIT 15
+    `,
+
+    // 14. CRM — leads por área de interesse
+    sql`
+      SELECT
+        COALESCE(area_interesse, 'Sem área') AS area,
+        COUNT(*)::int AS count
+      FROM crm_leads
+      WHERE estagio NOT IN ('perdido')
+      GROUP BY area
+      ORDER BY count DESC
+      LIMIT 8
+    `,
   ]);
 
   const kr = kpisRows[0];
@@ -338,6 +425,48 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
     totalColaboradores: Number(cr.total_colaboradores),
     controlesProximos: Number(cr.controles_proximos),
     vencidosCount: Number(cr.vencidos_count),
+  };
+
+  const ESTAGIO_LABELS: Record<string, string> = {
+    novo_contato: "Novo Contato",
+    consulta_agendada: "Consulta Agendada",
+    em_analise: "Em Análise",
+    proposta_enviada: "Proposta Enviada",
+    fechado: "Fechado",
+    perdido: "Perdido",
+  };
+
+  const cc = crmCountsRows[0] ?? {};
+  const crmFechados = Number(cc.fechados ?? 0);
+  const crmPerdidos = Number(cc.perdidos ?? 0);
+  const crmConvertidos = crmFechados + crmPerdidos;
+  const crm: CrmStats = {
+    leadsTotal: Number(cc.total ?? 0),
+    leadsAtivos: Number(cc.ativos ?? 0),
+    leadsMes: Number(cc.leads_mes ?? 0),
+    leadsFechados: crmFechados,
+    taxaConversao:
+      crmConvertidos > 0 ? (crmFechados / crmConvertidos) * 100 : 0,
+    tarefasVencidas: Number(cc.tarefas_vencidas ?? 0),
+    tarefasProximas7d: Number(cc.tarefas_proximas_7d ?? 0),
+    leadsPorEstagio: crmEstagioRows.map((r) => ({
+      estagio: String(r.estagio),
+      label: ESTAGIO_LABELS[String(r.estagio)] ?? String(r.estagio),
+      count: Number(r.count),
+    })),
+    tarefasProximas: crmTarefasRows.map((r) => ({
+      id: String(r.id),
+      titulo: String(r.titulo),
+      lead_id: String(r.lead_id),
+      lead_nome: String(r.lead_nome),
+      data_vencimento: String(r.data_vencimento),
+      dias_restantes: Number(r.dias_restantes),
+      responsavel_nome: r.responsavel_nome ? String(r.responsavel_nome) : null,
+    })),
+    leadsPorArea: crmAreaRows.map((r) => ({
+      area: String(r.area),
+      count: Number(r.count),
+    })),
   };
 
   return {
@@ -395,5 +524,6 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
         count: Number(r.count),
       }))
     ),
+    crm,
   };
 }

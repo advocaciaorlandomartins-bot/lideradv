@@ -13,6 +13,8 @@ import {
   UserPlusIcon,
   PlusIcon,
   ChartBarIcon,
+  FunnelIcon,
+  PhoneIcon,
 } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -136,7 +138,7 @@ export default async function DashboardPage() {
     getSession(),
   ]);
 
-  const { kpis, counts, receitasPorMes } = data;
+  const { kpis, counts, receitasPorMes, crm } = data;
   const { clientesDevedores, lancamentosVencidos, proximosControles } =
     dashData;
 
@@ -161,6 +163,11 @@ export default async function DashboardPage() {
       label: "Novo processo",
       icon: PlusIcon,
       href: "/dashboard/processos/novo",
+    },
+    {
+      label: "Novo lead",
+      icon: FunnelIcon,
+      href: "/dashboard/crm/leads/novo",
     },
     {
       label: "Financeiro",
@@ -213,7 +220,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── KPI cards (todos clicáveis) ──────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
         {/* Clientes */}
         <Link
           href="/dashboard/clientes"
@@ -332,7 +339,225 @@ export default async function DashboardPage() {
               : "Sem pendências →"}
           </p>
         </Link>
+        {/* CRM */}
+        <Link
+          href="/dashboard/crm"
+          className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+        >
+          <div className="flex items-start justify-between">
+            <div className="rounded-lg bg-indigo-50 p-2.5 transition-colors group-hover:bg-indigo-100">
+              <FunnelIcon className="h-5 w-5 text-indigo-600" />
+            </div>
+            {crm.tarefasVencidas > 0 && (
+              <span className="rounded-full bg-orange-100 px-2 py-0.5 font-body text-xs font-bold text-orange-700">
+                {crm.tarefasVencidas} task
+              </span>
+            )}
+          </div>
+          <p className="mt-3 font-heading text-3xl font-bold text-fg">
+            {crm.leadsAtivos}
+          </p>
+          <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+            Leads no funil
+          </p>
+          <p className="mt-2 font-body text-xs text-indigo-600 group-hover:underline">
+            {crm.leadsFechados} convertido{crm.leadsFechados !== 1 ? "s" : ""} ·{" "}
+            {crm.taxaConversao.toFixed(0)}% conversão →
+          </p>
+        </Link>
       </div>
+
+      {/* ── CRM — Funil resumido + Tarefas ──────────────────────────────── */}
+      {(crm.leadsAtivos > 0 || crm.tarefasProximas.length > 0) && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Mini funil por estágio */}
+          <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="font-heading text-base font-semibold text-fg">
+                  Funil de Vendas CRM
+                </h2>
+                <p className="mt-0.5 font-body text-xs text-muted">
+                  {crm.leadsTotal} lead{crm.leadsTotal !== 1 ? "s" : ""} total
+                </p>
+              </div>
+              <Link
+                href="/dashboard/crm"
+                className="font-body text-xs font-semibold text-primary hover:underline"
+              >
+                Ver CRM →
+              </Link>
+            </div>
+            <div className="space-y-3 p-5">
+              {crm.leadsTotal === 0 ? (
+                <p className="py-4 text-center font-body text-sm text-muted">
+                  Nenhum lead cadastrado ainda.
+                </p>
+              ) : (
+                (() => {
+                  const ESTAGIO_COLORS: Record<
+                    string,
+                    { bar: string; dot: string; text: string }
+                  > = {
+                    novo_contato: {
+                      bar: "bg-blue-400",
+                      dot: "bg-blue-400",
+                      text: "text-blue-700",
+                    },
+                    consulta_agendada: {
+                      bar: "bg-yellow-400",
+                      dot: "bg-yellow-400",
+                      text: "text-yellow-700",
+                    },
+                    em_analise: {
+                      bar: "bg-orange-400",
+                      dot: "bg-orange-400",
+                      text: "text-orange-700",
+                    },
+                    proposta_enviada: {
+                      bar: "bg-purple-400",
+                      dot: "bg-purple-400",
+                      text: "text-purple-700",
+                    },
+                    fechado: {
+                      bar: "bg-emerald-400",
+                      dot: "bg-emerald-400",
+                      text: "text-emerald-700",
+                    },
+                    perdido: {
+                      bar: "bg-slate-300",
+                      dot: "bg-slate-400",
+                      text: "text-slate-500",
+                    },
+                  };
+                  return crm.leadsPorEstagio.map((e) => {
+                    const pct =
+                      crm.leadsTotal > 0 ? (e.count / crm.leadsTotal) * 100 : 0;
+                    const clr = ESTAGIO_COLORS[e.estagio] ?? {
+                      bar: "bg-primary",
+                      dot: "bg-primary",
+                      text: "text-primary",
+                    };
+                    return (
+                      <div key={e.estagio}>
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-body text-xs text-fg">
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${clr.dot}`}
+                            />
+                            {e.label}
+                          </span>
+                          <span
+                            className={`font-body text-xs font-semibold ${clr.text}`}
+                          >
+                            {e.count}{" "}
+                            <span className="font-normal text-muted">
+                              ({pct.toFixed(0)}%)
+                            </span>
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={`h-1.5 rounded-full ${clr.bar}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()
+              )}
+            </div>
+            <div className="border-t border-border px-5 py-3">
+              <Link
+                href="/dashboard/crm/leads/novo"
+                className="font-body text-xs font-semibold text-primary hover:underline"
+              >
+                + Novo lead →
+              </Link>
+            </div>
+          </div>
+
+          {/* Tarefas CRM próximas/vencidas */}
+          <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="font-heading text-base font-semibold text-fg">
+                  Tarefas CRM
+                </h2>
+                <p className="mt-0.5 font-body text-xs text-muted">
+                  Próximas e vencidas
+                </p>
+              </div>
+              {crm.tarefasVencidas > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 px-3 py-1 font-body text-xs font-semibold text-orange-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                  {crm.tarefasVencidas} vencida
+                  {crm.tarefasVencidas !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+
+            {crm.tarefasProximas.length === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <PhoneIcon className="mx-auto mb-2 h-8 w-8 text-slate-200" />
+                <p className="font-body text-sm text-muted">
+                  Sem tarefas pendentes.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {crm.tarefasProximas.slice(0, 6).map((t) => {
+                  const vencida = t.dias_restantes < 0;
+                  const hoje = t.dias_restantes === 0;
+                  return (
+                    <Link
+                      key={t.id}
+                      href={`/dashboard/crm/leads/${t.lead_id}`}
+                      className={`flex items-center gap-3 px-5 py-3 transition-colors hover:bg-primary/5 ${vencida ? "bg-red-50/50" : ""}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-body text-sm font-medium text-fg">
+                          {t.titulo}
+                        </p>
+                        <p className="font-body text-xs text-muted">
+                          {t.lead_nome}
+                        </p>
+                      </div>
+                      <span
+                        className={`flex-shrink-0 rounded-full px-2.5 py-0.5 font-body text-xs font-bold ${
+                          vencida
+                            ? "bg-red-100 text-red-700"
+                            : hoje
+                              ? "bg-orange-100 text-orange-700"
+                              : t.dias_restantes <= 3
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {vencida
+                          ? `${Math.abs(t.dias_restantes)}d atraso`
+                          : hoje
+                            ? "Hoje"
+                            : `${t.dias_restantes}d`}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="border-t border-border px-5 py-3">
+              <Link
+                href="/dashboard/crm"
+                className="font-body text-xs font-semibold text-primary hover:underline"
+              >
+                Ver CRM completo →
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Prazos + Calendário ──────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">

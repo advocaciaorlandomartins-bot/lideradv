@@ -168,9 +168,12 @@ export function hasPermission(
   const perms = user.permissoes[modulo];
   if (perms !== undefined) return perms.includes(acao);
 
-  // Sub-módulo não presente na sessão (sessões antigas): herda do pai
+  // Sub-módulo não presente na sessão: herda do pai
   const parent = MODULOS.find((m) => m.key === modulo)?.parent;
   if (parent) return (user.permissoes[parent] ?? []).includes(acao);
 
-  return false;
+  // Módulo de nível superior ausente (sessão criada antes do módulo existir):
+  // faz fallback nos defaults da categoria para não exigir novo login.
+  const defaults = DEFAULTS_POR_CATEGORIA[user.categoria] ?? {};
+  return (defaults[modulo] ?? NONE).includes(acao);
 }

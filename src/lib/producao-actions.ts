@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 function revalidate() {
   revalidatePath("/dashboard/producao");
@@ -30,7 +32,11 @@ export async function registrarResultadoAdminAction(
   id: string,
   resultado: "concedido" | "negado",
   proximoEstagio: "judicial" | "arquivado"
-): Promise<void> {
+): Promise<{ error?: string }> {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "producao_resultado_adm", "ver")) {
+    return { error: "Sem permissão para registrar resultado administrativo." };
+  }
   await sql`
     UPDATE processos
     SET resultado_administrativo = ${resultado},
@@ -39,12 +45,17 @@ export async function registrarResultadoAdminAction(
     WHERE id = ${id}::uuid
   `;
   revalidate();
+  return {};
 }
 
 export async function registrarResultadoJudicialAction(
   id: string,
   resultado: "procedente" | "improcedente" | "parcial"
-): Promise<void> {
+): Promise<{ error?: string }> {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "producao_resultado_jud", "ver")) {
+    return { error: "Sem permissão para registrar resultado judicial." };
+  }
   await sql`
     UPDATE processos
     SET resultado_judicial = ${resultado},
@@ -53,6 +64,7 @@ export async function registrarResultadoJudicialAction(
     WHERE id = ${id}::uuid
   `;
   revalidate();
+  return {};
 }
 
 export async function arquivarProcessoAction(id: string): Promise<void> {

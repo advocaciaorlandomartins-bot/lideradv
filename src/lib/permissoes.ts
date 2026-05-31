@@ -3,6 +3,16 @@ import type { SessionUser } from "./session";
 export const MODULOS = [
   { key: "crm", label: "CRM", parent: null },
   { key: "producao", label: "Produção", parent: null },
+  {
+    key: "producao_resultado_adm",
+    label: "Resultado Administrativo",
+    parent: "producao",
+  },
+  {
+    key: "producao_resultado_jud",
+    label: "Resultado Judicial",
+    parent: "producao",
+  },
   { key: "clientes", label: "Clientes", parent: null },
   { key: "processos", label: "Processos", parent: null },
   { key: "financeiro", label: "Financeiro", parent: null },
@@ -110,6 +120,8 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
   "Estagiário(a)": {
     crm: VER,
     producao: VER,
+    producao_resultado_adm: NONE,
+    producao_resultado_jud: NONE,
     clientes: VER,
     processos: ["ver", "criar", "editar"],
     financeiro: NONE,

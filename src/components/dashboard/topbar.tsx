@@ -88,7 +88,7 @@ const GERENCIADOR_SUBS = [
     href: "/dashboard/gerenciador",
     icon: ChartBarIcon,
     label: "Gerenciador",
-    modulo: null,
+    modulo: "gerenciador",
   },
   {
     href: "/dashboard/usuarios",

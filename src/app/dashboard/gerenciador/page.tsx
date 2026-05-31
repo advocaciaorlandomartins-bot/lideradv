@@ -1,7 +1,13 @@
+import { notFound } from "next/navigation";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getGerenciadorData } from "@/lib/gerenciador-db";
 import GerenciadorContent from "@/components/dashboard/gerenciador/gerenciador-content";
 
 export default async function GerenciadorPage() {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "gerenciador", "ver")) notFound();
+
   const data = await getGerenciadorData();
 
   return (

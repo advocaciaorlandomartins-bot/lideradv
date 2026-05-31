@@ -16,6 +16,7 @@ function mapLead(r: any): Lead {
     responsavel_id: r.responsavel_id ?? null,
     responsavel_nome: r.responsavel_nome ?? null,
     client_id: r.client_id ?? null,
+    processo_id: r.processo_id ?? null,
     notas: r.notas ?? null,
     created_at: new Date(r.created_at).toLocaleDateString("pt-BR"),
     updated_at: new Date(r.updated_at).toLocaleDateString("pt-BR"),
@@ -33,6 +34,7 @@ export async function getAllLeads(): Promise<Lead[]> {
       l.responsavel_id::text,
       col.nome AS responsavel_nome,
       l.client_id::text,
+      l.processo_id::text,
       l.notas, l.created_at, l.updated_at,
       (SELECT COUNT(*)::int FROM crm_atividades WHERE lead_id = l.id) AS atividades_count,
       (SELECT COUNT(*)::int FROM crm_tarefas    WHERE lead_id = l.id AND concluida = FALSE) AS tarefas_pendentes
@@ -52,6 +54,7 @@ export async function getLeadById(id: string): Promise<Lead | null> {
       l.responsavel_id::text,
       col.nome AS responsavel_nome,
       l.client_id::text,
+      l.processo_id::text,
       l.notas, l.created_at, l.updated_at,
       (SELECT COUNT(*)::int FROM crm_atividades WHERE lead_id = l.id) AS atividades_count,
       (SELECT COUNT(*)::int FROM crm_tarefas    WHERE lead_id = l.id AND concluida = FALSE) AS tarefas_pendentes

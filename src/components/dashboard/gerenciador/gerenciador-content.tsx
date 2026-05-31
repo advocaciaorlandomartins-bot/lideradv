@@ -16,7 +16,10 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import type { GerenciadorData } from "@/lib/gerenciador-db";
+import type {
+  GerenciadorData,
+  ProducaoCasoUrgente,
+} from "@/lib/gerenciador-db";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -102,6 +105,216 @@ function atrasoBadge(dias: number): string {
   if (dias > 30) return "bg-red-100 text-red-700 border border-red-200";
   if (dias > 7) return "bg-orange-100 text-orange-700 border border-orange-200";
   return "bg-amber-100 text-amber-700 border border-amber-200";
+}
+
+// ── Pipeline Fluxo Completo ───────────────────────────────────────────────────
+
+const PIPELINE_STAGES = [
+  {
+    key: "crm_ativos",
+    label: "Leads Ativos",
+    sub: "CRM",
+    color: "#6366f1",
+    bg: "bg-indigo-50",
+    border: "border-indigo-200",
+    href: "/dashboard/crm",
+  },
+  {
+    key: "crm_fechados",
+    label: "Fechados",
+    sub: "CRM → Cliente",
+    color: "#22c55e",
+    bg: "bg-green-50",
+    border: "border-green-200",
+    href: "/dashboard/crm",
+  },
+  {
+    key: "analise",
+    label: "Análise",
+    sub: "Produção",
+    color: "#3b82f6",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    href: "/dashboard/producao",
+  },
+  {
+    key: "producao",
+    label: "Produção",
+    sub: "Produção",
+    color: "#14b8a6",
+    bg: "bg-teal-50",
+    border: "border-teal-200",
+    href: "/dashboard/producao",
+  },
+  {
+    key: "administrativo",
+    label: "Administrativo",
+    sub: "Produção",
+    color: "#f97316",
+    bg: "bg-orange-50",
+    border: "border-orange-200",
+    href: "/dashboard/producao",
+  },
+  {
+    key: "judicial",
+    label: "Judicial",
+    sub: "Produção",
+    color: "#8b5cf6",
+    bg: "bg-purple-50",
+    border: "border-purple-200",
+    href: "/dashboard/producao",
+  },
+  {
+    key: "arquivado",
+    label: "Arquivados",
+    sub: "Produção",
+    color: "#94a3b8",
+    bg: "bg-slate-50",
+    border: "border-slate-200",
+    href: "/dashboard/producao",
+  },
+] as const;
+
+function PipelineFluxo({ data }: { data: GerenciadorData }) {
+  const { crm, producao } = data;
+
+  const counts: Record<string, number> = {
+    crm_ativos: crm.leadsAtivos,
+    crm_fechados: crm.leadsFechados,
+    analise:
+      producao.porEstagio.find((e) => e.estagio === "analise")?.count ?? 0,
+    producao:
+      producao.porEstagio.find((e) => e.estagio === "producao")?.count ?? 0,
+    administrativo:
+      producao.porEstagio.find((e) => e.estagio === "administrativo")?.count ??
+      0,
+    judicial:
+      producao.porEstagio.find((e) => e.estagio === "judicial")?.count ?? 0,
+    arquivado:
+      producao.porEstagio.find((e) => e.estagio === "arquivado")?.count ?? 0,
+  };
+
+  const maxDias: Record<string, number> = {
+    analise:
+      producao.porEstagio.find((e) => e.estagio === "analise")?.max_dias ?? 0,
+    producao:
+      producao.porEstagio.find((e) => e.estagio === "producao")?.max_dias ?? 0,
+    administrativo:
+      producao.porEstagio.find((e) => e.estagio === "administrativo")
+        ?.max_dias ?? 0,
+    judicial:
+      producao.porEstagio.find((e) => e.estagio === "judicial")?.max_dias ?? 0,
+  };
+
+  return (
+    <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-5 py-3">
+        <h2 className="font-heading text-sm font-semibold text-gray-800">
+          Pipeline Completo — CRM → Produção
+        </h2>
+        <p className="font-body text-xs text-gray-400">
+          Fluxo integrado: lead captado → cliente convertido → caso em produção
+          → resultado
+        </p>
+      </div>
+      <div className="overflow-x-auto px-4 py-4">
+        <div
+          className="flex items-stretch gap-0"
+          style={{ minWidth: "max-content" }}
+        >
+          {PIPELINE_STAGES.map((stage, i) => {
+            const count = counts[stage.key] ?? 0;
+            const dias = maxDias[stage.key];
+            const alert = dias !== undefined && dias > 30;
+            const warn = dias !== undefined && dias > 7 && dias <= 30;
+            const isLast = i === PIPELINE_STAGES.length - 1;
+            const isCrmStage = stage.key.startsWith("crm_");
+
+            return (
+              <div key={stage.key} className="flex items-center">
+                <Link
+                  href={stage.href}
+                  className={`group flex w-[130px] flex-col rounded-xl border-2 p-3 transition-all hover:shadow-md ${stage.bg} ${stage.border} ${alert ? "ring-2 ring-red-300 ring-offset-1" : ""}`}
+                >
+                  {/* Sub-label */}
+                  <span className="mb-1 font-body text-[9px] font-semibold uppercase tracking-widest text-gray-400">
+                    {stage.sub}
+                  </span>
+                  {/* Count */}
+                  <span
+                    className="font-heading text-3xl font-bold leading-none"
+                    style={{ color: stage.color }}
+                  >
+                    {count}
+                  </span>
+                  {/* Label */}
+                  <span className="mt-1 font-body text-xs font-semibold text-gray-700">
+                    {stage.label}
+                  </span>
+                  {/* Dias alerta */}
+                  {dias !== undefined && dias > 0 && (
+                    <span
+                      className={`mt-1.5 inline-flex w-fit items-center rounded-full px-1.5 py-0.5 font-body text-[10px] font-semibold
+                        ${alert ? "bg-red-100 text-red-700" : warn ? "bg-yellow-100 text-yellow-700" : "bg-slate-100 text-slate-500"}`}
+                    >
+                      {alert ? "⚠ " : ""}
+                      {dias}d parado
+                    </span>
+                  )}
+                  {isCrmStage && (
+                    <span className="mt-1.5 font-body text-[10px] text-gray-400 group-hover:text-indigo-600">
+                      Ver CRM →
+                    </span>
+                  )}
+                </Link>
+
+                {/* Seta */}
+                {!isLast && (
+                  <div className="flex h-full items-center px-1">
+                    <svg
+                      className="h-5 w-5 text-gray-300"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Legenda de divisão CRM / Produção */}
+      <div className="flex items-center gap-6 border-t border-gray-50 px-5 py-2">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-indigo-400" />
+          <span className="font-body text-xs text-gray-500">
+            CRM — Funil de Vendas
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-teal-400" />
+          <span className="font-body text-xs text-gray-500">
+            Produção — Linha Jurídica
+          </span>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-red-400" />
+          <span className="font-body text-xs text-gray-500">
+            ⚠ Casos parados há +30 dias
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── KpiCard ───────────────────────────────────────────────────────────────────
@@ -212,16 +425,93 @@ function EmptyState({ msg }: { msg: string }) {
 
 // ── Aba Operacional ───────────────────────────────────────────────────────────
 
+const ESTAGIO_PRODUCAO_LABELS: Record<
+  string,
+  { label: string; color: string }
+> = {
+  analise: { label: "Análise", color: "bg-blue-100 text-blue-700" },
+  producao: { label: "Produção", color: "bg-teal-100 text-teal-700" },
+  administrativo: {
+    label: "Administrativo",
+    color: "bg-orange-100 text-orange-700",
+  },
+  judicial: { label: "Judicial", color: "bg-purple-100 text-purple-700" },
+};
+
+function CasosProducaoTable({ casos }: { casos: ProducaoCasoUrgente[] }) {
+  if (casos.length === 0) return <EmptyState msg="Nenhum caso em produção" />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full font-body text-xs">
+        <thead>
+          <tr className="border-b border-gray-100 bg-gray-50">
+            <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+              Cliente
+            </th>
+            <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">
+              Tipo de Ação
+            </th>
+            <th className="px-3 py-2 text-center font-semibold uppercase tracking-wide text-gray-500">
+              Etapa
+            </th>
+            <th className="px-3 py-2 text-center font-semibold uppercase tracking-wide text-gray-500">
+              Dias
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {casos.map((c) => {
+            const meta = ESTAGIO_PRODUCAO_LABELS[c.estagio_producao];
+            const diasCls =
+              c.dias_no_estagio > 30
+                ? "bg-red-100 text-red-700 border border-red-200"
+                : c.dias_no_estagio > 7
+                  ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                  : "bg-slate-100 text-slate-600 border border-slate-200";
+            return (
+              <ClickableRow key={c.id} href="/dashboard/producao">
+                <td className="max-w-[140px] truncate px-3 py-2 font-medium text-gray-800">
+                  {c.client_name}
+                </td>
+                <td className="max-w-[140px] truncate px-3 py-2 text-gray-500">
+                  {c.tipo_acao}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${meta?.color ?? "bg-gray-100 text-gray-600"}`}
+                  >
+                    {meta?.label ?? c.estagio_producao}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${diasCls}`}
+                  >
+                    {c.dias_no_estagio}d
+                  </span>
+                </td>
+              </ClickableRow>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function OperacionalTab({ data }: { data: GerenciadorData }) {
-  const { kpis, counts, proximosControles, vencidos, crm } = data;
+  const { kpis, counts, proximosControles, vencidos, crm, producao } = data;
 
   const controlesHojeAmanha = proximosControles.filter(
     (c) => c.dias_restantes <= 1
   ).length;
+  const casosParados = producao.casosUrgentes.filter(
+    (c) => c.dias_no_estagio > 30
+  ).length;
 
   return (
     <div className="space-y-6">
-      {/* KPIs financeiros + CRM */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
           label="Controles Hoje/Amanhã"
@@ -238,23 +528,26 @@ function OperacionalTab({ data }: { data: GerenciadorData }) {
           href="/dashboard/financeiro"
         />
         <KpiCard
-          label="Leads Ativos"
-          value={String(crm.leadsAtivos)}
-          sub="no funil de vendas"
-          href="/dashboard/crm"
+          label="Em Produção"
+          value={String(producao.totalAtivos)}
+          sub="casos em andamento"
+          href="/dashboard/producao"
         />
         <KpiCard
-          label="Tarefas CRM Vencidas"
-          value={String(crm.tarefasVencidas)}
-          sub="follow-ups atrasados"
-          alert={crm.tarefasVencidas > 0}
-          href="/dashboard/crm"
+          label="Casos Parados +30d"
+          value={String(casosParados)}
+          sub="precisam de atenção"
+          alert={casosParados > 0}
+          href="/dashboard/producao"
         />
       </div>
 
-      {/* Tabelas */}
+      {/* Casos em Produção + Tarefas CRM */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Tarefas CRM */}
+        <SectionCard title="Casos em Produção — Mais Antigos" noPad>
+          <CasosProducaoTable casos={producao.casosUrgentes} />
+        </SectionCard>
+
         <SectionCard title="Tarefas CRM — Próximas e Vencidas" noPad>
           {crm.tarefasProximas.length === 0 ? (
             <EmptyState msg="Nenhuma tarefa pendente" />
@@ -322,7 +615,10 @@ function OperacionalTab({ data }: { data: GerenciadorData }) {
             </div>
           )}
         </SectionCard>
+      </div>
 
+      {/* Controles + Vencidos */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Próximos Controles */}
         <SectionCard title="Próximos Controles (14 dias)" noPad>
           {proximosControles.length === 0 ? (
@@ -1273,6 +1569,9 @@ export default function GerenciadorContent({ data }: Props) {
 
   return (
     <div>
+      {/* Pipeline sempre visível */}
+      <PipelineFluxo data={data} />
+
       {/* Tab Buttons */}
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tabs.map((t) => {

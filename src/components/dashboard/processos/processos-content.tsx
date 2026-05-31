@@ -15,6 +15,17 @@ import {
 
 // ── Helpers ────────────────────────────────────────────────
 
+const ESTAGIO_PROD: Record<string, { label: string; cls: string }> = {
+  analise: { label: "Análise", cls: "bg-blue-50 text-blue-700" },
+  producao: { label: "Produção", cls: "bg-teal-50 text-teal-700" },
+  administrativo: {
+    label: "Administrativo",
+    cls: "bg-orange-50 text-orange-700",
+  },
+  judicial: { label: "Judicial", cls: "bg-purple-50 text-purple-700" },
+  arquivado: { label: "Arquivado", cls: "bg-slate-100 text-slate-500" },
+};
+
 const AREA_COLORS: Record<string, string> = {
   Cível: "bg-blue-50 text-blue-600",
   Criminal: "bg-red-50 text-red-600",
@@ -304,6 +315,9 @@ export default function ProcessosContent({ processos }: ProcessosContentProps) {
                     <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
                       Status
                     </th>
+                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Produção
+                    </th>
                     <th className="px-5 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
                       Ações
                     </th>
@@ -384,6 +398,20 @@ export default function ProcessosContent({ processos }: ProcessosContentProps) {
                       </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge status={p.status} />
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {(() => {
+                          const ep =
+                            ESTAGIO_PROD[p.estagio_producao] ??
+                            ESTAGIO_PROD["analise"];
+                          return (
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${ep.cls}`}
+                            >
+                              {ep.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td
                         className="px-5 py-3.5"

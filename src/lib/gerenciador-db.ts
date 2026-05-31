@@ -99,6 +99,20 @@ export interface CrmStats {
   leadsPorArea: Array<{ area: string; count: number }>;
 }
 
+export interface ProducaoCasoUrgente {
+  id: string;
+  client_name: string;
+  tipo_acao: string;
+  estagio_producao: string;
+  dias_no_estagio: number;
+}
+
+export interface ProducaoStats {
+  porEstagio: Array<{ estagio: string; count: number; max_dias: number }>;
+  casosUrgentes: ProducaoCasoUrgente[];
+  totalAtivos: number;
+}
+
 export interface GerenciadorData {
   kpis: FinanceiroKpis;
   receitasPorMes: MesData[];
@@ -111,6 +125,7 @@ export interface GerenciadorData {
   receitasPorCategoria: CategoriaTotal[];
   novosClientesPorMes: NovoClienteMes[];
   crm: CrmStats;
+  producao: ProducaoStats;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -196,6 +211,8 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
     crmEstagioRows,
     crmTarefasRows,
     crmAreaRows,
+    producaoEstagioRows,
+    producaoUrgentesRows,
   ] = await Promise.all([
     // 1. KPIs financeiros
     sql`
@@ -403,6 +420,41 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
       ORDER BY count DESC
       LIMIT 8
     `,
+
+    // 15. Produção — contagens por estágio
+    sql`
+      SELECT
+        estagio_producao,
+        COUNT(*)::int AS count,
+        COALESCE(MAX(
+          EXTRACT(EPOCH FROM (NOW() - data_estagio_at)) / 86400
+        )::int, 0) AS max_dias
+      FROM processos
+      GROUP BY estagio_producao
+      ORDER BY CASE estagio_producao
+        WHEN 'analise'        THEN 1
+        WHEN 'producao'       THEN 2
+        WHEN 'administrativo' THEN 3
+        WHEN 'judicial'       THEN 4
+        WHEN 'arquivado'      THEN 5
+        ELSE 6
+      END
+    `,
+
+    // 16. Produção — casos com mais tempo parados (não arquivados)
+    sql`
+      SELECT
+        p.id::text,
+        c.name AS client_name,
+        p.tipo_acao,
+        p.estagio_producao,
+        EXTRACT(EPOCH FROM (NOW() - p.data_estagio_at))::int / 86400 AS dias_no_estagio
+      FROM processos p
+      JOIN clients c ON c.id = p.client_id
+      WHERE p.estagio_producao != 'arquivado'
+      ORDER BY p.data_estagio_at ASC
+      LIMIT 8
+    `,
   ]);
 
   const kr = kpisRows[0];
@@ -469,6 +521,26 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
     })),
   };
 
+  const producaoPorEstagio = producaoEstagioRows.map((r) => ({
+    estagio: String(r.estagio_producao),
+    count: Number(r.count),
+    max_dias: Number(r.max_dias),
+  }));
+
+  const producao: ProducaoStats = {
+    porEstagio: producaoPorEstagio,
+    totalAtivos: producaoPorEstagio
+      .filter((e) => e.estagio !== "arquivado")
+      .reduce((s, e) => s + e.count, 0),
+    casosUrgentes: producaoUrgentesRows.map((r) => ({
+      id: String(r.id),
+      client_name: String(r.client_name),
+      tipo_acao: String(r.tipo_acao),
+      estagio_producao: String(r.estagio_producao),
+      dias_no_estagio: Number(r.dias_no_estagio),
+    })),
+  };
+
   return {
     kpis,
     receitasPorMes: fillMonths(
@@ -525,5 +597,6 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
       }))
     ),
     crm,
+    producao,
   };
 }

@@ -19,11 +19,25 @@ import {
   CogIcon,
   ChartBarIcon,
   PrinterIcon,
+  FunnelIcon,
+  KanbanIcon,
 } from "@/components/icons";
 
 // Itens principais do menu (sem Usuários e Configurações)
 const NAV_ITEMS = [
   { href: "/dashboard", icon: HomeIcon, label: "Dashboard", modulo: null },
+  {
+    href: "/dashboard/crm",
+    icon: FunnelIcon,
+    label: "CRM",
+    modulo: "crm",
+  },
+  {
+    href: "/dashboard/producao",
+    icon: KanbanIcon,
+    label: "Produção",
+    modulo: "producao",
+  },
   {
     href: "/dashboard/clientes",
     icon: UsersIcon,

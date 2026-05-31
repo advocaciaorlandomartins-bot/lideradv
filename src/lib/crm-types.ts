@@ -106,6 +106,7 @@ export interface Lead {
   responsavel_id: string | null;
   responsavel_nome: string | null;
   client_id: string | null;
+  processo_id: string | null;
   notas: string | null;
   created_at: string;
   updated_at: string;

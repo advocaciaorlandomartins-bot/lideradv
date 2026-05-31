@@ -17,6 +17,11 @@ export interface ProcessoExtended extends ProcessoFull {
   fase_precontrato_at: string | null;
   fase_elaboracao_at: string | null;
   fase_arquivado_at: string | null;
+  // Produção
+  estagio_producao: string;
+  resultado_administrativo: string | null;
+  resultado_judicial: string | null;
+  dias_no_estagio: number;
 }
 
 export interface HistoricoRegistro {
@@ -94,7 +99,11 @@ export async function getProcessoExtended(
       to_char(p.fase_precontrato_at, 'DD/MM/YYYY HH24:MI') AS fase_precontrato_at,
       to_char(p.fase_elaboracao_at,  'DD/MM/YYYY HH24:MI') AS fase_elaboracao_at,
       to_char(p.fase_arquivado_at,   'DD/MM/YYYY HH24:MI') AS fase_arquivado_at,
-      p.created_at
+      p.created_at,
+      COALESCE(p.estagio_producao, 'analise')             AS estagio_producao,
+      p.resultado_administrativo,
+      p.resultado_judicial,
+      EXTRACT(EPOCH FROM (NOW() - p.data_estagio_at))::int / 86400 AS dias_no_estagio
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     LEFT JOIN colaboradores col ON col.id = p.responsavel_id
@@ -131,6 +140,10 @@ export async function getProcessoExtended(
     fase_precontrato_at: r.fase_precontrato_at ?? null,
     fase_elaboracao_at: r.fase_elaboracao_at ?? null,
     fase_arquivado_at: r.fase_arquivado_at ?? null,
+    estagio_producao: r.estagio_producao ?? "analise",
+    resultado_administrativo: r.resultado_administrativo ?? null,
+    resultado_judicial: r.resultado_judicial ?? null,
+    dias_no_estagio: Number(r.dias_no_estagio ?? 0),
   };
 }
 

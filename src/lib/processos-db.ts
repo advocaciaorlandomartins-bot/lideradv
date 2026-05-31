@@ -15,6 +15,9 @@ export interface Processo {
   status: "ativo" | "em_andamento" | "arquivado" | "encerrado";
   data_distribuicao: string | null;
   created_at_formatted: string;
+  estagio_producao: string;
+  resultado_administrativo: string | null;
+  resultado_judicial: string | null;
 }
 
 export interface ProcessoFull extends Processo {
@@ -44,6 +47,9 @@ function mapRow(r: any): Processo {
     status: r.status as "ativo" | "arquivado" | "encerrado",
     data_distribuicao: r.data_distribuicao ?? null,
     created_at_formatted: formatDate(new Date(r.created_at)),
+    estagio_producao: r.estagio_producao ?? "analise",
+    resultado_administrativo: r.resultado_administrativo ?? null,
+    resultado_judicial: r.resultado_judicial ?? null,
   };
 }
 
@@ -63,7 +69,10 @@ export async function getAllProcessos(): Promise<Processo[]> {
       p.valor_causa,
       p.status,
       to_char(p.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
-      p.created_at
+      p.created_at,
+      p.estagio_producao,
+      p.resultado_administrativo,
+      p.resultado_judicial
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     ORDER BY p.created_at DESC
@@ -87,7 +96,10 @@ export async function getProcessoById(id: string): Promise<Processo | null> {
       p.valor_causa,
       p.status,
       to_char(p.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
-      p.created_at
+      p.created_at,
+      p.estagio_producao,
+      p.resultado_administrativo,
+      p.resultado_judicial
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.id = ${id}::uuid
@@ -150,7 +162,10 @@ export async function getProcessosByClientId(
       p.valor_causa,
       p.status,
       to_char(p.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
-      p.created_at
+      p.created_at,
+      p.estagio_producao,
+      p.resultado_administrativo,
+      p.resultado_judicial
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.client_id = ${clientId}::uuid

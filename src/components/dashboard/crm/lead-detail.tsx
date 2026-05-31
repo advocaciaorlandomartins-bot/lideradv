@@ -19,9 +19,11 @@ import {
   ESTAGIOS,
   ESTAGIO_META,
   TIPOS_ATIVIDADE,
+  ORIGENS,
   type Lead,
   type Atividade,
   type Tarefa,
+  type Estagio,
 } from "@/lib/crm-types";
 import {
   moveLeadEstagioAction,
@@ -45,6 +47,31 @@ function ConvertButton({ lead }: { lead: Lead }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // Já tem processo criado automaticamente → mostra links para processo e cliente
+  if (lead.processo_id) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href={`/dashboard/producao`}
+          className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 font-body text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
+        >
+          <ArrowRightIcon className="h-4 w-4" />
+          Ver na Produção
+        </Link>
+        {lead.client_id && (
+          <Link
+            href={`/dashboard/clientes/${lead.client_id}`}
+            className="flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 font-body text-sm font-medium text-green-700 transition-colors hover:bg-green-100"
+          >
+            <CheckCircleIcon className="h-4 w-4" />
+            Ver Cliente
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  // Tem cliente mas ainda sem processo
   if (lead.client_id) {
     return (
       <Link
@@ -57,16 +84,21 @@ function ConvertButton({ lead }: { lead: Lead }) {
     );
   }
 
+  // Não convertido: botão de conversão manual
   return (
     <div className="flex flex-col items-end gap-1">
       <button
         onClick={() => {
-          if (!confirm(`Converter "${lead.nome}" em cliente?`)) return;
+          if (
+            !confirm(
+              `Fechar lead e criar cliente + processo para "${lead.nome}"?`
+            )
+          )
+            return;
           startTransition(async () => {
             const result = await convertLeadToClientAction(lead.id);
             if (result.error) setError(result.error);
-            else if (result.clientId)
-              router.push(`/dashboard/clientes/${result.clientId}/editar`);
+            else router.refresh();
           });
         }}
         disabled={isPending}
@@ -77,7 +109,7 @@ function ConvertButton({ lead }: { lead: Lead }) {
         ) : (
           <ArrowRightIcon className="h-4 w-4" />
         )}
-        Converter em Cliente
+        Fechar & Converter
       </button>
       {error && <p className="font-body text-xs text-red-600">{error}</p>}
     </div>
@@ -86,47 +118,111 @@ function ConvertButton({ lead }: { lead: Lead }) {
 
 // ── Stage Progression ─────────────────────────────────────────────────────────
 
+// Pipeline linear (perdido é terminal separado)
+const PIPELINE_ESTAGIO: Estagio[] = [
+  "novo_contato",
+  "consulta_agendada",
+  "em_analise",
+  "proposta_enviada",
+  "fechado",
+];
+
 function EstagioBar({ lead }: { lead: Lead }) {
   const [isPending, startTransition] = useTransition();
-  const currentIdx = ESTAGIOS.indexOf(lead.estagio);
+  const currentIdx = PIPELINE_ESTAGIO.indexOf(lead.estagio);
+  const isPerdido = lead.estagio === "perdido";
+
+  function mover(alvo: Estagio) {
+    startTransition(async () => {
+      await moveLeadEstagioAction(lead.id, alvo);
+    });
+  }
 
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {ESTAGIOS.map((e, i) => {
+    <div className="flex flex-wrap items-center gap-1.5">
+      {PIPELINE_ESTAGIO.map((e, i) => {
         const meta = ESTAGIO_META[e];
         const isCurrent = e === lead.estagio;
-        const isPast = i < currentIdx;
-        const isNext = i === currentIdx + 1;
+        const isPast = !isPerdido && i < currentIdx;
+        const isNext = !isPerdido && i === currentIdx + 1;
+        const isFuture = isPerdido ? false : i > currentIdx;
+        // clicável: etapas passadas (voltar) e a próxima (avançar)
+        const isClickable = !isCurrent && !isPending && (isPast || isNext);
 
         return (
           <button
             key={e}
-            disabled={
-              isPending ||
-              isCurrent ||
-              (e === "perdido" && !isNext && !isCurrent)
+            disabled={isPending || isCurrent || (isFuture && !isNext)}
+            onClick={() => isClickable && mover(e)}
+            title={
+              isPast
+                ? `Voltar para ${meta.label}`
+                : isNext
+                  ? `Avançar para ${meta.label}`
+                  : undefined
             }
-            onClick={() => {
-              startTransition(() => moveLeadEstagioAction(lead.id, e));
-            }}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-body text-xs font-medium transition-all ${
-              isCurrent
-                ? `${meta.bg} ${meta.color} ${meta.border} border-2 shadow-sm`
-                : isPast
-                  ? "bg-slate-100 text-slate-400 border border-slate-200"
-                  : isNext
-                    ? `border ${meta.border} ${meta.color} hover:${meta.bg} cursor-pointer`
-                    : "border border-slate-200 text-slate-300 cursor-default"
-            } disabled:cursor-not-allowed`}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 font-body text-xs font-medium transition-all
+              ${
+                isCurrent
+                  ? `${meta.bg} ${meta.color} ${meta.border} border-2 shadow-sm`
+                  : isPast
+                    ? "border border-slate-200 bg-slate-100 text-slate-500 hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer"
+                    : isNext
+                      ? `border ${meta.border} ${meta.color} bg-white hover:${meta.bg} cursor-pointer`
+                      : "border border-slate-200 bg-white text-slate-300 cursor-default"
+              }
+              disabled:cursor-not-allowed`}
           >
+            {isPast && (
+              <svg
+                className="h-2.5 w-2.5 rotate-180 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            )}
             <span
-              className={`h-1.5 w-1.5 rounded-full ${isCurrent ? meta.dot : isPast ? "bg-slate-400" : meta.dot}`}
+              className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${isCurrent ? meta.dot : isPast ? "bg-slate-400" : meta.dot}`}
             />
             {meta.label}
-            {isNext && !isPending && <ChevronRightIcon className="h-3 w-3" />}
+            {isNext && !isPending && (
+              <ChevronRightIcon className="h-3 w-3 flex-shrink-0" />
+            )}
           </button>
         );
       })}
+
+      {/* Perdido — terminal sempre acessível se não estiver fechado/perdido */}
+      {!isPerdido && lead.estagio !== "fechado" && (
+        <button
+          disabled={isPending}
+          onClick={() => mover("perdido")}
+          title="Marcar como Perdido"
+          className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 font-body text-xs font-medium text-slate-400 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed"
+        >
+          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-slate-400" />
+          {ESTAGIO_META["perdido"].label}
+        </button>
+      )}
+
+      {/* Reabrir se perdido */}
+      {isPerdido && (
+        <button
+          disabled={isPending}
+          onClick={() => mover("novo_contato")}
+          className="flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 font-body text-xs font-medium text-primary transition-all hover:bg-primary/10 disabled:cursor-not-allowed"
+        >
+          Reabrir Lead
+        </button>
+      )}
+
       {isPending && <SpinnerIcon className="h-4 w-4 text-muted" />}
     </div>
   );
@@ -148,7 +244,12 @@ function InfoTab({ lead }: { lead: Lead }) {
     { label: "Telefone", value: lead.telefone },
     { label: "E-mail", value: lead.email },
     { label: "Área de Interesse", value: lead.area_interesse },
-    { label: "Origem", value: lead.origem },
+    {
+      label: "Origem",
+      value: lead.origem
+        ? (ORIGENS.find((o) => o.value === lead.origem)?.label ?? lead.origem)
+        : null,
+    },
     { label: "Responsável", value: lead.responsavel_nome },
     { label: "Criado em", value: lead.created_at },
     { label: "Atualizado em", value: lead.updated_at },

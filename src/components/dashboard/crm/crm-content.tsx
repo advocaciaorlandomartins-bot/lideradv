@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,6 +12,8 @@ import {
   MailIcon,
   TagIcon,
   ChevronRightIcon,
+  SpinnerIcon,
+  ArchiveBoxIcon,
 } from "@/components/icons";
 import {
   ESTAGIOS,
@@ -45,16 +47,102 @@ function pageWindow(page: number, totalPages: number): (number | "…")[] {
   return acc;
 }
 
-// ── Kanban Column ─────────────────────────────────────────────────────────────
+// ── Pipeline linear do CRM (fechado e perdido são terminais) ──────────────────
+const PIPELINE_CRM: Estagio[] = [
+  "novo_contato",
+  "consulta_agendada",
+  "em_analise",
+  "proposta_enviada",
+  "fechado",
+];
+
+// ── Stepper do CRM ────────────────────────────────────────────────────────────
+
+function CrmStepper({ estagio }: { estagio: Estagio }) {
+  const isPerdido = estagio === "perdido";
+  const currentIdx = PIPELINE_CRM.indexOf(estagio);
+
+  return (
+    <div className="flex items-center gap-0">
+      {PIPELINE_CRM.map((e, i) => {
+        const meta = ESTAGIO_META[e];
+        const isCurrent = e === estagio && !isPerdido;
+        const isDone = !isPerdido && i < currentIdx;
+        const isFuture = isPerdido ? true : i > currentIdx;
+
+        return (
+          <div key={e} className="flex items-center">
+            <div
+              title={meta.label}
+              className={`flex h-5 w-5 items-center justify-center rounded-full border-2 text-[9px] font-bold transition-all
+                ${isCurrent ? `${meta.dot} border-transparent text-white shadow-sm` : ""}
+                ${isDone ? "border-transparent bg-slate-300 text-white" : ""}
+                ${isFuture && !isCurrent ? "border-slate-200 bg-white text-slate-300" : ""}
+              `}
+            >
+              {isDone ? (
+                <svg
+                  className="h-2.5 w-2.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <span>{i + 1}</span>
+              )}
+            </div>
+            {i < PIPELINE_CRM.length - 1 && (
+              <div
+                className={`h-0.5 w-4 ${i < currentIdx && !isPerdido ? "bg-slate-300" : "bg-slate-200"}`}
+              />
+            )}
+          </div>
+        );
+      })}
+      <span
+        className={`ml-2 font-body text-[10px] font-semibold ${isPerdido ? "text-slate-500" : ESTAGIO_META[estagio].color}`}
+      >
+        {isPerdido ? "Perdido" : ESTAGIO_META[estagio].label}
+      </span>
+    </div>
+  );
+}
+
+// ── Kanban Card ───────────────────────────────────────────────────────────────
 
 function KanbanCard({ lead }: { lead: Lead }) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const meta = ESTAGIO_META[lead.estagio];
+
+  const currentIdx = PIPELINE_CRM.indexOf(lead.estagio);
+  const prevEstagio = currentIdx > 0 ? PIPELINE_CRM[currentIdx - 1] : null;
+  const nextEstagio =
+    currentIdx >= 0 && currentIdx < PIPELINE_CRM.length - 1
+      ? PIPELINE_CRM[currentIdx + 1]
+      : null;
+
+  function mover(alvo: Estagio, e: React.MouseEvent) {
+    e.stopPropagation();
+    startTransition(async () => {
+      await moveLeadEstagioAction(lead.id, alvo);
+    });
+  }
+
   return (
     <div
       onClick={() => router.push(`/dashboard/crm/leads/${lead.id}`)}
-      className="cursor-pointer rounded-lg border border-border bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
+      className="cursor-pointer rounded-xl border border-border bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
     >
+      {/* Stepper */}
+      <div className="mb-2.5">
+        <CrmStepper estagio={lead.estagio} />
+      </div>
+
+      {/* Dados */}
       <div className="mb-2 flex items-start justify-between gap-2">
         <p className="font-body text-sm font-semibold text-fg leading-tight line-clamp-2">
           {lead.nome}
@@ -67,14 +155,13 @@ function KanbanCard({ lead }: { lead: Lead }) {
       </div>
 
       {lead.area_interesse && (
-        <div className="mb-1.5 flex items-center gap-1">
+        <div className="mb-1 flex items-center gap-1">
           <TagIcon className="h-3 w-3 text-muted" />
           <span className="font-body text-xs text-muted">
             {lead.area_interesse}
           </span>
         </div>
       )}
-
       {lead.telefone && (
         <div className="flex items-center gap-1">
           <PhoneIcon className="h-3 w-3 text-muted" />
@@ -82,11 +169,9 @@ function KanbanCard({ lead }: { lead: Lead }) {
         </div>
       )}
 
-      <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2">
-        <span className="font-body text-[11px] text-muted">
-          {lead.created_at}
-        </span>
-        <div className="flex items-center gap-2">
+      {/* Contadores */}
+      {(lead.atividades_count > 0 || lead.tarefas_pendentes > 0) && (
+        <div className="mt-1.5 flex items-center gap-2">
           {lead.atividades_count > 0 && (
             <span className="font-body text-[11px] text-muted">
               {lead.atividades_count} ativ.
@@ -98,6 +183,76 @@ function KanbanCard({ lead }: { lead: Lead }) {
             </span>
           )}
         </div>
+      )}
+
+      {/* Botões avançar / voltar */}
+      <div
+        className="mt-2.5 flex items-center gap-1.5 border-t border-border pt-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ← Voltar */}
+        {prevEstagio && (
+          <button
+            onClick={(e) => mover(prevEstagio, e)}
+            disabled={isPending}
+            className="flex items-center gap-1 rounded px-1.5 py-1 font-body text-[11px] text-muted transition-colors hover:text-fg disabled:opacity-40"
+          >
+            {isPending ? (
+              <SpinnerIcon className="h-3 w-3" />
+            ) : (
+              <svg
+                className="h-3 w-3 rotate-180"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            )}
+            Voltar
+          </button>
+        )}
+
+        <span className="flex-1" />
+
+        {/* → Avançar */}
+        {nextEstagio && lead.estagio !== "perdido" && (
+          <button
+            onClick={(e) => mover(nextEstagio, e)}
+            disabled={isPending}
+            className={`flex items-center gap-1 rounded-lg border px-2 py-1 font-body text-[11px] font-semibold transition-colors disabled:opacity-40
+              ${ESTAGIO_META[nextEstagio].color} ${ESTAGIO_META[nextEstagio].bg} border-current/20 hover:opacity-80`}
+          >
+            {ESTAGIO_META[nextEstagio].label}
+            {isPending ? (
+              <SpinnerIcon className="h-3 w-3" />
+            ) : (
+              <ChevronRightIcon className="h-3 w-3" />
+            )}
+          </button>
+        )}
+
+        {/* Marcar como Perdido — disponível em qualquer etapa não terminal */}
+        {lead.estagio !== "fechado" && lead.estagio !== "perdido" && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              startTransition(async () => {
+                await moveLeadEstagioAction(lead.id, "perdido");
+              });
+            }}
+            disabled={isPending}
+            className="rounded px-1.5 py-1 font-body text-[10px] text-slate-400 transition-colors hover:text-red-500 disabled:opacity-40"
+            title="Marcar como Perdido"
+          >
+            ✕
+          </button>
+        )}
       </div>
     </div>
   );
@@ -106,7 +261,7 @@ function KanbanCard({ lead }: { lead: Lead }) {
 function KanbanColumn({ estagio, leads }: { estagio: Estagio; leads: Lead[] }) {
   const meta = ESTAGIO_META[estagio];
   return (
-    <div className="flex min-w-[220px] max-w-[260px] flex-1 flex-col rounded-xl border border-border bg-slate-50">
+    <div className="flex min-w-[240px] max-w-[280px] flex-1 flex-col rounded-xl border border-border bg-slate-50">
       <div
         className={`flex items-center gap-2 rounded-t-xl border-b border-border px-3 py-2.5 ${meta.bg}`}
       >
@@ -135,9 +290,20 @@ function KanbanColumn({ estagio, leads }: { estagio: Estagio; leads: Lead[] }) {
   );
 }
 
+// Estágios ativos vs encerrados
+const ESTAGIOS_ATIVOS: Estagio[] = [
+  "novo_contato",
+  "consulta_agendada",
+  "em_analise",
+  "proposta_enviada",
+];
+const ESTAGIOS_ENCERRADOS: Estagio[] = ["fechado", "perdido"];
+
 // ── Funil Tab ──────────────────────────────────────────────────────────────────
 
 function FunilTab({ leads }: { leads: Lead[] }) {
+  const [showEncerrados, setShowEncerrados] = useState(false);
+
   const byEstagio = useMemo(() => {
     const map: Record<Estagio, Lead[]> = {} as Record<Estagio, Lead[]>;
     for (const e of ESTAGIOS) map[e] = [];
@@ -145,16 +311,40 @@ function FunilTab({ leads }: { leads: Lead[] }) {
     return map;
   }, [leads]);
 
+  const estagiosVisiveis = showEncerrados
+    ? [...ESTAGIOS_ATIVOS, ...ESTAGIOS_ENCERRADOS]
+    : ESTAGIOS_ATIVOS;
+
+  const totalEncerrados =
+    byEstagio["fechado"].length + byEstagio["perdido"].length;
+
   return (
-    <div className="overflow-x-auto pb-4">
-      <div className="flex gap-3" style={{ minWidth: "max-content" }}>
-        {ESTAGIOS.map((estagio) => (
-          <KanbanColumn
-            key={estagio}
-            estagio={estagio}
-            leads={byEstagio[estagio]}
-          />
-        ))}
+    <div className="space-y-3">
+      <div className="flex items-center justify-end">
+        <button
+          onClick={() => setShowEncerrados((v) => !v)}
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-sm transition-colors ${
+            showEncerrados
+              ? "border-primary bg-primary/5 text-primary"
+              : "border-border text-muted hover:border-primary hover:text-primary"
+          }`}
+        >
+          <ArchiveBoxIcon className="h-4 w-4" />
+          {showEncerrados
+            ? "Ocultar Encerrados"
+            : `Mostrar Encerrados${totalEncerrados > 0 ? ` (${totalEncerrados})` : ""}`}
+        </button>
+      </div>
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-3" style={{ minWidth: "max-content" }}>
+          {estagiosVisiveis.map((estagio) => (
+            <KanbanColumn
+              key={estagio}
+              estagio={estagio}
+              leads={byEstagio[estagio]}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

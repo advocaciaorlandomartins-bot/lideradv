@@ -2,6 +2,7 @@ import type { SessionUser } from "./session";
 
 export const MODULOS = [
   { key: "crm", label: "CRM", parent: null },
+  { key: "producao", label: "Produção", parent: null },
   { key: "clientes", label: "Clientes", parent: null },
   { key: "processos", label: "Processos", parent: null },
   { key: "financeiro", label: "Financeiro", parent: null },
@@ -64,6 +65,7 @@ export function isSubModulo(key: string): boolean {
 export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
   "Administrador(a)": {
     crm: FULL,
+    producao: FULL,
     clientes: FULL,
     processos: FULL,
     financeiro: FULL,
@@ -77,6 +79,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
   },
   "Sócio(a)": {
     crm: FULL,
+    producao: FULL,
     clientes: FULL,
     processos: FULL,
     financeiro: FULL,
@@ -90,6 +93,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
   },
   "Advogado(a)": {
     crm: ["ver", "criar", "editar"],
+    producao: FULL,
     clientes: ["ver", "criar", "editar"],
     processos: FULL,
     financeiro: VER,
@@ -105,6 +109,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
   },
   "Estagiário(a)": {
     crm: VER,
+    producao: VER,
     clientes: VER,
     processos: ["ver", "criar", "editar"],
     financeiro: NONE,
@@ -118,6 +123,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
   },
   "Colaborador(a)": {
     crm: NONE,
+    producao: NONE,
     clientes: VER,
     processos: VER,
     financeiro: NONE,

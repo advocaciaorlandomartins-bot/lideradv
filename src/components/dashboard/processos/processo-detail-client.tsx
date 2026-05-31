@@ -29,6 +29,21 @@ import {
   deletePendenciaAction,
 } from "@/lib/processo-full-actions";
 import {
+  moverParaProducaoAction,
+  moverParaAdministrativoAction,
+  registrarResultadoAdminAction,
+  registrarResultadoJudicialAction,
+  arquivarProcessoAction as arquivarProducaoAction,
+  reabrirProcessoAction,
+  voltarEstagioAction,
+} from "@/lib/producao-actions";
+import {
+  ESTAGIOS_PRODUCAO,
+  ESTAGIO_PRODUCAO_META,
+  RESULTADO_ADMIN_META,
+  RESULTADO_JUDICIAL_META,
+} from "@/lib/producao-types";
+import {
   XMarkIcon,
   SpinnerIcon,
   DocumentTextIcon,
@@ -39,6 +54,8 @@ import {
   ClockIcon,
   FolderOpenIcon,
   ArrowDownTrayIcon,
+  KanbanIcon,
+  ArchiveBoxIcon,
 } from "@/components/icons";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -69,6 +86,384 @@ const btnOutline =
   "flex items-center gap-1.5 rounded-lg border border-border px-4 h-9 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary cursor-pointer";
 const btnDanger =
   "font-body text-xs font-semibold text-red-500 hover:text-red-700 transition-colors cursor-pointer";
+
+// ── Linha de Produção ──────────────────────────────────────────
+
+const PIPELINE_PROD = [
+  "analise",
+  "producao",
+  "administrativo",
+  "judicial",
+] as const;
+
+function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
+  const [showFormAdmin, setShowFormAdmin] = useState(false);
+  const [showFormJud, setShowFormJud] = useState(false);
+  const [resultadoAdmin, setResultadoAdmin] = useState<"concedido" | "negado">(
+    "concedido"
+  );
+  const [proximoAdmin, setProximoAdmin] = useState<"judicial" | "arquivado">(
+    "arquivado"
+  );
+  const [resultadoJud, setResultadoJud] = useState<
+    "procedente" | "improcedente" | "parcial"
+  >("procedente");
+  const [isPending, startTransition] = useTransition();
+
+  const estagio = processo.estagio_producao;
+  const isArquivado = estagio === "arquivado";
+  const currentIdx = PIPELINE_PROD.indexOf(
+    estagio as (typeof PIPELINE_PROD)[number]
+  );
+
+  const inputCls2 =
+    "w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg focus:border-primary focus:outline-none";
+
+  return (
+    <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border bg-slate-50 px-5 py-3">
+        <div>
+          <h3 className="font-heading text-sm font-semibold text-fg">
+            Linha de Produção
+          </h3>
+          <p className="font-body text-xs text-muted">
+            {isArquivado
+              ? "Processo arquivado"
+              : `${processo.dias_no_estagio}d na etapa atual`}
+          </p>
+        </div>
+        <Link
+          href="/dashboard/producao"
+          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-body text-xs font-medium text-muted transition-colors hover:border-primary hover:text-primary"
+        >
+          <KanbanIcon className="h-3.5 w-3.5" />
+          Ver na Produção
+        </Link>
+      </div>
+
+      {/* Stepper */}
+      <div className="px-5 py-4">
+        <div className="flex items-center gap-0 flex-wrap">
+          {PIPELINE_PROD.map((e, i) => {
+            const meta = ESTAGIO_PRODUCAO_META[e];
+            const isCurrent = e === estagio && !isArquivado;
+            const isDone = isArquivado || i < currentIdx;
+            const isFuture = !isArquivado && i > currentIdx;
+
+            return (
+              <div key={e} className="flex items-center">
+                <div
+                  title={meta.label}
+                  className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all
+                    ${isCurrent ? `${meta.dot} border-transparent text-white shadow-sm` : ""}
+                    ${isDone ? "border-transparent bg-slate-300 text-white" : ""}
+                    ${isFuture ? "border-slate-200 bg-white text-slate-300" : ""}
+                  `}
+                >
+                  {isDone && !isCurrent ? (
+                    <svg
+                      className="h-3 w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <span>{i + 1}</span>
+                  )}
+                </div>
+                <div className="flex flex-col items-center mx-1">
+                  <div
+                    className={`h-0.5 w-10 ${i < currentIdx || isArquivado ? "bg-slate-300" : "bg-slate-200"}`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Arquivado terminal */}
+          <div
+            title="Arquivado"
+            className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-[10px] font-bold
+              ${isArquivado ? "border-transparent bg-slate-400 text-white" : "border-slate-200 bg-white text-slate-300"}
+            `}
+          >
+            <ArchiveBoxIcon className="h-3.5 w-3.5" />
+          </div>
+
+          {/* Label atual */}
+          <span
+            className={`ml-3 font-body text-sm font-semibold ${ESTAGIO_PRODUCAO_META[estagio as keyof typeof ESTAGIO_PRODUCAO_META]?.color ?? "text-slate-500"}`}
+          >
+            {ESTAGIO_PRODUCAO_META[
+              estagio as keyof typeof ESTAGIO_PRODUCAO_META
+            ]?.label ?? estagio}
+          </span>
+
+          {/* Resultados */}
+          {processo.resultado_administrativo && (
+            <span
+              className={`ml-2 rounded-full px-2 py-0.5 font-body text-[11px] font-medium ${RESULTADO_ADMIN_META[processo.resultado_administrativo as keyof typeof RESULTADO_ADMIN_META]?.bg} ${RESULTADO_ADMIN_META[processo.resultado_administrativo as keyof typeof RESULTADO_ADMIN_META]?.color}`}
+            >
+              Adm:{" "}
+              {
+                RESULTADO_ADMIN_META[
+                  processo.resultado_administrativo as keyof typeof RESULTADO_ADMIN_META
+                ]?.label
+              }
+            </span>
+          )}
+          {processo.resultado_judicial && (
+            <span
+              className={`ml-2 rounded-full px-2 py-0.5 font-body text-[11px] font-medium ${RESULTADO_JUDICIAL_META[processo.resultado_judicial as keyof typeof RESULTADO_JUDICIAL_META]?.bg} ${RESULTADO_JUDICIAL_META[processo.resultado_judicial as keyof typeof RESULTADO_JUDICIAL_META]?.color}`}
+            >
+              Jud:{" "}
+              {
+                RESULTADO_JUDICIAL_META[
+                  processo.resultado_judicial as keyof typeof RESULTADO_JUDICIAL_META
+                ]?.label
+              }
+            </span>
+          )}
+        </div>
+
+        {/* Botões de ação */}
+        {!showFormAdmin && !showFormJud && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {/* Voltar */}
+            {["producao", "administrativo", "judicial"].includes(estagio) && (
+              <button
+                onClick={() =>
+                  startTransition(() => voltarEstagioAction(processo.id))
+                }
+                disabled={isPending}
+                className="flex items-center gap-1 rounded px-2 py-1 font-body text-xs text-muted transition-colors hover:text-fg disabled:opacity-40"
+              >
+                {isPending ? (
+                  <SpinnerIcon className="h-3 w-3" />
+                ) : (
+                  <svg
+                    className="h-3 w-3 rotate-180"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                )}
+                Voltar
+              </button>
+            )}
+
+            {/* Avançar */}
+            {estagio === "analise" && (
+              <button
+                onClick={() =>
+                  startTransition(() => moverParaProducaoAction(processo.id))
+                }
+                disabled={isPending}
+                className="flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1 font-body text-xs font-semibold text-teal-700 hover:bg-teal-100 disabled:opacity-50"
+              >
+                {isPending ? (
+                  <SpinnerIcon className="h-3 w-3" />
+                ) : (
+                  <ChevronRightIcon className="h-3 w-3" />
+                )}
+                Iniciar Produção
+              </button>
+            )}
+            {estagio === "producao" && (
+              <button
+                onClick={() =>
+                  startTransition(() =>
+                    moverParaAdministrativoAction(processo.id)
+                  )
+                }
+                disabled={isPending}
+                className="flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1 font-body text-xs font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+              >
+                {isPending ? (
+                  <SpinnerIcon className="h-3 w-3" />
+                ) : (
+                  <ChevronRightIcon className="h-3 w-3" />
+                )}
+                Protocolar Adm.
+              </button>
+            )}
+            {estagio === "administrativo" && (
+              <button
+                onClick={() => setShowFormAdmin(true)}
+                className="flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1 font-body text-xs font-semibold text-orange-700 hover:bg-orange-100"
+              >
+                <ChevronRightIcon className="h-3 w-3" />
+                Registrar Resultado
+              </button>
+            )}
+            {estagio === "judicial" && (
+              <button
+                onClick={() => setShowFormJud(true)}
+                className="flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1 font-body text-xs font-semibold text-purple-700 hover:bg-purple-100"
+              >
+                <ChevronRightIcon className="h-3 w-3" />
+                Registrar Resultado
+              </button>
+            )}
+            {isArquivado && (
+              <button
+                onClick={() =>
+                  startTransition(() => reabrirProcessoAction(processo.id))
+                }
+                disabled={isPending}
+                className="flex items-center gap-1 rounded px-2 py-1 font-body text-xs text-muted hover:text-primary disabled:opacity-40"
+              >
+                {isPending && <SpinnerIcon className="h-3 w-3" />}
+                Reabrir
+              </button>
+            )}
+            {!isArquivado && (
+              <button
+                onClick={() => {
+                  if (!confirm("Arquivar este processo na produção?")) return;
+                  startTransition(() => arquivarProducaoAction(processo.id));
+                }}
+                disabled={isPending}
+                className="ml-auto flex items-center gap-1 rounded px-2 py-1 font-body text-xs text-muted hover:text-red-600 disabled:opacity-40"
+              >
+                <ArchiveBoxIcon className="h-3 w-3" />
+                Arquivar
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Form resultado administrativo */}
+        {showFormAdmin && (
+          <div className="mt-3 space-y-3 rounded-lg border border-border bg-slate-50 p-4">
+            <p className="font-body text-xs font-semibold text-fg">
+              Resultado Administrativo
+            </p>
+            <select
+              value={resultadoAdmin}
+              onChange={(e) =>
+                setResultadoAdmin(e.target.value as "concedido" | "negado")
+              }
+              className={inputCls2}
+            >
+              <option value="concedido">Concedido ✓</option>
+              <option value="negado">Negado ✗</option>
+            </select>
+            {resultadoAdmin === "negado" && (
+              <div className="space-y-2">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={proximoAdmin === "judicial"}
+                    onChange={() => setProximoAdmin("judicial")}
+                    className="accent-primary"
+                  />
+                  <span className="font-body text-xs text-fg">
+                    Encaminhar para Judicial
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={proximoAdmin === "arquivado"}
+                    onChange={() => setProximoAdmin("arquivado")}
+                    className="accent-primary"
+                  />
+                  <span className="font-body text-xs text-fg">
+                    Arquivar sem judicial
+                  </span>
+                </label>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() =>
+                  startTransition(async () => {
+                    await registrarResultadoAdminAction(
+                      processo.id,
+                      resultadoAdmin,
+                      resultadoAdmin === "concedido"
+                        ? "arquivado"
+                        : proximoAdmin
+                    );
+                    setShowFormAdmin(false);
+                  })
+                }
+                disabled={isPending}
+                className="flex flex-1 justify-center items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-body text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {isPending && <SpinnerIcon className="h-3 w-3" />} Confirmar
+              </button>
+              <button
+                onClick={() => setShowFormAdmin(false)}
+                className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Form resultado judicial */}
+        {showFormJud && (
+          <div className="mt-3 space-y-3 rounded-lg border border-border bg-slate-50 p-4">
+            <p className="font-body text-xs font-semibold text-fg">
+              Resultado Judicial
+            </p>
+            <select
+              value={resultadoJud}
+              onChange={(e) =>
+                setResultadoJud(
+                  e.target.value as "procedente" | "improcedente" | "parcial"
+                )
+              }
+              className={inputCls2}
+            >
+              <option value="procedente">Procedente ✓</option>
+              <option value="improcedente">Improcedente ✗</option>
+              <option value="parcial">Parcial Procedente</option>
+            </select>
+            <div className="flex gap-2">
+              <button
+                onClick={() =>
+                  startTransition(async () => {
+                    await registrarResultadoJudicialAction(
+                      processo.id,
+                      resultadoJud
+                    );
+                    setShowFormJud(false);
+                  })
+                }
+                disabled={isPending}
+                className="flex flex-1 justify-center items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-body text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {isPending && <SpinnerIcon className="h-3 w-3" />} Confirmar e
+                Arquivar
+              </button>
+              <button
+                onClick={() => setShowFormJud(false)}
+                className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Modal wrapper ───────────────────────────────────────────────
 
@@ -1832,6 +2227,9 @@ export default function ProcessoDetailClient({
         onAvancar={() => setAvancarOpen(true)}
         onArquivar={() => setArquivarOpen(true)}
       />
+
+      {/* Linha de Produção */}
+      <ProducaoBar processo={processo} />
 
       {/* Tab Nav */}
       <div className="flex gap-1 rounded-xl border border-border bg-white p-1.5 shadow-sm">

@@ -102,6 +102,59 @@ export async function updateLeadAction(
   return { success: true };
 }
 
+// ── Helper: garante cliente + processo ao fechar lead ─────────────────────────
+
+async function garantirClienteEProcesso(leadId: string): Promise<void> {
+  const rows = await sql`
+    SELECT nome, email, telefone, tipo, empresa, area_interesse,
+           client_id::text, processo_id::text
+    FROM crm_leads WHERE id = ${leadId}::uuid
+  `;
+  if (rows.length === 0) return;
+  const lead = rows[0];
+
+  // 1. Cria cliente se ainda não existe
+  let clientId: string = lead.client_id ?? "";
+  if (!clientId) {
+    const cr = await sql`
+      INSERT INTO clients (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+      VALUES (
+        ${lead.tipo ?? "PF"},
+        ${lead.nome},
+        '',
+        ${lead.email ?? ""},
+        ${lead.telefone ?? ""},
+        '', '', '', '', '', '', 'ativo'
+      )
+      RETURNING id::text
+    `;
+    clientId = cr[0].id;
+    await sql`UPDATE crm_leads SET client_id = ${clientId}::uuid WHERE id = ${leadId}::uuid`;
+    revalidatePath("/dashboard/clientes");
+  }
+
+  // 2. Cria processo em Análise se ainda não existe
+  if (!lead.processo_id) {
+    const area = (lead.area_interesse as string | null) ?? "A Definir";
+    const pr = await sql`
+      INSERT INTO processos (client_id, lead_id, tipo_acao, area, status, estagio_producao, data_estagio_at)
+      VALUES (
+        ${clientId}::uuid,
+        ${leadId}::uuid,
+        ${area},
+        ${area},
+        'ativo',
+        'analise',
+        NOW()
+      )
+      RETURNING id::text
+    `;
+    const processoId = pr[0].id;
+    await sql`UPDATE crm_leads SET processo_id = ${processoId}::uuid WHERE id = ${leadId}::uuid`;
+    revalidatePath("/dashboard/producao");
+  }
+}
+
 export async function moveLeadEstagioAction(
   id: string,
   estagio: string
@@ -110,6 +163,10 @@ export async function moveLeadEstagioAction(
     UPDATE crm_leads SET estagio = ${estagio}, updated_at = NOW()
     WHERE id = ${id}::uuid
   `;
+  // Ao fechar: garante cliente + processo em Análise
+  if (estagio === "fechado") {
+    await garantirClienteEProcesso(id);
+  }
   revalidatePath("/dashboard/crm");
   revalidatePath(`/dashboard/crm/leads/${id}`);
 }
@@ -121,37 +178,16 @@ export async function deleteLeadAction(id: string): Promise<void> {
 
 export async function convertLeadToClientAction(
   leadId: string
-): Promise<{ error?: string; clientId?: string }> {
-  const rows = await sql`
-    SELECT nome, email, telefone, tipo, empresa FROM crm_leads WHERE id = ${leadId}::uuid
-  `;
-  if (rows.length === 0) return { error: "Lead não encontrado." };
-
-  const lead = rows[0];
-
+): Promise<{ error?: string; clientId?: string; processoId?: string }> {
   try {
-    const clientRows = await sql`
-      INSERT INTO clients (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
-      VALUES (
-        ${lead.tipo},
-        ${lead.nome},
-        '',
-        ${lead.email ?? ""},
-        ${lead.telefone ?? ""},
-        '', '', '', '', '', '', 'ativo'
-      )
-      RETURNING id::text
-    `;
-    const clientId = clientRows[0].id;
+    await sql`UPDATE crm_leads SET estagio = 'fechado', updated_at = NOW() WHERE id = ${leadId}::uuid`;
+    await garantirClienteEProcesso(leadId);
 
-    await sql`
-      UPDATE crm_leads SET client_id = ${clientId}::uuid, estagio = 'fechado', updated_at = NOW()
-      WHERE id = ${leadId}::uuid
-    `;
-
+    const rows =
+      await sql`SELECT client_id::text, processo_id::text FROM crm_leads WHERE id = ${leadId}::uuid`;
     revalidatePath("/dashboard/crm");
     revalidatePath("/dashboard/clientes");
-    return { clientId };
+    return { clientId: rows[0].client_id, processoId: rows[0].processo_id };
   } catch (err) {
     console.error("convertLeadToClientAction:", err);
     return { error: "Erro ao converter lead." };

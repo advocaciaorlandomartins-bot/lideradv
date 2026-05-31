@@ -408,3 +408,23 @@ export function TagIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function KanbanIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="3" width="5" height="18" rx="1" />
+      <rect x="10" y="3" width="5" height="12" rx="1" />
+      <rect x="17" y="3" width="5" height="8" rx="1" />
+    </Icon>
+  );
+}
+
+export function ArchiveBoxIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <polyline points="21 8 21 21 3 21 3 8" />
+      <rect x="1" y="3" width="22" height="5" rx="1" />
+      <line x1="10" y1="12" x2="14" y2="12" />
+    </Icon>
+  );
+}

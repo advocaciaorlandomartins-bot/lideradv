@@ -29,8 +29,10 @@ import {
   TrendDownIcon,
   CalendarIcon,
   SpinnerIcon,
-  UsersIcon,
+  ArrowDownTrayIcon,
+  ChevronDownIcon,
 } from "@/components/icons";
+import FinanceiroLancamentoModal from "./financeiro-lancamento-modal";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -98,15 +100,27 @@ function KpiCard({
   sub,
   color,
   icon: Icon,
+  active,
+  onClick,
 }: {
   label: string;
   value: number;
   sub?: string;
   color: string;
   icon: React.ComponentType<{ className?: string }>;
+  active?: boolean;
+  onClick?: () => void;
 }) {
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+    <Wrapper
+      onClick={onClick}
+      className={`rounded-xl border bg-white p-5 shadow-sm transition-all duration-150 ${
+        onClick ? "cursor-pointer" : ""
+      } ${active ? "border-primary ring-2 ring-primary/20" : "border-border"} ${
+        onClick && !active ? "hover:border-primary/40 hover:shadow-md" : ""
+      }`}
+    >
       <div className="flex items-center justify-between">
         <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
           {label}
@@ -121,7 +135,7 @@ function KpiCard({
         {fmt(value)}
       </p>
       {sub && <p className="mt-0.5 font-body text-xs text-muted">{sub}</p>}
-    </div>
+    </Wrapper>
   );
 }
 
@@ -434,14 +448,20 @@ function LancamentoRow({
   today.setHours(0, 0, 0, 0);
   const isToday = parseDMY(l.data_vencimento).getTime() === today.getTime();
 
+  const rowBorder = isPessoal
+    ? "border-l-2 border-l-purple-300"
+    : l.tipo === "entrada"
+      ? "border-l-2 border-l-emerald-400"
+      : "border-l-2 border-l-red-400";
+
   return (
-    <tr className="group transition-colors hover:bg-primary/5">
+    <tr className={`group transition-colors hover:bg-primary/5 ${rowBorder}`}>
       <td className="px-3 py-2">
         <span
           className={`flex items-center gap-1 font-body text-[11px] font-semibold ${highlightOverdue ? (isToday ? "text-amber-600" : "text-red-600") : "text-fg"}`}
         >
           <CalendarIcon className="h-3 w-3 flex-shrink-0" />
-          <span className="truncate">{l.data_vencimento}</span>
+          <span className="whitespace-nowrap">{l.data_vencimento}</span>
           {highlightOverdue && isToday && (
             <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 font-body text-[10px] font-bold text-amber-700">
               Hoje
@@ -503,8 +523,14 @@ interface Props {
 
 export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [mainTab, setMainTab] = useState<MainTab>("pendentes");
+  const [tipoFilter, setTipoFilter] = useState<"todos" | "entrada" | "saida">(
+    "todos"
+  );
   const [search, setSearch] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("mes");
+  const [showModal, setShowModal] = useState(false);
+  const [modalTipo, setModalTipo] = useState<"entrada" | "saida">("entrada");
+  const [showNovoDropdown, setShowNovoDropdown] = useState(false);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [pagePendentes, setPagePendentes] = useState(1);
@@ -519,31 +545,9 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     return new Date(n.getFullYear(), n.getMonth(), n.getDate());
   }, []);
 
-  const currentMonthSummary = useMemo(() => {
-    const now = new Date();
-    const yy = now.getFullYear(),
-      mm = now.getMonth();
-    const label = now.toLocaleDateString("pt-BR", {
-      month: "long",
-      year: "numeric",
-    });
-    let recebido = 0,
-      pago = 0;
-    for (const l of lancamentos) {
-      if (l.status !== "pago") continue;
-      const refStr = l.data_pagamento ?? l.data_vencimento;
-      const d = parseDMY(refStr);
-      if (d.getFullYear() === yy && d.getMonth() === mm) {
-        if (l.tipo === "entrada") recebido += l.valor;
-        else if (l.tipo === "saida") pago += l.valor;
-      }
-    }
-    return { recebido, pago, saldo: recebido - pago, label };
-  }, [lancamentos]);
-
   const chartData = useMemo(() => {
     const now = new Date();
-    return Array.from({ length: 12 }, (_, i) => {
+    const all = Array.from({ length: 12 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
       const yy = d.getFullYear(),
         mm = d.getMonth();
@@ -562,6 +566,11 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
       }
       return { month, receitas, despesas };
     });
+    // remove leading months with no data at all
+    const firstWithData = all.findIndex(
+      (d) => d.receitas > 0 || d.despesas > 0
+    );
+    return firstWithData === -1 ? all.slice(-6) : all.slice(firstWithData);
   }, [lancamentos]);
 
   const dateRange = useMemo(() => {
@@ -612,7 +621,6 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   }, [dateFiltered]);
 
   const saldo = filteredKpis.recebido - filteredKpis.pago;
-  const folhaTotal = filteredKpis.folhaPendente + filteredKpis.folhaPaga;
 
   const pendentesVencidos = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -621,14 +629,15 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         (l) =>
           l.status === "pendente" &&
           parseDMY(l.data_vencimento) <= today &&
-          matchesSearch(l, q)
+          matchesSearch(l, q) &&
+          (tipoFilter === "todos" || l.tipo === tipoFilter)
       )
       .sort(
         (a, b) =>
           parseDMY(a.data_vencimento).getTime() -
           parseDMY(b.data_vencimento).getTime()
       );
-  }, [lancamentos, today, search]);
+  }, [lancamentos, today, search, tipoFilter]);
 
   const pendentesNaoVencidos = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -637,25 +646,31 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         (l) =>
           l.status === "pendente" &&
           parseDMY(l.data_vencimento) > today &&
-          matchesSearch(l, q)
+          matchesSearch(l, q) &&
+          (tipoFilter === "todos" || l.tipo === tipoFilter)
       )
       .sort(
         (a, b) =>
           parseDMY(a.data_vencimento).getTime() -
           parseDMY(b.data_vencimento).getTime()
       );
-  }, [dateFiltered, today, search]);
+  }, [dateFiltered, today, search, tipoFilter]);
 
   const concluidas = useMemo(() => {
     const q = search.toLowerCase().trim();
     return dateFiltered
-      .filter((l) => l.status !== "pendente" && matchesSearch(l, q))
+      .filter(
+        (l) =>
+          l.status !== "pendente" &&
+          matchesSearch(l, q) &&
+          (tipoFilter === "todos" || l.tipo === tipoFilter)
+      )
       .sort(
         (a, b) =>
           parseDMY(b.data_vencimento).getTime() -
           parseDMY(a.data_vencimento).getTime()
       );
-  }, [dateFiltered, search]);
+  }, [dateFiltered, search, tipoFilter]);
 
   const concluidasTotals = useMemo(() => {
     let receitas = 0,
@@ -696,6 +711,57 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     setPageAtrasados(1);
   }
 
+  function handleTipoFilter(t: typeof tipoFilter) {
+    setTipoFilter(t);
+    setPageConcluidas(1);
+    setPagePendentes(1);
+    setPageAtrasados(1);
+  }
+
+  function handleKpiClick(tab: MainTab, tipo: "entrada" | "saida") {
+    setMainTab(tab);
+    setTipoFilter(tipo);
+    setPageConcluidas(1);
+    setPagePendentes(1);
+    setPageAtrasados(1);
+  }
+
+  function exportCSV() {
+    const all = [...pendentesVencidos, ...pendentesNaoVencidos, ...concluidas];
+    const headers = [
+      "ID",
+      "Tipo",
+      "Categoria",
+      "Descrição",
+      "Cliente",
+      "Valor",
+      "Status",
+      "Vencimento",
+      "Pago em",
+    ];
+    const rows = all.map((l) => [
+      l.id,
+      l.tipo === "entrada" ? "Receita" : "Despesa",
+      l.categoria ?? "",
+      l.descricao,
+      l.client_name ?? "",
+      l.valor.toFixed(2).replace(".", ","),
+      l.status,
+      l.data_vencimento,
+      l.data_pagamento ?? "",
+    ]);
+    const csv = [headers, ...rows]
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";"))
+      .join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `financeiro_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const dateRangeLabel = (() => {
     if (datePreset === "todos" || datePreset === "custom") return null;
     const r = getPresetRange(datePreset);
@@ -707,20 +773,20 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
 
   const colsPendentes = (
     <colgroup>
-      <col className="w-[90px]" />
+      <col className="w-[112px]" />
       <col />
-      <col className="w-[90px]" />
-      <col className="w-[296px]" />
+      <col className="w-[100px]" />
+      <col className="w-[280px]" />
     </colgroup>
   );
 
   const colsConcluidas = (
     <colgroup>
-      <col className="w-[90px]" />
+      <col className="w-[112px]" />
       <col />
-      <col className="w-[90px]" />
-      <col className="w-[90px]" />
-      <col className="w-[200px]" />
+      <col className="w-[100px]" />
+      <col className="w-[100px]" />
+      <col className="w-[180px]" />
     </colgroup>
   );
 
@@ -729,203 +795,163 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
 
   return (
     <div className="space-y-5">
-      {/* ── KPI row 1 ─────────────────────────────────────────────────────── */}
+      {/* ── KPI row ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard
           label="A Receber"
           value={filteredKpis.aReceber}
+          sub={`${lancamentos.filter((l) => l.tipo === "entrada" && l.status === "pendente").length} lançamentos`}
           color="bg-blue-50 text-blue-600"
           icon={TrendUpIcon}
+          active={mainTab === "pendentes" && tipoFilter === "entrada"}
+          onClick={() => handleKpiClick("pendentes", "entrada")}
         />
         <KpiCard
           label="Recebido"
           value={filteredKpis.recebido}
+          sub="entradas pagas"
           color="bg-emerald-50 text-emerald-600"
           icon={BanknotesIcon}
+          active={mainTab === "concluidas" && tipoFilter === "entrada"}
+          onClick={() => handleKpiClick("concluidas", "entrada")}
         />
         <KpiCard
           label="A Pagar"
           value={filteredKpis.aPagar}
+          sub={`${lancamentos.filter((l) => l.tipo === "saida" && l.status === "pendente").length} lançamentos`}
           color="bg-amber-50 text-amber-600"
           icon={TrendDownIcon}
+          active={mainTab === "pendentes" && tipoFilter === "saida"}
+          onClick={() => handleKpiClick("pendentes", "saida")}
         />
         <KpiCard
           label="Pago"
           value={filteredKpis.pago}
+          sub="saídas pagas"
           color="bg-slate-100 text-slate-500"
           icon={BanknotesIcon}
+          active={mainTab === "concluidas" && tipoFilter === "saida"}
+          onClick={() => handleKpiClick("concluidas", "saida")}
         />
         <div
           className={`col-span-2 rounded-xl border bg-white p-5 shadow-sm lg:col-span-1 ${saldo >= 0 ? "border-emerald-200" : "border-red-200"}`}
         >
           <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
-            Saldo
+            Saldo do período
           </p>
           <p
             className={`mt-3 font-heading text-2xl font-semibold ${saldo >= 0 ? "text-emerald-700" : "text-red-600"}`}
           >
             {fmt(saldo)}
           </p>
+          <p className="mt-0.5 font-body text-xs text-muted">Recebido − Pago</p>
         </div>
       </div>
 
-      {/* ── KPI row 2: folha ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <KpiCard
-          label="Folha — A Pagar"
-          value={filteredKpis.folhaPendente}
-          sub="Remunerações pendentes"
-          color="bg-purple-50 text-purple-600"
-          icon={UsersIcon}
-        />
-        <KpiCard
-          label="Folha — Pago"
-          value={filteredKpis.folhaPaga}
-          sub="Remunerações quitadas"
-          color="bg-purple-100 text-purple-700"
-          icon={UsersIcon}
-        />
-        <div className="rounded-xl border border-purple-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
-              Folha Total
-            </p>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
-              <UsersIcon className="h-4 w-4" />
-            </div>
+      {/* ── Type filter + novo lançamento ────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Tipo filter pills */}
+        <div className="flex gap-1 rounded-xl border border-border bg-white p-1 shadow-sm">
+          {(["todos", "entrada", "saida"] as const).map((t) => {
+            const labels: Record<string, string> = {
+              todos: "Todos",
+              entrada: "Receitas",
+              saida: "Despesas",
+            };
+            const active = tipoFilter === t;
+            return (
+              <button
+                key={t}
+                onClick={() => handleTipoFilter(t)}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 font-body text-sm font-semibold transition-colors ${
+                  active
+                    ? t === "entrada"
+                      ? "bg-emerald-600 text-white"
+                      : t === "saida"
+                        ? "bg-red-600 text-white"
+                        : "bg-primary text-white"
+                    : "text-muted hover:text-fg"
+                }`}
+              >
+                {t === "entrada" && <TrendUpIcon className="h-3.5 w-3.5" />}
+                {t === "saida" && <TrendDownIcon className="h-3.5 w-3.5" />}
+                {labels[t]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Quick actions */}
+        {canEdit && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setModalTipo("entrada");
+                setShowModal(true);
+              }}
+              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
+            >
+              <PlusIcon className="h-4 w-4" />+ Receita
+            </button>
+            <button
+              onClick={() => {
+                setModalTipo("saida");
+                setShowModal(true);
+              }}
+              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"
+            >
+              <PlusIcon className="h-4 w-4" />+ Despesa
+            </button>
+            <button
+              onClick={exportCSV}
+              title="Exportar CSV"
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" />
+            </button>
           </div>
-          <p className="mt-3 font-heading text-2xl font-semibold text-purple-700">
-            {fmt(folhaTotal)}
-          </p>
-          <p className="mt-0.5 font-body text-xs text-muted">
-            {filteredKpis.aPagar > 0
-              ? (
-                  (filteredKpis.folhaPendente / filteredKpis.aPagar) *
-                  100
-                ).toFixed(1)
-              : "0"}
-            % das despesas
-          </p>
-        </div>
+        )}
       </div>
 
-      {/* ── Month summary ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
-          <p className="mb-3 font-body text-xs font-semibold uppercase tracking-wide text-muted capitalize">
-            Recebido em {currentMonthSummary.label}
-          </p>
-          <p className="font-heading text-2xl font-semibold text-emerald-700">
-            {fmt(currentMonthSummary.recebido)}
-          </p>
-        </div>
-        <div className="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
-          <p className="mb-3 font-body text-xs font-semibold uppercase tracking-wide text-muted capitalize">
-            Pago em {currentMonthSummary.label}
-          </p>
-          <p className="font-heading text-2xl font-semibold text-red-600">
-            {fmt(currentMonthSummary.pago)}
-          </p>
-        </div>
-        <div
-          className={`rounded-xl border bg-white p-5 shadow-sm ${currentMonthSummary.saldo >= 0 ? "border-primary/30" : "border-red-200"}`}
-        >
-          <p className="mb-3 font-body text-xs font-semibold uppercase tracking-wide text-muted capitalize">
-            Saldo {currentMonthSummary.label}
-          </p>
-          <p
-            className={`font-heading text-2xl font-semibold ${currentMonthSummary.saldo >= 0 ? "text-primary" : "text-red-600"}`}
-          >
-            {fmt(currentMonthSummary.saldo)}
-          </p>
-        </div>
-      </div>
-
-      {/* ── Main tab cards ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {/* Pendentes */}
+      {/* ── Tab selector ──────────────────────────────────────────────────── */}
+      <div className="flex gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm">
         <button
           onClick={() => setMainTab("pendentes")}
-          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all duration-150 cursor-pointer ${mainTab === "pendentes" ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-white hover:border-primary/40 hover:bg-slate-50"}`}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 cursor-pointer ${mainTab === "pendentes" ? "bg-primary text-white shadow-sm" : "text-muted hover:text-fg"}`}
         >
-          <div
-            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${mainTab === "pendentes" ? "bg-primary text-white" : "bg-amber-50 text-amber-600"}`}
-          >
-            <BanknotesIcon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p
-              className={`font-body text-sm font-semibold ${mainTab === "pendentes" ? "text-primary" : "text-fg"}`}
-            >
-              A receber / A pagar
-            </p>
-            <p className="font-body text-xs text-muted">
-              {pendentesNaoVencidos.length} vencimentos futuros
-            </p>
-          </div>
+          <BanknotesIcon className="h-4 w-4" />
+          Pendentes
           {pendentesNaoVencidos.length > 0 && (
             <span
-              className={`flex-shrink-0 rounded-full px-2 py-0.5 font-body text-xs font-bold ${mainTab === "pendentes" ? "bg-primary text-white" : "bg-amber-50 text-amber-700"}`}
+              className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "pendentes" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}
             >
               {pendentesNaoVencidos.length}
             </span>
           )}
         </button>
-
-        {/* Concluídas */}
         <button
           onClick={() => setMainTab("concluidas")}
-          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all duration-150 cursor-pointer ${mainTab === "concluidas" ? "border-primary bg-primary/5 shadow-sm" : "border-border bg-white hover:border-primary/40 hover:bg-slate-50"}`}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 cursor-pointer ${mainTab === "concluidas" ? "bg-primary text-white shadow-sm" : "text-muted hover:text-fg"}`}
         >
-          <div
-            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${mainTab === "concluidas" ? "bg-primary text-white" : "bg-emerald-50 text-emerald-600"}`}
-          >
-            <TrendUpIcon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p
-              className={`font-body text-sm font-semibold ${mainTab === "concluidas" ? "text-primary" : "text-fg"}`}
-            >
-              Recebidas e pagas
-            </p>
-            <p className="font-body text-xs text-muted">
-              {concluidas.length} registros concluídos
-            </p>
-          </div>
+          <TrendUpIcon className="h-4 w-4" />
+          Concluídas
           {concluidas.length > 0 && (
             <span
-              className={`flex-shrink-0 rounded-full px-2 py-0.5 font-body text-xs font-bold ${mainTab === "concluidas" ? "bg-primary text-white" : "bg-slate-100 text-muted"}`}
+              className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "concluidas" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}
             >
               {concluidas.length}
             </span>
           )}
         </button>
-
-        {/* Atrasados */}
         <button
           onClick={() => setMainTab("atrasados")}
-          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all duration-150 cursor-pointer ${mainTab === "atrasados" ? "border-red-500 bg-red-50 shadow-sm" : pendentesVencidos.length > 0 ? "border-red-200 bg-white hover:border-red-400 hover:bg-red-50/40" : "border-border bg-white hover:border-primary/40 hover:bg-slate-50"}`}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 cursor-pointer ${mainTab === "atrasados" ? "bg-red-600 text-white shadow-sm" : pendentesVencidos.length > 0 ? "text-red-600 hover:text-red-700" : "text-muted hover:text-fg"}`}
         >
-          <div
-            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${mainTab === "atrasados" ? "bg-red-500 text-white" : pendentesVencidos.length > 0 ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-400"}`}
-          >
-            <TrendDownIcon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p
-              className={`font-body text-sm font-semibold ${mainTab === "atrasados" ? "text-red-600" : pendentesVencidos.length > 0 ? "text-red-600" : "text-fg"}`}
-            >
-              Vencidos em aberto
-            </p>
-            <p className="font-body text-xs text-muted">
-              {pendentesVencidos.length === 0
-                ? "Tudo em dia!"
-                : `${pendentesVencidos.length} em atraso`}
-            </p>
-          </div>
+          <TrendDownIcon className="h-4 w-4" />
+          Vencidos
           {pendentesVencidos.length > 0 && (
             <span
-              className={`flex-shrink-0 rounded-full px-2 py-0.5 font-body text-xs font-bold ${mainTab === "atrasados" ? "bg-red-600 text-white" : "bg-red-50 text-red-700"}`}
+              className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "atrasados" ? "bg-white/20 text-white" : "bg-red-100 text-red-700"}`}
             >
               {pendentesVencidos.length}
             </span>
@@ -936,134 +962,83 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
       {/* ── Active tab panel ──────────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
         {/* Panel header */}
-        <div className="space-y-3 border-b border-border bg-slate-50 px-5 py-4">
-          {/* Row 1: title + action buttons */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div
-                className={`flex h-9 w-9 items-center justify-center rounded-lg ${mainTab === "atrasados" ? "bg-red-50" : "bg-primary/10"}`}
-              >
-                {mainTab === "atrasados" ? (
-                  <TrendDownIcon className="h-5 w-5 text-red-500" />
-                ) : mainTab === "concluidas" ? (
-                  <TrendUpIcon className="h-5 w-5 text-primary" />
-                ) : (
-                  <BanknotesIcon className="h-5 w-5 text-primary" />
-                )}
-              </div>
-              <div>
-                <h2
-                  className={`font-heading text-sm font-bold ${mainTab === "atrasados" ? "text-red-600" : "text-fg"}`}
-                >
-                  {mainTab === "pendentes"
-                    ? "Próximos vencimentos"
-                    : mainTab === "concluidas"
-                      ? "Recebidas e pagas"
-                      : "Vencidos em aberto"}
-                </h2>
-                <p className="font-body text-xs text-muted">
-                  {mainTab === "pendentes"
-                    ? `${pendentesNaoVencidos.length} lançamentos`
-                    : mainTab === "concluidas"
-                      ? `${concluidas.length} lançamentos`
-                      : pendentesVencidos.length === 0
-                        ? "Nenhum vencimento em atraso"
-                        : `${pendentesVencidos.length} lançamentos em atraso`}
-                  {search ? ` · busca: "${search}"` : ""}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Search */}
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-                <input
-                  type="search"
-                  placeholder="Buscar descrição, cliente…"
-                  value={search}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="h-9 w-44 rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100 lg:w-52"
-                />
-              </div>
-              {mainTab !== "concluidas" && (
-                <>
-                  <Link
-                    href="/dashboard/financeiro/novo?tipo=entrada"
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                    Nova Receita
-                  </Link>
-                  <Link
-                    href="/dashboard/financeiro/novo?tipo=saida"
-                    className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                    Nova Despesa
-                  </Link>
-                </>
-              )}
-              {mainTab === "concluidas" && (
-                <Link
-                  href="/dashboard/remuneracoes/nova"
-                  className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-purple-700 whitespace-nowrap"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                  Nova Remuneração
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {/* Row 2: date presets (not shown on atrasados — those always show all overdue) */}
-          {mainTab !== "atrasados" && (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-slate-50 px-5 py-3">
+          {/* Left: título + filtros de período */}
+          <div className="flex flex-wrap items-center gap-2">
+            <h2
+              className={`font-heading text-sm font-bold ${mainTab === "atrasados" ? "text-red-600" : "text-fg"}`}
+            >
+              {mainTab === "pendentes"
+                ? "Próximos vencimentos"
+                : mainTab === "concluidas"
+                  ? "Recebidas e pagas"
+                  : "Vencidos em aberto"}
+            </h2>
+            {mainTab !== "atrasados" && (
+              <>
+                <span className="text-border">·</span>
                 {DATE_PRESETS.map((p) => (
                   <button
                     key={p.key}
                     onClick={() => handleDatePreset(p.key)}
-                    className={`flex items-center gap-1 rounded-md px-2.5 py-1 font-body text-xs font-semibold transition-colors cursor-pointer ${
+                    className={`flex items-center gap-1 rounded-md px-2 py-0.5 font-body text-xs font-semibold transition-colors cursor-pointer ${
                       datePreset === p.key
                         ? "bg-primary text-white"
                         : "border border-border bg-white text-muted hover:border-primary/40 hover:text-fg"
                     }`}
                   >
-                    {p.key !== "todos" && p.key !== "custom" && (
-                      <CalendarIcon className="h-3 w-3" />
-                    )}
                     {p.label}
                   </button>
                 ))}
-              </div>
-              {datePreset === "custom" && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={customFrom}
-                    onChange={(e) => {
-                      setCustomFrom(e.target.value);
-                      setPageConcluidas(1);
-                    }}
-                    className="h-8 rounded-lg border border-border bg-white px-2 font-body text-sm text-fg outline-none focus:border-primary"
-                  />
-                  <span className="font-body text-xs text-muted">até</span>
-                  <input
-                    type="date"
-                    value={customTo}
-                    onChange={(e) => {
-                      setCustomTo(e.target.value);
-                      setPageConcluidas(1);
-                    }}
-                    className="h-8 rounded-lg border border-border bg-white px-2 font-body text-sm text-fg outline-none focus:border-primary"
-                  />
-                </div>
-              )}
-              {dateRangeLabel && (
-                <p className="font-body text-xs text-muted">{dateRangeLabel}</p>
-              )}
+                {datePreset === "custom" && (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={customFrom}
+                      onChange={(e) => {
+                        setCustomFrom(e.target.value);
+                        setPageConcluidas(1);
+                      }}
+                      className="h-7 rounded border border-border bg-white px-2 font-body text-xs text-fg outline-none focus:border-primary"
+                    />
+                    <span className="font-body text-xs text-muted">até</span>
+                    <input
+                      type="date"
+                      value={customTo}
+                      onChange={(e) => {
+                        setCustomTo(e.target.value);
+                        setPageConcluidas(1);
+                      }}
+                      className="h-7 rounded border border-border bg-white px-2 font-body text-xs text-fg outline-none focus:border-primary"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Right: busca + ação */}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+              <input
+                type="search"
+                placeholder="Buscar…"
+                value={search}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="h-8 w-40 rounded-lg border border-border bg-white pl-8 pr-3 font-body text-xs text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100 lg:w-48"
+              />
             </div>
-          )}
+            {mainTab === "concluidas" && (
+              <Link
+                href="/dashboard/remuneracoes/nova"
+                className="flex h-8 items-center gap-1.5 rounded-lg bg-purple-600 px-3 font-body text-xs font-semibold text-white transition-colors hover:bg-purple-700 whitespace-nowrap"
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+                Nova Remuneração
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* ── Concluídas: summary mini-cards ── */}
@@ -1285,6 +1260,18 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* ── Modal de lançamento rápido ────────────────────────────────────── */}
+      <FinanceiroLancamentoModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        defaultTipo={modalTipo}
+        onSuccess={() => {
+          setShowModal(false);
+          // router.refresh() is called inside RowActions; here we just close
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }

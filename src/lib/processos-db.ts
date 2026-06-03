@@ -11,10 +11,13 @@ export interface Processo {
   vara: string | null;
   comarca: string | null;
   parte_contraria: string | null;
+  parte_contraria_doc: string | null;
   valor_causa: number | null;
   status: "ativo" | "em_andamento" | "arquivado" | "encerrado";
   data_distribuicao: string | null;
+  data_distribuicao_iso: string | null;
   created_at_formatted: string;
+  updated_at: Date | null;
   estagio_producao: string;
   resultado_administrativo: string | null;
   resultado_judicial: string | null;
@@ -43,10 +46,13 @@ function mapRow(r: any): Processo {
     vara: r.vara ?? null,
     comarca: r.comarca ?? null,
     parte_contraria: r.parte_contraria ?? null,
+    parte_contraria_doc: r.parte_contraria_doc ?? null,
     valor_causa: r.valor_causa ? Number(r.valor_causa) : null,
-    status: r.status as "ativo" | "arquivado" | "encerrado",
+    status: r.status as "ativo" | "em_andamento" | "arquivado" | "encerrado",
     data_distribuicao: r.data_distribuicao ?? null,
+    data_distribuicao_iso: r.data_distribuicao_iso ?? null,
     created_at_formatted: formatDate(new Date(r.created_at)),
+    updated_at: r.updated_at ? new Date(r.updated_at) : null,
     estagio_producao: r.estagio_producao ?? "analise",
     resultado_administrativo: r.resultado_administrativo ?? null,
     resultado_judicial: r.resultado_judicial ?? null,
@@ -66,16 +72,19 @@ export async function getAllProcessos(): Promise<Processo[]> {
       p.vara,
       p.comarca,
       p.parte_contraria,
+      p.parte_contraria_doc,
       p.valor_causa,
       p.status,
       to_char(p.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
+      to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao_iso,
       p.created_at,
+      p.updated_at,
       p.estagio_producao,
       p.resultado_administrativo,
       p.resultado_judicial
     FROM processos p
     JOIN clients c ON c.id = p.client_id
-    ORDER BY p.created_at DESC
+    ORDER BY COALESCE(p.updated_at, p.created_at) DESC
   `;
   return rows.map(mapRow);
 }
@@ -159,17 +168,20 @@ export async function getProcessosByClientId(
       p.vara,
       p.comarca,
       p.parte_contraria,
+      p.parte_contraria_doc,
       p.valor_causa,
       p.status,
       to_char(p.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
+      to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao_iso,
       p.created_at,
+      p.updated_at,
       p.estagio_producao,
       p.resultado_administrativo,
       p.resultado_judicial
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.client_id = ${clientId}::uuid
-    ORDER BY p.created_at DESC
+    ORDER BY COALESCE(p.updated_at, p.created_at) DESC
   `;
   return rows.map(mapRow);
 }

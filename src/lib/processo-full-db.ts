@@ -100,6 +100,7 @@ export async function getProcessoExtended(
       to_char(p.fase_elaboracao_at,  'DD/MM/YYYY HH24:MI') AS fase_elaboracao_at,
       to_char(p.fase_arquivado_at,   'DD/MM/YYYY HH24:MI') AS fase_arquivado_at,
       p.created_at,
+      p.updated_at,
       COALESCE(p.estagio_producao, 'analise')             AS estagio_producao,
       p.resultado_administrativo,
       p.resultado_judicial,
@@ -144,6 +145,7 @@ export async function getProcessoExtended(
     resultado_administrativo: r.resultado_administrativo ?? null,
     resultado_judicial: r.resultado_judicial ?? null,
     dias_no_estagio: Number(r.dias_no_estagio ?? 0),
+    updated_at: r.updated_at ? new Date(r.updated_at) : null,
   };
 }
 

@@ -1,5 +1,7 @@
 import { getAllProcessos } from "@/lib/processos-db";
+import { getAllClients } from "@/lib/clients-db";
 import ProcessosContent from "@/components/dashboard/processos/processos-content";
+import ProcessosSubNav from "@/components/dashboard/processos/processos-sub-nav";
 
 export const metadata = {
   title: "Processos — AdvMartins",
@@ -8,12 +10,18 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ProcessosPage() {
-  const processos = await getAllProcessos();
+  const [processos, clients] = await Promise.all([
+    getAllProcessos(),
+    getAllClients(),
+  ]);
+
   const ativos = processos.filter((p) => p.status === "ativo").length;
   const total = processos.length;
 
+  const clientOptions = clients.map((c) => ({ id: c.id, name: c.name }));
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <h1 className="font-heading text-3xl font-semibold text-fg">
           Processos
@@ -23,7 +31,9 @@ export default async function ProcessosPage() {
         </p>
       </div>
 
-      <ProcessosContent processos={processos} />
+      <ProcessosSubNav />
+
+      <ProcessosContent processos={processos} clients={clientOptions} />
     </div>
   );
 }

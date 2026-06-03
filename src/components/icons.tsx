@@ -428,3 +428,240 @@ export function ArchiveBoxIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <polyline points="6 9 12 15 18 9" />
+    </Icon>
+  );
+}
+
+export function ChevronUpIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <polyline points="18 15 12 9 6 15" />
+    </Icon>
+  );
+}
+
+export function ChevronLeftIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <polyline points="15 18 9 12 15 6" />
+    </Icon>
+  );
+}
+
+export function BuildingOfficeIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </Icon>
+  );
+}
+
+export function TagsIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+      <path d="M22 12l-9.17 9.17" strokeDasharray="3 2" />
+    </Icon>
+  );
+}
+
+export function UploadIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <polyline points="16 16 12 12 8 16" />
+      <line x1="12" y1="12" x2="12" y2="21" />
+      <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+    </Icon>
+  );
+}
+
+export function ActivityIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </Icon>
+  );
+}
+
+export function PauseCircleIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="10" y1="15" x2="10" y2="9" />
+      <line x1="14" y1="15" x2="14" y2="9" />
+    </Icon>
+  );
+}
+
+export function ExclamationCircleIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </Icon>
+  );
+}
+
+export function GlobeAltIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </Icon>
+  );
+}
+
+export function ListBulletIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </Icon>
+  );
+}
+
+export function AdjustmentsHorizontalIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+      <circle cx="8" cy="6" r="2" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="12" r="2" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="18" r="2" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+export function BookOpenIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </Icon>
+  );
+}
+
+export function BellAlertIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      <circle cx="19" cy="4" r="2" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+export function InboxArrowDownIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M22 12h-6l-2 3H10l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </Icon>
+  );
+}
+
+export function MapPinIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </Icon>
+  );
+}
+
+export function IdentificationIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <circle cx="8.5" cy="10.5" r="2.5" />
+      <path d="M14 8h4M14 12h4M14 16H6" />
+    </Icon>
+  );
+}
+
+export function StarIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </Icon>
+  );
+}
+
+export function BookmarkIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </Icon>
+  );
+}
+
+export function ArrowUpDownIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <polyline points="7 15 12 20 17 15" />
+      <polyline points="7 9 12 4 17 9" />
+    </Icon>
+  );
+}
+
+export function DocumentArrowUpIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <polyline points="9 15 12 12 15 15" />
+      <line x1="12" y1="12" x2="12" y2="19" />
+    </Icon>
+  );
+}
+
+export function SlidersIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <line x1="4" y1="21" x2="4" y2="14" />
+      <line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" />
+      <line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </Icon>
+  );
+}
+
+export function ClipboardCheckIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+      <rect x="9" y="3" width="6" height="4" rx="1" />
+      <path d="m9 12 2 2 4-4" />
+    </Icon>
+  );
+}
+
+export function WifiIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+      <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+      <path d="M8.53 16.11a6 16 0 0 1 6.95 0" />
+      <line x1="12" y1="20" x2="12.01" y2="20" />
+    </Icon>
+  );
+}

@@ -279,6 +279,36 @@ export async function getAllClientsWithOrigin(): Promise<ClientOptionFull[]> {
   }));
 }
 
+// ── Birthday clients ──────────────────────────────────────────────────────────
+
+export interface BirthdayClient {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  birth_date: string; // YYYY-MM-DD
+}
+
+export async function getClientsWithBirthdays(): Promise<BirthdayClient[]> {
+  const rows = await sql`
+    SELECT id::text, name, email, phone,
+           TO_CHAR(birth_date, 'YYYY-MM-DD') AS birth_date
+    FROM clients
+    WHERE birth_date IS NOT NULL AND type = 'PF'
+    ORDER BY
+      EXTRACT(MONTH FROM birth_date),
+      EXTRACT(DAY FROM birth_date),
+      name
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email ?? "",
+    phone: r.phone ?? "",
+    birth_date: r.birth_date,
+  }));
+}
+
 export async function getClientById(id: string): Promise<Client | null> {
   const rows = await sql`
     SELECT

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import type {
   RelatorioLancamento,
   RelatorioResumo,
@@ -17,7 +17,6 @@ import {
   BanknotesIcon,
   UsersIcon,
   UserPlusIcon,
-  TrendUpIcon,
   CalendarIcon as FluxoIcon,
 } from "@/components/icons";
 
@@ -57,6 +56,113 @@ const REM_TIPO_COLORS: Record<string, string> = {
   bonificacao: "bg-emerald-50 text-emerald-700",
   adiantamento: "bg-amber-50 text-amber-700",
 };
+
+// ── PaginationBar ─────────────────────────────────────────────────────────────
+function PaginationBar({
+  page,
+  pageSize,
+  total,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (p: number) => void;
+  onPageSize: (s: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (total === 0) return null;
+
+  function pageWindow(): (number | "…")[] {
+    if (totalPages <= 7)
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const left = Math.max(2, page - 2);
+    const right = Math.min(totalPages - 1, page + 2);
+    const acc: (number | "…")[] = [1];
+    if (left > 2) acc.push("…");
+    for (let i = left; i <= right; i++) acc.push(i);
+    if (right < totalPages - 1) acc.push("…");
+    acc.push(totalPages);
+    return acc;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-1 pt-3">
+      <div className="flex items-center gap-1">
+        <span className="mr-1 font-body text-xs text-muted">Exibir:</span>
+        {[10, 20, 50].map((s) => (
+          <button
+            key={s}
+            onClick={() => {
+              onPageSize(s);
+              onPage(1);
+            }}
+            className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <p className="mr-1 font-body text-xs text-muted">
+          {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de{" "}
+          {total}
+        </p>
+        {totalPages > 1 && (
+          <div className="flex gap-1">
+            <button
+              onClick={() => onPage(1)}
+              disabled={page === 1}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-xs text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              «
+            </button>
+            <button
+              onClick={() => onPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              ‹
+            </button>
+            {pageWindow().map((n, i) =>
+              n === "…" ? (
+                <span
+                  key={`e${i}`}
+                  className="flex h-7 w-7 items-center justify-center font-body text-xs text-muted"
+                >
+                  …
+                </span>
+              ) : (
+                <button
+                  key={n}
+                  onClick={() => onPage(n as number)}
+                  className={`flex h-7 w-7 items-center justify-center rounded font-body text-xs transition-colors cursor-pointer ${page === n ? "bg-primary font-semibold text-white" : "border border-border text-muted hover:border-primary hover:text-primary"}`}
+                >
+                  {n}
+                </button>
+              )
+            )}
+            <button
+              onClick={() => onPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              ›
+            </button>
+            <button
+              onClick={() => onPage(totalPages)}
+              disabled={page === totalPages}
+              className="flex h-7 w-7 items-center justify-center rounded border border-border font-body text-xs text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            >
+              »
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   lancamentos: RelatorioLancamento[];
@@ -151,10 +257,19 @@ function KpiCard({
   );
 }
 function LancamentosTable({ rows }: { rows: RelatorioLancamento[] }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
   if (rows.length === 0)
     return (
       <EmptyState msg="Nenhum lançamento encontrado para os filtros selecionados." />
     );
+
   const totalEntradas = rows
     .filter((r) => r.tipo === "entrada")
     .reduce((s, r) => s + r.valor, 0);
@@ -162,6 +277,8 @@ function LancamentosTable({ rows }: { rows: RelatorioLancamento[] }) {
     .filter((r) => r.tipo === "saida")
     .reduce((s, r) => s + r.valor, 0);
   const saldo = totalEntradas - totalSaidas;
+  const paginated = rows.slice((page - 1) * pageSize, page * pageSize);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between px-1">
@@ -206,7 +323,7 @@ function LancamentosTable({ rows }: { rows: RelatorioLancamento[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {rows.map((r) => (
+            {paginated.map((r) => (
               <tr key={r.id} className="hover:bg-primary/5 transition-colors">
                 <td className="px-4 py-3 font-body text-sm text-muted whitespace-nowrap">
                   {r.data_vencimento}
@@ -272,6 +389,13 @@ function LancamentosTable({ rows }: { rows: RelatorioLancamento[] }) {
             </tr>
           </tfoot>
         </table>
+        <PaginationBar
+          page={page}
+          pageSize={pageSize}
+          total={rows.length}
+          onPage={setPage}
+          onPageSize={setPageSize}
+        />
       </div>
     </div>
   );
@@ -659,6 +783,8 @@ function FolhaTab({
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroInicio, setFiltroInicio] = useState("");
   const [filtroFim, setFiltroFim] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const filtered = useMemo(
     () =>
       remuneracoes.filter((r) => {
@@ -687,12 +813,21 @@ function FolhaTab({
       filtroFim,
     ]
   );
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    setPage(1);
+  }, [filtroColaborador, filtroTipo, filtroStatus, filtroInicio, filtroFim]);
+
   const totalPago = filtered
     .filter((r) => r.status === "pago")
     .reduce((s, r) => s + r.valor, 0);
   const totalPendente = filtered
     .filter((r) => r.status === "pendente")
     .reduce((s, r) => s + r.valor, 0);
+  const paginatedFiltered = filtered.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
   const byColaborador = useMemo(() => {
     const map = new Map<string, RelatorioRemuneracao[]>();
     for (const r of filtered) {
@@ -828,7 +963,7 @@ function FolhaTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((r) => (
+              {paginatedFiltered.map((r) => (
                 <tr key={r.id} className="hover:bg-primary/5 transition-colors">
                   <td className="px-4 py-3 font-body text-sm text-muted whitespace-nowrap">
                     {r.competencia ?? "—"}
@@ -877,6 +1012,13 @@ function FolhaTab({
               </tr>
             </tfoot>
           </table>
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            total={filtered.length}
+            onPage={setPage}
+            onPageSize={setPageSize}
+          />
         </div>
       ) : (
         <div className="space-y-4">
@@ -1401,7 +1543,6 @@ function ClienteBusca({
 
   const sugestoes = useMemo(() => {
     if (!busca.trim()) return clientes.slice(0, 8);
-    const q = busca.toLowerCase().replace(/\D/g, "") || busca.toLowerCase();
     return clientes
       .filter((c) => {
         const nomeMatch = c.name.toLowerCase().includes(busca.toLowerCase());

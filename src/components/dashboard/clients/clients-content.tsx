@@ -20,6 +20,8 @@ import {
   PhoneIcon,
   MapPinIcon,
   BookmarkIcon,
+  DocumentArrowUpIcon,
+  CalendarIcon,
 } from "@/components/icons";
 import ClientesFiltroModal, {
   type FiltroCliente,
@@ -27,6 +29,7 @@ import ClientesFiltroModal, {
   countFiltrosCliente,
 } from "./clientes-filtro-modal";
 import ClienteRapidoModal from "./cliente-rapido-modal";
+import AiDocumentImport from "./ai-document-import";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -241,6 +244,7 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
 
   const [showFiltro, setShowFiltro] = useState(false);
   const [showRapido, setShowRapido] = useState(false);
+  const [showAiImport, setShowAiImport] = useState(false);
   const [showNovo, setShowNovo] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showQuick, setShowQuick] = useState(false);
@@ -572,6 +576,15 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                     router.push("/dashboard/clientes/novo");
                   }}
                 />
+                <DropdownItem
+                  icon={DocumentArrowUpIcon}
+                  label="Importar por documento"
+                  description="IA extrai dados automaticamente"
+                  onClick={() => {
+                    setShowNovo(false);
+                    setShowAiImport(true);
+                  }}
+                />
               </DropdownMenu>
             </div>
 
@@ -636,6 +649,16 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                 </DropdownMenu>
               </div>
             )}
+
+            {/* Aniversários */}
+            <Link
+              href="/dashboard/clientes/aniversarios"
+              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-white px-3 font-body text-sm font-semibold text-muted transition-colors hover:border-primary/40 hover:text-fg"
+              title="Aniversários"
+            >
+              <CalendarIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Aniversários</span>
+            </Link>
 
             {/* Export */}
             <div ref={exportRef} className="relative">
@@ -1056,6 +1079,24 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
           </div>
         )}
       </div>
+
+      {/* AI Import Modal */}
+      {showAiImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+            <div className="p-6">
+              <AiDocumentImport
+                compact
+                onClose={() => setShowAiImport(false)}
+                onSuccess={() => {
+                  setShowAiImport(false);
+                  router.refresh();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <ClientesFiltroModal

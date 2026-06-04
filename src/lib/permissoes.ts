@@ -1,6 +1,18 @@
 import type { SessionUser } from "./session";
 
 export const MODULOS = [
+  { key: "dashboard", label: "Dashboard", parent: null },
+  { key: "dashboard_crm", label: "Seção CRM", parent: "dashboard" },
+  {
+    key: "dashboard_controles",
+    label: "Prazos e Calendário",
+    parent: "dashboard",
+  },
+  {
+    key: "dashboard_financeiro",
+    label: "Resumo Financeiro",
+    parent: "dashboard",
+  },
   { key: "crm", label: "CRM", parent: null },
   { key: "producao", label: "Produção", parent: null },
   {
@@ -75,6 +87,10 @@ export function isSubModulo(key: string): boolean {
 
 export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
   "Administrador(a)": {
+    dashboard: VER,
+    dashboard_crm: VER,
+    dashboard_controles: VER,
+    dashboard_financeiro: VER,
     crm: FULL,
     producao: FULL,
     clientes: FULL,
@@ -90,6 +106,10 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     usuarios: FULL,
   },
   "Sócio(a)": {
+    dashboard: VER,
+    dashboard_crm: VER,
+    dashboard_controles: VER,
+    dashboard_financeiro: VER,
     crm: FULL,
     producao: FULL,
     clientes: FULL,
@@ -105,6 +125,10 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     usuarios: VER,
   },
   "Advogado(a)": {
+    dashboard: VER,
+    dashboard_crm: VER,
+    dashboard_controles: VER,
+    dashboard_financeiro: NONE,
     crm: ["ver", "criar", "editar"],
     producao: FULL,
     clientes: ["ver", "criar", "editar"],
@@ -121,6 +145,10 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     usuarios: NONE,
   },
   "Estagiário(a)": {
+    dashboard: VER,
+    dashboard_crm: NONE,
+    dashboard_controles: VER,
+    dashboard_financeiro: NONE,
     crm: VER,
     producao: VER,
     producao_resultado_adm: NONE,
@@ -138,6 +166,10 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     usuarios: NONE,
   },
   "Colaborador(a)": {
+    dashboard: VER,
+    dashboard_crm: NONE,
+    dashboard_controles: NONE,
+    dashboard_financeiro: NONE,
     crm: NONE,
     producao: NONE,
     clientes: VER,

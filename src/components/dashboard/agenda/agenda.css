@@ -1,0 +1,319 @@
+/* ── Layout da agenda ─────────────────────────────────────────────────────── */
+
+.agenda-layout {
+  display: flex;
+  gap: 20px;
+  height: calc(100dvh - 180px);
+  min-height: 500px;
+}
+
+.agenda-sidebar {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.agenda-main {
+  flex: 1 1 0%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+
+/* ── Barra de progresso ───────────────────────────────────────────────────── */
+
+.agenda-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 10;
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+}
+
+.agenda-progress-bar {
+  height: 100%;
+  background: #1e3a8a;
+  transition: width 0.25s ease-out;
+}
+
+/* ── Popover dia ──────────────────────────────────────────────────────────── */
+
+.agenda-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 230px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.agenda-popover-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  gap: 6px;
+}
+
+.agenda-popover-body {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── FullCalendar Overrides ───────────────────────────────────────────────── */
+
+.agenda-main .fc {
+  font-family: inherit;
+  font-size: 13px;
+  height: 100%;
+  padding: 8px;
+}
+
+.agenda-main .fc table {
+  border-collapse: collapse;
+}
+
+.agenda-main .fc .fc-scrollgrid {
+  border-radius: 8px;
+  overflow: hidden;
+  border-color: #e2e8f0;
+}
+
+.agenda-main .fc td,
+.agenda-main .fc th {
+  border-color: #e2e8f0;
+}
+
+/* Cabeçalho dias */
+.agenda-main .fc .fc-col-header-cell {
+  background-color: #eff6ff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  padding: 6px 4px;
+}
+
+.agenda-main .fc .fc-col-header-cell-cushion {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Toolbar */
+.agenda-main .fc .fc-toolbar-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.agenda-main .fc .fc-toolbar {
+  margin-bottom: 0.5em !important;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Botões */
+.agenda-main .fc .fc-button {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: all 0.15s;
+}
+
+.agenda-main .fc .fc-button:hover {
+  background: #f8fafc;
+  border-color: rgba(30, 58, 138, 0.3);
+  color: #1e3a8a;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.agenda-main .fc .fc-button:focus {
+  box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2) !important;
+}
+
+.agenda-main .fc .fc-button-primary:not(:disabled).fc-button-active,
+.agenda-main .fc .fc-button-primary:not(:disabled):active {
+  background: #1e3a8a;
+  border-color: #1e3a8a;
+  color: white;
+  box-shadow: 0 2px 6px rgba(30, 58, 138, 0.4);
+}
+
+.agenda-main .fc .fc-button-group > .fc-button {
+  border-radius: 0;
+}
+.agenda-main .fc .fc-button-group > .fc-button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.agenda-main .fc .fc-button-group > .fc-button:last-child {
+  border-radius: 0 8px 8px 0;
+}
+.agenda-main .fc .fc-button-group > .fc-button + .fc-button {
+  margin-left: -1px;
+}
+
+/* Evento */
+.agenda-main .fc .fc-event {
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 4px;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+}
+
+.agenda-main .fc .fc-event:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+.agenda-main .fc-event-inner {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.agenda-main .fc-event-icon {
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.agenda-main .fc-event-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hover nos dias */
+.agenda-main .fc .fc-daygrid-day-frame:hover {
+  background-color: #eff6ff;
+  cursor: pointer;
+}
+
+.agenda-main .fc .fc-timegrid-slot-lane:hover {
+  background-color: #eff6ff;
+}
+
+/* Dia atual */
+.agenda-main .fc .fc-day-today {
+  background-color: rgba(30, 58, 138, 0.04) !important;
+}
+
+/* Números dos dias */
+.agenda-main .fc .fc-daygrid-day-number {
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  padding: 2px 4px;
+  text-decoration: none;
+}
+
+.agenda-main .fc .fc-day-today .fc-daygrid-day-number {
+  background: #1e3a8a;
+  color: white;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mais eventos */
+.agenda-main .fc .fc-daygrid-more-link {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+/* List view */
+.agenda-main .fc .fc-list-event {
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.agenda-main .fc .fc-list-event:hover td {
+  background-color: #eff6ff;
+}
+
+.agenda-main .fc .fc-list-day-cushion {
+  background-color: #f8fafc;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: capitalize;
+}
+
+.agenda-main .fc .fc-list-event-dot {
+  border-width: 7px;
+}
+
+.agenda-main .fc .fc-list-empty {
+  background: white;
+  font-family: inherit;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* Timegrid */
+.agenda-main .fc .fc-timegrid-slot {
+  height: 1.5em;
+}
+
+.agenda-main .fc .fc-timegrid-slot-label-cushion {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* Popover "more" */
+.agenda-main .fc .fc-popover {
+  border-radius: 10px;
+  border-color: #e2e8f0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+}
+
+.agenda-main .fc .fc-popover-title {
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .agenda-layout {
+    flex-direction: column;
+    height: auto;
+  }
+  .agenda-sidebar {
+    flex: none;
+  }
+  .agenda-main {
+    height: calc(100dvh - 300px);
+    min-height: 400px;
+  }
+}

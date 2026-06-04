@@ -21,11 +21,23 @@ import {
   PrinterIcon,
   FunnelIcon,
   KanbanIcon,
+  CalendarIcon,
 } from "@/components/icons";
 
 // Itens principais do menu (sem Usuários e Configurações)
 const NAV_ITEMS = [
-  { href: "/dashboard", icon: HomeIcon, label: "Dashboard", modulo: null },
+  {
+    href: "/dashboard",
+    icon: HomeIcon,
+    label: "Dashboard",
+    modulo: "dashboard",
+  },
+  {
+    href: "/dashboard/agenda",
+    icon: CalendarIcon,
+    label: "Agenda",
+    modulo: "controles",
+  },
   {
     href: "/dashboard/crm",
     icon: FunnelIcon,

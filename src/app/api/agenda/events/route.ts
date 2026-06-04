@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { fetchGoogleEvents, getStoredToken } from "@/lib/google-calendar";
 
 const TIPO_COLORS: Record<string, string> = {
   audiencias: "#7c3aed",
@@ -189,6 +190,29 @@ export async function GET(req: NextRequest) {
           });
         }
       }
+    }
+  }
+
+  // ── Google Calendar events ────────────────────────────────────────────────
+  const googleToken = await getStoredToken(session.id);
+  if (googleToken) {
+    const gcalEvents = await fetchGoogleEvents(session.id, startDate, endDate);
+    for (const g of gcalEvents) {
+      events.push({
+        id: g.id,
+        title: g.title,
+        start: g.start,
+        end: g.end,
+        allDay: g.allDay,
+        backgroundColor: "#4285F4",
+        borderColor: "transparent",
+        textColor: "#ffffff",
+        extendedProps: {
+          source: "google",
+          description: g.description,
+          href: g.htmlLink,
+        },
+      });
     }
   }
 

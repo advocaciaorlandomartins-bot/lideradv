@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -18,8 +18,14 @@ import "./agenda.css";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
+interface GoogleStatus {
+  connected: boolean;
+  configured: boolean;
+  email: string | null;
+}
+
 interface EventExtended {
-  source: "controle" | "lancamento" | "birthday";
+  source: "controle" | "lancamento" | "birthday" | "google";
   tipoLabel?: string;
   clienteNome?: string;
   clienteId?: string;
@@ -107,6 +113,7 @@ const LEGENDA = [
 
 export default function AgendaCalendar() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const calRef = useRef<FullCalendar>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -115,7 +122,26 @@ export default function AgendaCalendar() {
   const [showArchived, setShowArchived] = useState(false);
   const [activeShortcut, setActiveShortcut] = useState("mes");
   const [dayPopover, setDayPopover] = useState<DayPopover | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleMsg, setGoogleMsg] = useState<{
+    type: "ok" | "err";
+    text: string;
+  } | null>(null);
+
+  // Inicializa mensagem OAuth a partir dos query params (antes de qualquer effect)
+  const oauthConnected = searchParams.get("google_connected");
+  const oauthError = searchParams.get("google_error");
+  const OAUTH_MSGS: Record<string, string> = {
+    missing_code: "Código OAuth inválido.",
+    invalid_state: "Sessão inválida. Tente novamente.",
+    token_exchange: "Erro ao trocar o código. Tente novamente.",
+  };
+
+  // getApi — declarado antes dos effects que o usam
+  const getApi = useCallback((): CalendarApi | null => {
+    return calRef.current?.getApi() ?? null;
+  }, []);
 
   // Fecha popover ao clicar fora
   useEffect(() => {
@@ -131,14 +157,57 @@ export default function AgendaCalendar() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const getApi = useCallback((): CalendarApi | null => {
-    return calRef.current?.getApi() ?? null;
+  // Carrega status do Google Calendar + limpa query params OAuth
+  useEffect(() => {
+    fetch("/api/agenda/google/status")
+      .then((r) => r.json())
+      .then((data: GoogleStatus) => {
+        setGoogleStatus(data);
+        if (oauthConnected === "1") {
+          setGoogleStatus((s) => (s ? { ...s, connected: true } : s));
+          setGoogleMsg({
+            type: "ok",
+            text: "Google Calendar conectado com sucesso!",
+          });
+          router.replace("/dashboard/agenda");
+        } else if (oauthError) {
+          setGoogleMsg({
+            type: "err",
+            text: OAUTH_MSGS[oauthError] ?? "Erro ao conectar.",
+          });
+          router.replace("/dashboard/agenda");
+        }
+      })
+      .catch(() =>
+        setGoogleStatus({ connected: false, configured: false, email: null })
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-dismiss message
+  useEffect(() => {
+    if (!googleMsg) return;
+    const t = setTimeout(() => setGoogleMsg(null), 5000);
+    return () => clearTimeout(t);
+  }, [googleMsg]);
 
   // Atualiza eventos ao mudar filtro arquivados
   useEffect(() => {
     getApi()?.refetchEvents();
   }, [showArchived, getApi]);
+
+  async function handleGoogleDisconnect() {
+    setGoogleLoading(true);
+    try {
+      await fetch("/api/agenda/google/disconnect", { method: "POST" });
+      setGoogleStatus((s) => (s ? { ...s, connected: false, email: null } : s));
+      setGoogleMsg({ type: "ok", text: "Google Calendar desconectado." });
+      getApi()?.refetchEvents();
+    } finally {
+      setGoogleLoading(false);
+      setTimeout(() => setGoogleMsg(null), 4000);
+    }
+  }
 
   // ── Busca de eventos ────────────────────────────────────────────────────────
 
@@ -193,7 +262,6 @@ export default function AgendaCalendar() {
   // ── Clique em dia vazio → abre popover ──────────────────────────────────────
 
   function handleDateClick(info: DateClickArg) {
-    const rect = (info.jsEvent.target as HTMLElement).getBoundingClientRect();
     const x = Math.min(info.jsEvent.clientX + 8, window.innerWidth - 240);
     const y = Math.min(info.jsEvent.clientY + 8, window.innerHeight - 200);
     setSelectedDate(info.dateStr);
@@ -219,28 +287,29 @@ export default function AgendaCalendar() {
   }) {
     const props = arg.event.extendedProps as unknown as EventExtended;
     const icon =
-      props.source === "controle"
-        ? props.tipoLabel === "Audiência"
-          ? "⚖️"
-          : props.tipoLabel === "Prazo"
-            ? "⏰"
-            : props.tipoLabel === "Perícia"
-              ? "🔬"
-              : props.tipoLabel === "DCB"
-                ? "📋"
-                : props.tipoLabel === "Benefício"
-                  ? "✅"
-                  : props.tipoLabel === "Alvará"
-                    ? "📄"
-                    : "📌"
-        : props.source === "lancamento"
-          ? props.isVencido
-            ? "🔴"
-            : props.source === "lancamento" &&
-                (props as { tipo?: string }).tipo === "entrada"
-              ? "💰"
-              : "💸"
-          : "";
+      props.source === "google"
+        ? "📅"
+        : props.source === "controle"
+          ? props.tipoLabel === "Audiência"
+            ? "⚖️"
+            : props.tipoLabel === "Prazo"
+              ? "⏰"
+              : props.tipoLabel === "Perícia"
+                ? "🔬"
+                : props.tipoLabel === "DCB"
+                  ? "📋"
+                  : props.tipoLabel === "Benefício"
+                    ? "✅"
+                    : props.tipoLabel === "Alvará"
+                      ? "📄"
+                      : "📌"
+          : props.source === "lancamento"
+            ? props.isVencido
+              ? "🔴"
+              : (props as { tipo?: string }).tipo === "entrada"
+                ? "💰"
+                : "💸"
+            : "";
 
     return (
       <div className="fc-event-inner">
@@ -309,21 +378,102 @@ export default function AgendaCalendar() {
           Exibir concluídos
         </label>
 
+        {/* Google Calendar */}
+        <div className="rounded-xl border border-border bg-white p-3">
+          <p className="mb-2 font-body text-[11px] font-semibold uppercase tracking-wider text-muted">
+            Google Calendar
+          </p>
+
+          {googleMsg && (
+            <div
+              className={`mb-2 rounded-lg px-2.5 py-1.5 font-body text-xs font-semibold ${googleMsg.type === "ok" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}
+            >
+              {googleMsg.text}
+            </div>
+          )}
+
+          {googleStatus === null ? (
+            <p className="font-body text-xs text-muted">Verificando…</p>
+          ) : !googleStatus.configured ? (
+            <p className="font-body text-[11px] text-muted leading-relaxed">
+              Configure{" "}
+              <code className="rounded bg-slate-100 px-1 text-[10px]">
+                GOOGLE_CLIENT_ID
+              </code>{" "}
+              no{" "}
+              <code className="rounded bg-slate-100 px-1 text-[10px]">
+                .env.local
+              </code>{" "}
+              para ativar.
+            </p>
+          ) : googleStatus.connected ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <p className="font-body text-xs font-semibold text-emerald-700">
+                  Conectado
+                </p>
+              </div>
+              {googleStatus.email && (
+                <p className="truncate font-body text-[11px] text-muted">
+                  {googleStatus.email}
+                </p>
+              )}
+              <button
+                onClick={handleGoogleDisconnect}
+                disabled={googleLoading}
+                className="w-full rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 font-body text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+              >
+                {googleLoading ? "Desconectando…" : "Desconectar"}
+              </button>
+            </div>
+          ) : (
+            <a
+              href="/api/agenda/google/auth"
+              className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-body text-xs font-semibold text-fg shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+            >
+              <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 48 48">
+                <path
+                  fill="#EA4335"
+                  d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+                />
+              </svg>
+              Conectar Google Calendar
+            </a>
+          )}
+        </div>
+
         {/* Legenda */}
         <div>
           <p className="mb-2 font-body text-[11px] font-semibold uppercase tracking-wider text-muted">
             Legenda
           </p>
           <ul className="space-y-1.5">
-            {LEGENDA.map((l) => (
-              <li key={l.label} className="flex items-center gap-2">
-                <span
-                  className="h-3 w-3 flex-shrink-0 rounded-sm"
-                  style={{ backgroundColor: l.color }}
-                />
-                <span className="font-body text-xs text-muted">{l.label}</span>
-              </li>
-            ))}
+            {[...LEGENDA, { color: "#4285F4", label: "Google Calendar" }].map(
+              (l) => (
+                <li key={l.label} className="flex items-center gap-2">
+                  <span
+                    className="h-3 w-3 flex-shrink-0 rounded-sm"
+                    style={{ backgroundColor: l.color }}
+                  />
+                  <span className="font-body text-xs text-muted">
+                    {l.label}
+                  </span>
+                </li>
+              )
+            )}
           </ul>
         </div>
       </aside>

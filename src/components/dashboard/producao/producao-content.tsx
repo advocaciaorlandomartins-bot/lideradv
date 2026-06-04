@@ -509,49 +509,90 @@ function KanbanColumn({
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
-function StatsBar({ processos }: { processos: ProcessoProducao[] }) {
-  const stats = [
+function StatsBar({
+  processos,
+  activeFilter,
+  onFilter,
+}: {
+  processos: ProcessoProducao[];
+  activeFilter: EstagioProducao | null;
+  onFilter: (e: EstagioProducao) => void;
+}) {
+  const stats: {
+    label: string;
+    estagio: EstagioProducao;
+    value: number;
+    color: string;
+    activeColor: string;
+  }[] = [
     {
       label: "Análise",
+      estagio: "analise",
       value: processos.filter((p) => p.estagio_producao === "analise").length,
       color: "text-blue-600",
+      activeColor: "border-blue-400 bg-blue-50",
     },
     {
       label: "Produção",
+      estagio: "producao",
       value: processos.filter((p) => p.estagio_producao === "producao").length,
       color: "text-teal-600",
+      activeColor: "border-teal-400 bg-teal-50",
     },
     {
       label: "Administrativo",
+      estagio: "administrativo",
       value: processos.filter((p) => p.estagio_producao === "administrativo")
         .length,
       color: "text-orange-600",
+      activeColor: "border-orange-400 bg-orange-50",
     },
     {
       label: "Judicial",
+      estagio: "judicial",
       value: processos.filter((p) => p.estagio_producao === "judicial").length,
       color: "text-purple-600",
+      activeColor: "border-purple-400 bg-purple-50",
     },
     {
       label: "Arquivados",
+      estagio: "arquivado",
       value: processos.filter((p) => p.estagio_producao === "arquivado").length,
       color: "text-slate-500",
+      activeColor: "border-slate-400 bg-slate-50",
     },
   ];
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      {stats.map((s) => (
-        <div
-          key={s.label}
-          className="rounded-xl border border-border bg-white p-4 shadow-sm"
-        >
-          <p className="font-body text-xs text-muted">{s.label}</p>
-          <p className={`mt-1 font-heading text-2xl font-bold ${s.color}`}>
-            {s.value}
-          </p>
-        </div>
-      ))}
+      {stats.map((s) => {
+        const isActive = activeFilter === s.estagio;
+        return (
+          <button
+            key={s.label}
+            onClick={() => onFilter(s.estagio)}
+            className={`cursor-pointer rounded-xl border-2 p-4 shadow-sm text-left transition-all hover:shadow-md ${
+              isActive
+                ? s.activeColor
+                : "border-border bg-white hover:border-primary/40"
+            }`}
+          >
+            <p
+              className={`font-body text-xs font-semibold ${isActive ? "" : "text-muted"}`}
+            >
+              {s.label}
+            </p>
+            <p className={`mt-1 font-heading text-2xl font-bold ${s.color}`}>
+              {s.value}
+            </p>
+            {isActive && (
+              <p className="mt-1 font-body text-[10px] font-semibold text-muted">
+                clique para limpar
+              </p>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -564,10 +605,23 @@ export default function ProducaoContent({
   processos: ProcessoProducao[];
 }) {
   const [showArquivados, setShowArquivados] = useState(false);
+  const [filterEstagio, setFilterEstagio] = useState<EstagioProducao | null>(
+    null
+  );
 
-  const estagiosVisiveis = showArquivados
-    ? ESTAGIOS_PRODUCAO
-    : ESTAGIOS_PRODUCAO.filter((e) => e !== "arquivado");
+  function handleStatsFilter(estagio: EstagioProducao) {
+    if (estagio === "arquivado") {
+      setShowArquivados(true);
+    }
+    setFilterEstagio((prev) => (prev === estagio ? null : estagio));
+  }
+
+  const estagiosVisiveis = (() => {
+    if (filterEstagio) return [filterEstagio];
+    return showArquivados
+      ? ESTAGIOS_PRODUCAO
+      : ESTAGIOS_PRODUCAO.filter((e) => e !== "arquivado");
+  })();
 
   const byEstagio = Object.fromEntries(
     ESTAGIOS_PRODUCAO.map((e) => [
@@ -578,7 +632,11 @@ export default function ProducaoContent({
 
   return (
     <div className="space-y-5">
-      <StatsBar processos={processos} />
+      <StatsBar
+        processos={processos}
+        activeFilter={filterEstagio}
+        onFilter={handleStatsFilter}
+      />
 
       <div className="flex items-center justify-between">
         <Link
@@ -587,17 +645,30 @@ export default function ProducaoContent({
         >
           + Novo Processo
         </Link>
-        <button
-          onClick={() => setShowArquivados((v) => !v)}
-          className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-sm transition-colors ${
-            showArquivados
-              ? "border-primary bg-primary/5 text-primary"
-              : "border-border text-muted hover:border-primary hover:text-primary"
-          }`}
-        >
-          <ArchiveBoxIcon className="h-4 w-4" />
-          {showArquivados ? "Ocultar Arquivados" : "Mostrar Arquivados"}
-        </button>
+        <div className="flex items-center gap-2">
+          {filterEstagio && (
+            <button
+              onClick={() => setFilterEstagio(null)}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 font-body text-sm text-primary transition-colors hover:bg-primary/10"
+            >
+              Limpar filtro
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setShowArquivados((v) => !v);
+              if (filterEstagio === "arquivado") setFilterEstagio(null);
+            }}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-sm transition-colors ${
+              showArquivados
+                ? "border-primary bg-primary/5 text-primary"
+                : "border-border text-muted hover:border-primary hover:text-primary"
+            }`}
+          >
+            <ArchiveBoxIcon className="h-4 w-4" />
+            {showArquivados ? "Ocultar Arquivados" : "Mostrar Arquivados"}
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto pb-4">

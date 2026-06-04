@@ -31,6 +31,13 @@ export interface ControleDetalhe {
   dias_restantes: number;
 }
 
+export interface AniversarianteHoje {
+  id: string;
+  name: string;
+  phone: string | null;
+  birth_date: string;
+}
+
 const TIPO_LABELS: Record<string, string> = {
   audiencias: "Audiência",
   prazos: "Prazo",
@@ -47,6 +54,7 @@ export async function getDashboardData() {
     clientesDevedoresRows,
     lancamentosVencidosRows,
     proximosControlesRows,
+    aniversariantesRows,
   ] = await Promise.all([
     // Clientes com lançamentos de entrada vencidos (agrupados)
     sql`
@@ -106,6 +114,22 @@ export async function getDashboardData() {
         ORDER BY c.data_evento ASC
         LIMIT 20
       `,
+
+    // Todos os clientes PF com data de aniversário (para filtro por mês no dashboard)
+    sql`
+        SELECT
+          id::text,
+          name,
+          phone,
+          TO_CHAR(birth_date, 'YYYY-MM-DD') AS birth_date
+        FROM clients
+        WHERE type = 'PF'
+          AND birth_date IS NOT NULL
+        ORDER BY
+          EXTRACT(MONTH FROM birth_date),
+          EXTRACT(DAY FROM birth_date),
+          name
+      `,
   ]);
 
   const clientesDevedores: ClienteDevedor[] = clientesDevedoresRows.map(
@@ -144,5 +168,19 @@ export async function getDashboardData() {
     })
   );
 
-  return { clientesDevedores, lancamentosVencidos, proximosControles };
+  const aniversariantesTodos: AniversarianteHoje[] = aniversariantesRows.map(
+    (r) => ({
+      id: String(r.id),
+      name: String(r.name),
+      phone: r.phone ? String(r.phone) : null,
+      birth_date: String(r.birth_date),
+    })
+  );
+
+  return {
+    clientesDevedores,
+    lancamentosVencidos,
+    proximosControles,
+    aniversariantesTodos,
+  };
 }

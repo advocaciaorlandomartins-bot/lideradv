@@ -2,13 +2,14 @@ import Link from "next/link";
 import { getGerenciadorData } from "@/lib/gerenciador-db";
 import { getDashboardData } from "@/lib/dashboard-db";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import MiniCalendar from "@/components/dashboard/mini-calendar";
+import DashboardAniversariosCard from "@/components/dashboard/dashboard-aniversarios-card";
 import {
   UsersIcon,
   FolderOpenIcon,
   BanknotesIcon,
   CalendarIcon,
-  ClockIcon,
   AlertIcon,
   UserPlusIcon,
   PlusIcon,
@@ -129,18 +130,62 @@ function BarChart({
   );
 }
 
+// ── Sem acesso — bloco neutro ─────────────────────────────────────────────────
+
+function SemAcesso({ modulo }: { modulo: string }) {
+  return (
+    <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-border bg-slate-50">
+      <p className="font-body text-xs text-muted">
+        Sem permissão de acesso a {modulo}.
+      </p>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
-  const [data, dashData, session] = await Promise.all([
-    getGerenciadorData(),
-    getDashboardData(),
-    getSession(),
+  const session = await getSession();
+  if (!session) return null;
+
+  // ── Flags de permissão ────────────────────────────────────────────────────
+  const perm = {
+    clientes: hasPermission(session, "clientes", "ver"),
+    processos: hasPermission(session, "processos", "ver"),
+    financeiro: hasPermission(session, "financeiro", "ver"),
+    controles: hasPermission(session, "controles", "ver"),
+    crm: hasPermission(session, "crm", "ver"),
+    producao: hasPermission(session, "producao", "ver"),
+    gerenciador: hasPermission(session, "gerenciador", "ver"),
+    relatorios: hasPermission(session, "relatorios", "ver"),
+    modelos: hasPermission(session, "modelos", "ver"),
+    dashboard_crm: hasPermission(session, "dashboard_crm", "ver"),
+    dashboard_controles: hasPermission(session, "dashboard_controles", "ver"),
+    dashboard_financeiro: hasPermission(session, "dashboard_financeiro", "ver"),
+  };
+
+  // ── Busca condicional de dados ────────────────────────────────────────────
+  const showCrm = perm.crm && perm.dashboard_crm;
+  const showControles = perm.controles && perm.dashboard_controles;
+  const showFinanceiro = perm.financeiro && perm.dashboard_financeiro;
+
+  const needsGerData =
+    showFinanceiro || showCrm || perm.clientes || perm.processos;
+  const needsDashData = showControles || showFinanceiro || perm.clientes;
+
+  const [gerData, dashData] = await Promise.all([
+    needsGerData ? getGerenciadorData() : Promise.resolve(null),
+    needsDashData ? getDashboardData() : Promise.resolve(null),
   ]);
 
-  const { kpis, counts, receitasPorMes, crm } = data;
-  const { clientesDevedores, lancamentosVencidos, proximosControles } =
-    dashData;
+  const kpis = gerData?.kpis;
+  const counts = gerData?.counts;
+  const receitasPorMes = gerData?.receitasPorMes ?? [];
+  const crm = gerData?.crm;
+  const clientesDevedores = dashData?.clientesDevedores ?? [];
+  const lancamentosVencidos = dashData?.lancamentosVencidos ?? [];
+  const proximosControles = dashData?.proximosControles ?? [];
+  const aniversariantesTodos = dashData?.aniversariantesTodos ?? [];
 
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
@@ -149,46 +194,49 @@ export default async function DashboardPage() {
     year: "numeric",
   });
 
-  // No eventDays needed — MiniCalendar receives full events and filters internally
-
   const chartData = receitasPorMes.slice(-6);
+  const totalVencido = clientesDevedores.reduce(
+    (s, c) => s + c.total_vencido,
+    0
+  );
 
+  const nomeUsuario = session.login
+    ? session.login.charAt(0).toUpperCase() + session.login.slice(1)
+    : "Usuário";
+
+  // ── Ações rápidas — apenas módulos com acesso ─────────────────────────────
   const quickActions = [
     {
       label: "Novo cliente",
       icon: UserPlusIcon,
       href: "/dashboard/clientes/novo",
+      show: hasPermission(session, "clientes", "criar"),
     },
     {
       label: "Novo processo",
       icon: PlusIcon,
       href: "/dashboard/processos/novo",
+      show: hasPermission(session, "processos", "criar"),
     },
     {
       label: "Novo lead",
       icon: FunnelIcon,
       href: "/dashboard/crm/leads/novo",
+      show: hasPermission(session, "crm", "criar"),
     },
     {
       label: "Financeiro",
       icon: BanknotesIcon,
       href: "/dashboard/financeiro/novo",
+      show: perm.financeiro,
     },
     {
       label: "Gerenciador",
       icon: ChartBarIcon,
       href: "/dashboard/gerenciador",
+      show: perm.gerenciador,
     },
-  ];
-
-  const nomeUsuario = session?.login
-    ? session.login.charAt(0).toUpperCase() + session.login.slice(1)
-    : "Orlando";
-
-  const totalVencido = clientesDevedores.reduce(
-    (s, c) => s + c.total_vencido,
-    0
-  );
+  ].filter((a) => a.show);
 
   return (
     <div className="space-y-6">
@@ -196,696 +244,742 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-3xl font-semibold text-fg">
-            {getGreeting()}, Dr.&nbsp;{nomeUsuario}.
+            {getGreeting()}, {nomeUsuario}.
           </h1>
           <p className="mt-1 font-body text-sm text-muted capitalize">
             {today}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {quickActions.map((a) => {
-            const Icon = a.icon;
-            return (
-              <Link
-                key={a.label}
-                href={a.href}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 font-body text-xs font-semibold text-fg shadow-sm transition-colors hover:border-primary hover:text-primary"
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {a.label}
-              </Link>
-            );
-          })}
-        </div>
+        {quickActions.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {quickActions.map((a) => {
+              const Icon = a.icon;
+              return (
+                <Link
+                  key={a.label}
+                  href={a.href}
+                  className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 font-body text-xs font-semibold text-fg shadow-sm transition-colors hover:border-primary hover:text-primary"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {a.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* ── KPI cards (todos clicáveis) ──────────────────────────────────── */}
+      {/* ── KPI cards ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
-        {/* Clientes */}
-        <Link
-          href="/dashboard/clientes"
-          className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-        >
-          <div className="flex items-start justify-between">
-            <div className="rounded-lg bg-blue-50 p-2.5 transition-colors group-hover:bg-blue-100">
-              <UsersIcon className="h-5 w-5 text-blue-600" />
-            </div>
-            <span className="font-body text-xs font-semibold text-emerald-600">
-              Ativos
-            </span>
-          </div>
-          <p className="mt-3 font-heading text-3xl font-bold text-fg">
-            {counts.totalClientes}
-          </p>
-          <p className="mt-0.5 font-body text-xs font-semibold text-muted">
-            Clientes
-          </p>
-          <p className="mt-2 font-body text-xs text-blue-600 group-hover:underline">
-            {counts.totalColaboradores} colaborador
-            {counts.totalColaboradores !== 1 ? "es" : ""} →
-          </p>
-        </Link>
-
-        {/* Processos */}
-        <Link
-          href="/dashboard/processos"
-          className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-        >
-          <div className="flex items-start justify-between">
-            <div className="rounded-lg bg-amber-50 p-2.5 transition-colors group-hover:bg-amber-100">
-              <FolderOpenIcon className="h-5 w-5 text-amber-600" />
-            </div>
-            <span className="font-body text-xs font-semibold text-amber-600">
-              Ativos
-            </span>
-          </div>
-          <p className="mt-3 font-heading text-3xl font-bold text-fg">
-            {counts.totalProcessos}
-          </p>
-          <p className="mt-0.5 font-body text-xs font-semibold text-muted">
-            Processos
-          </p>
-          <p
-            className={`mt-2 font-body text-xs group-hover:underline ${counts.controlesProximos > 0 ? "text-red-500 font-semibold" : "text-muted"}`}
+        {perm.clientes && counts && (
+          <Link
+            href="/dashboard/clientes"
+            className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
           >
-            {counts.controlesProximos} controle
-            {counts.controlesProximos !== 1 ? "s" : ""} esta semana →
-          </p>
-        </Link>
-
-        {/* Receita do mês */}
-        <Link
-          href="/dashboard/financeiro"
-          className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-        >
-          <div className="flex items-start justify-between">
-            <div className="rounded-lg bg-emerald-50 p-2.5 transition-colors group-hover:bg-emerald-100">
-              <BanknotesIcon className="h-5 w-5 text-emerald-600" />
-            </div>
-            <span
-              className={`font-body text-xs font-semibold ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
-            >
-              {kpis.saldoMes >= 0 ? "▲" : "▼"} Saldo
-            </span>
-          </div>
-          <p className="mt-3 font-heading text-2xl font-bold text-fg">
-            {fmt(kpis.recebidoMes)}
-          </p>
-          <p className="mt-0.5 font-body text-xs font-semibold text-muted">
-            Receita do mês
-          </p>
-          <p
-            className={`mt-2 font-body text-xs font-semibold group-hover:underline ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
-          >
-            Saldo: {fmt(kpis.saldoMes)} →
-          </p>
-        </Link>
-
-        {/* Controles / Alertas */}
-        <Link
-          href="/dashboard/controles"
-          className={`group rounded-xl border bg-white p-5 shadow-sm transition-all hover:shadow-md ${counts.controlesProximos > 0 ? "border-red-200 hover:border-red-300" : "border-border hover:border-primary/30"}`}
-        >
-          <div className="flex items-start justify-between">
-            <div
-              className={`rounded-lg p-2.5 ${counts.controlesProximos > 0 ? "bg-red-50 group-hover:bg-red-100" : "bg-slate-50 group-hover:bg-slate-100"} transition-colors`}
-            >
-              {counts.controlesProximos > 0 ? (
-                <AlertIcon className="h-5 w-5 text-red-500" />
-              ) : (
-                <CalendarIcon className="h-5 w-5 text-slate-400" />
-              )}
-            </div>
-            {counts.vencidosCount > 0 && (
-              <span className="rounded-full bg-red-100 px-2 py-0.5 font-body text-xs font-bold text-red-600">
-                {counts.vencidosCount} vencido
-                {counts.vencidosCount !== 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-          <p
-            className={`mt-3 font-heading text-3xl font-bold ${counts.controlesProximos > 0 ? "text-red-600" : "text-fg"}`}
-          >
-            {counts.controlesProximos}
-          </p>
-          <p className="mt-0.5 font-body text-xs font-semibold text-muted">
-            Prazos esta semana
-          </p>
-          <p
-            className={`mt-2 font-body text-xs group-hover:underline ${kpis.vencidosValor > 0 ? "text-red-500 font-semibold" : "text-muted"}`}
-          >
-            {kpis.vencidosValor > 0
-              ? `${fmt(kpis.vencidosValor)} em atraso →`
-              : "Sem pendências →"}
-          </p>
-        </Link>
-        {/* CRM */}
-        <Link
-          href="/dashboard/crm"
-          className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-        >
-          <div className="flex items-start justify-between">
-            <div className="rounded-lg bg-indigo-50 p-2.5 transition-colors group-hover:bg-indigo-100">
-              <FunnelIcon className="h-5 w-5 text-indigo-600" />
-            </div>
-            {crm.tarefasVencidas > 0 && (
-              <span className="rounded-full bg-orange-100 px-2 py-0.5 font-body text-xs font-bold text-orange-700">
-                {crm.tarefasVencidas} task
-              </span>
-            )}
-          </div>
-          <p className="mt-3 font-heading text-3xl font-bold text-fg">
-            {crm.leadsAtivos}
-          </p>
-          <p className="mt-0.5 font-body text-xs font-semibold text-muted">
-            Leads no funil
-          </p>
-          <p className="mt-2 font-body text-xs text-indigo-600 group-hover:underline">
-            {crm.leadsFechados} convertido{crm.leadsFechados !== 1 ? "s" : ""} ·{" "}
-            {crm.taxaConversao.toFixed(0)}% conversão →
-          </p>
-        </Link>
-      </div>
-
-      {/* ── CRM — Funil resumido + Tarefas ──────────────────────────────── */}
-      {(crm.leadsAtivos > 0 || crm.tarefasProximas.length > 0) && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* Mini funil por estágio */}
-          <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <h2 className="font-heading text-base font-semibold text-fg">
-                  Funil de Vendas CRM
-                </h2>
-                <p className="mt-0.5 font-body text-xs text-muted">
-                  {crm.leadsTotal} lead{crm.leadsTotal !== 1 ? "s" : ""} total
-                </p>
+            <div className="flex items-start justify-between">
+              <div className="rounded-lg bg-blue-50 p-2.5 transition-colors group-hover:bg-blue-100">
+                <UsersIcon className="h-5 w-5 text-blue-600" />
               </div>
-              <Link
-                href="/dashboard/crm"
-                className="font-body text-xs font-semibold text-primary hover:underline"
-              >
-                Ver CRM →
-              </Link>
+              <span className="font-body text-xs font-semibold text-emerald-600">
+                Ativos
+              </span>
             </div>
-            <div className="space-y-3 p-5">
-              {crm.leadsTotal === 0 ? (
-                <p className="py-4 text-center font-body text-sm text-muted">
-                  Nenhum lead cadastrado ainda.
-                </p>
-              ) : (
-                (() => {
-                  const ESTAGIO_COLORS: Record<
-                    string,
-                    { bar: string; dot: string; text: string }
-                  > = {
-                    novo_contato: {
-                      bar: "bg-blue-400",
-                      dot: "bg-blue-400",
-                      text: "text-blue-700",
-                    },
-                    consulta_agendada: {
-                      bar: "bg-yellow-400",
-                      dot: "bg-yellow-400",
-                      text: "text-yellow-700",
-                    },
-                    em_analise: {
-                      bar: "bg-orange-400",
-                      dot: "bg-orange-400",
-                      text: "text-orange-700",
-                    },
-                    proposta_enviada: {
-                      bar: "bg-purple-400",
-                      dot: "bg-purple-400",
-                      text: "text-purple-700",
-                    },
-                    fechado: {
-                      bar: "bg-emerald-400",
-                      dot: "bg-emerald-400",
-                      text: "text-emerald-700",
-                    },
-                    perdido: {
-                      bar: "bg-slate-300",
-                      dot: "bg-slate-400",
-                      text: "text-slate-500",
-                    },
-                  };
-                  return crm.leadsPorEstagio.map((e) => {
-                    const pct =
-                      crm.leadsTotal > 0 ? (e.count / crm.leadsTotal) * 100 : 0;
-                    const clr = ESTAGIO_COLORS[e.estagio] ?? {
-                      bar: "bg-primary",
-                      dot: "bg-primary",
-                      text: "text-primary",
-                    };
-                    return (
-                      <div key={e.estagio}>
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 font-body text-xs text-fg">
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${clr.dot}`}
-                            />
-                            {e.label}
-                          </span>
-                          <span
-                            className={`font-body text-xs font-semibold ${clr.text}`}
-                          >
-                            {e.count}{" "}
-                            <span className="font-normal text-muted">
-                              ({pct.toFixed(0)}%)
-                            </span>
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className={`h-1.5 rounded-full ${clr.bar}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  });
-                })()
-              )}
-            </div>
-            <div className="border-t border-border px-5 py-3">
-              <Link
-                href="/dashboard/crm/leads/novo"
-                className="font-body text-xs font-semibold text-primary hover:underline"
-              >
-                + Novo lead →
-              </Link>
-            </div>
-          </div>
+            <p className="mt-3 font-heading text-3xl font-bold text-fg">
+              {counts.totalClientes}
+            </p>
+            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+              Clientes
+            </p>
+            <p className="mt-2 font-body text-xs text-blue-600 group-hover:underline">
+              {counts.totalColaboradores} colaborador
+              {counts.totalColaboradores !== 1 ? "es" : ""} →
+            </p>
+          </Link>
+        )}
 
-          {/* Tarefas CRM próximas/vencidas */}
-          <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <h2 className="font-heading text-base font-semibold text-fg">
-                  Tarefas CRM
-                </h2>
-                <p className="mt-0.5 font-body text-xs text-muted">
-                  Próximas e vencidas
-                </p>
+        {perm.processos && counts && (
+          <Link
+            href="/dashboard/processos"
+            className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between">
+              <div className="rounded-lg bg-amber-50 p-2.5 transition-colors group-hover:bg-amber-100">
+                <FolderOpenIcon className="h-5 w-5 text-amber-600" />
               </div>
-              {crm.tarefasVencidas > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 px-3 py-1 font-body text-xs font-semibold text-orange-700">
-                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                  {crm.tarefasVencidas} vencida
-                  {crm.tarefasVencidas !== 1 ? "s" : ""}
+              <span className="font-body text-xs font-semibold text-amber-600">
+                Ativos
+              </span>
+            </div>
+            <p className="mt-3 font-heading text-3xl font-bold text-fg">
+              {counts.totalProcessos}
+            </p>
+            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+              Processos
+            </p>
+            <p
+              className={`mt-2 font-body text-xs group-hover:underline ${counts.controlesProximos > 0 ? "text-red-500 font-semibold" : "text-muted"}`}
+            >
+              {counts.controlesProximos} controle
+              {counts.controlesProximos !== 1 ? "s" : ""} esta semana →
+            </p>
+          </Link>
+        )}
+
+        {perm.financeiro && kpis && (
+          <Link
+            href="/dashboard/financeiro"
+            className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between">
+              <div className="rounded-lg bg-emerald-50 p-2.5 transition-colors group-hover:bg-emerald-100">
+                <BanknotesIcon className="h-5 w-5 text-emerald-600" />
+              </div>
+              <span
+                className={`font-body text-xs font-semibold ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
+              >
+                {kpis.saldoMes >= 0 ? "▲" : "▼"} Saldo
+              </span>
+            </div>
+            <p className="mt-3 font-heading text-2xl font-bold text-fg">
+              {fmt(kpis.recebidoMes)}
+            </p>
+            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+              Receita do mês
+            </p>
+            <p
+              className={`mt-2 font-body text-xs font-semibold group-hover:underline ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
+            >
+              Saldo: {fmt(kpis.saldoMes)} →
+            </p>
+          </Link>
+        )}
+
+        {perm.controles && counts && (
+          <Link
+            href="/dashboard/controles"
+            className={`group rounded-xl border bg-white p-5 shadow-sm transition-all hover:shadow-md ${counts.controlesProximos > 0 ? "border-red-200 hover:border-red-300" : "border-border hover:border-primary/30"}`}
+          >
+            <div className="flex items-start justify-between">
+              <div
+                className={`rounded-lg p-2.5 ${counts.controlesProximos > 0 ? "bg-red-50 group-hover:bg-red-100" : "bg-slate-50 group-hover:bg-slate-100"} transition-colors`}
+              >
+                {counts.controlesProximos > 0 ? (
+                  <AlertIcon className="h-5 w-5 text-red-500" />
+                ) : (
+                  <CalendarIcon className="h-5 w-5 text-slate-400" />
+                )}
+              </div>
+              {kpis && kpis.vencidosCount > 0 && (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 font-body text-xs font-bold text-red-600">
+                  {kpis.vencidosCount} vencido
+                  {kpis.vencidosCount !== 1 ? "s" : ""}
                 </span>
               )}
             </div>
+            <p
+              className={`mt-3 font-heading text-3xl font-bold ${counts.controlesProximos > 0 ? "text-red-600" : "text-fg"}`}
+            >
+              {counts.controlesProximos}
+            </p>
+            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+              Prazos esta semana
+            </p>
+            <p
+              className={`mt-2 font-body text-xs group-hover:underline ${kpis && kpis.vencidosValor > 0 ? "text-red-500 font-semibold" : "text-muted"}`}
+            >
+              {kpis && kpis.vencidosValor > 0
+                ? `${fmt(kpis.vencidosValor)} em atraso →`
+                : "Sem pendências →"}
+            </p>
+          </Link>
+        )}
 
-            {crm.tarefasProximas.length === 0 ? (
+        {showCrm && crm && (
+          <Link
+            href="/dashboard/crm"
+            className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between">
+              <div className="rounded-lg bg-indigo-50 p-2.5 transition-colors group-hover:bg-indigo-100">
+                <FunnelIcon className="h-5 w-5 text-indigo-600" />
+              </div>
+              {crm.tarefasVencidas > 0 && (
+                <span className="rounded-full bg-orange-100 px-2 py-0.5 font-body text-xs font-bold text-orange-700">
+                  {crm.tarefasVencidas} task
+                </span>
+              )}
+            </div>
+            <p className="mt-3 font-heading text-3xl font-bold text-fg">
+              {crm.leadsAtivos}
+            </p>
+            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+              Leads no funil
+            </p>
+            <p className="mt-2 font-body text-xs text-indigo-600 group-hover:underline">
+              {crm.leadsFechados} convertido{crm.leadsFechados !== 1 ? "s" : ""}{" "}
+              · {crm.taxaConversao.toFixed(0)}% conversão →
+            </p>
+          </Link>
+        )}
+      </div>
+
+      {/* ── Aniversariantes — card com filtro por mês ────────────────────── */}
+      {perm.clientes && aniversariantesTodos.length > 0 && (
+        <DashboardAniversariosCard clientes={aniversariantesTodos} />
+      )}
+
+      {/* ── CRM — Funil + Tarefas (somente se tiver acesso ao CRM) ──────── */}
+      {showCrm &&
+        crm &&
+        (crm.leadsAtivos > 0 || crm.tarefasProximas.length > 0) && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Mini funil por estágio */}
+            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div>
+                  <h2 className="font-heading text-base font-semibold text-fg">
+                    Funil de Vendas CRM
+                  </h2>
+                  <p className="mt-0.5 font-body text-xs text-muted">
+                    {crm.leadsTotal} lead{crm.leadsTotal !== 1 ? "s" : ""} total
+                  </p>
+                </div>
+                <Link
+                  href="/dashboard/crm"
+                  className="font-body text-xs font-semibold text-primary hover:underline"
+                >
+                  Ver CRM →
+                </Link>
+              </div>
+              <div className="space-y-3 p-5">
+                {crm.leadsTotal === 0 ? (
+                  <p className="py-4 text-center font-body text-sm text-muted">
+                    Nenhum lead cadastrado ainda.
+                  </p>
+                ) : (
+                  (() => {
+                    const ESTAGIO_COLORS: Record<
+                      string,
+                      { bar: string; dot: string; text: string }
+                    > = {
+                      novo_contato: {
+                        bar: "bg-blue-400",
+                        dot: "bg-blue-400",
+                        text: "text-blue-700",
+                      },
+                      consulta_agendada: {
+                        bar: "bg-yellow-400",
+                        dot: "bg-yellow-400",
+                        text: "text-yellow-700",
+                      },
+                      em_analise: {
+                        bar: "bg-orange-400",
+                        dot: "bg-orange-400",
+                        text: "text-orange-700",
+                      },
+                      proposta_enviada: {
+                        bar: "bg-purple-400",
+                        dot: "bg-purple-400",
+                        text: "text-purple-700",
+                      },
+                      fechado: {
+                        bar: "bg-emerald-400",
+                        dot: "bg-emerald-400",
+                        text: "text-emerald-700",
+                      },
+                      perdido: {
+                        bar: "bg-slate-300",
+                        dot: "bg-slate-400",
+                        text: "text-slate-500",
+                      },
+                    };
+                    return crm.leadsPorEstagio.map((e) => {
+                      const pct =
+                        crm.leadsTotal > 0
+                          ? (e.count / crm.leadsTotal) * 100
+                          : 0;
+                      const clr = ESTAGIO_COLORS[e.estagio] ?? {
+                        bar: "bg-primary",
+                        dot: "bg-primary",
+                        text: "text-primary",
+                      };
+                      return (
+                        <div key={e.estagio}>
+                          <div className="mb-1 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 font-body text-xs text-fg">
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${clr.dot}`}
+                              />
+                              {e.label}
+                            </span>
+                            <span
+                              className={`font-body text-xs font-semibold ${clr.text}`}
+                            >
+                              {e.count}{" "}
+                              <span className="font-normal text-muted">
+                                ({pct.toFixed(0)}%)
+                              </span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className={`h-1.5 rounded-full ${clr.bar}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()
+                )}
+              </div>
+              <div className="border-t border-border px-5 py-3">
+                <Link
+                  href="/dashboard/crm/leads/novo"
+                  className="font-body text-xs font-semibold text-primary hover:underline"
+                >
+                  + Novo lead →
+                </Link>
+              </div>
+            </div>
+
+            {/* Tarefas CRM */}
+            <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div>
+                  <h2 className="font-heading text-base font-semibold text-fg">
+                    Tarefas CRM
+                  </h2>
+                  <p className="mt-0.5 font-body text-xs text-muted">
+                    Próximas e vencidas
+                  </p>
+                </div>
+                {crm.tarefasVencidas > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 px-3 py-1 font-body text-xs font-semibold text-orange-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                    {crm.tarefasVencidas} vencida
+                    {crm.tarefasVencidas !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+              {crm.tarefasProximas.length === 0 ? (
+                <div className="px-5 py-10 text-center">
+                  <PhoneIcon className="mx-auto mb-2 h-8 w-8 text-slate-200" />
+                  <p className="font-body text-sm text-muted">
+                    Sem tarefas pendentes.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {crm.tarefasProximas.slice(0, 6).map((t) => {
+                    const vencida = t.dias_restantes < 0;
+                    const hoje = t.dias_restantes === 0;
+                    return (
+                      <Link
+                        key={t.id}
+                        href={`/dashboard/crm/leads/${t.lead_id}`}
+                        className={`flex items-center gap-3 px-5 py-3 transition-colors hover:bg-primary/5 ${vencida ? "bg-red-50/50" : ""}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-body text-sm font-medium text-fg">
+                            {t.titulo}
+                          </p>
+                          <p className="font-body text-xs text-muted">
+                            {t.lead_nome}
+                          </p>
+                        </div>
+                        <span
+                          className={`flex-shrink-0 rounded-full px-2.5 py-0.5 font-body text-xs font-bold ${
+                            vencida
+                              ? "bg-red-100 text-red-700"
+                              : hoje
+                                ? "bg-orange-100 text-orange-700"
+                                : t.dias_restantes <= 3
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {vencida
+                            ? `${Math.abs(t.dias_restantes)}d atraso`
+                            : hoje
+                              ? "Hoje"
+                              : `${t.dias_restantes}d`}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="border-t border-border px-5 py-3">
+                <Link
+                  href="/dashboard/crm"
+                  className="font-body text-xs font-semibold text-primary hover:underline"
+                >
+                  Ver CRM completo →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* ── Prazos + Calendário (somente se tiver acesso a controles) ────── */}
+      {showControles ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+          <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm lg:col-span-3">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="font-heading text-base font-semibold text-fg">
+                  Próximos Prazos e Controles
+                </h2>
+                <p className="mt-0.5 font-body text-xs text-muted">
+                  Próximos 14 dias
+                </p>
+              </div>
+              {counts && counts.controlesProximos > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1 font-body text-xs font-semibold text-red-600">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  {counts.controlesProximos} esta semana
+                </span>
+              )}
+            </div>
+            {proximosControles.length === 0 ? (
               <div className="px-5 py-10 text-center">
-                <PhoneIcon className="mx-auto mb-2 h-8 w-8 text-slate-200" />
+                <CalendarIcon className="mx-auto mb-2 h-8 w-8 text-slate-200" />
                 <p className="font-body text-sm text-muted">
-                  Sem tarefas pendentes.
+                  Nenhum controle nos próximos 14 dias.
                 </p>
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {crm.tarefasProximas.slice(0, 6).map((t) => {
-                  const vencida = t.dias_restantes < 0;
-                  const hoje = t.dias_restantes === 0;
+                {proximosControles.map((c) => {
+                  const urg = urgencyBadge(c.dias_restantes);
+                  const tipoCls =
+                    TIPO_COLORS[c.tipo] ?? "bg-slate-100 text-slate-600";
                   return (
                     <Link
-                      key={t.id}
-                      href={`/dashboard/crm/leads/${t.lead_id}`}
-                      className={`flex items-center gap-3 px-5 py-3 transition-colors hover:bg-primary/5 ${vencida ? "bg-red-50/50" : ""}`}
+                      key={c.id}
+                      href={`/dashboard/controles/${c.id}`}
+                      className="flex items-center gap-4 px-5 py-3 transition-colors hover:bg-primary/5 cursor-pointer"
                     >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-body text-sm font-medium text-fg">
-                          {t.titulo}
-                        </p>
-                        <p className="font-body text-xs text-muted">
-                          {t.lead_nome}
+                      <div className="w-12 flex-shrink-0 text-center">
+                        <span
+                          className={`mb-1 inline-block h-1.5 w-1.5 rounded-full ${urg.dotCls}`}
+                        />
+                        <p className="font-body text-xs font-semibold text-muted">
+                          {fmtDateShort(c.data_evento)}
                         </p>
                       </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`inline-block rounded px-2 py-0.5 font-body text-[11px] font-semibold ${tipoCls}`}
+                          >
+                            {c.tipo_label}
+                          </span>
+                          {c.processo_numero && (
+                            <span className="font-body text-[11px] text-muted">
+                              Proc.&nbsp;{c.processo_numero}
+                            </span>
+                          )}
+                        </div>
+                        <p className="truncate font-body text-sm text-fg">
+                          {c.descricao}
+                        </p>
+                        {c.cliente_nome && (
+                          <p className="font-body text-xs font-semibold text-primary">
+                            {c.cliente_nome}
+                          </p>
+                        )}
+                      </div>
                       <span
-                        className={`flex-shrink-0 rounded-full px-2.5 py-0.5 font-body text-xs font-bold ${
-                          vencida
-                            ? "bg-red-100 text-red-700"
-                            : hoje
-                              ? "bg-orange-100 text-orange-700"
-                              : t.dias_restantes <= 3
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-blue-100 text-blue-700"
-                        }`}
+                        className={`flex-shrink-0 rounded-full px-2.5 py-0.5 font-body text-xs font-bold ${urg.cls}`}
                       >
-                        {vencida
-                          ? `${Math.abs(t.dias_restantes)}d atraso`
-                          : hoje
-                            ? "Hoje"
-                            : `${t.dias_restantes}d`}
+                        {urg.label}
                       </span>
                     </Link>
                   );
                 })}
               </div>
             )}
-
             <div className="border-t border-border px-5 py-3">
               <Link
-                href="/dashboard/crm"
+                href="/dashboard/controles"
                 className="font-body text-xs font-semibold text-primary hover:underline"
               >
-                Ver CRM completo →
+                Ver todos os controles →
               </Link>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* ── Prazos + Calendário ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {/* Tabela de próximos controles — cada linha é clicável */}
-        <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm lg:col-span-3">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
-              <h2 className="font-heading text-base font-semibold text-fg">
-                Próximos Prazos e Controles
-              </h2>
-              <p className="mt-0.5 font-body text-xs text-muted">
-                Próximos 14 dias
-              </p>
-            </div>
-            {counts.controlesProximos > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1 font-body text-xs font-semibold text-red-600">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                {counts.controlesProximos} esta semana
-              </span>
-            )}
-          </div>
+          <div className="flex flex-col gap-4 lg:col-span-2">
+            <MiniCalendar events={proximosControles} />
 
-          {proximosControles.length === 0 ? (
-            <div className="px-5 py-10 text-center">
-              <CalendarIcon className="mx-auto mb-2 h-8 w-8 text-slate-200" />
-              <p className="font-body text-sm text-muted">
-                Nenhum controle nos próximos 14 dias.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {proximosControles.map((c) => {
-                const urg = urgencyBadge(c.dias_restantes);
-                const tipoCls =
-                  TIPO_COLORS[c.tipo] ?? "bg-slate-100 text-slate-600";
-                const href = `/dashboard/controles/${c.id}`;
-                return (
-                  <Link
-                    key={c.id}
-                    href={href}
-                    className="flex items-center gap-4 px-5 py-3 transition-colors hover:bg-primary/5 cursor-pointer"
-                  >
-                    {/* Data */}
-                    <div className="w-12 flex-shrink-0 text-center">
-                      <span
-                        className={`mb-1 inline-block h-1.5 w-1.5 rounded-full ${urg.dotCls}`}
-                      />
-                      <p className="font-body text-xs font-semibold text-muted">
-                        {fmtDateShort(c.data_evento)}
-                      </p>
-                    </div>
-
-                    {/* Info */}
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
-                        <span
-                          className={`inline-block rounded px-2 py-0.5 font-body text-[11px] font-semibold ${tipoCls}`}
-                        >
-                          {c.tipo_label}
-                        </span>
-                        {c.processo_numero && (
-                          <span className="font-body text-[11px] text-muted">
-                            Proc.&nbsp;{c.processo_numero}
-                          </span>
-                        )}
-                      </div>
-                      <p className="truncate font-body text-sm text-fg">
-                        {c.descricao}
-                      </p>
-                      {c.cliente_nome && (
-                        <p className="font-body text-xs font-semibold text-primary">
-                          {c.cliente_nome}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Badge urgência */}
-                    <span
-                      className={`flex-shrink-0 rounded-full px-2.5 py-0.5 font-body text-xs font-bold ${urg.cls}`}
+            {/* Resumo financeiro — só aparece se tiver acesso */}
+            {showFinanceiro && kpis ? (
+              <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+                <h2 className="mb-4 font-heading text-sm font-semibold text-fg">
+                  Resumo Financeiro
+                </h2>
+                <div className="space-y-1">
+                  {[
+                    {
+                      label: "Recebido no mês",
+                      value: kpis.recebidoMes,
+                      cls: "text-emerald-600",
+                      href: "/dashboard/financeiro?tipo=entrada&status=pago",
+                    },
+                    {
+                      label: "Pago no mês",
+                      value: kpis.pagoMes,
+                      cls: "text-red-500",
+                      href: "/dashboard/financeiro?tipo=saida&status=pago",
+                    },
+                    {
+                      label: "A receber",
+                      value: kpis.aReceber,
+                      cls: "text-amber-600",
+                      href: "/dashboard/financeiro?tipo=entrada&status=pendente",
+                    },
+                    {
+                      label: "A pagar",
+                      value: kpis.aPagar,
+                      cls: "text-orange-600",
+                      href: "/dashboard/financeiro?tipo=saida&status=pendente",
+                    },
+                  ].map(({ label, value, cls, href }) => (
+                    <Link
+                      key={label}
+                      href={href}
+                      className="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-primary/5"
                     >
-                      {urg.label}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="border-t border-border px-5 py-3">
-            <Link
-              href="/dashboard/controles"
-              className="font-body text-xs font-semibold text-primary hover:underline"
-            >
-              Ver todos os controles →
-            </Link>
-          </div>
-        </div>
-
-        {/* Calendário + Resumo Financeiro */}
-        <div className="flex flex-col gap-4 lg:col-span-2">
-          <MiniCalendar events={proximosControles} />
-
-          {/* Resumo financeiro — linhas clicáveis */}
-          <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
-            <h2 className="mb-4 font-heading text-sm font-semibold text-fg">
-              Resumo Financeiro
-            </h2>
-            <div className="space-y-1">
-              {[
-                {
-                  label: "Recebido no mês",
-                  value: kpis.recebidoMes,
-                  cls: "text-emerald-600",
-                  href: "/dashboard/financeiro?tipo=entrada&status=pago",
-                },
-                {
-                  label: "Pago no mês",
-                  value: kpis.pagoMes,
-                  cls: "text-red-500",
-                  href: "/dashboard/financeiro?tipo=saida&status=pago",
-                },
-                {
-                  label: "A receber",
-                  value: kpis.aReceber,
-                  cls: "text-amber-600",
-                  href: "/dashboard/financeiro?tipo=entrada&status=pendente",
-                },
-                {
-                  label: "A pagar",
-                  value: kpis.aPagar,
-                  cls: "text-orange-600",
-                  href: "/dashboard/financeiro?tipo=saida&status=pendente",
-                },
-              ].map(({ label, value, cls, href }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  className="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors hover:bg-primary/5"
-                >
-                  <span className="font-body text-xs text-muted">{label}</span>
-                  <span className={`font-body text-sm font-bold ${cls}`}>
-                    {fmt(value)}
-                  </span>
-                </Link>
-              ))}
-              <div className="border-t border-border pt-2.5">
-                <div className="flex items-center justify-between px-2">
-                  <span className="font-body text-sm font-semibold text-fg">
-                    Saldo do mês
-                  </span>
-                  <span
-                    className={`font-body text-base font-bold ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-600"}`}
-                  >
-                    {fmt(kpis.saldoMes)}
-                  </span>
+                      <span className="font-body text-xs text-muted">
+                        {label}
+                      </span>
+                      <span className={`font-body text-sm font-bold ${cls}`}>
+                        {fmt(value)}
+                      </span>
+                    </Link>
+                  ))}
+                  <div className="border-t border-border pt-2.5">
+                    <div className="flex items-center justify-between px-2">
+                      <span className="font-body text-sm font-semibold text-fg">
+                        Saldo do mês
+                      </span>
+                      <span
+                        className={`font-body text-base font-bold ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                      >
+                        {fmt(kpis.saldoMes)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
+                {kpis.vencidosCount > 0 && (
+                  <Link
+                    href="/dashboard/financeiro?status=vencido"
+                    className="mt-3 block rounded-lg border border-red-100 bg-red-50 px-3 py-2 transition-colors hover:bg-red-100"
+                  >
+                    <p className="font-body text-xs font-semibold text-red-700">
+                      ⚠ {kpis.vencidosCount} lançamento
+                      {kpis.vencidosCount !== 1 ? "s" : ""} vencido
+                      {kpis.vencidosCount !== 1 ? "s" : ""} —{" "}
+                      {fmt(kpis.vencidosValor)}
+                    </p>
+                  </Link>
+                )}
+                <Link
+                  href="/dashboard/financeiro"
+                  className="mt-3 block font-body text-xs font-semibold text-primary hover:underline"
+                >
+                  Ver financeiro completo →
+                </Link>
               </div>
-            </div>
-
-            {kpis.vencidosCount > 0 && (
-              <Link
-                href="/dashboard/financeiro?status=vencido"
-                className="mt-3 block rounded-lg border border-red-100 bg-red-50 px-3 py-2 transition-colors hover:bg-red-100"
-              >
-                <p className="font-body text-xs font-semibold text-red-700">
-                  ⚠ {kpis.vencidosCount} lançamento
-                  {kpis.vencidosCount !== 1 ? "s" : ""} vencido
-                  {kpis.vencidosCount !== 1 ? "s" : ""} —{" "}
-                  {fmt(kpis.vencidosValor)}
-                </p>
-              </Link>
+            ) : (
+              <SemAcesso modulo="Financeiro" />
             )}
-
-            <Link
-              href="/dashboard/financeiro"
-              className="mt-3 block font-body text-xs font-semibold text-primary hover:underline"
-            >
-              Ver financeiro completo →
-            </Link>
           </div>
         </div>
-      </div>
-
-      {/* ── Gráfico + Clientes em Débito ─────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {/* Gráfico Receitas × Despesas */}
-        <div className="rounded-xl border border-border bg-white p-5 shadow-sm lg:col-span-3">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="font-heading text-base font-semibold text-fg">
-                Receitas × Despesas
-              </h2>
-              <p className="font-body text-xs text-muted">Últimos 6 meses</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5 font-body text-xs text-muted">
-                <span className="h-2.5 w-2.5 rounded-sm bg-emerald-400" />
-                Receitas
-              </span>
-              <span className="flex items-center gap-1.5 font-body text-xs text-muted">
-                <span className="h-2.5 w-2.5 rounded-sm bg-red-400" />
-                Despesas
-              </span>
-            </div>
-          </div>
-          {chartData.every((d) => d.receitas === 0 && d.despesas === 0) ? (
-            <div className="flex h-40 items-center justify-center">
-              <p className="font-body text-sm text-muted">
-                Sem dados financeiros ainda.
-              </p>
-            </div>
-          ) : (
-            <BarChart data={chartData} />
-          )}
-          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
+      ) : showFinanceiro && kpis ? (
+        /* Se não tem controles mas tem financeiro, mostra só o financeiro */
+        <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+          <h2 className="mb-4 font-heading text-sm font-semibold text-fg">
+            Resumo Financeiro
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               {
-                label: "Recebido no ano",
-                value: kpis.recebidoAno,
+                label: "Recebido no mês",
+                value: kpis.recebidoMes,
                 cls: "text-emerald-600",
               },
               {
-                label: "Pago no ano",
-                value: kpis.pagoAno,
+                label: "Pago no mês",
+                value: kpis.pagoMes,
                 cls: "text-red-500",
               },
               {
-                label: "Saldo anual",
-                value: kpis.recebidoAno - kpis.pagoAno,
-                cls:
-                  kpis.recebidoAno - kpis.pagoAno >= 0
-                    ? "text-emerald-600"
-                    : "text-red-600",
+                label: "A receber",
+                value: kpis.aReceber,
+                cls: "text-amber-600",
+              },
+              {
+                label: "Saldo do mês",
+                value: kpis.saldoMes,
+                cls: kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-600",
               },
             ].map(({ label, value, cls }) => (
-              <div key={label} className="text-center">
+              <div key={label} className="rounded-lg bg-slate-50 p-3">
                 <p className="font-body text-xs text-muted">{label}</p>
-                <p className={`mt-0.5 font-heading text-base font-bold ${cls}`}>
+                <p className={`mt-1 font-heading text-lg font-bold ${cls}`}>
                   {fmt(value)}
                 </p>
               </div>
             ))}
           </div>
         </div>
+      ) : null}
 
-        {/* Clientes em Débito — cada linha leva ao financeiro do cliente */}
-        <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
-              <h2 className="font-heading text-base font-semibold text-fg">
-                Clientes em Débito
-              </h2>
-              <p className="mt-0.5 font-body text-xs text-muted">
-                Honorários em atraso
-              </p>
+      {/* ── Gráfico + Clientes em Débito (somente se tiver acesso financeiro) */}
+      {showFinanceiro && kpis && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+          <div className="rounded-xl border border-border bg-white p-5 shadow-sm lg:col-span-3">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="font-heading text-base font-semibold text-fg">
+                  Receitas × Despesas
+                </h2>
+                <p className="font-body text-xs text-muted">Últimos 6 meses</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1.5 font-body text-xs text-muted">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-emerald-400" />{" "}
+                  Receitas
+                </span>
+                <span className="flex items-center gap-1.5 font-body text-xs text-muted">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-red-400" />{" "}
+                  Despesas
+                </span>
+              </div>
             </div>
-            {clientesDevedores.length > 0 && (
-              <span className="rounded-full bg-red-100 px-2.5 py-0.5 font-body text-xs font-bold text-red-600">
-                {clientesDevedores.length}
-              </span>
+            {chartData.every((d) => d.receitas === 0 && d.despesas === 0) ? (
+              <div className="flex h-40 items-center justify-center">
+                <p className="font-body text-sm text-muted">
+                  Sem dados financeiros ainda.
+                </p>
+              </div>
+            ) : (
+              <BarChart data={chartData} />
             )}
-          </div>
-
-          {clientesDevedores.length === 0 ? (
-            <div className="px-5 py-10 text-center">
-              <BanknotesIcon className="mx-auto mb-2 h-8 w-8 text-slate-200" />
-              <p className="font-body text-sm text-muted">
-                Sem honorários em atraso.
-              </p>
-              <p className="mt-1 font-body text-xs font-semibold text-emerald-600">
-                Tudo em dia!
-              </p>
-            </div>
-          ) : (
-            <div className="max-h-64 overflow-y-auto divide-y divide-border">
-              {clientesDevedores.map((c) => (
-                <Link
-                  key={c.client_id}
-                  href={`/dashboard/clientes/${c.client_id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-red-50 cursor-pointer group"
-                >
-                  {/* Avatar inicial */}
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-100 font-heading text-xs font-bold text-red-600 group-hover:bg-red-200 transition-colors">
-                    {c.client_name.charAt(0).toUpperCase()}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-body text-sm font-semibold text-fg group-hover:text-primary transition-colors">
-                      {c.client_name}
-                    </p>
-                    <p className="font-body text-xs text-muted">
-                      {c.count_vencidos} lançamento
-                      {c.count_vencidos !== 1 ? "s" : ""} · {c.max_dias_atraso}d
-                      atraso
-                    </p>
-                  </div>
-
-                  <div className="flex-shrink-0 text-right">
-                    <p className="font-body text-sm font-bold text-red-600">
-                      {fmt(c.total_vencido)}
-                    </p>
-                    <p className="font-body text-[10px] text-muted group-hover:text-primary transition-colors">
-                      ver →
-                    </p>
-                  </div>
-                </Link>
+            <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
+              {[
+                {
+                  label: "Recebido no ano",
+                  value: kpis.recebidoAno,
+                  cls: "text-emerald-600",
+                },
+                {
+                  label: "Pago no ano",
+                  value: kpis.pagoAno,
+                  cls: "text-red-500",
+                },
+                {
+                  label: "Saldo anual",
+                  value: kpis.recebidoAno - kpis.pagoAno,
+                  cls:
+                    kpis.recebidoAno - kpis.pagoAno >= 0
+                      ? "text-emerald-600"
+                      : "text-red-600",
+                },
+              ].map(({ label, value, cls }) => (
+                <div key={label} className="text-center">
+                  <p className="font-body text-xs text-muted">{label}</p>
+                  <p
+                    className={`mt-0.5 font-heading text-base font-bold ${cls}`}
+                  >
+                    {fmt(value)}
+                  </p>
+                </div>
               ))}
             </div>
-          )}
+          </div>
 
-          <div className="flex items-center justify-between border-t border-border px-5 py-3">
-            <Link
-              href="/dashboard/financeiro"
-              className="font-body text-xs font-semibold text-primary hover:underline"
-            >
-              Ver financeiro →
-            </Link>
-            {clientesDevedores.length > 0 && (
-              <span className="font-body text-xs font-semibold text-red-600">
-                Total: {fmt(totalVencido)}
-              </span>
+          <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm lg:col-span-2">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="font-heading text-base font-semibold text-fg">
+                  Clientes em Débito
+                </h2>
+                <p className="mt-0.5 font-body text-xs text-muted">
+                  Honorários em atraso
+                </p>
+              </div>
+              {clientesDevedores.length > 0 && (
+                <span className="rounded-full bg-red-100 px-2.5 py-0.5 font-body text-xs font-bold text-red-600">
+                  {clientesDevedores.length}
+                </span>
+              )}
+            </div>
+            {clientesDevedores.length === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <BanknotesIcon className="mx-auto mb-2 h-8 w-8 text-slate-200" />
+                <p className="font-body text-sm text-muted">
+                  Sem honorários em atraso.
+                </p>
+                <p className="mt-1 font-body text-xs font-semibold text-emerald-600">
+                  Tudo em dia!
+                </p>
+              </div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto divide-y divide-border">
+                {clientesDevedores.map((c) => (
+                  <Link
+                    key={c.client_id}
+                    href={`/dashboard/clientes/${c.client_id}`}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-red-50 cursor-pointer group"
+                  >
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-100 font-heading text-xs font-bold text-red-600 group-hover:bg-red-200 transition-colors">
+                      {c.client_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-body text-sm font-semibold text-fg group-hover:text-primary transition-colors">
+                        {c.client_name}
+                      </p>
+                      <p className="font-body text-xs text-muted">
+                        {c.count_vencidos} lançamento
+                        {c.count_vencidos !== 1 ? "s" : ""} ·{" "}
+                        {c.max_dias_atraso}d atraso
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="font-body text-sm font-bold text-red-600">
+                        {fmt(c.total_vencido)}
+                      </p>
+                      <p className="font-body text-[10px] text-muted group-hover:text-primary transition-colors">
+                        ver →
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             )}
+            <div className="flex items-center justify-between border-t border-border px-5 py-3">
+              <Link
+                href="/dashboard/financeiro"
+                className="font-body text-xs font-semibold text-primary hover:underline"
+              >
+                Ver financeiro →
+              </Link>
+              {clientesDevedores.length > 0 && (
+                <span className="font-body text-xs font-semibold text-red-600">
+                  Total: {fmt(totalVencido)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ── Vencidos detalhados (se houver) ─────────────────────────────── */}
-      {lancamentosVencidos.length > 0 && (
+      {/* ── Lançamentos Vencidos (somente se tiver acesso financeiro) ────── */}
+      {showFinanceiro && lancamentosVencidos.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-red-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-5 py-4">
             <div>
@@ -900,7 +994,6 @@ export default async function DashboardPage() {
               {lancamentosVencidos.length}
             </span>
           </div>
-
           <div className="divide-y divide-border">
             {lancamentosVencidos.slice(0, 10).map((v) => {
               const href = v.client_id
@@ -933,7 +1026,6 @@ export default async function DashboardPage() {
               );
             })}
           </div>
-
           {lancamentosVencidos.length > 10 && (
             <div className="border-t border-border px-5 py-3">
               <Link
@@ -946,67 +1038,6 @@ export default async function DashboardPage() {
           )}
         </div>
       )}
-
-      {/* ── Acesso rápido às seções ──────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {[
-          {
-            label: "Clientes",
-            icon: UsersIcon,
-            href: "/dashboard/clientes",
-            bg: "bg-blue-50",
-            ic: "text-blue-600",
-          },
-          {
-            label: "Processos",
-            icon: FolderOpenIcon,
-            href: "/dashboard/processos",
-            bg: "bg-amber-50",
-            ic: "text-amber-600",
-          },
-          {
-            label: "Financeiro",
-            icon: BanknotesIcon,
-            href: "/dashboard/financeiro",
-            bg: "bg-emerald-50",
-            ic: "text-emerald-600",
-          },
-          {
-            label: "Controles",
-            icon: ClockIcon,
-            href: "/dashboard/controles",
-            bg: "bg-violet-50",
-            ic: "text-violet-600",
-          },
-          {
-            label: "Relatórios",
-            icon: ChartBarIcon,
-            href: "/dashboard/relatorios",
-            bg: "bg-cyan-50",
-            ic: "text-cyan-600",
-          },
-          {
-            label: "Gerenciador",
-            icon: AlertIcon,
-            href: "/dashboard/gerenciador",
-            bg: "bg-red-50",
-            ic: "text-red-500",
-          },
-        ].map(({ label, icon: Icon, href, bg, ic }) => (
-          <Link
-            key={label}
-            href={href}
-            className="flex flex-col items-center gap-2 rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary hover:shadow-md"
-          >
-            <div className={`rounded-lg p-2.5 ${bg}`}>
-              <Icon className={`h-5 w-5 ${ic}`} />
-            </div>
-            <span className="font-body text-xs font-semibold text-fg">
-              {label}
-            </span>
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

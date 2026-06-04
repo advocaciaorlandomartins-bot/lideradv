@@ -380,9 +380,16 @@ function MoveEstagioButton({ lead }: { lead: Lead }) {
 
 // ── Leads List Tab ─────────────────────────────────────────────────────────────
 
-function LeadsTab({ leads }: { leads: Lead[] }) {
+function LeadsTab({
+  leads,
+  filter,
+  onFilterChange,
+}: {
+  leads: Lead[];
+  filter: EstagioFilter;
+  onFilterChange: (f: EstagioFilter) => void;
+}) {
   const router = useRouter();
-  const [filter, setFilter] = useState<EstagioFilter>("todos");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
@@ -409,7 +416,7 @@ function LeadsTab({ leads }: { leads: Lead[] }) {
   );
 
   function handleFilterChange(f: EstagioFilter) {
-    setFilter(f);
+    onFilterChange(f);
     setPage(1);
   }
 
@@ -673,7 +680,15 @@ function LeadsTab({ leads }: { leads: Lead[] }) {
 
 // ── Stats Cards ────────────────────────────────────────────────────────────────
 
-function StatsCards({ leads }: { leads: Lead[] }) {
+function StatsCards({
+  leads,
+  activeCard,
+  onCard,
+}: {
+  leads: Lead[];
+  activeCard: string | null;
+  onCard: (card: string) => void;
+}) {
   const total = leads.length;
   const ativos = leads.filter(
     (l) => l.estagio !== "fechado" && l.estagio !== "perdido"
@@ -685,29 +700,64 @@ function StatsCards({ leads }: { leads: Lead[] }) {
   );
 
   const stats = [
-    { label: "Total de Leads", value: total, color: "text-fg" },
-    { label: "Em Andamento", value: ativos, color: "text-blue-600" },
-    { label: "Convertidos", value: fechados, color: "text-green-600" },
     {
+      key: "total",
+      label: "Total de Leads",
+      value: total,
+      color: "text-fg",
+      activeColor: "border-primary bg-primary/5",
+    },
+    {
+      key: "ativos",
+      label: "Em Andamento",
+      value: ativos,
+      color: "text-blue-600",
+      activeColor: "border-blue-400 bg-blue-50",
+    },
+    {
+      key: "convertidos",
+      label: "Convertidos",
+      value: fechados,
+      color: "text-emerald-600",
+      activeColor: "border-emerald-400 bg-emerald-50",
+    },
+    {
+      key: "tarefas",
       label: "Tarefas Pendentes",
       value: tarefasPendentes,
       color: "text-orange-600",
+      activeColor: "border-orange-400 bg-orange-50",
     },
   ];
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {stats.map((s) => (
-        <div
-          key={s.label}
-          className="rounded-xl border border-border bg-white p-4 shadow-sm"
-        >
-          <p className="font-body text-xs text-muted">{s.label}</p>
-          <p className={`mt-1 font-heading text-2xl font-bold ${s.color}`}>
-            {s.value}
-          </p>
-        </div>
-      ))}
+      {stats.map((s) => {
+        const isActive = activeCard === s.key;
+        return (
+          <button
+            key={s.key}
+            onClick={() => onCard(s.key)}
+            className={`cursor-pointer rounded-xl border-2 p-4 shadow-sm text-left transition-all hover:shadow-md ${
+              isActive
+                ? s.activeColor
+                : "border-border bg-white hover:border-primary/40"
+            }`}
+          >
+            <p className="font-body text-xs font-semibold text-muted">
+              {s.label}
+            </p>
+            <p className={`mt-1 font-heading text-2xl font-bold ${s.color}`}>
+              {s.value}
+            </p>
+            {isActive && (
+              <p className="mt-1 font-body text-[10px] text-muted">
+                clique para limpar
+              </p>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -716,10 +766,44 @@ function StatsCards({ leads }: { leads: Lead[] }) {
 
 export default function CrmContent({ leads }: { leads: Lead[] }) {
   const [tab, setTab] = useState<TabKey>("funil");
+  const [leadsFilter, setLeadsFilter] = useState<EstagioFilter>("todos");
+  const [activeCard, setActiveCard] = useState<string | null>(null);
+
+  function handleCard(card: string) {
+    // toggle
+    if (activeCard === card) {
+      setActiveCard(null);
+      setLeadsFilter("todos");
+      return;
+    }
+    setActiveCard(card);
+
+    if (card === "total") {
+      setTab("leads");
+      setLeadsFilter("todos");
+    } else if (card === "ativos") {
+      setTab("leads");
+      setLeadsFilter("todos");
+    } else if (card === "convertidos") {
+      setTab("leads");
+      setLeadsFilter("fechado");
+    } else if (card === "tarefas") {
+      // Tarefas ficam visíveis no funil (cada card mostra badge de tasks)
+      setTab("funil");
+    }
+  }
+
+  function handleLeadsFilter(f: EstagioFilter) {
+    setLeadsFilter(f);
+    // ao mudar manualmente o filtro, desmarca o card ativo
+    if (f === "todos") setActiveCard(null);
+    else if (f === "fechado") setActiveCard("convertidos");
+    else setActiveCard(null);
+  }
 
   return (
     <div className="space-y-5">
-      <StatsCards leads={leads} />
+      <StatsCards leads={leads} activeCard={activeCard} onCard={handleCard} />
 
       {/* Tab cards */}
       <div className="flex gap-2">
@@ -750,7 +834,13 @@ export default function CrmContent({ leads }: { leads: Lead[] }) {
       </div>
 
       {tab === "funil" && <FunilTab leads={leads} />}
-      {tab === "leads" && <LeadsTab leads={leads} />}
+      {tab === "leads" && (
+        <LeadsTab
+          leads={leads}
+          filter={leadsFilter}
+          onFilterChange={handleLeadsFilter}
+        />
+      )}
     </div>
   );
 }

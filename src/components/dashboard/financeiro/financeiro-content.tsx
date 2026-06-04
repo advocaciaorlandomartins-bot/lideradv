@@ -32,7 +32,6 @@ import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
 } from "@/components/icons";
-import FinanceiroLancamentoModal from "./financeiro-lancamento-modal";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -528,9 +527,6 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   );
   const [search, setSearch] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("mes");
-  const [showModal, setShowModal] = useState(false);
-  const [modalTipo, setModalTipo] = useState<"entrada" | "saida">("entrada");
-  const [showNovoDropdown, setShowNovoDropdown] = useState(false);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [pagePendentes, setPagePendentes] = useState(1);
@@ -848,114 +844,95 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         </div>
       </div>
 
-      {/* ── Type filter + novo lançamento ────────────────────────────────── */}
+      {/* ── Barra de controles unificada ────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Tipo filter pills */}
-        <div className="flex gap-1 rounded-xl border border-border bg-white p-1 shadow-sm">
-          {(["todos", "entrada", "saida"] as const).map((t) => {
-            const labels: Record<string, string> = {
-              todos: "Todos",
-              entrada: "Receitas",
-              saida: "Despesas",
-            };
-            const active = tipoFilter === t;
-            return (
-              <button
-                key={t}
-                onClick={() => handleTipoFilter(t)}
-                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 font-body text-sm font-semibold transition-colors ${
-                  active
-                    ? t === "entrada"
-                      ? "bg-emerald-600 text-white"
-                      : t === "saida"
-                        ? "bg-red-600 text-white"
-                        : "bg-primary text-white"
-                    : "text-muted hover:text-fg"
-                }`}
-              >
-                {t === "entrada" && <TrendUpIcon className="h-3.5 w-3.5" />}
-                {t === "saida" && <TrendDownIcon className="h-3.5 w-3.5" />}
-                {labels[t]}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Quick actions */}
-        {canEdit && (
-          <div className="flex items-center gap-2">
+        {/* Abas de situação + filtro de tipo */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Tab situação */}
+          <div className="flex gap-1 rounded-xl border border-border bg-white p-1 shadow-sm">
             <button
-              onClick={() => {
-                setModalTipo("entrada");
-                setShowModal(true);
-              }}
-              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
+              onClick={() => setMainTab("pendentes")}
+              className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 font-body text-sm font-semibold transition-colors duration-150 ${mainTab === "pendentes" ? "bg-primary text-white shadow-sm" : "text-muted hover:text-fg"}`}
             >
-              <PlusIcon className="h-4 w-4" />+ Receita
+              <BanknotesIcon className="h-4 w-4" />
+              Pendentes
+              {pendentesNaoVencidos.length > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "pendentes" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}
+                >
+                  {pendentesNaoVencidos.length}
+                </span>
+              )}
             </button>
             <button
-              onClick={() => {
-                setModalTipo("saida");
-                setShowModal(true);
-              }}
-              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"
+              onClick={() => setMainTab("concluidas")}
+              className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 font-body text-sm font-semibold transition-colors duration-150 ${mainTab === "concluidas" ? "bg-primary text-white shadow-sm" : "text-muted hover:text-fg"}`}
             >
-              <PlusIcon className="h-4 w-4" />+ Despesa
+              <TrendUpIcon className="h-4 w-4" />
+              Concluídas
+              {concluidas.length > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "concluidas" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}
+                >
+                  {concluidas.length}
+                </span>
+              )}
             </button>
             <button
-              onClick={exportCSV}
-              title="Exportar CSV"
-              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted transition-colors hover:border-primary/40 hover:text-primary"
+              onClick={() => setMainTab("atrasados")}
+              className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 font-body text-sm font-semibold transition-colors duration-150 ${mainTab === "atrasados" ? "bg-red-600 text-white shadow-sm" : pendentesVencidos.length > 0 ? "text-red-600 hover:text-red-700" : "text-muted hover:text-fg"}`}
             >
-              <ArrowDownTrayIcon className="h-4 w-4" />
+              <TrendDownIcon className="h-4 w-4" />
+              Vencidos
+              {pendentesVencidos.length > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "atrasados" ? "bg-white/20 text-white" : "bg-red-100 text-red-700"}`}
+                >
+                  {pendentesVencidos.length}
+                </span>
+              )}
             </button>
           </div>
-        )}
-      </div>
 
-      {/* ── Tab selector ──────────────────────────────────────────────────── */}
-      <div className="flex gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm">
+          {/* Tipo filter */}
+          <div className="flex gap-1 rounded-xl border border-border bg-white p-1 shadow-sm">
+            {(["todos", "entrada", "saida"] as const).map((t) => {
+              const labels: Record<string, string> = {
+                todos: "Todos",
+                entrada: "Receitas",
+                saida: "Despesas",
+              };
+              const active = tipoFilter === t;
+              return (
+                <button
+                  key={t}
+                  onClick={() => handleTipoFilter(t)}
+                  className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 font-body text-sm font-semibold transition-colors ${
+                    active
+                      ? t === "entrada"
+                        ? "bg-emerald-600 text-white"
+                        : t === "saida"
+                          ? "bg-red-600 text-white"
+                          : "bg-primary text-white"
+                      : "text-muted hover:text-fg"
+                  }`}
+                >
+                  {t === "entrada" && <TrendUpIcon className="h-3.5 w-3.5" />}
+                  {t === "saida" && <TrendDownIcon className="h-3.5 w-3.5" />}
+                  {labels[t]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Exportar */}
         <button
-          onClick={() => setMainTab("pendentes")}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 cursor-pointer ${mainTab === "pendentes" ? "bg-primary text-white shadow-sm" : "text-muted hover:text-fg"}`}
+          onClick={exportCSV}
+          title="Exportar CSV"
+          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted transition-colors hover:border-primary/40 hover:text-primary"
         >
-          <BanknotesIcon className="h-4 w-4" />
-          Pendentes
-          {pendentesNaoVencidos.length > 0 && (
-            <span
-              className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "pendentes" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}
-            >
-              {pendentesNaoVencidos.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setMainTab("concluidas")}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 cursor-pointer ${mainTab === "concluidas" ? "bg-primary text-white shadow-sm" : "text-muted hover:text-fg"}`}
-        >
-          <TrendUpIcon className="h-4 w-4" />
-          Concluídas
-          {concluidas.length > 0 && (
-            <span
-              className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "concluidas" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}
-            >
-              {concluidas.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setMainTab("atrasados")}
-          className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 cursor-pointer ${mainTab === "atrasados" ? "bg-red-600 text-white shadow-sm" : pendentesVencidos.length > 0 ? "text-red-600 hover:text-red-700" : "text-muted hover:text-fg"}`}
-        >
-          <TrendDownIcon className="h-4 w-4" />
-          Vencidos
-          {pendentesVencidos.length > 0 && (
-            <span
-              className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "atrasados" ? "bg-white/20 text-white" : "bg-red-100 text-red-700"}`}
-            >
-              {pendentesVencidos.length}
-            </span>
-          )}
+          <ArrowDownTrayIcon className="h-4 w-4" />
         </button>
       </div>
 
@@ -1260,18 +1237,6 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           </ResponsiveContainer>
         </div>
       </div>
-
-      {/* ── Modal de lançamento rápido ────────────────────────────────────── */}
-      <FinanceiroLancamentoModal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        defaultTipo={modalTipo}
-        onSuccess={() => {
-          setShowModal(false);
-          // router.refresh() is called inside RowActions; here we just close
-          window.location.reload();
-        }}
-      />
     </div>
   );
 }

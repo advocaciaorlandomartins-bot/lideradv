@@ -256,8 +256,12 @@ export function encryptPdf(pdfBytes: Uint8Array, password: string): Buffer {
     "ascii"
   );
 
-  // /Encrypt object is appended right after the (modified) original PDF
-  const encObjOffset = buf.length;
+  // Ensure we start on a new line (pdf-lib doesn't add trailing newline after %%EOF)
+  const prefix =
+    buf[buf.length - 1] === 0x0a ? Buffer.alloc(0) : Buffer.from("\n");
+
+  // /Encrypt object offset = end of original buf + optional prefix newline
+  const encObjOffset = buf.length + prefix.length;
 
   // xref section starts after the /Encrypt object
   const xrefOffset = encObjOffset + encObj.length;
@@ -279,5 +283,5 @@ export function encryptPdf(pdfBytes: Uint8Array, password: string): Buffer {
     "ascii"
   );
 
-  return Buffer.concat([buf, encObj, xrefSection, newTrailer]);
+  return Buffer.concat([buf, prefix, encObj, xrefSection, newTrailer]);
 }

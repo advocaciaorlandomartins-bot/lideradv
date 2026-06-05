@@ -30,7 +30,7 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: "leads", label: "Lista de Leads", icon: ClipboardListIcon },
 ];
 
-type EstagioFilter = Estagio | "todos";
+type EstagioFilter = Estagio | "todos" | "ativos";
 
 const PAGE_SIZE = 15;
 
@@ -396,7 +396,16 @@ function LeadsTab({
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return leads.filter((l) => {
-      if (filter !== "todos" && l.estagio !== filter) return false;
+      if (filter === "ativos") {
+        if (
+          !ESTAGIOS_ATIVOS.includes(
+            l.estagio as (typeof ESTAGIOS_ATIVOS)[number]
+          )
+        )
+          return false;
+      } else if (filter !== "todos" && l.estagio !== filter) {
+        return false;
+      }
       if (
         q &&
         !l.nome.toLowerCase().includes(q) &&
@@ -449,11 +458,30 @@ function LeadsTab({
       {/* Header */}
       <div className="border-b border-border bg-slate-50 px-5 py-4">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="font-heading text-base font-semibold text-fg">
-            {filter === "todos"
-              ? "Todos os Leads"
-              : ESTAGIO_META[filter as Estagio].label}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-heading text-base font-semibold text-fg">
+              Leads
+            </h2>
+            {filter !== "todos" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-0.5 font-body text-xs font-semibold text-white">
+                {filter === "ativos"
+                  ? "Em Andamento"
+                  : ESTAGIO_META[filter as Estagio].label}
+                <button
+                  onClick={() => handleFilterChange("todos")}
+                  className="ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white/20 transition-colors hover:bg-white/40"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            <span className="font-body text-sm text-muted">
+              {filtered.length} {filtered.length === 1 ? "lead" : "leads"}
+              {filter !== "todos" && leads.length !== filtered.length && (
+                <span className="text-muted"> de {leads.length}</span>
+              )}
+            </span>
+          </div>
           <div className="relative ml-auto">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
@@ -776,7 +804,7 @@ export default function CrmContent({ leads }: { leads: Lead[] }) {
       setLeadsFilter("todos");
     } else if (card === "ativos") {
       setTab("leads");
-      setLeadsFilter("todos");
+      setLeadsFilter("ativos");
     } else if (card === "convertidos") {
       setTab("leads");
       setLeadsFilter("fechado");
@@ -788,9 +816,9 @@ export default function CrmContent({ leads }: { leads: Lead[] }) {
 
   function handleLeadsFilter(f: EstagioFilter) {
     setLeadsFilter(f);
-    // ao mudar manualmente o filtro, desmarca o card ativo
     if (f === "todos") setActiveCard(null);
     else if (f === "fechado") setActiveCard("convertidos");
+    else if (f === "ativos") setActiveCard("ativos");
     else setActiveCard(null);
   }
 

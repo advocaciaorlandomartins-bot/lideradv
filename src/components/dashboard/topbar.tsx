@@ -23,6 +23,7 @@ import {
   KanbanIcon,
   CalendarIcon,
   PuzzleIcon,
+  InboxArrowDownIcon,
 } from "@/components/icons";
 
 // Itens principais do menu (sem Usuários e Configurações)
@@ -61,6 +62,12 @@ const NAV_ITEMS = [
     href: "/dashboard/processos",
     icon: FolderOpenIcon,
     label: "Processos",
+    modulo: "processos",
+  },
+  {
+    href: "/dashboard/publicacoes",
+    icon: InboxArrowDownIcon,
+    label: "Publicações",
     modulo: "processos",
   },
   {

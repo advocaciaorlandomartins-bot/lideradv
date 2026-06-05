@@ -24,6 +24,7 @@ import {
   CalendarIcon,
   PuzzleIcon,
   InboxArrowDownIcon,
+  FileStackIcon,
 } from "@/components/icons";
 
 // Itens principais do menu (sem Usuários e Configurações)
@@ -87,6 +88,12 @@ const NAV_ITEMS = [
     icon: DocumentTextIcon,
     label: "Modelos",
     modulo: "modelos",
+  },
+  {
+    href: "/dashboard/ferramentas-pdf",
+    icon: FileStackIcon,
+    label: "PDFs",
+    modulo: null,
   },
   {
     href: "/dashboard/colaboradores",

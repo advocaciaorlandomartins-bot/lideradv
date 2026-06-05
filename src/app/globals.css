@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #1E3A8A;
+  --color-primary: #1e3a8a;
   --color-primary-dark: #162d6e;
   --color-primary-light: #2547b0;
-  --color-cta: #B45309;
-  --color-cta-hover: #92400E;
-  --color-bg: #F8FAFC;
-  --color-fg: #0F172A;
+  --color-cta: #b45309;
+  --color-cta-hover: #92400e;
+  --color-bg: #f8fafc;
+  --color-fg: #0f172a;
   --color-muted: #475569;
-  --color-border: #E2E8F0;
+  --color-border: #e2e8f0;
 }
 
 @theme inline {
@@ -18,12 +18,21 @@
 }
 
 body {
-  background-color: #F8FAFC;
-  color: #0F172A;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+@keyframes cardReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }

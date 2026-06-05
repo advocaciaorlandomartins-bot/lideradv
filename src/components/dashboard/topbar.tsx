@@ -22,6 +22,7 @@ import {
   FunnelIcon,
   KanbanIcon,
   CalendarIcon,
+  PuzzleIcon,
 } from "@/components/icons";
 
 // Itens principais do menu (sem Usuários e Configurações)
@@ -101,6 +102,12 @@ const GERENCIADOR_SUBS = [
     icon: ChartBarIcon,
     label: "Gerenciador",
     modulo: "gerenciador",
+  },
+  {
+    href: "/dashboard/integracoes",
+    icon: PuzzleIcon,
+    label: "Integrações",
+    modulo: "configuracoes",
   },
   {
     href: "/dashboard/usuarios",

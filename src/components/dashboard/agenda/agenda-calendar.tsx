@@ -264,7 +264,6 @@ export default function AgendaCalendar() {
   function handleDateClick(info: DateClickArg) {
     const x = Math.min(info.jsEvent.clientX + 8, window.innerWidth - 240);
     const y = Math.min(info.jsEvent.clientY + 8, window.innerHeight - 200);
-    setSelectedDate(info.dateStr);
     setDayPopover({ dateStr: info.dateStr, x, y });
   }
 

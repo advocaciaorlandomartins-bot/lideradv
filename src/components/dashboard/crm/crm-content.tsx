@@ -463,13 +463,6 @@ function LeadsTab({
               className="h-8 rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-muted focus:border-primary focus:outline-none"
             />
           </div>
-          <Link
-            href="/dashboard/crm/leads/novo"
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Novo Lead
-          </Link>
         </div>
         {/* Stage filter pills */}
         <div className="mt-3 flex flex-wrap gap-1.5">

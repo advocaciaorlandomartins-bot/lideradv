@@ -1,11 +1,14 @@
-import { getAllPublicacoes } from "@/lib/publicacoes-db";
+import { getAllPublicacoes, getAllOabs } from "@/lib/publicacoes-db";
 import PublicacoesContent from "@/components/dashboard/publicacoes/publicacoes-content";
 
 export const metadata = { title: "Publicações — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function PublicacoesPage() {
-  const publicacoes = await getAllPublicacoes();
+  const [publicacoes, oabs] = await Promise.all([
+    getAllPublicacoes(),
+    getAllOabs(),
+  ]);
   const naoLidas = publicacoes.filter((p) => p.status === "nao_lida").length;
 
   return (
@@ -26,7 +29,7 @@ export default async function PublicacoesPage() {
         </div>
       </div>
 
-      <PublicacoesContent publicacoes={publicacoes} />
+      <PublicacoesContent publicacoes={publicacoes} oabs={oabs} />
     </div>
   );
 }

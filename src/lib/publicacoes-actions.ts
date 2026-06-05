@@ -3,29 +3,56 @@
 import sql from "./db";
 import { revalidatePath } from "next/cache";
 
+// ── Publicações ───────────────────────────────────────────────────────────────
+
 export async function marcarComoTratadaAction(id: number) {
-  await sql`
-    UPDATE publicacoes
-    SET status = 'tratada', updated_at = now()
-    WHERE id = ${id}
-  `;
+  await sql`UPDATE publicacoes SET status = 'tratada', updated_at = now() WHERE id = ${id}`;
   revalidatePath("/dashboard/publicacoes");
 }
 
 export async function marcarComoNaoLidaAction(id: number) {
-  await sql`
-    UPDATE publicacoes
-    SET status = 'nao_lida', updated_at = now()
-    WHERE id = ${id}
-  `;
+  await sql`UPDATE publicacoes SET status = 'nao_lida', updated_at = now() WHERE id = ${id}`;
   revalidatePath("/dashboard/publicacoes");
 }
 
 export async function marcarTodasComoTratadasAction() {
+  await sql`UPDATE publicacoes SET status = 'tratada', updated_at = now() WHERE status = 'nao_lida'`;
+  revalidatePath("/dashboard/publicacoes");
+}
+
+// ── OABs ─────────────────────────────────────────────────────────────────────
+
+export async function adicionarOabAction(data: {
+  numero: string;
+  estado: string;
+  nome_advogado: string;
+}) {
+  const { numero, estado, nome_advogado } = data;
+  if (!numero.trim() || !estado.trim())
+    throw new Error("Número e estado são obrigatórios.");
   await sql`
-    UPDATE publicacoes
-    SET status = 'tratada', updated_at = now()
-    WHERE status = 'nao_lida'
+    INSERT INTO oabs_monitoradas (numero, estado, nome_advogado)
+    VALUES (${numero.trim().toUpperCase()}, ${estado.trim().toUpperCase()}, ${nome_advogado.trim() || null})
+    ON CONFLICT (numero, estado) DO UPDATE
+      SET ativa = true,
+          nome_advogado = EXCLUDED.nome_advogado
+  `;
+  revalidatePath("/dashboard/publicacoes");
+}
+
+export async function toggleOabAction(id: string, ativa: boolean) {
+  await sql`UPDATE oabs_monitoradas SET ativa = ${ativa} WHERE id = ${id}::uuid`;
+  revalidatePath("/dashboard/publicacoes");
+}
+
+export async function removerOabAction(id: string) {
+  await sql`DELETE FROM oabs_monitoradas WHERE id = ${id}::uuid`;
+  revalidatePath("/dashboard/publicacoes");
+}
+
+export async function registrarBuscaOabAction(id: string) {
+  await sql`
+    UPDATE oabs_monitoradas SET ultima_busca = now() WHERE id = ${id}::uuid
   `;
   revalidatePath("/dashboard/publicacoes");
 }

@@ -19,6 +19,7 @@ import {
   ChartBarIcon,
   PrinterIcon,
   FunnelIcon,
+  MailIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -55,6 +56,12 @@ const NAV_ITEMS = [
     icon: BanknotesIcon,
     label: "Financeiro",
     modulo: "financeiro",
+  },
+  {
+    href: "/dashboard/publicacoes",
+    icon: MailIcon,
+    label: "Publicações",
+    modulo: "publicacoes",
   },
   {
     href: "/dashboard/controles",

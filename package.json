@@ -18,6 +18,7 @@
     "migrate:colaboradores:demissao": "tsx scripts/migrate-add-data-demissao.ts",
     "migrate:remuneracoes": "tsx scripts/migrate-remuneracoes.ts",
     "migrate:lancamentos:remuneracao": "tsx scripts/migrate-add-remuneracao-id.ts",
+    "migrate:publicacoes": "tsx scripts/migrate-publicacoes.ts",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

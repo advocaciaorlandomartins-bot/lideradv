@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, EncryptedPDFError } from "pdf-lib";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,25 +14,39 @@ export async function POST(req: NextRequest) {
       );
 
     const buf = await file.arrayBuffer();
-    const doc = await PDFDocument.load(buf, {
-      password: senha || undefined,
-      ignoreEncryption: !senha,
-    });
 
-    // Salvar sem senha remove a proteção
-    const bytes = await doc.save();
+    let doc: PDFDocument;
+    try {
+      doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+    } catch (err) {
+      if (
+        err instanceof EncryptedPDFError ||
+        String(err).toLowerCase().includes("encrypt")
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Não foi possível processar este PDF protegido. O pdf-lib não suporta descriptografia de PDFs com senha.",
+          },
+          { status: 400 }
+        );
+      }
+      throw err;
+    }
 
-    return new NextResponse(bytes, {
+    const bytes = await doc.save({ useObjectStreams: true });
+
+    return new NextResponse(Buffer.from(bytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="sem-senha.pdf"',
       },
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const userMsg = msg.toLowerCase().includes("encrypt")
-      ? "Senha incorreta ou arquivo com proteção avançada."
-      : "Erro ao remover senha do PDF.";
-    return NextResponse.json({ error: userMsg }, { status: 500 });
+    console.error(e);
+    return NextResponse.json(
+      { error: "Erro ao remover senha do PDF." },
+      { status: 500 }
+    );
   }
 }

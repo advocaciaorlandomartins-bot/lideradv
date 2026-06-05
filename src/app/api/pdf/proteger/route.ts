@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
+import { encryptPdf } from "@/lib/pdf-encrypt";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,24 +17,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Informe a senha." }, { status: 400 });
 
     const buf = await file.arrayBuffer();
-    const doc = await PDFDocument.load(buf);
+    // Re-serialize with pdf-lib (useObjectStreams: false = traditional xref, needed for post-processing)
+    const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+    const pdfBytes = await doc.save({ useObjectStreams: false });
 
-    // pdf-lib suporta criptografia via save() com opções de permissão
-    const bytes = await doc.save({
-      userPassword: senha,
-      ownerPassword: senha + "_owner",
-      permissions: {
-        printing: "lowResolution",
-        modifying: false,
-        copying: false,
-        annotating: false,
-        fillingForms: true,
-        contentAccessibility: true,
-        documentAssembly: false,
-      },
-    });
+    // Apply RC4 128-bit encryption via post-processing
+    const encrypted = encryptPdf(pdfBytes, senha);
 
-    return new NextResponse(bytes, {
+    return new NextResponse(encrypted as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="protegido.pdf"`,

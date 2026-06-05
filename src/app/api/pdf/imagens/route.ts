@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     const bytes = await doc.save();
-    return new NextResponse(bytes, {
+    return new NextResponse(Buffer.from(bytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="imagens.pdf"',

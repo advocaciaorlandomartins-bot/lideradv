@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const bytes = await merged.save();
-    return new NextResponse(bytes, {
+    return new NextResponse(Buffer.from(bytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="juntos.pdf"',

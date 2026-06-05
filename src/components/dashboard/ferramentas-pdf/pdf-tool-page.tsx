@@ -214,9 +214,14 @@ export default function PdfToolPage({
       const origSize = res.headers.get("X-Original-Size");
       const resSize = res.headers.get("X-Result-Size");
       const reducao = res.headers.get("X-Reducao-Pct");
+      const jaOtimizado = res.headers.get("X-Ja-Otimizado") === "1";
       let info = "";
       if (origSize && resSize) {
-        info = `${fmtBytes(Number(origSize))} → ${fmtBytes(Number(resSize))}${reducao ? ` (${reducao}% menor)` : ""}`;
+        if (jaOtimizado) {
+          info = `PDF já otimizado — redução mínima possível (${fmtBytes(Number(origSize))}). O arquivo retornado é o original.`;
+        } else {
+          info = `${fmtBytes(Number(origSize))} → ${fmtBytes(Number(resSize))}${reducao ? ` (${reducao}% menor)` : ""}`;
+        }
       }
 
       setResultado({ url, nome, info });

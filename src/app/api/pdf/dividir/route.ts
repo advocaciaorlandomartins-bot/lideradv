@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     const zipBuf = await zip.generateAsync({ type: "nodebuffer" });
-    return new NextResponse(zipBuf, {
+    return new NextResponse(zipBuf as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": 'attachment; filename="dividido.zip"',

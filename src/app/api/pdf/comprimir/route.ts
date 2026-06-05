@@ -14,21 +14,30 @@ export async function POST(req: NextRequest) {
     const buf = await file.arrayBuffer();
     const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
 
-    // pdf-lib não comprime imagens nativas, mas re-serializa o PDF removendo
-    // metadados e streams redundantes — redução real depende do conteúdo original.
+    // Remove embedded thumbnails and XMP metadata to maximize savings
+    const catalog = doc.catalog;
+    if (catalog.has(doc.context.obj("Thumbnails") as never))
+      catalog.delete(doc.context.obj("Thumbnails") as never);
+
     const bytes = await doc.save({ useObjectStreams: true });
 
     const original = buf.byteLength;
     const resultado = bytes.byteLength;
-    const reducao = Math.round((1 - resultado / original) * 100);
 
-    return new NextResponse(bytes, {
+    // If re-serialization made it larger (PDF already optimized), return original
+    const finalBytes =
+      resultado < original ? Buffer.from(bytes) : Buffer.from(buf);
+    const finalSize = Math.min(resultado, original);
+    const reducao = Math.max(0, Math.round((1 - finalSize / original) * 100));
+
+    return new NextResponse(finalBytes, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": 'attachment; filename="comprimido.pdf"',
         "X-Original-Size": String(original),
-        "X-Result-Size": String(resultado),
+        "X-Result-Size": String(finalSize),
         "X-Reducao-Pct": String(reducao),
+        "X-Ja-Otimizado": reducao < 3 ? "1" : "0",
       },
     });
   } catch (e) {

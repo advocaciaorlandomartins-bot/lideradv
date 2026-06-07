@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { getAllUsuarios, countAtivos, MAX_USUARIOS } from "@/lib/usuarios-db";
+import { getAllUsuarios } from "@/lib/usuarios-db";
 import UsuariosList from "@/components/dashboard/usuarios/usuarios-list";
 
 export const metadata = {
@@ -14,10 +14,8 @@ export default async function UsuariosPage() {
   const user = await getSession();
   if (!user || !hasPermission(user, "usuarios", "ver")) notFound();
 
-  const [usuarios, ativos] = await Promise.all([
-    getAllUsuarios(),
-    countAtivos(),
-  ]);
+  const usuarios = await getAllUsuarios();
+  const ativos = usuarios.filter((u) => u.ativo).length;
 
   return (
     <div className="space-y-6">
@@ -26,11 +24,12 @@ export default async function UsuariosPage() {
           Usuários e Permissões
         </h1>
         <p className="mt-1 font-body text-sm text-muted">
-          {ativos} de {MAX_USUARIOS} usuários ativos
+          {ativos} usuário{ativos !== 1 ? "s" : ""} ativo
+          {ativos !== 1 ? "s" : ""}
         </p>
       </div>
 
-      <UsuariosList usuarios={usuarios} maxUsuarios={MAX_USUARIOS} />
+      <UsuariosList usuarios={usuarios} />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
-import { countAtivos, getSenhaHash, MAX_USUARIOS } from "./usuarios-db";
+import { getSenhaHash } from "./usuarios-db";
 import { MODULOS, ACOES, type Permissoes } from "./permissoes";
 import { logAction } from "./audit";
 
@@ -59,11 +59,6 @@ export async function createUsuarioAction(
   if (!categoria) return { error: "Selecione uma categoria." };
 
   try {
-    const ativos = await countAtivos();
-    if (ativos >= MAX_USUARIOS) {
-      return { error: `Limite de ${MAX_USUARIOS} usuários atingido.` };
-    }
-
     const senhaHash = hashPassword(senha);
     const permissoes = parsePermissoes(formData);
 

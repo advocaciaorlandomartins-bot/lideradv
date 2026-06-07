@@ -63,12 +63,11 @@ type Filter = "todos" | "ativo" | "inativo";
 
 interface Props {
   usuarios: Usuario[];
-  maxUsuarios: number;
 }
 
 // ── Component ──────────────────────────────────────────────
 
-export default function UsuariosList({ usuarios, maxUsuarios }: Props) {
+export default function UsuariosList({ usuarios }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("todos");
   const [search, setSearch] = useState("");
@@ -97,8 +96,6 @@ export default function UsuariosList({ usuarios, maxUsuarios }: Props) {
       return matchFilter && matchSearch;
     });
   }, [usuarios, filter, search]);
-
-  const vagasRestantes = maxUsuarios - counts.ativo;
 
   const tabs: { key: Filter; label: string }[] = [
     { key: "todos", label: "Todos" },
@@ -158,17 +155,7 @@ export default function UsuariosList({ usuarios, maxUsuarios }: Props) {
               <p className="font-body text-xs text-muted">
                 {filtered.length} usuário{filtered.length !== 1 ? "s" : ""}
                 {" · "}
-                <span
-                  className={
-                    vagasRestantes > 0
-                      ? "text-muted"
-                      : "text-amber-600 font-semibold"
-                  }
-                >
-                  {vagasRestantes > 0
-                    ? `${counts.ativo} de ${maxUsuarios} slots usados`
-                    : "Limite atingido"}
-                </span>
+                {counts.ativo} ativo{counts.ativo !== 1 ? "s" : ""}
                 {search ? ` · busca: "${search}"` : ""}
               </p>
             </div>
@@ -187,12 +174,7 @@ export default function UsuariosList({ usuarios, maxUsuarios }: Props) {
             </div>
             <Link
               href="/dashboard/usuarios/novo"
-              aria-disabled={vagasRestantes === 0}
-              className={`flex h-9 items-center gap-1.5 rounded-lg px-3 font-body text-sm font-semibold text-white transition-colors whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1 ${
-                vagasRestantes > 0
-                  ? "bg-cta hover:bg-cta-hover"
-                  : "pointer-events-none bg-slate-300"
-              }`}
+              className="flex h-9 items-center gap-1.5 rounded-lg px-3 font-body text-sm font-semibold text-white transition-colors whitespace-nowrap bg-cta hover:bg-cta-hover focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1"
             >
               <PlusIcon className="h-4 w-4" />
               Novo usuário
@@ -348,45 +330,6 @@ export default function UsuariosList({ usuarios, maxUsuarios }: Props) {
           </div>
         )}
       </div>
-
-      {/* Capacity bar */}
-      {counts.ativo > 0 && (
-        <div className="rounded-xl border border-border bg-white px-5 py-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <p className="font-body text-xs font-semibold text-muted uppercase tracking-wide">
-              Capacidade de usuários
-            </p>
-            <p className="font-body text-xs text-muted">
-              <span className="font-semibold text-fg">{counts.ativo}</span> /{" "}
-              {maxUsuarios} slots ativos
-            </p>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-            <div
-              className={`h-2 rounded-full transition-all duration-500 ${
-                counts.ativo >= maxUsuarios
-                  ? "bg-amber-500"
-                  : counts.ativo >= maxUsuarios * 0.8
-                    ? "bg-amber-400"
-                    : "bg-primary"
-              }`}
-              style={{
-                width: `${Math.min(100, (counts.ativo / maxUsuarios) * 100)}%`,
-              }}
-            />
-          </div>
-          {vagasRestantes > 0 ? (
-            <p className="mt-1.5 font-body text-xs text-muted">
-              {vagasRestantes} vaga{vagasRestantes !== 1 ? "s" : ""} disponíve
-              {vagasRestantes !== 1 ? "is" : "l"}
-            </p>
-          ) : (
-            <p className="mt-1.5 font-body text-xs font-semibold text-amber-600">
-              Limite atingido. Desative um usuário para cadastrar outro.
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

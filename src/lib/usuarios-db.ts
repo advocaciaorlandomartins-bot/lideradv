@@ -1,7 +1,6 @@
 import sql from "./db";
 
 export {
-  MAX_USUARIOS,
   CATEGORIAS,
   type Categoria,
   type Usuario,

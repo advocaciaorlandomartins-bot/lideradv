@@ -1,7 +1,5 @@
 import type { Permissoes } from "./permissoes";
 
-export const MAX_USUARIOS = 3;
-
 export const CATEGORIAS = [
   "Sócio(a)",
   "Advogado(a)",

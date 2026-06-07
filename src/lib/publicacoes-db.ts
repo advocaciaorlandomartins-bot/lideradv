@@ -2,6 +2,13 @@ import sql from "./db";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface ResumoIa {
+  texto: string;
+  prazo_dias: number | null;
+  acao_necessaria: string | null;
+  audiencia: string | null; // DD/MM/YYYY ou null
+}
+
 export interface Publicacao {
   id: number;
   processo: string;
@@ -15,6 +22,7 @@ export interface Publicacao {
   origem: "automatica" | "manual";
   conteudo: string | null;
   conteudo_completo: string | null;
+  resumo_ia: ResumoIa | null;
   created_at: string;
 }
 
@@ -92,6 +100,7 @@ function mapPublicacao(r: Record<string, unknown>): Publicacao {
     origem: (String(r.origem) as "automatica" | "manual") ?? "automatica",
     conteudo: r.conteudo ? String(r.conteudo) : null,
     conteudo_completo: r.conteudo_completo ? String(r.conteudo_completo) : null,
+    resumo_ia: r.resumo_ia ? (r.resumo_ia as ResumoIa) : null,
     created_at: String(r.created_at),
   };
 }

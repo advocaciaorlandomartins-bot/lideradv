@@ -25,6 +25,7 @@ import {
   PuzzleIcon,
   InboxArrowDownIcon,
   FileStackIcon,
+  PenSignIcon,
 } from "@/components/icons";
 
 // Itens principais do menu (sem Usuários e Configurações)
@@ -69,7 +70,7 @@ const NAV_ITEMS = [
     href: "/dashboard/publicacoes",
     icon: InboxArrowDownIcon,
     label: "Publicações",
-    modulo: "processos",
+    modulo: "publicacoes",
   },
   {
     href: "/dashboard/financeiro",
@@ -90,6 +91,12 @@ const NAV_ITEMS = [
     modulo: "modelos",
   },
   {
+    href: "/dashboard/assinaturas",
+    icon: PenSignIcon,
+    label: "Assinaturas",
+    modulo: "assinaturas",
+  },
+  {
     href: "/dashboard/ferramentas-pdf",
     icon: FileStackIcon,
     label: "PDFs",
@@ -101,12 +108,6 @@ const NAV_ITEMS = [
     label: "Colaboradores",
     modulo: "colaboradores",
   },
-  {
-    href: "/dashboard/relatorios",
-    icon: PrinterIcon,
-    label: "Relatórios",
-    modulo: null,
-  },
 ] as const;
 
 // Sub-itens do dropdown Gerenciador
@@ -116,6 +117,18 @@ const GERENCIADOR_SUBS = [
     icon: ChartBarIcon,
     label: "Gerenciador",
     modulo: "gerenciador",
+  },
+  {
+    href: "/dashboard/gerenciador/auditoria",
+    icon: ClipboardListIcon,
+    label: "Log de Auditoria",
+    modulo: "gerenciador",
+  },
+  {
+    href: "/dashboard/relatorios",
+    icon: PrinterIcon,
+    label: "Relatórios",
+    modulo: null,
   },
   {
     href: "/dashboard/integracoes",

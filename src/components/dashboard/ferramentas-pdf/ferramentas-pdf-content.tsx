@@ -173,6 +173,29 @@ function IconSparkles() {
   );
 }
 
+function IconPdfToImage() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ color: "#9333ea" }}
+      aria-hidden="true"
+    >
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+      <circle cx="10" cy="14" r="2" />
+      <path d="m20 17-1.296-1.296a2 2 0 0 0-2.828 0L10 22" />
+    </svg>
+  );
+}
+
 // ── Dados das ferramentas ─────────────────────────────────────────────────────
 
 const FERRAMENTAS: Ferramenta[] = [
@@ -228,10 +251,18 @@ const FERRAMENTAS: Ferramenta[] = [
     id: "dividir-ia",
     titulo: "Dividir por tipo de documento",
     descricao:
-      "Divide o PDF por tipo de documento com Inteligência Artificial (TramitaIA)",
+      "Divide o PDF por tipo de documento com Inteligência Artificial (ProIA)",
     href: "/dashboard/ferramentas-pdf/dividir-ia",
     icone: <IconSparkles />,
     badge: "IA",
+  },
+  {
+    id: "pdf-para-imagens",
+    titulo: "Converter PDF em imagens",
+    descricao: "Converta páginas de PDF em imagens (JPG, PNG, etc)",
+    href: "/dashboard/ferramentas-pdf/pdf-para-imagens",
+    icone: <IconPdfToImage />,
+    badge: null,
   },
 ];
 

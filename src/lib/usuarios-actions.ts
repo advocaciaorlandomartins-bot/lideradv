@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { countAtivos, getSenhaHash, MAX_USUARIOS } from "./usuarios-db";
 import { MODULOS, ACOES, type Permissoes } from "./permissoes";
+import { logAction } from "./audit";
 
 export type UsuarioFormState = { error?: string; success?: boolean } | null;
 
@@ -82,6 +83,11 @@ export async function createUsuarioAction(
     return { error: "Erro ao criar usuário." };
   }
 
+  await logAction({
+    acao: "criar",
+    entidade: "usuario",
+    descricao: `Criou usuário: ${login} (${categoria})`,
+  });
   revalidatePath("/dashboard/usuarios");
   return { success: true };
 }
@@ -158,11 +164,24 @@ export async function updateUsuarioAction(
     return { error: "Erro ao atualizar usuário." };
   }
 
+  await logAction({
+    acao: "editar",
+    entidade: "usuario",
+    entidadeId: id,
+    descricao: `Editou usuário: ${login} (${categoria})`,
+    detalhes: { ativo },
+  });
   revalidatePath("/dashboard/usuarios");
   return { success: true };
 }
 
 export async function deleteUsuarioAction(id: string): Promise<void> {
+  await logAction({
+    acao: "excluir",
+    entidade: "usuario",
+    entidadeId: id,
+    descricao: "Excluiu usuário",
+  });
   await sql`DELETE FROM usuarios WHERE id = ${id}::uuid`;
   revalidatePath("/dashboard/usuarios");
 }

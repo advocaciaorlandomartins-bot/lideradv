@@ -11,7 +11,7 @@ export default async function GerenciadorPage() {
   const data = await getGerenciadorData();
 
   return (
-    <main id="main-content" className="flex-1 overflow-y-auto p-6">
+    <div>
       <div className="mb-6">
         <h1 className="font-heading text-2xl font-bold text-gray-900">
           Gerenciador
@@ -22,6 +22,6 @@ export default async function GerenciadorPage() {
         </p>
       </div>
       <GerenciadorContent data={data} />
-    </main>
+    </div>
   );
 }

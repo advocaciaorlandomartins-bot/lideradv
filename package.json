@@ -19,6 +19,9 @@
     "migrate:remuneracoes": "tsx scripts/migrate-remuneracoes.ts",
     "migrate:lancamentos:remuneracao": "tsx scripts/migrate-add-remuneracao-id.ts",
     "migrate:publicacoes": "tsx scripts/migrate-publicacoes.ts",
+    "migrate:assinaturas": "tsx scripts/migrate-assinaturas.ts",
+    "migrate:compromissos": "tsx scripts/migrate-compromissos.ts",
+    "migrate:compromissos:status": "tsx scripts/migrate-add-status-compromissos.ts",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

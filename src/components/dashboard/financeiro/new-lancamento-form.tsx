@@ -27,7 +27,12 @@ const PERIODICIDADES = [
   { key: "anual", label: "Anualmente" },
 ];
 
-type PaymentMode = "avista" | "parcelado" | "recorrente";
+type PaymentMode =
+  | "avista"
+  | "parcelado"
+  | "recorrente"
+  | "retroativo"
+  | "mensalidade";
 
 const inputClass =
   "h-11 w-full rounded-lg border border-border bg-white px-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
@@ -224,6 +229,12 @@ export default function NewLancamentoForm({
   const [numSalarios, setNumSalarios] = useState("1");
   const [jaRecebida, setJaRecebida] = useState(false);
 
+  // ── Novos modos ────────────────────────────────────────────
+  const [valorRetroativo, setValorRetroativo] = useState("");
+  const [percentualAdv, setPercentualAdv] = useState("30");
+  const [valorMensalidade, setValorMensalidade] = useState("");
+
+  // ── Salário base ───────────────────────────────────────────
   const salarioValor = useMemo(() => {
     if (!salarioMode) return null;
     const n = parseFloat(numSalarios) || 1;
@@ -232,10 +243,55 @@ export default function NewLancamentoForm({
     });
   }, [salarioMode, numSalarios, salarioMinimo]);
 
-  const effectiveValor = salarioMode ? (salarioValor ?? "") : valor;
+  // ── Cálculo Retroativo ─────────────────────────────────────
+  const retroativoCalc = useMemo(() => {
+    if (paymentMode !== "retroativo") return null;
+    const vRetro = parseFloat(parseMoney(valorRetroativo)) || 0;
+    const pct = parseFloat(percentualAdv) || 0;
+    const percValor = Math.round(vRetro * (pct / 100) * 100) / 100;
+    const salarioPart = salarioMode
+      ? Math.round(
+          (parseFloat(numSalarios.replace(",", ".")) || 0) * salarioMinimo * 100
+        ) / 100
+      : 0;
+    const total = percValor + salarioPart;
+    return { vRetro, pct, percValor, salarioPart, total };
+  }, [
+    paymentMode,
+    valorRetroativo,
+    percentualAdv,
+    salarioMode,
+    numSalarios,
+    salarioMinimo,
+  ]);
 
+  // ── Valor efetivo (base para cálculos) ─────────────────────
+  const effectiveValor =
+    paymentMode === "retroativo" && retroativoCalc != null
+      ? retroativoCalc.total > 0
+        ? retroativoCalc.total.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        : ""
+      : salarioMode
+        ? (salarioValor ?? "")
+        : valor;
+
+  // ── Cálculo Mensalidade fixa ───────────────────────────────
+  const mensalidadeCalc = useMemo(() => {
+    if (paymentMode !== "mensalidade") return null;
+    const total = parseFloat(parseMoney(effectiveValor)) || 0;
+    const mens = parseFloat(parseMoney(valorMensalidade)) || 0;
+    if (!total || !mens || mens <= 0) return null;
+    const numParcelas = Math.ceil(total / mens);
+    return { total, mens, numParcelas };
+  }, [paymentMode, effectiveValor, valorMensalidade]);
+
+  // ── Preview Parcelado (inclui modo retroativo) ─────────────
   const previewParcelas = useMemo(() => {
-    if (paymentMode !== "parcelado") return null;
+    if (paymentMode !== "parcelado" && paymentMode !== "retroativo")
+      return null;
     const v = parseFloat(parseMoney(effectiveValor));
     const e = parseFloat(parseMoney(valorEntrada)) || 0;
     const n = parseInt(totalParcelas) || 1;
@@ -257,7 +313,7 @@ export default function NewLancamentoForm({
     };
   }, [paymentMode, effectiveValor, numRecorrencias, periodicidade]);
 
-  // Commission auto-fill: only when tipo=entrada + process selected + client has indicador
+  // ── Comissão de indicador ──────────────────────────────────
   const commissionInfo = useMemo(() => {
     if (tipo !== "entrada") return null;
     if (!processoId) return null;
@@ -281,6 +337,12 @@ export default function NewLancamentoForm({
     };
   }, [tipo, processoId, selectedClient, effectiveValor]);
 
+  // ── Número total de parcelas para modo mensalidade ─────────
+  const totalParcelasEfetivo =
+    paymentMode === "mensalidade" && mensalidadeCalc
+      ? String(mensalidadeCalc.numParcelas)
+      : totalParcelas;
+
   return (
     <form action={formAction} className="space-y-8" noValidate>
       {/* Hidden fields */}
@@ -288,7 +350,9 @@ export default function NewLancamentoForm({
       <input
         type="hidden"
         name="parcelado"
-        value={String(paymentMode === "parcelado")}
+        value={String(
+          paymentMode === "parcelado" || paymentMode === "retroativo"
+        )}
       />
       <input type="hidden" name="descricao" value={autoDescricao} />
       <input type="hidden" name="valor" value={parseMoney(effectiveValor)} />
@@ -311,6 +375,12 @@ export default function NewLancamentoForm({
       />
       <input type="hidden" name="periodicidade" value={periodicidade} />
       <input type="hidden" name="num_recorrencias" value={numRecorrencias} />
+      <input type="hidden" name="total_parcelas" value={totalParcelasEfetivo} />
+      <input
+        type="hidden"
+        name="valor_mensalidade"
+        value={parseMoney(valorMensalidade)}
+      />
       <input
         type="hidden"
         name="indicador_id"
@@ -512,8 +582,11 @@ export default function NewLancamentoForm({
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1.5">
                 <p className="font-body text-xs font-semibold uppercase tracking-wide text-amber-700">
                   Comissão do indicador — será criada automaticamente
-                  {paymentMode === "parcelado" && totalParcelas
-                    ? ` (${totalParcelas}× parcelas)`
+                  {(paymentMode === "parcelado" ||
+                    paymentMode === "retroativo" ||
+                    paymentMode === "mensalidade") &&
+                  totalParcelasEfetivo
+                    ? ` (${totalParcelasEfetivo}× parcelas)`
                     : ""}
                 </p>
                 <div className="flex flex-wrap items-center gap-4">
@@ -545,8 +618,10 @@ export default function NewLancamentoForm({
                           {fmt(commissionInfo.comissao_calculada)}
                         </p>
                       </div>
-                      {paymentMode === "parcelado" &&
-                        parseInt(totalParcelas) > 1 && (
+                      {(paymentMode === "parcelado" ||
+                        paymentMode === "retroativo" ||
+                        paymentMode === "mensalidade") &&
+                        parseInt(totalParcelasEfetivo) > 1 && (
                           <div>
                             <span className="font-body text-xs text-amber-600">
                               Por parcela
@@ -555,7 +630,7 @@ export default function NewLancamentoForm({
                               {fmt(
                                 Math.round(
                                   (commissionInfo.comissao_calculada /
-                                    parseInt(totalParcelas)) *
+                                    parseInt(totalParcelasEfetivo)) *
                                     100
                                 ) / 100
                               )}
@@ -621,7 +696,7 @@ export default function NewLancamentoForm({
       <div className="space-y-4">
         <SectionTitle>Valores e pagamento</SectionTitle>
         <div className="mt-4 space-y-4">
-          {/* Modo de pagamento */}
+          {/* ── Modo de pagamento — linha 1: modos padrão ── */}
           <div>
             <label className={labelClass}>Modo de pagamento</label>
             <div className="flex gap-2">
@@ -635,7 +710,11 @@ export default function NewLancamentoForm({
                 <button
                   key={m.key}
                   type="button"
-                  onClick={() => setPaymentMode(m.key)}
+                  onClick={() => {
+                    setPaymentMode(m.key);
+                    setValorRetroativo("");
+                    setValorMensalidade("");
+                  }}
                   disabled={isPending}
                   className={`flex-1 rounded-lg border-2 px-3 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
                     paymentMode === m.key
@@ -647,10 +726,100 @@ export default function NewLancamentoForm({
                 </button>
               ))}
             </div>
+
+            {/* ── Linha 2: modos especiais ── */}
+            <div className="mt-2 flex gap-2">
+              {(
+                [
+                  {
+                    key: "retroativo",
+                    label: "Retroativo + Parcelado",
+                    desc: "% sobre retroativo + salários",
+                  },
+                  {
+                    key: "mensalidade",
+                    label: "Mensalidade Fixa",
+                    desc: "total em salários ÷ parcela fixa",
+                  },
+                ] as { key: PaymentMode; label: string; desc: string }[]
+              ).map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => {
+                    setPaymentMode(m.key);
+                    setValor("");
+                    setSalarioMode(false);
+                  }}
+                  disabled={isPending}
+                  className={`flex-1 rounded-lg border-2 px-3 py-2 font-body transition-colors duration-150 ${
+                    paymentMode === m.key
+                      ? "border-violet-500 bg-violet-50 text-violet-700"
+                      : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{m.label}</p>
+                  <p
+                    className={`text-[11px] font-normal ${paymentMode === m.key ? "text-violet-500" : "text-slate-400"}`}
+                  >
+                    {m.desc}
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
 
+          {/* ── Grid de campos ── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* Salário mínimo toggle — only for entrada */}
+            {/* ── Campos exclusivos do modo RETROATIVO ── */}
+            {paymentMode === "retroativo" && (
+              <>
+                <Field label="Valor retroativo a receber pelo cliente" required>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                      R$
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={valorRetroativo}
+                      onChange={(e) =>
+                        setValorRetroativo(formatMoneyInput(e.target.value))
+                      }
+                      onBlur={() =>
+                        setValorRetroativo(normalizeMoneyBlur(valorRetroativo))
+                      }
+                      disabled={isPending}
+                      className={`${inputClass} pl-10`}
+                    />
+                  </div>
+                </Field>
+
+                <Field label="Percentual do advogado (%)">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={percentualAdv}
+                      onChange={(e) => setPercentualAdv(e.target.value)}
+                      disabled={isPending}
+                      className={`${inputClass} max-w-[120px]`}
+                    />
+                    <span className="font-body text-sm text-muted">%</span>
+                    {retroativoCalc && retroativoCalc.vRetro > 0 && (
+                      <span className="font-body text-sm font-semibold text-violet-700">
+                        = {fmt(retroativoCalc.percValor)}
+                      </span>
+                    )}
+                  </div>
+                </Field>
+              </>
+            )}
+
+            {/* ── Toggle salário mínimo ── */}
             {tipo === "entrada" && (
               <div className="sm:col-span-2">
                 <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-border px-4 py-3.5 transition-colors hover:border-slate-300">
@@ -671,10 +840,17 @@ export default function NewLancamentoForm({
                   </div>
                   <div>
                     <p className="font-body text-sm font-semibold text-fg">
-                      Baseado em salário mínimo vigente
+                      {paymentMode === "retroativo"
+                        ? "Acrescentar salários mínimos ao honorário"
+                        : paymentMode === "mensalidade"
+                          ? "Total baseado em salários mínimos"
+                          : "Baseado em salário mínimo vigente"}
                     </p>
                     <p className="font-body text-xs text-muted">
-                      SM atual: {fmt(salarioMinimo)} — calcular automaticamente
+                      SM atual: {fmt(salarioMinimo)}{" "}
+                      {paymentMode === "retroativo"
+                        ? "— componente adicional ao percentual"
+                        : "— calcular automaticamente"}
                     </p>
                   </div>
                 </label>
@@ -697,37 +873,97 @@ export default function NewLancamentoForm({
                   <span className="font-body text-sm text-muted">
                     × {fmt(salarioMinimo)}
                   </span>
+                  {salarioValor && (
+                    <span className="font-body text-sm font-semibold text-emerald-700">
+                      ={" "}
+                      {fmt(
+                        (parseFloat(numSalarios.replace(",", ".")) || 0) *
+                          salarioMinimo
+                      )}
+                    </span>
+                  )}
                 </div>
               </Field>
             )}
 
-            {/* Valor total */}
-            <Field label="Valor total" required>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
-                  R$
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  value={effectiveValor}
-                  onChange={(e) => {
-                    if (!salarioMode)
-                      setValor(formatMoneyInput(e.target.value));
-                  }}
-                  onBlur={() => {
-                    if (!salarioMode) setValor(normalizeMoneyBlur(valor));
-                  }}
-                  readOnly={salarioMode}
-                  disabled={isPending}
-                  className={`${inputClass} pl-10 ${salarioMode ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold" : ""}`}
-                />
-              </div>
-            </Field>
+            {/* ── Resumo do cálculo retroativo ── */}
+            {paymentMode === "retroativo" &&
+              retroativoCalc &&
+              retroativoCalc.total > 0 && (
+                <div className="sm:col-span-2">
+                  <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
+                    <p className="font-body text-xs font-semibold uppercase tracking-wide text-violet-700 mb-2">
+                      Composição do honorário
+                    </p>
+                    <div className="flex flex-wrap gap-5">
+                      <div>
+                        <span className="font-body text-xs text-muted">
+                          {retroativoCalc.pct}% do retroativo
+                        </span>
+                        <p className="font-heading text-base font-semibold text-fg">
+                          {fmt(retroativoCalc.percValor)}
+                        </p>
+                      </div>
+                      {retroativoCalc.salarioPart > 0 && (
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            + {parseFloat(numSalarios.replace(",", ".")) || 0}×
+                            SM
+                          </span>
+                          <p className="font-heading text-base font-semibold text-fg">
+                            {fmt(retroativoCalc.salarioPart)}
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-body text-xs font-semibold text-violet-600">
+                          Total do honorário
+                        </span>
+                        <p className="font-heading text-xl font-bold text-violet-700">
+                          {fmt(retroativoCalc.total)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            {/* Parcelado */}
-            {paymentMode === "parcelado" && (
+            {/* ── Valor total (oculto no modo retroativo) ── */}
+            {paymentMode !== "retroativo" && (
+              <Field
+                label={
+                  paymentMode === "mensalidade"
+                    ? "Valor total cobrado"
+                    : "Valor total"
+                }
+                required
+              >
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                    R$
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={effectiveValor}
+                    onChange={(e) => {
+                      if (!salarioMode)
+                        setValor(formatMoneyInput(e.target.value));
+                    }}
+                    onBlur={() => {
+                      if (!salarioMode) setValor(normalizeMoneyBlur(valor));
+                    }}
+                    readOnly={salarioMode}
+                    disabled={isPending}
+                    className={`${inputClass} pl-10 ${salarioMode ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold" : ""}`}
+                  />
+                </div>
+              </Field>
+            )}
+
+            {/* ── Campos do modo PARCELADO e RETROATIVO ── */}
+            {(paymentMode === "parcelado" || paymentMode === "retroativo") && (
               <>
                 <Field label="Valor de entrada">
                   <div className="relative">
@@ -753,7 +989,6 @@ export default function NewLancamentoForm({
 
                 <Field label="Número de parcelas">
                   <input
-                    name="total_parcelas"
                     type="number"
                     min="2"
                     max="120"
@@ -804,7 +1039,91 @@ export default function NewLancamentoForm({
               </>
             )}
 
-            {/* Recorrente */}
+            {/* ── Campos do modo MENSALIDADE FIXA ── */}
+            {paymentMode === "mensalidade" && (
+              <>
+                <Field
+                  label="Mensalidade do cliente (valor fixo da parcela)"
+                  required
+                >
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                      R$
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={valorMensalidade}
+                      onChange={(e) =>
+                        setValorMensalidade(formatMoneyInput(e.target.value))
+                      }
+                      onBlur={() =>
+                        setValorMensalidade(
+                          normalizeMoneyBlur(valorMensalidade)
+                        )
+                      }
+                      disabled={isPending}
+                      className={`${inputClass} pl-10`}
+                    />
+                  </div>
+                </Field>
+
+                {mensalidadeCalc && (
+                  <div className="sm:col-span-2">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
+                      <p className="font-body text-xs font-semibold uppercase tracking-wide text-amber-700 mb-3">
+                        Plano de pagamento
+                      </p>
+                      <div className="flex flex-wrap gap-6 items-end">
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            Total cobrado
+                          </span>
+                          <p className="font-heading text-base font-semibold text-fg">
+                            {fmt(mensalidadeCalc.total)}
+                          </p>
+                        </div>
+                        <div className="text-muted font-body text-lg">÷</div>
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            Mensalidade
+                          </span>
+                          <p className="font-heading text-base font-semibold text-fg">
+                            {fmt(mensalidadeCalc.mens)}
+                          </p>
+                        </div>
+                        <div className="text-muted font-body text-lg">=</div>
+                        <div>
+                          <span className="font-body text-xs font-semibold text-amber-700">
+                            Total de parcelas
+                          </span>
+                          <p className="font-heading text-2xl font-bold text-amber-800">
+                            {mensalidadeCalc.numParcelas}×
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2">
+                        <p className="font-body text-sm font-semibold text-amber-900">
+                          O cliente ficará devendo{" "}
+                          <strong>
+                            {mensalidadeCalc.numParcelas} parcelas
+                          </strong>{" "}
+                          de <strong>{fmt(mensalidadeCalc.mens)}</strong>
+                        </p>
+                        <p className="font-body text-xs text-amber-700 mt-0.5">
+                          Serão criados {mensalidadeCalc.numParcelas}{" "}
+                          lançamentos mensais de {fmt(mensalidadeCalc.mens)}{" "}
+                          cada
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Campos do modo RECORRENTE ── */}
             {paymentMode === "recorrente" && (
               <>
                 <Field label="Repetir a cada">

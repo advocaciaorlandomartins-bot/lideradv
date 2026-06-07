@@ -17,8 +17,6 @@ import {
   CalendarIcon,
 } from "@/components/icons";
 
-const PAGE_SIZE = 10;
-
 function StatusBadge({ status }: { status: "ativo" | "inativo" }) {
   return status === "ativo" ? (
     <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-body text-xs font-semibold bg-emerald-50 text-emerald-700">
@@ -46,6 +44,7 @@ export default function ColaboradoresContent({ colaboradores }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [cargoFilter, setCargoFilter] = useState<CargoFilter>("todos");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const statusCounts = useMemo(
     () => ({
@@ -70,8 +69,8 @@ export default function ColaboradoresContent({ colaboradores }: Props) {
     });
   }, [colaboradores, search, statusFilter, cargoFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   function handleStatusFilter(f: StatusFilter) {
     setStatusFilter(f);
@@ -396,66 +395,87 @@ export default function ColaboradoresContent({ colaboradores }: Props) {
             </ul>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-border px-5 py-3">
-                <p className="font-body text-xs text-muted">
-                  {(page - 1) * PAGE_SIZE + 1}–
-                  {Math.min(page * PAGE_SIZE, filtered.length)} de{" "}
-                  {filtered.length}
-                </p>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setPage(1)}
-                    disabled={page === 1}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                  >
-                    «
-                  </button>
-                  <button
-                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                    disabled={page === 1}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                  >
-                    ‹
-                  </button>
-                  {pageWindow().map((n, i) =>
-                    n === "…" ? (
-                      <span
-                        key={`ellipsis-${i}`}
-                        className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
-                      >
-                        …
-                      </span>
-                    ) : (
+            {filtered.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                <div className="flex items-center gap-1">
+                  <span className="mr-1 font-body text-xs text-muted">
+                    Exibir:
+                  </span>
+                  {[10, 20, 50].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setPageSize(s);
+                        setPage(1);
+                      }}
+                      className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <p className="mr-1 font-body text-xs text-muted">
+                    {(page - 1) * pageSize + 1}–
+                    {Math.min(page * pageSize, filtered.length)} de{" "}
+                    {filtered.length}
+                  </p>
+                  {totalPages > 1 && (
+                    <div className="flex gap-1">
                       <button
-                        key={n}
-                        onClick={() => setPage(n)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors cursor-pointer ${
-                          page === n
-                            ? "bg-primary text-white font-semibold"
-                            : "border border-border text-muted hover:border-primary hover:text-primary"
-                        }`}
+                        onClick={() => setPage(1)}
+                        disabled={page === 1}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                       >
-                        {n}
+                        «
                       </button>
-                    )
+                      <button
+                        onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                        disabled={page === 1}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                      >
+                        ‹
+                      </button>
+                      {pageWindow().map((n, i) =>
+                        n === "…" ? (
+                          <span
+                            key={`ellipsis-${i}`}
+                            className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
+                          >
+                            …
+                          </span>
+                        ) : (
+                          <button
+                            key={n}
+                            onClick={() => setPage(n)}
+                            className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors cursor-pointer ${
+                              page === n
+                                ? "bg-primary text-white font-semibold"
+                                : "border border-border text-muted hover:border-primary hover:text-primary"
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        )
+                      )}
+                      <button
+                        onClick={() =>
+                          setPage((prev) => Math.min(totalPages, prev + 1))
+                        }
+                        disabled={page === totalPages}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                      >
+                        ›
+                      </button>
+                      <button
+                        onClick={() => setPage(totalPages)}
+                        disabled={page === totalPages}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                      >
+                        »
+                      </button>
+                    </div>
                   )}
-                  <button
-                    onClick={() =>
-                      setPage((prev) => Math.min(totalPages, prev + 1))
-                    }
-                    disabled={page === totalPages}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                  >
-                    ›
-                  </button>
-                  <button
-                    onClick={() => setPage(totalPages)}
-                    disabled={page === totalPages}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                  >
-                    »
-                  </button>
                 </div>
               </div>
             )}

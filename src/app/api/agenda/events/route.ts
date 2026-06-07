@@ -193,6 +193,67 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Compromissos pessoais ─────────────────────────────────────────────────
+  const TIPO_ICONS_COMP: Record<string, string> = {
+    reuniao: "🤝",
+    videochamada: "📹",
+    fechamento: "✍️",
+    consulta: "👥",
+    outro: "📌",
+  };
+
+  const compRows = await sql`
+    SELECT * FROM compromissos
+    WHERE criado_por  = ${session.login}
+      AND data_inicio >= ${startDate}::date
+      AND data_inicio <  ${endDate}::date
+      ${showArchived ? sql`` : sql`AND status = 'pendente'`}
+    ORDER BY data_inicio, hora_inicio NULLS LAST
+  `;
+
+  for (const c of compRows) {
+    const tipo = String(c.tipo);
+    const icon = TIPO_ICONS_COMP[tipo] ?? "📌";
+    const di = c.data_inicio;
+    const dateStr =
+      di instanceof Date
+        ? di.toISOString().slice(0, 10)
+        : String(di).slice(0, 10);
+    const hasTime = c.hora_inicio != null;
+    const startStr = hasTime
+      ? `${dateStr}T${String(c.hora_inicio).slice(0, 5)}`
+      : dateStr;
+    const endStr =
+      hasTime && c.hora_fim
+        ? `${dateStr}T${String(c.hora_fim).slice(0, 5)}`
+        : undefined;
+
+    const isConcluido = String(c.status) === "concluido";
+    events.push({
+      id: `comp-${String(c.id)}`,
+      title: `${icon} ${String(c.titulo)}`,
+      start: startStr,
+      ...(endStr ? { end: endStr } : {}),
+      allDay: !hasTime,
+      backgroundColor: isConcluido ? "#94a3b8" : String(c.cor),
+      borderColor: "transparent",
+      textColor: "#ffffff",
+      extendedProps: {
+        source: "compromisso",
+        compromissoStatus: isConcluido ? "concluido" : "pendente",
+        compromissoId: String(c.id),
+        compromissoTitulo: String(c.titulo),
+        compromissoTipo: tipo,
+        compromissoHoraInicio: c.hora_inicio
+          ? String(c.hora_inicio).slice(0, 5)
+          : null,
+        compromissoHoraFim: c.hora_fim ? String(c.hora_fim).slice(0, 5) : null,
+        compromissoLocalLink: c.local_link ? String(c.local_link) : null,
+        compromissoDescricao: c.descricao ? String(c.descricao) : null,
+      },
+    });
+  }
+
   // ── Google Calendar events ────────────────────────────────────────────────
   const googleToken = await getStoredToken(session.id);
   if (googleToken) {

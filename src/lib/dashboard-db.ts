@@ -1,4 +1,10 @@
 import sql from "./db";
+import {
+  listarCompromissosProximos,
+  type Compromisso,
+} from "./compromissos-db";
+
+export type { Compromisso };
 
 export interface ClienteDevedor {
   client_id: string;
@@ -49,7 +55,7 @@ const TIPO_LABELS: Record<string, string> = {
   alvaras: "Alvará",
 };
 
-export async function getDashboardData() {
+export async function getDashboardData(login?: string) {
   const [
     clientesDevedoresRows,
     lancamentosVencidosRows,
@@ -177,10 +183,15 @@ export async function getDashboardData() {
     })
   );
 
+  const compromissosProximos: Compromisso[] = login
+    ? await listarCompromissosProximos(login, 14)
+    : [];
+
   return {
     clientesDevedores,
     lancamentosVencidos,
     proximosControles,
     aniversariantesTodos,
+    compromissosProximos,
   };
 }

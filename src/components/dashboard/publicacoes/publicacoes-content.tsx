@@ -2,7 +2,6 @@
 
 import { useState, useTransition, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { Publicacao, OabMonitorada } from "@/lib/publicacoes-db";
 import {
   marcarComoTratadaAction,
@@ -43,7 +42,6 @@ function StatusBadge({ status }: { status: Publicacao["status"] }) {
 // ── Row de publicação ─────────────────────────────────────────────────────────
 
 function PublicacaoRow({ pub }: { pub: Publicacao }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [action, setAction] = useState<string | null>(null);
   const loading = isPending && action !== null;
@@ -159,6 +157,21 @@ function TabelaPublicacoes({
   emptyMsg: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const totalPages = Math.max(1, Math.ceil(publicacoes.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const slice = publicacoes.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  );
+  const pages: (number | "…")[] = [];
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - safePage) <= 1)
+      pages.push(i);
+    else if (pages[pages.length - 1] !== "…") pages.push("…");
+  }
 
   function copiar() {
     const header = [
@@ -211,34 +224,98 @@ function TabelaPublicacoes({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-slate-50/60">
-                {[
-                  "Processo",
-                  "Destinatário",
-                  "Advogados",
-                  "Órgão",
-                  "Disponibilização",
-                  "Status / Ações",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-2.5 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted"
-                  >
-                    {h}
-                  </th>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-slate-50/60">
+                  {[
+                    "Processo",
+                    "Destinatário",
+                    "Advogados",
+                    "Órgão",
+                    "Disponibilização",
+                    "Status / Ações",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-2.5 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {slice.map((pub) => (
+                  <PublicacaoRow key={pub.id} pub={pub} />
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {publicacoes.map((pub) => (
-                <PublicacaoRow key={pub.id} pub={pub} />
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+            <div className="flex items-center gap-1">
+              <span className="mr-1 font-body text-xs text-muted">Exibir:</span>
+              {[10, 20, 50].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    setPageSize(s);
+                    setPage(1);
+                  }}
+                  className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
+                >
+                  {s}
+                </button>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <p className="mr-1 font-body text-xs text-muted">
+                {(safePage - 1) * pageSize + 1}–
+                {Math.min(safePage * pageSize, publicacoes.length)} de{" "}
+                {publicacoes.length}
+              </p>
+              {totalPages > 1 && (
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                    disabled={safePage === 1}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    ‹
+                  </button>
+                  {pages.map((n, i) =>
+                    n === "…" ? (
+                      <span
+                        key={`e-${i}`}
+                        className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={n}
+                        onClick={() => setPage(n as number)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors ${n === safePage ? "bg-primary font-semibold text-white" : "border border-border text-muted hover:border-primary hover:text-primary"}`}
+                      >
+                        {n}
+                      </button>
+                    )
+                  )}
+                  <button
+                    onClick={() =>
+                      setPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                    disabled={safePage === totalPages}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    ›
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition, useCallback } from "react";
+import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -31,8 +31,6 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
 ];
 
 type EstagioFilter = Estagio | "todos" | "ativos";
-
-const PAGE_SIZE = 15;
 
 function pageWindow(page: number, totalPages: number): (number | "…")[] {
   if (totalPages <= 7)
@@ -392,6 +390,7 @@ function LeadsTab({
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -417,12 +416,9 @@ function LeadsTab({
     });
   }, [leads, filter, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const slice = filtered.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE
-  );
+  const slice = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function handleFilterChange(f: EstagioFilter) {
     onFilterChange(f);
@@ -648,50 +644,71 @@ function LeadsTab({
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-border px-5 py-3">
-          <span className="font-body text-sm text-muted">
-            {(safePage - 1) * PAGE_SIZE + 1}–
-            {Math.min(safePage * PAGE_SIZE, filtered.length)} de{" "}
-            {filtered.length}
-          </span>
+      {filtered.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={safePage === 1}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
-            >
-              ‹
-            </button>
-            {pages.map((n, i) =>
-              n === "…" ? (
-                <span
-                  key={`e-${i}`}
-                  className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
-                >
-                  …
-                </span>
-              ) : (
+            <span className="mr-1 font-body text-xs text-muted">Exibir:</span>
+            {[10, 20, 50].map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setPageSize(s);
+                  setPage(1);
+                }}
+                className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <p className="mr-1 font-body text-xs text-muted">
+              {(safePage - 1) * pageSize + 1}–
+              {Math.min(safePage * pageSize, filtered.length)} de{" "}
+              {filtered.length}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex gap-1">
                 <button
-                  key={n}
-                  onClick={() => setPage(n as number)}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors ${
-                    n === safePage
-                      ? "bg-primary font-semibold text-white"
-                      : "border border-border text-muted hover:border-primary hover:text-primary"
-                  }`}
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safePage === 1}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
                 >
-                  {n}
+                  ‹
                 </button>
-              )
+                {pages.map((n, i) =>
+                  n === "…" ? (
+                    <span
+                      key={`e-${i}`}
+                      className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={n}
+                      onClick={() => setPage(n as number)}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors ${
+                        n === safePage
+                          ? "bg-primary font-semibold text-white"
+                          : "border border-border text-muted hover:border-primary hover:text-primary"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  )
+                )}
+                <button
+                  onClick={() =>
+                    setPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                  disabled={safePage === totalPages}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                >
+                  ›
+                </button>
+              </div>
             )}
-            <button
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={safePage === totalPages}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
-            >
-              ›
-            </button>
           </div>
         </div>
       )}

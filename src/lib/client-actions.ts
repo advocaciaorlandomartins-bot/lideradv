@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import sql from "./db";
+import { logAction } from "./audit";
 
 export type ClientFormState = { error: string } | null;
 
@@ -150,6 +151,13 @@ export async function createClientAction(
       return { error: "Erro ao salvar cliente. Tente novamente." };
     }
   }
+
+  await logAction({
+    acao: "criar",
+    entidade: "cliente",
+    descricao: `Cadastrou cliente: ${name}`,
+    detalhes: { type, doc },
+  });
 
   redirect("/dashboard/clientes");
 }
@@ -331,6 +339,13 @@ export async function updateClientAction(
     }
   }
 
+  await logAction({
+    acao: "editar",
+    entidade: "cliente",
+    entidadeId: id,
+    descricao: `Editou cliente: ${name}`,
+  });
+
   redirect(`/dashboard/clientes/${id}`);
 }
 
@@ -341,5 +356,11 @@ export async function deleteClientAction(id: string): Promise<void> {
     console.error("deleteClientAction DB error:", err);
     return;
   }
+  await logAction({
+    acao: "excluir",
+    entidade: "cliente",
+    entidadeId: id,
+    descricao: "Excluiu cliente",
+  });
   redirect("/dashboard/clientes");
 }

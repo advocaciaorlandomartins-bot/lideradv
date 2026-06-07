@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import sql from "./db";
+import { logAction } from "./audit";
 
 export type ColaboradorFormState = { error: string } | null;
 
@@ -102,6 +103,13 @@ export async function createColaboradorAction(
     return { error: "Erro ao salvar colaborador. Tente novamente." };
   }
 
+  await logAction({
+    acao: "criar",
+    entidade: "colaborador",
+    descricao: `Cadastrou colaborador: ${f.nome}`,
+    detalhes: { cargo: f.cargo },
+  });
+
   redirect("/dashboard/colaboradores");
 }
 
@@ -136,6 +144,14 @@ export async function updateColaboradorAction(
     return { error: "Erro ao atualizar colaborador. Tente novamente." };
   }
 
+  await logAction({
+    acao: "editar",
+    entidade: "colaborador",
+    entidadeId: id,
+    descricao: `Editou colaborador: ${f.nome}`,
+    detalhes: { status: f.status },
+  });
+
   redirect(`/dashboard/colaboradores/${id}`);
 }
 
@@ -145,5 +161,11 @@ export async function deleteColaboradorAction(id: string): Promise<void> {
   } catch (err) {
     console.error("deleteColaboradorAction DB error:", err);
   }
+  await logAction({
+    acao: "excluir",
+    entidade: "colaborador",
+    entidadeId: id,
+    descricao: "Excluiu colaborador",
+  });
   redirect("/dashboard/colaboradores");
 }

@@ -14,7 +14,6 @@ import {
   CurrencyIcon,
   CheckIcon,
   CalendarIcon,
-  UsersIcon,
   ChevronRightIcon,
 } from "@/components/icons";
 import { CARGO_LABELS } from "@/lib/colaboradores-types";
@@ -96,8 +95,6 @@ function DeleteButton({ id }: { id: string }) {
 type TipoFilter = "todos" | string;
 type StatusFilter = "todos" | "pendente" | "pago";
 
-const PAGE_SIZE = 10;
-
 interface Props {
   remuneracoes: Remuneracao[];
   kpis: RemuneracaoKpis;
@@ -109,6 +106,7 @@ export default function RemuneracoesContent({ remuneracoes, kpis }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [competenciaFilter, setCompetenciaFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -127,8 +125,8 @@ export default function RemuneracoesContent({ remuneracoes, kpis }: Props) {
     });
   }, [remuneracoes, search, tipoFilter, statusFilter, competenciaFilter]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   function reset(fn: () => void) {
     fn();
@@ -416,43 +414,66 @@ export default function RemuneracoesContent({ remuneracoes, kpis }: Props) {
             </ul>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-border px-5 py-3">
-                <p className="font-body text-xs text-muted">
-                  {(page - 1) * PAGE_SIZE + 1}–
-                  {Math.min(page * PAGE_SIZE, filtered.length)} de{" "}
-                  {filtered.length}
-                </p>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                  >
-                    ‹
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (n) => (
+            {filtered.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                <div className="flex items-center gap-1">
+                  <span className="mr-1 font-body text-xs text-muted">
+                    Exibir:
+                  </span>
+                  {[10, 20, 50].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setPageSize(s);
+                        setPage(1);
+                      }}
+                      className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <p className="mr-1 font-body text-xs text-muted">
+                    {(page - 1) * pageSize + 1}–
+                    {Math.min(page * pageSize, filtered.length)} de{" "}
+                    {filtered.length}
+                  </p>
+                  {totalPages > 1 && (
+                    <div className="flex gap-1">
                       <button
-                        key={n}
-                        onClick={() => setPage(n)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors duration-150 cursor-pointer ${
-                          page === n
-                            ? "bg-primary text-white font-semibold"
-                            : "border border-border text-muted hover:border-primary hover:text-primary"
-                        }`}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                       >
-                        {n}
+                        ‹
                       </button>
-                    )
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                        (n) => (
+                          <button
+                            key={n}
+                            onClick={() => setPage(n)}
+                            className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors duration-150 cursor-pointer ${
+                              page === n
+                                ? "bg-primary text-white font-semibold"
+                                : "border border-border text-muted hover:border-primary hover:text-primary"
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        )
+                      )}
+                      <button
+                        onClick={() =>
+                          setPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={page === totalPages}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                      >
+                        ›
+                      </button>
+                    </div>
                   )}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-                  >
-                    ›
-                  </button>
                 </div>
               </div>
             )}

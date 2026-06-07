@@ -691,3 +691,13 @@ export function FileStackIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function PenSignIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M15.232 5.232l3.536 3.536-9.193 9.193a4 4 0 0 1-1.697.985l-3.183.796.796-3.183a4 4 0 0 1 .985-1.697z" />
+      <path d="M17.5 2.5a2.121 2.121 0 0 1 3 3L19 7l-3-3z" />
+      <path d="M3 21h18" />
+    </Icon>
+  );
+}

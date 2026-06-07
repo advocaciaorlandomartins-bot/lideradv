@@ -99,8 +99,6 @@ function daysDiff(date: Date | null): number {
   return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-const PAGE_SIZE = 20;
-
 // ── Sub-components ─────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: Processo["status"] }) {
@@ -302,6 +300,7 @@ export default function ProcessosContent({
 
   // Pagination
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // UI modals/dropdowns
   const [showFiltro, setShowFiltro] = useState(false);
@@ -460,8 +459,8 @@ export default function ProcessosContent({
     sortDir,
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const valorTotal = filtered.reduce((s, p) => s + (p.valor_causa ?? 0), 0);
   const activeFiltrosCount = filtrosAtivos
@@ -947,8 +946,6 @@ export default function ProcessosContent({
                       p.status !== "arquivado" &&
                       p.status !== "encerrado";
                     const movimentado = diasAtual <= settings.diasMovimentado;
-                    const incompleto = !p.numero || !p.vara;
-
                     return (
                       <tr
                         key={p.id}
@@ -1127,64 +1124,87 @@ export default function ProcessosContent({
             </ul>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-border px-5 py-3">
-                <p className="font-body text-xs text-muted">
-                  {(page - 1) * PAGE_SIZE + 1}–
-                  {Math.min(page * PAGE_SIZE, filtered.length)} de{" "}
-                  {filtered.length}
-                </p>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setPage(1)}
-                    disabled={page === 1}
-                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    «
-                  </button>
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    ‹
-                  </button>
-                  {pageWindow().map((n, i) =>
-                    n === "…" ? (
-                      <span
-                        key={`ellipsis-${i}`}
-                        className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
-                      >
-                        …
-                      </span>
-                    ) : (
+            {filtered.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                <div className="flex items-center gap-1">
+                  <span className="mr-1 font-body text-xs text-muted">
+                    Exibir:
+                  </span>
+                  {[10, 20, 50].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => {
+                        setPageSize(s);
+                        setPage(1);
+                      }}
+                      className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <p className="mr-1 font-body text-xs text-muted">
+                    {(page - 1) * pageSize + 1}–
+                    {Math.min(page * pageSize, filtered.length)} de{" "}
+                    {filtered.length}
+                  </p>
+                  {totalPages > 1 && (
+                    <div className="flex gap-1">
                       <button
-                        key={n}
-                        onClick={() => setPage(n)}
-                        className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg font-body text-sm transition-colors ${
-                          page === n
-                            ? "bg-primary font-semibold text-white"
-                            : "border border-border text-muted hover:border-primary hover:text-primary"
-                        }`}
+                        onClick={() => setPage(1)}
+                        disabled={page === 1}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {n}
+                        «
                       </button>
-                    )
+                      <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        ‹
+                      </button>
+                      {pageWindow().map((n, i) =>
+                        n === "…" ? (
+                          <span
+                            key={`ellipsis-${i}`}
+                            className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
+                          >
+                            …
+                          </span>
+                        ) : (
+                          <button
+                            key={n}
+                            onClick={() => setPage(n)}
+                            className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg font-body text-sm transition-colors ${
+                              page === n
+                                ? "bg-primary font-semibold text-white"
+                                : "border border-border text-muted hover:border-primary hover:text-primary"
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        )
+                      )}
+                      <button
+                        onClick={() =>
+                          setPage((p) => Math.min(totalPages, p + 1))
+                        }
+                        disabled={page === totalPages}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        ›
+                      </button>
+                      <button
+                        onClick={() => setPage(totalPages)}
+                        disabled={page === totalPages}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        »
+                      </button>
+                    </div>
                   )}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    ›
-                  </button>
-                  <button
-                    onClick={() => setPage(totalPages)}
-                    disabled={page === totalPages}
-                    className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    »
-                  </button>
                 </div>
               </div>
             )}

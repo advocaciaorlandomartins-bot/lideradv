@@ -291,9 +291,6 @@ export default function ControlesContent({
   const countConcluido = controles.filter(
     (c) => c.status === "concluido"
   ).length;
-  const countCancelado = controles.filter(
-    (c) => c.status === "cancelado"
-  ).length;
   const countUrgente = controles.filter((c) => {
     const d = getDaysRemaining(c.data_evento);
     return c.status === "pendente" && d !== null && d <= 3;
@@ -449,8 +446,6 @@ export default function ControlesContent({
           <p className="mt-2 font-body text-xs text-muted">
             {total} registro{total !== 1 ? "s" : ""} encontrado
             {total !== 1 ? "s" : ""}
-            {" · "}
-            {rpp} por página
           </p>
         </div>
 
@@ -660,69 +655,87 @@ export default function ControlesContent({
         )}
 
         {/* Paginação */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-border px-5 py-3">
-            <p className="font-body text-xs text-muted">
-              {(pagina - 1) * rpp + 1}–{Math.min(pagina * rpp, total)} de{" "}
-              {total}
-            </p>
+        {total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
             <div className="flex items-center gap-1">
-              <Link
-                href={buildUrl({ pagina: 1 })}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === 1 ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
-              >
-                «
-              </Link>
-              <Link
-                href={buildUrl({ pagina: Math.max(1, pagina - 1) })}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === 1 ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
-              >
-                ‹
-              </Link>
-              {(() => {
-                const pages: (number | "…")[] = [];
-                if (totalPages <= 7) {
-                  for (let i = 1; i <= totalPages; i++) pages.push(i);
-                } else {
-                  const left = Math.max(2, pagina - 2);
-                  const right = Math.min(totalPages - 1, pagina + 2);
-                  pages.push(1);
-                  if (left > 2) pages.push("…");
-                  for (let i = left; i <= right; i++) pages.push(i);
-                  if (right < totalPages - 1) pages.push("…");
-                  pages.push(totalPages);
-                }
-                return pages.map((p, i) =>
-                  p === "…" ? (
-                    <span
-                      key={`ellipsis-${i}`}
-                      className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
-                    >
-                      …
-                    </span>
-                  ) : (
-                    <Link
-                      key={p}
-                      href={buildUrl({ pagina: p })}
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors ${p === pagina ? "bg-primary text-white font-semibold" : "border border-border text-muted hover:border-primary hover:text-primary"}`}
-                    >
-                      {p}
-                    </Link>
-                  )
-                );
-              })()}
-              <Link
-                href={buildUrl({ pagina: Math.min(totalPages, pagina + 1) })}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === totalPages ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
-              >
-                ›
-              </Link>
-              <Link
-                href={buildUrl({ pagina: totalPages })}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === totalPages ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
-              >
-                »
-              </Link>
+              <span className="mr-1 font-body text-xs text-muted">Exibir:</span>
+              {[10, 20, 50].map((s) => (
+                <Link
+                  key={s}
+                  href={buildUrl({ rpp: s, pagina: 1 })}
+                  className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors text-center ${rpp === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
+                >
+                  {s}
+                </Link>
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <p className="mr-1 font-body text-xs text-muted">
+                {(pagina - 1) * rpp + 1}–{Math.min(pagina * rpp, total)} de{" "}
+                {total}
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <Link
+                    href={buildUrl({ pagina: 1 })}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === 1 ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
+                  >
+                    «
+                  </Link>
+                  <Link
+                    href={buildUrl({ pagina: Math.max(1, pagina - 1) })}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === 1 ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
+                  >
+                    ‹
+                  </Link>
+                  {(() => {
+                    const pages: (number | "…")[] = [];
+                    if (totalPages <= 7) {
+                      for (let i = 1; i <= totalPages; i++) pages.push(i);
+                    } else {
+                      const left = Math.max(2, pagina - 2);
+                      const right = Math.min(totalPages - 1, pagina + 2);
+                      pages.push(1);
+                      if (left > 2) pages.push("…");
+                      for (let i = left; i <= right; i++) pages.push(i);
+                      if (right < totalPages - 1) pages.push("…");
+                      pages.push(totalPages);
+                    }
+                    return pages.map((p, i) =>
+                      p === "…" ? (
+                        <span
+                          key={`ellipsis-${i}`}
+                          className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <Link
+                          key={p}
+                          href={buildUrl({ pagina: p })}
+                          className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors ${p === pagina ? "bg-primary text-white font-semibold" : "border border-border text-muted hover:border-primary hover:text-primary"}`}
+                        >
+                          {p}
+                        </Link>
+                      )
+                    );
+                  })()}
+                  <Link
+                    href={buildUrl({
+                      pagina: Math.min(totalPages, pagina + 1),
+                    })}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === totalPages ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
+                  >
+                    ›
+                  </Link>
+                  <Link
+                    href={buildUrl({ pagina: totalPages })}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg border font-body text-sm transition-colors ${pagina === totalPages ? "pointer-events-none border-border text-slate-300" : "border-border text-muted hover:border-primary hover:text-primary"}`}
+                  >
+                    »
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         )}

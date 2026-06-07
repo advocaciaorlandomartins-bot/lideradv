@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { logAction } from "./audit";
+import { getSession } from "./session";
 
 export type LancamentoFormState = { error: string } | null;
 
@@ -41,8 +43,9 @@ export async function createLancamentoAction(
   const paymentMode = (
     (formData.get("payment_mode") as string | null) ?? "avista"
   ).trim();
-  const parcelado = paymentMode === "parcelado";
+  const parcelado = paymentMode === "parcelado" || paymentMode === "retroativo";
   const recorrente = paymentMode === "recorrente";
+  const mensalidade = paymentMode === "mensalidade";
   const valorEntradaStr = (
     (formData.get("valor_entrada") as string | null) ?? ""
   ).trim();
@@ -60,6 +63,12 @@ export async function createLancamentoAction(
   const numRecorrencias = parseInt(numRecorrenciasStr) || 12;
   const observacoes =
     ((formData.get("observacoes") as string | null) ?? "").trim() || null;
+  const valorMensalidadeStr = (
+    (formData.get("valor_mensalidade") as string | null) ?? ""
+  ).trim();
+  const valorMensalidade = valorMensalidadeStr
+    ? parseFloat(valorMensalidadeStr)
+    : 0;
   const indicadorId =
     ((formData.get("indicador_id") as string | null) ?? "").trim() || null;
   const comissaoTipo =
@@ -73,6 +82,8 @@ export async function createLancamentoAction(
 
   if (!valorStr || isNaN(valor) || valor <= 0)
     return { error: "Informe um valor válido." };
+  if (mensalidade && (isNaN(valorMensalidade) || valorMensalidade <= 0))
+    return { error: "Informe o valor da mensalidade." };
 
   // Calculate commission if applicable
   const shouldCreateComissao =
@@ -125,6 +136,32 @@ export async function createLancamentoAction(
           RETURNING id
         `;
         if (i === 0) firstLancamentoId = rows[0].id as string;
+      }
+    } else if (mensalidade) {
+      // Mensalidade fixa: N lancamentos de valor fixo = valorMensalidade cada
+      const grupoParcelas = crypto.randomUUID();
+      const numParcelas = Math.ceil(valor / valorMensalidade);
+      const baseDate = new Date(`${baseDateStr}T12:00:00`);
+      for (let i = 1; i <= numParcelas; i++) {
+        const parcDate = new Date(baseDate);
+        parcDate.setMonth(parcDate.getMonth() + i);
+        const parcDateStr = parcDate.toISOString().split("T")[0];
+        const descParcela = `${descricao} — Parcela ${i}/${numParcelas}`;
+        const rows = await sql`
+          INSERT INTO lancamentos
+            (tipo, categoria, descricao, valor, client_id, processo_id,
+             status, data_vencimento, parcela_atual, total_parcelas,
+             grupo_parcelas, observacoes)
+          VALUES
+            (${tipo}, ${categoria}, ${descParcela}, ${valorMensalidade},
+             ${clientId ? clientId : null}::uuid,
+             ${processoId ? processoId : null}::uuid,
+             'pendente', ${parcDateStr}::date, ${i}, ${numParcelas},
+             ${grupoParcelas}::uuid, ${observacoes})
+          RETURNING id
+        `;
+        if (!firstLancamentoId) firstLancamentoId = rows[0].id as string;
+        parcelaLancamentoIds.push(rows[0].id as string);
       }
     } else if (!parcelado) {
       const dataVenc = dataVencimento || null;
@@ -196,7 +233,7 @@ export async function createLancamentoAction(
     if (shouldCreateComissao && comissaoValorFinal > 0) {
       const descComissao = `Comissão — ${descricao}`;
 
-      if (parcelado && parcelaLancamentoIds.length > 0) {
+      if ((parcelado || mensalidade) && parcelaLancamentoIds.length > 0) {
         // One commission remuneração per installment, linked to each lancamento
         const commPerParcela =
           Math.round((comissaoValorFinal / parcelaLancamentoIds.length) * 100) /
@@ -245,6 +282,17 @@ export async function createLancamentoAction(
     console.error("createLancamentoAction DB error:", err);
     return { error: "Erro ao salvar lançamento. Tente novamente." };
   }
+
+  const valorFmt = valor.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  await logAction({
+    acao: "criar",
+    entidade: "lancamento",
+    descricao: `Registrou ${tipo === "entrada" ? "receita" : "despesa"} de R$ ${valorFmt} — ${descricao}`,
+    detalhes: { paymentMode, valor, tipo },
+  });
 
   redirect("/dashboard/financeiro");
 }
@@ -343,6 +391,14 @@ export async function updateLancamentoAction(
     return { error: "Erro ao atualizar lançamento. Tente novamente." };
   }
 
+  await logAction({
+    acao: "editar",
+    entidade: "lancamento",
+    entidadeId: id,
+    descricao: `Editou lançamento — ${descricao}`,
+    detalhes: { valor, status },
+  });
+
   redirect("/dashboard/financeiro");
 }
 
@@ -364,6 +420,7 @@ export async function reagendarLancamentoAction(
 }
 
 export async function markAsPagoAction(id: string): Promise<void> {
+  const session = await getSession();
   try {
     const rows = await sql`
       UPDATE lancamentos
@@ -382,10 +439,19 @@ export async function markAsPagoAction(id: string): Promise<void> {
   } catch (err) {
     console.error("markAsPagoAction DB error:", err);
   }
+  await logAction({
+    acao: "pagar",
+    entidade: "lancamento",
+    entidadeId: id,
+    descricao: "Marcou lançamento como pago",
+    _login: session?.login ?? "sistema",
+    _cat: session?.categoria ? String(session.categoria) : undefined,
+  });
   revalidatePath("/dashboard/financeiro");
 }
 
 export async function deleteLancamentoAction(id: string): Promise<void> {
+  const session = await getSession();
   try {
     const rows = await sql`
       DELETE FROM lancamentos WHERE id = ${id}::uuid
@@ -400,10 +466,19 @@ export async function deleteLancamentoAction(id: string): Promise<void> {
   } catch (err) {
     console.error("deleteLancamentoAction DB error:", err);
   }
+  await logAction({
+    acao: "excluir",
+    entidade: "lancamento",
+    entidadeId: id,
+    descricao: "Excluiu lançamento",
+    _login: session?.login ?? "sistema",
+    _cat: session?.categoria ? String(session.categoria) : undefined,
+  });
   revalidatePath("/dashboard/financeiro");
 }
 
 export async function revertParaPendenteAction(id: string): Promise<void> {
+  const session = await getSession();
   try {
     const rows = await sql`
       UPDATE lancamentos
@@ -422,6 +497,14 @@ export async function revertParaPendenteAction(id: string): Promise<void> {
   } catch (err) {
     console.error("revertParaPendenteAction DB error:", err);
   }
+  await logAction({
+    acao: "reverter",
+    entidade: "lancamento",
+    entidadeId: id,
+    descricao: "Reverteu lançamento para pendente",
+    _login: session?.login ?? "sistema",
+    _cat: session?.categoria ? String(session.categoria) : undefined,
+  });
   revalidatePath("/dashboard/financeiro");
 }
 

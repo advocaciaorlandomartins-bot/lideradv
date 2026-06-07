@@ -3,8 +3,9 @@
 import crypto from "crypto";
 import { redirect } from "next/navigation";
 import sql from "./db";
-import { createSession, destroySession } from "./session";
+import { createSession, destroySession, getSession } from "./session";
 import { resolvePermissoes } from "./permissoes";
+import { logAction } from "./audit";
 
 export type LoginState = { error: string } | null;
 
@@ -74,11 +75,27 @@ export async function loginAction(
     permissoes,
   });
 
+  await logAction({
+    acao: "login",
+    entidade: "usuario",
+    descricao: `Login realizado — ${login}`,
+    _login: login,
+    _cat: String(user.categoria),
+  });
+
   redirect("/dashboard");
 }
 
 export async function logoutAction(): Promise<void> {
+  const session = await getSession();
   await destroySession();
+  await logAction({
+    acao: "logout",
+    entidade: "usuario",
+    descricao: `Logout — ${session?.login ?? "usuário"}`,
+    _login: session?.login ?? "sistema",
+    _cat: session?.categoria,
+  });
   redirect("/");
 }
 

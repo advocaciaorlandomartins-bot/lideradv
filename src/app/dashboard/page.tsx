@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getGerenciadorData } from "@/lib/gerenciador-db";
 import { getDashboardData } from "@/lib/dashboard-db";
+import { TIPO_LABELS_COMP, TIPO_ICONS_COMP } from "@/lib/compromissos-db";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import MiniCalendar from "@/components/dashboard/mini-calendar";
@@ -175,7 +176,7 @@ export default async function DashboardPage() {
 
   const [gerData, dashData] = await Promise.all([
     needsGerData ? getGerenciadorData() : Promise.resolve(null),
-    needsDashData ? getDashboardData() : Promise.resolve(null),
+    needsDashData ? getDashboardData(session.login) : Promise.resolve(null),
   ]);
 
   const kpis = gerData?.kpis;
@@ -186,6 +187,7 @@ export default async function DashboardPage() {
   const lancamentosVencidos = dashData?.lancamentosVencidos ?? [];
   const proximosControles = dashData?.proximosControles ?? [];
   const aniversariantesTodos = dashData?.aniversariantesTodos ?? [];
+  const compromissosProximos = dashData?.compromissosProximos ?? [];
 
   const today = new Date().toLocaleDateString("pt-BR", {
     weekday: "long",
@@ -712,7 +714,28 @@ export default async function DashboardPage() {
           </div>
 
           <div className="flex flex-col gap-4 lg:col-span-2">
-            <MiniCalendar events={proximosControles} />
+            <MiniCalendar
+              events={[
+                ...proximosControles,
+                ...compromissosProximos.map((c) => ({
+                  id: c.id,
+                  tipo_label: `${TIPO_ICONS_COMP[c.tipo] ?? "📌"} ${TIPO_LABELS_COMP[c.tipo] ?? "Compromisso"}`,
+                  descricao: c.titulo,
+                  cliente_nome: null,
+                  data_evento: c.data_inicio,
+                  dias_restantes: Math.max(
+                    0,
+                    Math.floor(
+                      (new Date(c.data_inicio + "T12:00:00").getTime() -
+                        new Date().setHours(0, 0, 0, 0)) /
+                        86400000
+                    )
+                  ),
+                  source: "compromisso" as const,
+                  href: "/dashboard/agenda",
+                })),
+              ]}
+            />
 
             {/* Resumo financeiro — só aparece se tiver acesso */}
             {showFinanceiro && kpis ? (

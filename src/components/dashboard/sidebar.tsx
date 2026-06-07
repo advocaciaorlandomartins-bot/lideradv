@@ -19,7 +19,11 @@ import {
   ChartBarIcon,
   PrinterIcon,
   FunnelIcon,
-  MailIcon,
+  CalendarIcon,
+  KanbanIcon,
+  PenSignIcon,
+  FileStackIcon,
+  InboxArrowDownIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -34,10 +38,22 @@ const NAV_ITEMS = [
     modulo: null,
   },
   {
+    href: "/dashboard/agenda",
+    icon: CalendarIcon,
+    label: "Agenda",
+    modulo: "controles",
+  },
+  {
     href: "/dashboard/crm",
     icon: FunnelIcon,
     label: "CRM",
     modulo: "crm",
+  },
+  {
+    href: "/dashboard/producao",
+    icon: KanbanIcon,
+    label: "Produção",
+    modulo: "producao",
   },
   {
     href: "/dashboard/clientes",
@@ -52,16 +68,16 @@ const NAV_ITEMS = [
     modulo: "processos",
   },
   {
+    href: "/dashboard/publicacoes",
+    icon: InboxArrowDownIcon,
+    label: "Publicações",
+    modulo: "publicacoes",
+  },
+  {
     href: "/dashboard/financeiro",
     icon: BanknotesIcon,
     label: "Financeiro",
     modulo: "financeiro",
-  },
-  {
-    href: "/dashboard/publicacoes",
-    icon: MailIcon,
-    label: "Publicações",
-    modulo: "publicacoes",
   },
   {
     href: "/dashboard/controles",
@@ -74,6 +90,18 @@ const NAV_ITEMS = [
     icon: DocumentTextIcon,
     label: "Modelos",
     modulo: "modelos",
+  },
+  {
+    href: "/dashboard/assinaturas",
+    icon: PenSignIcon,
+    label: "Assinaturas",
+    modulo: "assinaturas",
+  },
+  {
+    href: "/dashboard/ferramentas-pdf",
+    icon: FileStackIcon,
+    label: "PDFs",
+    modulo: null,
   },
   {
     href: "/dashboard/colaboradores",

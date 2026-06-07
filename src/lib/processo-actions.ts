@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import sql from "./db";
+import { logAction } from "./audit";
 
 export type ProcessoFormState = { error: string } | null;
 
@@ -52,6 +53,13 @@ export async function createProcessoAction(
     console.error("createProcessoAction DB error:", err);
     return { error: "Erro ao salvar processo. Tente novamente." };
   }
+
+  await logAction({
+    acao: "criar",
+    entidade: "processo",
+    descricao: `Abriu processo: ${tipoAcao}`,
+    detalhes: { tipoAcao, area },
+  });
 
   redirect("/dashboard/processos");
 }
@@ -112,6 +120,14 @@ export async function updateProcessoAction(
     return { error: "Erro ao atualizar processo. Tente novamente." };
   }
 
+  await logAction({
+    acao: "editar",
+    entidade: "processo",
+    entidadeId: id,
+    descricao: `Editou processo: ${tipoAcao}`,
+    detalhes: { status },
+  });
+
   redirect(`/dashboard/processos/${id}`);
 }
 
@@ -122,5 +138,11 @@ export async function deleteProcessoAction(id: string): Promise<void> {
     console.error("deleteProcessoAction DB error:", err);
     return;
   }
+  await logAction({
+    acao: "excluir",
+    entidade: "processo",
+    entidadeId: id,
+    descricao: "Excluiu processo",
+  });
   redirect("/dashboard/processos");
 }

@@ -1,7 +1,19 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import {
+  useRef,
+  useState,
+  useReducer,
+  useCallback,
+  useEffect,
+  useTransition,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  criarCompromissoAction,
+  atualizarCompromissoAction,
+  deletarCompromissoAction,
+} from "@/lib/compromissos-actions";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -25,7 +37,7 @@ interface GoogleStatus {
 }
 
 interface EventExtended {
-  source: "controle" | "lancamento" | "birthday" | "google";
+  source: "controle" | "lancamento" | "birthday" | "google" | "compromisso";
   tipoLabel?: string;
   clienteNome?: string;
   clienteId?: string;
@@ -35,7 +47,37 @@ interface EventExtended {
   isVencido?: boolean;
   href?: string;
   status?: string;
+  // compromisso fields
+  compromissoId?: string;
+  compromissoTitulo?: string;
+  compromissoTipo?: string;
+  compromissoStatus?: string;
+  compromissoHoraInicio?: string | null;
+  compromissoHoraFim?: string | null;
+  compromissoLocalLink?: string | null;
+  compromissoDescricao?: string | null;
 }
+
+interface CompromissoModalState {
+  mode: "create" | "edit";
+  dateStr?: string;
+  id?: string;
+  titulo?: string;
+  tipo?: string;
+  horaInicio?: string;
+  horaFim?: string;
+  localLink?: string;
+  descricao?: string;
+  status?: string;
+}
+
+const TIPOS_COMP = [
+  { key: "reuniao", label: "Reunião", icon: "🤝" },
+  { key: "videochamada", label: "Videochamada", icon: "📹" },
+  { key: "fechamento", label: "Fechamento", icon: "✍️" },
+  { key: "consulta", label: "Consulta", icon: "👥" },
+  { key: "outro", label: "Outro", icon: "📌" },
+] as const;
 
 interface DayPopover {
   dateStr: string;
@@ -106,8 +148,40 @@ const LEGENDA = [
   { color: "#059669", label: "Benefício / Receita" },
   { color: "#2563eb", label: "Implantado / Alvará" },
   { color: "#db2777", label: "Aniversário" },
+  { color: "#0ea5e9", label: "Compromisso pessoal" },
   { color: "#94a3b8", label: "Concluído" },
 ];
+
+// ── Form reducer (evita múltiplos setState no useEffect) ──────────────────────
+
+type ModalFormState = {
+  titulo: string;
+  tipo: string;
+  data: string;
+  horaInicio: string;
+  horaFim: string;
+  localLink: string;
+  descricao: string;
+  status: "pendente" | "concluido";
+  deleteConfirm: boolean;
+};
+const EMPTY_FORM: ModalFormState = {
+  titulo: "",
+  tipo: "reuniao",
+  data: "",
+  horaInicio: "",
+  horaFim: "",
+  localLink: "",
+  descricao: "",
+  status: "pendente",
+  deleteConfirm: false,
+};
+function formReducer(
+  s: ModalFormState,
+  p: Partial<ModalFormState>
+): ModalFormState {
+  return { ...s, ...p };
+}
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
@@ -116,6 +190,7 @@ export default function AgendaCalendar() {
   const searchParams = useSearchParams();
   const calRef = useRef<FullCalendar>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const [isPending, startTransition] = useTransition();
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -128,6 +203,84 @@ export default function AgendaCalendar() {
     type: "ok" | "err";
     text: string;
   } | null>(null);
+
+  // ── Modal de compromisso ────────────────────────────────────────────────────
+  const [modalComp, setModalComp] = useState<CompromissoModalState | null>(
+    null
+  );
+  const [form, dispatch] = useReducer(formReducer, EMPTY_FORM);
+
+  // Preenche o formulário quando o modal abre (dispatch = único setState)
+  useEffect(() => {
+    if (!modalComp) return;
+    const today = new Date().toISOString().slice(0, 10);
+    if (modalComp.mode === "create") {
+      dispatch({
+        titulo: "",
+        tipo: modalComp.tipo ?? "reuniao",
+        data: modalComp.dateStr ?? today,
+        horaInicio: "",
+        horaFim: "",
+        localLink: "",
+        descricao: "",
+        status: "pendente",
+        deleteConfirm: false,
+      });
+    } else {
+      dispatch({
+        titulo: modalComp.titulo ?? "",
+        tipo: modalComp.tipo ?? "reuniao",
+        data: modalComp.dateStr ?? today,
+        horaInicio: modalComp.horaInicio ?? "",
+        horaFim: modalComp.horaFim ?? "",
+        localLink: modalComp.localLink ?? "",
+        descricao: modalComp.descricao ?? "",
+        status: (modalComp.status ?? "pendente") as "pendente" | "concluido",
+        deleteConfirm: false,
+      });
+    }
+  }, [modalComp]);
+
+  function openNovoCompromisso(dateStr?: string) {
+    setDayPopover(null);
+    setModalComp({
+      mode: "create",
+      dateStr: dateStr ?? new Date().toISOString().slice(0, 10),
+    });
+  }
+
+  function handleSaveCompromisso(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.titulo.trim()) return;
+    const data = {
+      titulo: form.titulo.trim(),
+      tipo: form.tipo,
+      dataInicio: form.data,
+      horaInicio: form.horaInicio || null,
+      horaFim: form.horaFim || null,
+      localLink: form.localLink.trim() || null,
+      descricao: form.descricao.trim() || null,
+      status: form.status,
+    };
+    startTransition(async () => {
+      if (modalComp?.mode === "edit" && modalComp.id) {
+        await atualizarCompromissoAction(modalComp.id, data);
+      } else {
+        await criarCompromissoAction(data);
+      }
+      setModalComp(null);
+      getApi()?.refetchEvents();
+    });
+  }
+
+  function handleDeleteCompromisso() {
+    if (!modalComp?.id) return;
+    startTransition(async () => {
+      await deletarCompromissoAction(modalComp.id!);
+      setModalComp(null);
+      getApi()?.refetchEvents();
+    });
+  }
 
   // Inicializa mensagem OAuth a partir dos query params (antes de qualquer effect)
   const oauthConnected = searchParams.get("google_connected");
@@ -252,11 +405,26 @@ export default function AgendaCalendar() {
     api.changeView(view);
   }
 
-  // ── Clique em evento → navega para o link ───────────────────────────────────
+  // ── Clique em evento → navega para o link ou abre modal ────────────────────
 
   function handleEventClick(info: EventClickArg) {
     const props = info.event.extendedProps as EventExtended;
-    if (props.href) router.push(props.href);
+    if (props.source === "compromisso") {
+      setModalComp({
+        mode: "edit",
+        id: props.compromissoId,
+        titulo: props.compromissoTitulo ?? "",
+        tipo: props.compromissoTipo ?? "outro",
+        dateStr: info.event.startStr.slice(0, 10),
+        horaInicio: props.compromissoHoraInicio ?? "",
+        horaFim: props.compromissoHoraFim ?? "",
+        localLink: props.compromissoLocalLink ?? "",
+        descricao: props.compromissoDescricao ?? "",
+        status: props.compromissoStatus ?? "pendente",
+      });
+    } else if (props.href) {
+      router.push(props.href);
+    }
   }
 
   // ── Clique em dia vazio → abre popover ──────────────────────────────────────
@@ -285,6 +453,14 @@ export default function AgendaCalendar() {
     event: { extendedProps: Record<string, unknown>; title: string };
   }) {
     const props = arg.event.extendedProps as unknown as EventExtended;
+    // compromisso events already have icon in the title (added by the API)
+    if (props.source === "compromisso") {
+      return (
+        <div className="fc-event-inner">
+          <span className="fc-event-label">{arg.event.title}</span>
+        </div>
+      );
+    }
     const icon =
       props.source === "google"
         ? "📅"
@@ -322,6 +498,27 @@ export default function AgendaCalendar() {
     <div className="agenda-layout">
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       <aside className="agenda-sidebar">
+        {/* Novo compromisso */}
+        <button
+          onClick={() => openNovoCompromisso()}
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          Novo compromisso
+        </button>
+
         {/* Atualizar */}
         <button
           onClick={() => getApi()?.refetchEvents()}
@@ -554,6 +751,13 @@ export default function AgendaCalendar() {
           </div>
           <div className="agenda-popover-body">
             <button
+              onClick={() => openNovoCompromisso(dayPopover.dateStr)}
+              className="w-full rounded-lg px-3 py-2 text-left font-body text-xs font-semibold text-fg transition-colors hover:bg-sky-50 hover:text-sky-700"
+            >
+              📝 Novo compromisso
+            </button>
+            <div className="mx-1 border-t border-border" />
+            <button
               onClick={() => {
                 setDayPopover(null);
                 router.push(
@@ -593,6 +797,204 @@ export default function AgendaCalendar() {
             >
               🕐 Ver dia por hora
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de compromisso ─────────────────────────────────────────────── */}
+      {modalComp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => e.target === e.currentTarget && setModalComp(null)}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <h2 className="font-heading text-base font-semibold text-fg">
+                {modalComp.mode === "create"
+                  ? "Novo Compromisso"
+                  : "Editar Compromisso"}
+              </h2>
+              <button
+                onClick={() => setModalComp(null)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-slate-100 hover:text-fg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Formulário */}
+            <form
+              onSubmit={handleSaveCompromisso}
+              className="px-6 py-5 space-y-4"
+            >
+              {/* Tipo */}
+              <div>
+                <label className="mb-2 block font-body text-xs font-semibold text-muted">
+                  Tipo
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {TIPOS_COMP.map((t) => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => dispatch({ tipo: t.key })}
+                      className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-body text-xs font-semibold transition-colors ${form.tipo === t.key ? "border-sky-300 bg-sky-50 text-sky-700" : "border-border text-muted hover:border-sky-200 hover:text-fg"}`}
+                    >
+                      <span>{t.icon}</span>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Título */}
+              <div>
+                <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                  Título *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.titulo}
+                  onChange={(e) => dispatch({ titulo: e.target.value })}
+                  placeholder="Ex.: Reunião com cliente João Silva"
+                  className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                />
+              </div>
+
+              {/* Data */}
+              <div>
+                <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                  Data *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.data}
+                  onChange={(e) => dispatch({ data: e.target.value })}
+                  className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                />
+              </div>
+
+              {/* Horário */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                    Hora início
+                  </label>
+                  <input
+                    type="time"
+                    value={form.horaInicio}
+                    onChange={(e) => dispatch({ horaInicio: e.target.value })}
+                    className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                    Hora fim
+                  </label>
+                  <input
+                    type="time"
+                    value={form.horaFim}
+                    onChange={(e) => dispatch({ horaFim: e.target.value })}
+                    className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  />
+                </div>
+              </div>
+
+              {/* Local / Link */}
+              <div>
+                <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                  Local ou link (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={form.localLink}
+                  onChange={(e) => dispatch({ localLink: e.target.value })}
+                  placeholder="Ex.: Sala de reunião / https://meet.google.com/…"
+                  className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                />
+              </div>
+
+              {/* Descrição */}
+              <div>
+                <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                  Observações (opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={form.descricao}
+                  onChange={(e) => dispatch({ descricao: e.target.value })}
+                  placeholder="Detalhes adicionais…"
+                  className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                />
+              </div>
+
+              {/* Botões */}
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={isPending || !form.titulo.trim()}
+                  className="flex-1 rounded-lg bg-sky-500 px-4 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {isPending ? "Salvando…" : "Salvar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalComp(null)}
+                  className="rounded-lg border border-border px-4 py-2 font-body text-sm font-semibold text-muted transition-colors hover:text-fg"
+                >
+                  Cancelar
+                </button>
+                {modalComp.mode === "edit" && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() =>
+                        dispatch({
+                          status:
+                            form.status === "pendente"
+                              ? "concluido"
+                              : "pendente",
+                        })
+                      }
+                      title={
+                        form.status === "pendente"
+                          ? "Dar baixa no compromisso"
+                          : "Reabrir compromisso"
+                      }
+                      className={`rounded-lg border px-3 py-2 font-body text-sm transition-colors disabled:opacity-50 ${
+                        form.status === "concluido"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          : "border-slate-200 text-slate-500 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                      }`}
+                    >
+                      {form.status === "concluido" ? "✅ Concluído" : "✓ Baixa"}
+                    </button>
+                    {form.deleteConfirm ? (
+                      <button
+                        type="button"
+                        onClick={handleDeleteCompromisso}
+                        disabled={isPending}
+                        className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 font-body text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                      >
+                        Confirmar exclusão
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => dispatch({ deleteConfirm: true })}
+                        className="rounded-lg border border-red-200 px-3 py-2 font-body text-sm text-red-500 transition-colors hover:border-red-300 hover:bg-red-50"
+                      >
+                        🗑
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       )}

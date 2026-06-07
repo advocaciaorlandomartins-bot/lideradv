@@ -68,40 +68,42 @@ export default async function FinanceiroPage({
 
       {/* Tabs + botões de cadastro completo */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm">
-          <Link
-            href="/dashboard/financeiro"
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 ${
-              !isRemuneracoes && !isContas
-                ? "bg-primary text-white shadow-sm"
-                : "text-muted hover:text-fg"
-            }`}
-          >
-            <BanknotesIcon className="h-4 w-4" />
-            Lançamentos
-          </Link>
-          <Link
-            href="/dashboard/financeiro?tab=remuneracoes"
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 ${
-              isRemuneracoes
-                ? "bg-primary text-white shadow-sm"
-                : "text-muted hover:text-fg"
-            }`}
-          >
-            <CurrencyIcon className="h-4 w-4" />
-            Remunerações
-          </Link>
-          <Link
-            href="/dashboard/financeiro?tab=contas"
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 ${
-              isContas
-                ? "bg-primary text-white shadow-sm"
-                : "text-muted hover:text-fg"
-            }`}
-          >
-            <ClipboardListIcon className="h-4 w-4" />
-            Contas
-          </Link>
+        <div className="overflow-x-auto scrollbar-none">
+          <div className="flex gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm min-w-0">
+            <Link
+              href="/dashboard/financeiro"
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 ${
+                !isRemuneracoes && !isContas
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              <BanknotesIcon className="h-4 w-4" />
+              Lançamentos
+            </Link>
+            <Link
+              href="/dashboard/financeiro?tab=remuneracoes"
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 ${
+                isRemuneracoes
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              <CurrencyIcon className="h-4 w-4" />
+              Remunerações
+            </Link>
+            <Link
+              href="/dashboard/financeiro?tab=contas"
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 font-body text-sm font-semibold transition-colors duration-150 ${
+                isContas
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              <ClipboardListIcon className="h-4 w-4" />
+              Contas
+            </Link>
+          </div>
         </div>
 
         {canEdit && !isRemuneracoes && !isContas && (

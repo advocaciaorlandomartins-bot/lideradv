@@ -167,7 +167,13 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-export default function Topbar({ user }: { user: SessionUser }) {
+export default function Topbar({
+  user,
+  onMenuOpen,
+}: {
+  user: SessionUser;
+  onMenuOpen?: () => void;
+}) {
   const [pending, startTransition] = useTransition();
   const [userOpen, setUserOpen] = useState(false);
   const [gerOpen, setGerOpen] = useState(false);
@@ -210,17 +216,44 @@ export default function Topbar({ user }: { user: SessionUser }) {
 
   return (
     <header className="sticky top-0 z-30 flex-shrink-0 bg-primary shadow-md">
-      {/* ── Linha 1: logo + usuário ──────────────────────────────────────── */}
+      {/* ── Linha 1: logo + hambúrguer (mobile) + usuário ───────────────── */}
       <div className="flex h-12 items-center justify-between px-4 lg:px-6">
-        {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-2 text-white">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15">
-            <ScalesIcon className="h-4 w-4 text-white" />
-          </div>
-          <span className="font-heading text-base font-semibold text-white">
-            AdvMartins
-          </span>
-        </Link>
+        {/* Logo + hambúrguer */}
+        <div className="flex items-center gap-3">
+          {/* Hambúrguer — só mobile */}
+          <button
+            type="button"
+            onClick={onMenuOpen}
+            aria-label="Abrir menu"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
+
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 text-white"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15">
+              <ScalesIcon className="h-4 w-4 text-white" />
+            </div>
+            <span className="font-heading text-base font-semibold text-white">
+              AdvMartins
+            </span>
+          </Link>
+        </div>
 
         {/* Usuário */}
         <div className="relative flex items-center gap-2">
@@ -287,9 +320,9 @@ export default function Topbar({ user }: { user: SessionUser }) {
         </div>
       </div>
 
-      {/* ── Linha 2: navegação ───────────────────────────────────────────── */}
+      {/* ── Linha 2: navegação — oculta no mobile, visível no desktop ─────── */}
       <nav
-        className="border-t border-white/10 px-2 py-1"
+        className="hidden border-t border-white/10 px-2 py-1 lg:block"
         aria-label="Menu principal"
       >
         <ul className="flex flex-wrap gap-0.5">

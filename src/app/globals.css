@@ -22,6 +22,15 @@ body {
   color: #0f172a;
 }
 
+/* Hide scrollbar but keep functionality */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes cardReveal {
   to {
     opacity: 1;

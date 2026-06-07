@@ -165,18 +165,18 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile backdrop */}
+      {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-20 bg-black/40 transition-opacity duration-200 lg:hidden ${
+        className={`fixed inset-0 z-20 bg-black/40 transition-opacity duration-200 ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Sidebar */}
+      {/* Drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-60 flex-shrink-0 flex-col bg-primary transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-shrink-0 flex-col bg-primary shadow-2xl transition-transform duration-250 ease-in-out ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >

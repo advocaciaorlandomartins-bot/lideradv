@@ -26,6 +26,8 @@ import {
   InboxArrowDownIcon,
   ClipboardCheckIcon,
   PuzzleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -180,9 +182,17 @@ interface SidebarProps {
   open: boolean;
   onClose: () => void;
   user: SessionUser;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export default function Sidebar({ open, onClose, user }: SidebarProps) {
+export default function Sidebar({
+  open,
+  onClose,
+  user,
+  collapsed = false,
+  onToggleCollapse,
+}: SidebarProps) {
   const pathname = usePathname();
   const [, startTransition] = useTransition();
 
@@ -210,7 +220,7 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
 
   return (
     <>
-      {/* Backdrop — apenas mobile */}
+      {/* Backdrop — mobile only */}
       <div
         className={`fixed inset-0 z-20 bg-black/50 backdrop-blur-[1px] transition-opacity duration-200 lg:hidden ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
@@ -219,49 +229,95 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
         aria-hidden="true"
       />
 
-      {/* Drawer — overlay mobile / fixo desktop */}
+      {/* Drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-shrink-0 flex-col bg-primary transition-transform duration-300 ease-out lg:translate-x-0 lg:shadow-none lg:border-r lg:border-white/10 ${
+        className={`fixed inset-y-0 left-0 z-30 flex flex-shrink-0 flex-col bg-primary transition-all duration-300 ease-out lg:border-r lg:border-white/10 lg:shadow-none lg:translate-x-0 ${
           open ? "translate-x-0 shadow-2xl" : "-translate-x-full"
-        }`}
+        } ${collapsed ? "w-16" : "w-72"}`}
       >
-        {/* Header: logo + close */}
-        <div className="flex h-16 flex-shrink-0 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
+        {/* Header: logo + toggle/close */}
+        <div
+          className={`flex h-16 flex-shrink-0 items-center px-3 ${
+            collapsed ? "justify-center" : "justify-between px-4"
+          }`}
+        >
+          {!collapsed && (
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                <ScalesIcon className="h-5 w-5 text-white" />
+              </div>
+              <span className="font-heading text-xl font-semibold text-white">
+                AdvMartins
+              </span>
+            </div>
+          )}
+
+          {collapsed && (
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
               <ScalesIcon className="h-5 w-5 text-white" />
             </div>
-            <span className="font-heading text-xl font-semibold text-white">
-              AdvMartins
-            </span>
-          </div>
+          )}
+
+          {/* Toggle collapse — desktop only */}
+          {!collapsed && (
+            <button
+              onClick={onToggleCollapse}
+              aria-label="Recolher menu"
+              className="hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white lg:flex"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Close — mobile only */}
+          {!collapsed && (
+            <button
+              onClick={onClose}
+              aria-label="Fechar menu"
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-white/60 transition-colors duration-150 hover:bg-white/10 hover:text-white lg:hidden"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        {/* Toggle expand — desktop only, shown when collapsed */}
+        {collapsed && (
           <button
-            onClick={onClose}
-            aria-label="Fechar menu"
-            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-white/60 transition-colors duration-150 hover:bg-white/10 hover:text-white lg:hidden"
+            onClick={onToggleCollapse}
+            aria-label="Expandir menu"
+            className="mx-auto mb-2 hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white lg:flex"
           >
-            <XMarkIcon className="h-5 w-5" />
+            <ChevronRightIcon className="h-4 w-4" />
           </button>
-        </div>
+        )}
 
-        {/* User info card */}
-        <div className="mx-3 mb-2 rounded-xl bg-white/10 px-3 py-2.5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/20 font-heading text-sm font-bold text-white select-none">
-              {initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-body text-sm font-semibold text-white">
-                {displayName}
-              </p>
-              <p className="font-body text-[11px] text-white/60">
-                {user.categoria}
-              </p>
+        {/* User card */}
+        {!collapsed ? (
+          <div className="mx-3 mb-2 rounded-xl bg-white/10 px-3 py-2.5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/20 font-heading text-sm font-bold text-white select-none">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-body text-sm font-semibold text-white">
+                  {displayName}
+                </p>
+                <p className="font-body text-[11px] text-white/60">
+                  {user.categoria}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 font-heading text-sm font-bold text-white select-none">
+            {initials}
+          </div>
+        )}
 
-        <div className="mx-4 border-t border-white/10" />
+        <div
+          className={`border-t border-white/10 ${collapsed ? "mx-2" : "mx-4"}`}
+        />
 
         {/* Skip link */}
         <a
@@ -273,55 +329,94 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
 
         {/* Nav */}
         <nav
-          className="relative flex-1 overflow-y-auto px-2 py-3 [mask-image:linear-gradient(to_bottom,black_calc(100%-40px),transparent_100%)]"
+          className={`flex-1 overflow-y-auto py-3 ${
+            collapsed
+              ? "px-1 [mask-image:none]"
+              : "px-2 [mask-image:linear-gradient(to_bottom,black_calc(100%-40px),transparent_100%)]"
+          }`}
           aria-label="Menu principal"
         >
-          {visibleGroups.map((group, gi) => (
-            <div key={gi} className={gi > 0 ? "mt-4" : ""}>
-              {group.label && (
-                <p className="mb-1 px-3 font-body text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                  {group.label}
-                </p>
-              )}
-              <ul className="space-y-0.5">
-                {group.visibleItems.map(({ href, icon: Icon, label }) => {
+          {collapsed ? (
+            /* Collapsed: icon-only, centered, with tooltip */
+            <ul className="space-y-0.5">
+              {visibleGroups.flatMap((g) =>
+                g.visibleItems.map(({ href, icon: Icon, label }) => {
                   const active = isActive(href);
                   return (
                     <li key={href}>
                       <Link
                         href={href}
                         onClick={onClose}
+                        title={label}
+                        aria-label={label}
                         aria-current={active ? "page" : undefined}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 font-body text-sm transition-colors duration-150 ${
+                        className={`flex items-center justify-center rounded-lg py-2.5 transition-colors duration-150 ${
                           active
-                            ? "bg-white/20 font-semibold text-white"
-                            : "text-white/70 hover:bg-white/10 hover:text-white"
+                            ? "bg-white/20 text-white"
+                            : "text-white/60 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <Icon
-                          className={`h-4 w-4 flex-shrink-0 ${active ? "text-white" : "text-white/60"}`}
-                        />
-                        {label}
-                        {active && (
-                          <span className="ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full bg-white/80" />
-                        )}
+                        <Icon className="h-5 w-5 flex-shrink-0" />
                       </Link>
                     </li>
                   );
-                })}
-              </ul>
-            </div>
-          ))}
+                })
+              )}
+            </ul>
+          ) : (
+            /* Expanded: groups with labels */
+            visibleGroups.map((group, gi) => (
+              <div key={gi} className={gi > 0 ? "mt-4" : ""}>
+                {group.label && (
+                  <p className="mb-1 px-3 font-body text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                    {group.label}
+                  </p>
+                )}
+                <ul className="space-y-0.5">
+                  {group.visibleItems.map(({ href, icon: Icon, label }) => {
+                    const active = isActive(href);
+                    return (
+                      <li key={href}>
+                        <Link
+                          href={href}
+                          onClick={onClose}
+                          aria-current={active ? "page" : undefined}
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 font-body text-sm transition-colors duration-150 ${
+                            active
+                              ? "bg-white/20 font-semibold text-white"
+                              : "text-white/70 hover:bg-white/10 hover:text-white"
+                          }`}
+                        >
+                          <Icon
+                            className={`h-4 w-4 flex-shrink-0 ${active ? "text-white" : "text-white/60"}`}
+                          />
+                          {label}
+                          {active && (
+                            <span className="ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full bg-white/80" />
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))
+          )}
         </nav>
 
         {/* Logout */}
-        <div className="mx-2 mb-4 border-t border-white/10 pt-3">
+        <div
+          className={`mb-4 border-t border-white/10 pt-3 ${collapsed ? "mx-1" : "mx-2"}`}
+        >
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 font-body text-sm text-white/60 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+            title="Sair da conta"
+            className={`flex w-full items-center rounded-lg font-body text-sm text-white/60 transition-colors duration-150 hover:bg-white/10 hover:text-white ${
+              collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5"
+            }`}
           >
             <LogoutIcon className="h-4 w-4 flex-shrink-0" />
-            Sair da conta
+            {!collapsed && "Sair da conta"}
           </button>
         </div>
       </aside>

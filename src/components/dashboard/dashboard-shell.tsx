@@ -14,6 +14,19 @@ export default function DashboardShell({
   user: SessionUser;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      localStorage.getItem("sidebar-collapsed") === "true"
+  );
+
+  function toggleCollapse() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebar-collapsed", String(next));
+      return next;
+    });
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
@@ -22,10 +35,14 @@ export default function DashboardShell({
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         user={user}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
       />
       <main
         id="main-content"
-        className="flex-1 p-4 pb-20 lg:ml-72 lg:p-8 lg:pb-8"
+        className={`flex-1 p-4 pb-20 transition-[margin] duration-300 lg:p-8 lg:pb-8 ${
+          collapsed ? "lg:ml-16" : "lg:ml-72"
+        }`}
       >
         {children}
       </main>

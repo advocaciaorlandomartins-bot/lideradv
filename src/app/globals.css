@@ -46,3 +46,23 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Prevent iOS Safari auto-zoom on input focus (requires font-size >= 16px) */
+@media (max-width: 1023px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Smooth momentum scrolling on iOS for scrollable containers */
+.overflow-y-auto,
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent content jump when modal opens on iOS */
+html {
+  overflow-x: hidden;
+}

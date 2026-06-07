@@ -178,12 +178,12 @@ export default function CadastroSimplesModal({
   const tipoAcaoFinal = tipoAcaoSel === "outro" ? tipoAcaoManual : tipoAcaoSel;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-border bg-white shadow-2xl">
+      <div className="relative z-10 w-full max-w-lg rounded-t-2xl sm:rounded-2xl border border-border bg-white shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-3">
@@ -241,7 +241,7 @@ export default function CadastroSimplesModal({
             <input type="hidden" name="tipo_acao" value={tipoAcaoFinal} />
           )}
 
-          <div className="max-h-[60vh] overflow-y-auto px-6 py-5 space-y-4">
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">
                 {error}

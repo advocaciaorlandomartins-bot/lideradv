@@ -171,7 +171,7 @@ export default function FinanceiroLancamentoModal({
   const borderAccent = isReceita ? "border-emerald-300" : "border-red-300";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
@@ -234,7 +234,7 @@ export default function FinanceiroLancamentoModal({
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4 px-6 py-5">
+          <div className="flex-1 overflow-y-auto space-y-4 px-6 py-5">
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">
                 {error}

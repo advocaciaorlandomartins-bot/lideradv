@@ -82,12 +82,12 @@ export default function ProcessosSettingsModal({
     "h-10 w-24 rounded-lg border border-border bg-white px-3 font-mono text-sm text-fg text-center outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-border bg-white shadow-2xl">
+      <div className="relative z-10 w-full max-w-lg rounded-t-2xl sm:rounded-2xl border border-border bg-white shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-3">

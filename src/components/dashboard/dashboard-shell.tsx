@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Topbar from "@/components/dashboard/topbar";
 import Sidebar from "@/components/dashboard/sidebar";
+import BottomNav from "@/components/dashboard/bottom-nav";
 import type { SessionUser } from "@/lib/session";
 
 export default function DashboardShell({
@@ -22,9 +23,10 @@ export default function DashboardShell({
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main id="main-content" className="flex-1 p-4 lg:p-8">
+      <main id="main-content" className="flex-1 p-4 pb-20 lg:p-8 lg:pb-8">
         {children}
       </main>
+      <BottomNav onMenuOpen={() => setSidebarOpen(true)} />
     </div>
   );
 }

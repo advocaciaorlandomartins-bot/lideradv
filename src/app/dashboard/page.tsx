@@ -245,7 +245,7 @@ export default async function DashboardPage() {
       {/* ── Saudação + ações rápidas ─────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-3xl font-semibold text-fg">
+          <h1 className="font-heading text-2xl font-semibold text-fg sm:text-3xl">
             {getGreeting()}, {nomeUsuario}.
           </h1>
           <p className="mt-1 font-body text-sm text-muted capitalize">
@@ -253,14 +253,14 @@ export default async function DashboardPage() {
           </p>
         </div>
         {quickActions.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none sm:flex-wrap sm:overflow-visible sm:pb-0">
             {quickActions.map((a) => {
               const Icon = a.icon;
               return (
                 <Link
                   key={a.label}
                   href={a.href}
-                  className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 font-body text-xs font-semibold text-fg shadow-sm transition-colors hover:border-primary hover:text-primary"
+                  className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 font-body text-xs font-semibold text-fg shadow-sm transition-colors hover:border-primary hover:text-primary"
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {a.label}
@@ -272,11 +272,11 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         {perm.clientes && counts && (
           <Link
             href="/dashboard/clientes"
-            className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+            className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
           >
             <div className="flex items-start justify-between">
               <div className="rounded-lg bg-blue-50 p-2.5 transition-colors group-hover:bg-blue-100">
@@ -302,7 +302,7 @@ export default async function DashboardPage() {
         {perm.processos && counts && (
           <Link
             href="/dashboard/processos"
-            className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+            className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
           >
             <div className="flex items-start justify-between">
               <div className="rounded-lg bg-amber-50 p-2.5 transition-colors group-hover:bg-amber-100">
@@ -330,7 +330,7 @@ export default async function DashboardPage() {
         {perm.financeiro && kpis && (
           <Link
             href="/dashboard/financeiro"
-            className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+            className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
           >
             <div className="flex items-start justify-between">
               <div className="rounded-lg bg-emerald-50 p-2.5 transition-colors group-hover:bg-emerald-100">
@@ -342,7 +342,7 @@ export default async function DashboardPage() {
                 {kpis.saldoMes >= 0 ? "▲" : "▼"} Saldo
               </span>
             </div>
-            <p className="mt-3 font-heading text-2xl font-bold text-fg">
+            <p className="mt-3 font-heading text-xl font-bold text-fg sm:text-2xl">
               {fmt(kpis.recebidoMes)}
             </p>
             <p className="mt-0.5 font-body text-xs font-semibold text-muted">
@@ -359,7 +359,7 @@ export default async function DashboardPage() {
         {perm.controles && counts && (
           <Link
             href="/dashboard/controles"
-            className={`group rounded-xl border bg-white p-5 shadow-sm transition-all hover:shadow-md ${counts.controlesProximos > 0 ? "border-red-200 hover:border-red-300" : "border-border hover:border-primary/30"}`}
+            className={`group rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md ${counts.controlesProximos > 0 ? "border-red-200 hover:border-red-300" : "border-border hover:border-primary/30"}`}
           >
             <div className="flex items-start justify-between">
               <div
@@ -399,7 +399,7 @@ export default async function DashboardPage() {
         {showCrm && crm && (
           <Link
             href="/dashboard/crm"
-            className="group rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+            className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
           >
             <div className="flex items-start justify-between">
               <div className="rounded-lg bg-indigo-50 p-2.5 transition-colors group-hover:bg-indigo-100">

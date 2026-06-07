@@ -225,7 +225,7 @@ export default function Topbar({
             type="button"
             onClick={onMenuOpen}
             aria-label="Abrir menu"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
           >
             <svg
               className="h-5 w-5"

@@ -61,8 +61,3 @@ body {
 .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
 }
-
-/* Prevent content jump when modal opens on iOS */
-html {
-  overflow-x: hidden;
-}

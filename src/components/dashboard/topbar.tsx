@@ -182,13 +182,13 @@ export default function Topbar({
 
   // Fecha dropdown do Gerenciador ao clicar fora
   useEffect(() => {
-    function handler(e: MouseEvent) {
+    function handler(e: PointerEvent) {
       if (gerRef.current && !gerRef.current.contains(e.target as Node)) {
         setGerOpen(false);
       }
     }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
   }, []);
 
   const visibleItems = NAV_ITEMS.filter(

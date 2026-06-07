@@ -264,7 +264,7 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
   });
 
   useEffect(() => {
-    function handler(e: MouseEvent) {
+    function handler(e: PointerEvent) {
       if (novoRef.current && !novoRef.current.contains(e.target as Node))
         setShowNovo(false);
       if (exportRef.current && !exportRef.current.contains(e.target as Node))
@@ -272,8 +272,8 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
       if (quickRef.current && !quickRef.current.contains(e.target as Node))
         setShowQuick(false);
     }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
   }, []);
 
   function persistQuickFilters(qf: typeof quickFilters) {

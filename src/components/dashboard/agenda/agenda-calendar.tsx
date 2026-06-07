@@ -298,7 +298,7 @@ export default function AgendaCalendar() {
 
   // Fecha popover ao clicar fora
   useEffect(() => {
-    function handler(e: MouseEvent) {
+    function handler(e: PointerEvent) {
       if (
         popoverRef.current &&
         !popoverRef.current.contains(e.target as Node)
@@ -306,8 +306,8 @@ export default function AgendaCalendar() {
         setDayPopover(null);
       }
     }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
   }, []);
 
   // Carrega status do Google Calendar + limpa query params OAuth

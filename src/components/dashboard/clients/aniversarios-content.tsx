@@ -276,11 +276,6 @@ export default function AniversariosContent({ clients }: Props) {
     }
   }
 
-  function handleWhatsApp(client: BirthdayClient) {
-    const text = buildMessage(message, client);
-    window.open(whatsAppUrl(client.phone, text), "_blank");
-  }
-
   const filtered = useMemo(() => {
     let result = filterByPeriod(clients, period);
     if (search.trim()) {
@@ -499,7 +494,10 @@ export default function AniversariosContent({ clients }: Props) {
                         className="group transition-colors hover:bg-primary/5"
                       >
                         <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
+                          <Link
+                            href={`/dashboard/clientes/${c.id}`}
+                            className="flex items-center gap-3 hover:opacity-80"
+                          >
                             <div
                               className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full font-body text-sm font-bold ${avatarColor(c.name)}`}
                             >
@@ -513,7 +511,7 @@ export default function AniversariosContent({ clients }: Props) {
                                 {age} anos
                               </p>
                             </div>
-                          </div>
+                          </Link>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-1.5">
@@ -560,18 +558,23 @@ export default function AniversariosContent({ clients }: Props) {
                               )}
                             </button>
                             {c.phone && (
-                              <button
-                                onClick={() => handleWhatsApp(c)}
+                              <a
+                                href={whatsAppUrl(
+                                  c.phone,
+                                  buildMessage(message, c)
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 title="Abrir WhatsApp"
                                 className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 font-body text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                               >
                                 <PhoneIcon className="h-3.5 w-3.5" />
                                 WhatsApp
-                              </button>
+                              </a>
                             )}
                             <Link
                               href={`/dashboard/clientes/${c.id}`}
-                              className="flex h-8 items-center rounded-lg border border-border px-3 font-body text-xs font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+                              className="flex h-8 cursor-pointer items-center rounded-lg border border-border px-3 font-body text-xs font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
                             >
                               Ver
                             </Link>
@@ -625,17 +628,22 @@ export default function AniversariosContent({ clients }: Props) {
                             {isCopied ? "Copiado" : "Copiar"}
                           </button>
                           {c.phone && (
-                            <button
-                              onClick={() => handleWhatsApp(c)}
+                            <a
+                              href={whatsAppUrl(
+                                c.phone,
+                                buildMessage(message, c)
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="flex h-7 cursor-pointer items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 font-body text-xs font-semibold text-emerald-700"
                             >
                               <PhoneIcon className="h-3 w-3" />
                               WhatsApp
-                            </button>
+                            </a>
                           )}
                           <Link
                             href={`/dashboard/clientes/${c.id}`}
-                            className="ml-auto flex h-7 items-center gap-1 font-body text-xs font-semibold text-muted hover:text-primary"
+                            className="ml-auto flex h-7 cursor-pointer items-center gap-1 font-body text-xs font-semibold text-muted hover:text-primary"
                           >
                             Ver
                             <ChevronRightIcon className="h-3.5 w-3.5" />

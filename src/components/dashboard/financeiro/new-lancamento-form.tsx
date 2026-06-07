@@ -227,6 +227,8 @@ export default function NewLancamentoForm({
   const [numRecorrencias, setNumRecorrencias] = useState("12");
   const [salarioMode, setSalarioMode] = useState(false);
   const [numSalarios, setNumSalarios] = useState("1");
+  const [salarioBase, setSalarioBase] = useState<"minimo" | "custom">("minimo");
+  const [salarioCustomInput, setSalarioCustomInput] = useState("");
   const [jaRecebida, setJaRecebida] = useState(false);
 
   // ── Novos modos ────────────────────────────────────────────
@@ -235,13 +237,21 @@ export default function NewLancamentoForm({
   const [valorMensalidade, setValorMensalidade] = useState("");
 
   // ── Salário base ───────────────────────────────────────────
+  const salarioBaseValor = useMemo(() => {
+    if (salarioBase === "custom") {
+      const v = parseFloat(parseMoney(salarioCustomInput));
+      return v > 0 ? v : salarioMinimo;
+    }
+    return salarioMinimo;
+  }, [salarioBase, salarioCustomInput, salarioMinimo]);
+
   const salarioValor = useMemo(() => {
     if (!salarioMode) return null;
-    const n = parseFloat(numSalarios) || 1;
-    return (salarioMinimo * n).toLocaleString("pt-BR", {
+    const n = parseFloat(numSalarios.replace(",", ".")) || 1;
+    return (salarioBaseValor * n).toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
     });
-  }, [salarioMode, numSalarios, salarioMinimo]);
+  }, [salarioMode, numSalarios, salarioBaseValor]);
 
   // ── Cálculo Retroativo ─────────────────────────────────────
   const retroativoCalc = useMemo(() => {
@@ -251,7 +261,9 @@ export default function NewLancamentoForm({
     const percValor = Math.round(vRetro * (pct / 100) * 100) / 100;
     const salarioPart = salarioMode
       ? Math.round(
-          (parseFloat(numSalarios.replace(",", ".")) || 0) * salarioMinimo * 100
+          (parseFloat(numSalarios.replace(",", ".")) || 0) *
+            salarioBaseValor *
+            100
         ) / 100
       : 0;
     const total = percValor + salarioPart;
@@ -262,7 +274,7 @@ export default function NewLancamentoForm({
     percentualAdv,
     salarioMode,
     numSalarios,
-    salarioMinimo,
+    salarioBaseValor,
   ]);
 
   // ── Valor efetivo (base para cálculos) ─────────────────────
@@ -750,6 +762,8 @@ export default function NewLancamentoForm({
                     setPaymentMode(m.key);
                     setValor("");
                     setSalarioMode(false);
+                    setSalarioBase("minimo");
+                    setSalarioCustomInput("");
                   }}
                   disabled={isPending}
                   className={`flex-1 rounded-lg border-2 px-3 py-2 font-body transition-colors duration-150 ${
@@ -826,7 +840,11 @@ export default function NewLancamentoForm({
                   <div
                     onClick={() => {
                       setSalarioMode((v) => !v);
-                      if (salarioMode) setValor("");
+                      if (salarioMode) {
+                        setValor("");
+                        setSalarioBase("minimo");
+                        setSalarioCustomInput("");
+                      }
                     }}
                     className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 cursor-pointer ${
                       salarioMode ? "bg-emerald-500" : "bg-slate-300"
@@ -858,32 +876,101 @@ export default function NewLancamentoForm({
             )}
 
             {tipo === "entrada" && salarioMode && (
-              <Field label="Quantidade de salários mínimos">
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={numSalarios}
-                    onChange={(e) =>
-                      setNumSalarios(e.target.value.replace(/[^0-9.,]/g, ""))
-                    }
-                    disabled={isPending}
-                    className={`${inputClass} max-w-[140px]`}
-                  />
-                  <span className="font-body text-sm text-muted">
-                    × {fmt(salarioMinimo)}
-                  </span>
-                  {salarioValor && (
-                    <span className="font-body text-sm font-semibold text-emerald-700">
-                      ={" "}
-                      {fmt(
-                        (parseFloat(numSalarios.replace(",", ".")) || 0) *
-                          salarioMinimo
-                      )}
-                    </span>
-                  )}
+              <div className="sm:col-span-2 space-y-3">
+                {/* Seletor de base salarial */}
+                <div>
+                  <label className={labelClass}>Base do cálculo</label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSalarioBase("minimo");
+                        setSalarioCustomInput("");
+                      }}
+                      disabled={isPending}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                        salarioBase === "minimo"
+                          ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                          : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                      }`}
+                    >
+                      SM vigente — {fmt(salarioMinimo)}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSalarioBase("custom")}
+                      disabled={isPending}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                        salarioBase === "custom"
+                          ? "border-primary bg-blue-50 text-primary"
+                          : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                      }`}
+                    >
+                      Salário do cliente
+                    </button>
+
+                    {salarioBase === "custom" && (
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                          R$
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          value={salarioCustomInput}
+                          onChange={(e) =>
+                            setSalarioCustomInput(
+                              formatMoneyInput(e.target.value)
+                            )
+                          }
+                          onBlur={() =>
+                            setSalarioCustomInput(
+                              normalizeMoneyBlur(salarioCustomInput)
+                            )
+                          }
+                          disabled={isPending}
+                          className={`${inputClass} pl-10 w-44`}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </Field>
+
+                {/* Quantidade × base = total */}
+                <div>
+                  <label className={labelClass}>Quantidade de salários</label>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={numSalarios}
+                      onChange={(e) =>
+                        setNumSalarios(e.target.value.replace(/[^0-9.,]/g, ""))
+                      }
+                      disabled={isPending}
+                      className={`${inputClass} max-w-[120px]`}
+                    />
+                    <span className="font-body text-sm text-muted">
+                      ×{" "}
+                      {salarioBase === "custom" &&
+                      parseFloat(parseMoney(salarioCustomInput)) > 0
+                        ? fmt(parseFloat(parseMoney(salarioCustomInput)))
+                        : fmt(salarioMinimo)}
+                    </span>
+                    {salarioValor && (
+                      <span className="font-body text-sm font-semibold text-emerald-700">
+                        ={" "}
+                        {fmt(
+                          (parseFloat(numSalarios.replace(",", ".")) || 0) *
+                            salarioBaseValor
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* ── Resumo do cálculo retroativo ── */}
@@ -907,8 +994,8 @@ export default function NewLancamentoForm({
                       {retroativoCalc.salarioPart > 0 && (
                         <div>
                           <span className="font-body text-xs text-muted">
-                            + {parseFloat(numSalarios.replace(",", ".")) || 0}×
-                            SM
+                            + {parseFloat(numSalarios.replace(",", ".")) || 0}×{" "}
+                            {salarioBase === "custom" ? "sal. cliente" : "SM"}
                           </span>
                           <p className="font-heading text-base font-semibold text-fg">
                             {fmt(retroativoCalc.salarioPart)}

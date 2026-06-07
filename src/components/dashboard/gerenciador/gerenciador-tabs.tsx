@@ -23,7 +23,7 @@ export default function GerenciadorTabs() {
   const pathname = usePathname();
 
   return (
-    <div className="mb-6 border-b border-border bg-white">
+    <div className="mb-6 overflow-x-auto border-b border-border bg-white scrollbar-none">
       <nav className="flex gap-0" aria-label="Seções do gerenciador">
         {TABS.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);

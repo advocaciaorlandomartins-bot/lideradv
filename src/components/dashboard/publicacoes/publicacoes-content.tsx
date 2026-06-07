@@ -675,80 +675,85 @@ function TabOabs({ oabs }: { oabs: OabMonitorada[] }) {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-slate-50/60">
-                {[
-                  "OAB",
-                  "Estado",
-                  "Advogado",
-                  "Última busca",
-                  "Status",
-                  "Ações",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-2.5 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {oabs.map((oab) => (
-                <tr
-                  key={oab.id}
-                  className="transition-colors hover:bg-slate-50"
-                >
-                  <td className="px-4 py-3 font-body text-sm font-semibold text-fg">
-                    {oab.numero}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 font-body text-xs font-semibold text-primary">
-                      {oab.estado}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-body text-sm text-muted">
-                    {oab.nome_advogado ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 font-body text-xs text-muted">
-                    {oab.ultima_busca
-                      ? new Date(oab.ultima_busca).toLocaleDateString("pt-BR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "Nunca"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleToggle(oab.id, oab.ativa)}
-                      disabled={isPending}
-                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-body text-xs font-semibold transition-colors ${oab.ativa ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"}`}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-slate-50/60">
+                  {[
+                    "OAB",
+                    "Estado",
+                    "Advogado",
+                    "Última busca",
+                    "Status",
+                    "Ações",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-2.5 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted"
                     >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${oab.ativa ? "bg-emerald-500" : "bg-slate-400"}`}
-                      />
-                      {oab.ativa ? "Ativa" : "Inativa"}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleRemover(oab.id, oab.numero)}
-                      disabled={isPending}
-                      className="flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 font-body text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
-                    >
-                      <XMarkIcon className="h-3 w-3" />
-                      Remover
-                    </button>
-                  </td>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {oabs.map((oab) => (
+                  <tr
+                    key={oab.id}
+                    className="transition-colors hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-3 font-body text-sm font-semibold text-fg">
+                      {oab.numero}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 font-body text-xs font-semibold text-primary">
+                        {oab.estado}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-body text-sm text-muted">
+                      {oab.nome_advogado ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 font-body text-xs text-muted">
+                      {oab.ultima_busca
+                        ? new Date(oab.ultima_busca).toLocaleDateString(
+                            "pt-BR",
+                            {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )
+                        : "Nunca"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleToggle(oab.id, oab.ativa)}
+                        disabled={isPending}
+                        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-body text-xs font-semibold transition-colors ${oab.ativa ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"}`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${oab.ativa ? "bg-emerald-500" : "bg-slate-400"}`}
+                        />
+                        {oab.ativa ? "Ativa" : "Inativa"}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleRemover(oab.id, oab.numero)}
+                        disabled={isPending}
+                        className="flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 font-body text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                      >
+                        <XMarkIcon className="h-3 w-3" />
+                        Remover
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

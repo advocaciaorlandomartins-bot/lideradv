@@ -66,8 +66,8 @@ export default function ProcessosSettingsModal({
   const [local, setLocal] = useState<ProcessosSettings>(settings);
 
   // Sync local copy when modal reopens
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) setLocal(settings);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -1,3 +1,6 @@
+import { notFound } from "next/navigation";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getAllUsuarios, countAtivos, MAX_USUARIOS } from "@/lib/usuarios-db";
 import UsuariosList from "@/components/dashboard/usuarios/usuarios-list";
 
@@ -8,6 +11,9 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "usuarios", "ver")) notFound();
+
   const [usuarios, ativos] = await Promise.all([
     getAllUsuarios(),
     countAtivos(),

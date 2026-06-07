@@ -150,9 +150,9 @@ export async function POST(request: Request) {
         // Dynamic import evita problemas de bundling no Next.js
         const mod = await import("pdf-parse");
         // pdf-parse exports differently depending on bundler
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pdfParse: (buf: Buffer) => Promise<{ text: string }> =
-          (mod as any).default ?? (mod as any);
+        type PdfParseFn = (buf: Buffer) => Promise<{ text: string }>;
+        const pdfParse = ((mod as { default?: PdfParseFn }).default ??
+          mod) as PdfParseFn;
         const parsed = await pdfParse(buffer);
         pdfText = (parsed.text as string).trim();
       } catch (e) {

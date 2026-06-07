@@ -3,6 +3,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
+import { logAction } from "./audit";
 
 export type PericiaFormState = { error: string } | null;
 
@@ -40,6 +43,10 @@ export async function createPericiaAction(
   _prev: PericiaFormState,
   formData: FormData
 ): Promise<PericiaFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "criar"))
+    return { error: "Sem permissão." };
+
   const f = getFields(formData);
 
   if (!f.tipo) return { error: "Selecione o tipo de perícia." };
@@ -72,6 +79,13 @@ export async function createPericiaAction(
     return { error: "Erro ao salvar perícia. Tente novamente." };
   }
 
+  await logAction({
+    acao: "criar",
+    entidade: "pericia",
+    descricao: `Cadastrou perícia: ${f.tipo}`,
+    detalhes: { tipo: f.tipo, data: f.dataPericia },
+  });
+
   redirect("/dashboard/pericias");
 }
 
@@ -80,6 +94,10 @@ export async function updatePericiaAction(
   _prev: PericiaFormState,
   formData: FormData
 ): Promise<PericiaFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "editar"))
+    return { error: "Sem permissão." };
+
   const f = getFields(formData);
 
   if (!f.tipo) return { error: "Selecione o tipo de perícia." };
@@ -112,10 +130,20 @@ export async function updatePericiaAction(
     return { error: "Erro ao atualizar perícia. Tente novamente." };
   }
 
+  await logAction({
+    acao: "editar",
+    entidade: "pericia",
+    entidadeId: id,
+    descricao: `Editou perícia: ${f.tipo}`,
+  });
+
   redirect(`/dashboard/pericias/${id}`);
 }
 
 export async function markPericiaRealizadaAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "editar")) return;
+
   try {
     await sql`
       UPDATE pericias SET status = 'realizado', updated_at = NOW()
@@ -124,10 +152,19 @@ export async function markPericiaRealizadaAction(id: string): Promise<void> {
   } catch (err) {
     console.error("markPericiaRealizadaAction DB error:", err);
   }
+  await logAction({
+    acao: "editar",
+    entidade: "pericia",
+    entidadeId: id,
+    descricao: "Marcou perícia como realizada",
+  });
   revalidatePath("/dashboard/pericias");
 }
 
 export async function deletePericiaAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "excluir")) return;
+
   try {
     await sql`DELETE FROM pericias WHERE id = ${id}::uuid`;
   } catch (err) {

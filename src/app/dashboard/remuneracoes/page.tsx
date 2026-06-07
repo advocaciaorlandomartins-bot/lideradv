@@ -1,3 +1,6 @@
+import { notFound } from "next/navigation";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getAllRemuneracoes, getRemuneracaoKpis } from "@/lib/remuneracoes-db";
 import RemuneracoesContent from "@/components/dashboard/remuneracoes/remuneracoes-content";
 
@@ -8,6 +11,9 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RemuneracoesPage() {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "remuneracoes", "ver")) notFound();
+
   const [remuneracoes, kpis] = await Promise.all([
     getAllRemuneracoes(),
     getRemuneracaoKpis(),

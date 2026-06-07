@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getAllClients } from "@/lib/clients-db";
 import { getAllProcessos } from "@/lib/processos-db";
 import NewPericiaForm from "@/components/dashboard/pericias/new-pericia-form";
@@ -15,6 +18,9 @@ export default async function NovaPericiaPage({
 }: {
   searchParams: Promise<{ cliente?: string }>;
 }) {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "controles", "criar")) notFound();
+
   const { cliente } = await searchParams;
   const [clients, processos] = await Promise.all([
     getAllClients(),

@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import {
   getRelatorioLancamentos,
   getRelatorioResumo,
@@ -9,12 +10,16 @@ import {
 } from "@/lib/relatorios-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import RelatoriosContent from "@/components/dashboard/relatorios/relatorios-content";
 
 export const metadata = { title: "Relatórios — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function RelatoriosPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "relatorios", "ver")) notFound();
+
   const [
     lancamentos,
     resumo,
@@ -24,7 +29,6 @@ export default async function RelatoriosPage() {
     colaboradores,
     escritorio,
     clientesComDados,
-    session,
   ] = await Promise.all([
     getRelatorioLancamentos({}),
     getRelatorioResumo({}),
@@ -34,7 +38,6 @@ export default async function RelatoriosPage() {
     getColaboradoresParaRelatorio(),
     getEscritorioConfig(),
     getClientesParaRecibo(),
-    getSession(),
   ]);
 
   return (
@@ -56,7 +59,7 @@ export default async function RelatoriosPage() {
         colaboradores={colaboradores}
         escritorio={escritorio}
         clientesComDados={clientesComDados}
-        permissoes={session?.permissoes ?? {}}
+        permissoes={session.permissoes ?? {}}
       />
     </div>
   );

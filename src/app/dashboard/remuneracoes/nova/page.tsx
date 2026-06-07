@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
 import { getAllProcessos } from "@/lib/processos-db";
 import { getAllClients } from "@/lib/clients-db";
@@ -16,6 +19,9 @@ export default async function NovaRemuneracaoPage({
 }: {
   searchParams: Promise<{ colaborador?: string; tipo?: string }>;
 }) {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "remuneracoes", "criar")) notFound();
+
   const { colaborador: defaultColaboradorId, tipo: defaultTipo } =
     await searchParams;
   const [colaboradores, processos, clients] = await Promise.all([

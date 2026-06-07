@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getPericiaFull } from "@/lib/pericias-db";
 import { TIPO_LABELS, TIPO_COLORS } from "@/lib/pericias-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
@@ -32,6 +34,9 @@ export default async function PericiaDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "controles", "ver")) notFound();
+
   const { id } = await params;
   const [pericia, documentos] = await Promise.all([
     getPericiaFull(id),

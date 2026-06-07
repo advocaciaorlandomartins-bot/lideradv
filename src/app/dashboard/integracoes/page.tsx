@@ -1,9 +1,15 @@
+import { notFound } from "next/navigation";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import IntegracoesContent from "@/components/dashboard/integracoes/integracoes-content";
 
 export const metadata = { title: "Integrações — AdvMartins" };
 export const dynamic = "force-dynamic";
 
-export default function IntegracoesPage() {
+export default async function IntegracoesPage() {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "gerenciador", "ver")) notFound();
+
   return (
     <div className="space-y-6">
       <div>

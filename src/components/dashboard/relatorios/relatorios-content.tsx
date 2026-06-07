@@ -260,8 +260,8 @@ function LancamentosTable({ rows }: { rows: RelatorioLancamento[] }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [rows]);
 
@@ -813,8 +813,8 @@ function FolhaTab({
       filtroFim,
     ]
   );
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [filtroColaborador, filtroTipo, filtroStatus, filtroInicio, filtroFim]);
 

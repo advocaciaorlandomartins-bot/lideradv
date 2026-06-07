@@ -3,6 +3,8 @@
 import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 import { countAtivos, getSenhaHash, MAX_USUARIOS } from "./usuarios-db";
 import { MODULOS, ACOES, type Permissoes } from "./permissoes";
 import { logAction } from "./audit";
@@ -35,6 +37,10 @@ export async function createUsuarioAction(
   _prev: UsuarioFormState,
   formData: FormData
 ): Promise<UsuarioFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "usuarios", "criar"))
+    return { error: "Sem permissão para criar usuários." };
+
   const login = ((formData.get("login") as string) ?? "").trim().toLowerCase();
   const nome = ((formData.get("nome") as string) ?? "").trim();
   const senha = (formData.get("senha") as string) ?? "";
@@ -96,6 +102,10 @@ export async function updateUsuarioAction(
   _prev: UsuarioFormState,
   formData: FormData
 ): Promise<UsuarioFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "usuarios", "editar"))
+    return { error: "Sem permissão para editar usuários." };
+
   const id = (formData.get("id") as string) ?? "";
   const login = ((formData.get("login") as string) ?? "").trim().toLowerCase();
   const nome = ((formData.get("nome") as string) ?? "").trim();
@@ -176,6 +186,9 @@ export async function updateUsuarioAction(
 }
 
 export async function deleteUsuarioAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "usuarios", "excluir")) return;
+
   await logAction({
     acao: "excluir",
     entidade: "usuario",

@@ -3,6 +3,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
+import { logAction } from "./audit";
 
 export type RemuneracaoFormState = { error: string } | null;
 
@@ -36,6 +39,10 @@ export async function createRemuneracaoAction(
   _prev: RemuneracaoFormState,
   formData: FormData
 ): Promise<RemuneracaoFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "remuneracoes", "criar"))
+    return { error: "Sem permissão." };
+
   const f = getFields(formData);
 
   if (!f.colaboradorId) return { error: "Selecione o colaborador." };
@@ -100,10 +107,20 @@ export async function createRemuneracaoAction(
     return { error: "Erro ao salvar remuneração. Tente novamente." };
   }
 
+  await logAction({
+    acao: "criar",
+    entidade: "remuneracao",
+    descricao: `Lançou remuneração: ${TIPO_LABEL[f.tipo] ?? f.tipo}`,
+    detalhes: { tipo: f.tipo, valor: f.valor },
+  });
+
   redirect("/dashboard/financeiro?tab=remuneracoes");
 }
 
 export async function markRemuneracaoPagaAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "remuneracoes", "editar")) return;
+
   try {
     await sql`
       UPDATE remuneracoes
@@ -119,15 +136,30 @@ export async function markRemuneracaoPagaAction(id: string): Promise<void> {
   } catch (err) {
     console.error("markRemuneracaoPagaAction DB error:", err);
   }
+  await logAction({
+    acao: "editar",
+    entidade: "remuneracao",
+    entidadeId: id,
+    descricao: "Marcou remuneração como paga",
+  });
   revalidatePath("/dashboard/financeiro");
 }
 
 export async function deleteRemuneracaoAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "remuneracoes", "excluir")) return;
+
   try {
     // ON DELETE CASCADE automatically removes the linked lancamento
     await sql`DELETE FROM remuneracoes WHERE id = ${id}::uuid`;
   } catch (err) {
     console.error("deleteRemuneracaoAction DB error:", err);
   }
+  await logAction({
+    acao: "excluir",
+    entidade: "remuneracao",
+    entidadeId: id,
+    descricao: "Excluiu remuneração",
+  });
   revalidatePath("/dashboard/financeiro");
 }

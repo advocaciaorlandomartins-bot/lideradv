@@ -1,3 +1,6 @@
+import { notFound } from "next/navigation";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getAllPericias } from "@/lib/pericias-db";
 import PericiasContent from "@/components/dashboard/pericias/pericias-content";
 
@@ -8,6 +11,9 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function PericiasPage() {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "controles", "ver")) notFound();
+
   const pericias = await getAllPericias();
   const agendadas = pericias.filter((p) => p.status === "agendado").length;
   const total = pericias.length;

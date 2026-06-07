@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getPericiaFull } from "@/lib/pericias-db";
 import { TIPO_LABELS } from "@/lib/pericias-db";
 import { getAllClients } from "@/lib/clients-db";
@@ -18,6 +20,9 @@ export default async function EditarPericiaPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await getSession();
+  if (!user || !hasPermission(user, "controles", "editar")) notFound();
+
   const { id } = await params;
   const [pericia, clients, processos] = await Promise.all([
     getPericiaFull(id),

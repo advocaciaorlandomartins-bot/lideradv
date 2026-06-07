@@ -23,7 +23,10 @@ export default function DashboardShell({
         onClose={() => setSidebarOpen(false)}
         user={user}
       />
-      <main id="main-content" className="flex-1 p-4 pb-20 lg:p-8 lg:pb-8">
+      <main
+        id="main-content"
+        className="flex-1 p-4 pb-20 lg:ml-72 lg:p-8 lg:pb-8"
+      >
         {children}
       </main>
       <BottomNav onMenuOpen={() => setSidebarOpen(true)} />

@@ -215,7 +215,7 @@ export default function Topbar({
   const gerActive = visibleGerSubs.some(({ href }) => isActive(href));
 
   return (
-    <header className="sticky top-0 z-30 flex-shrink-0 bg-primary shadow-md">
+    <header className="sticky top-0 z-30 flex-shrink-0 bg-primary shadow-md lg:hidden">
       {/* ── Linha 1: logo + hambúrguer (mobile) + usuário ───────────────── */}
       <div className="flex h-12 items-center justify-between px-4 lg:px-6">
         {/* Logo + hambúrguer */}

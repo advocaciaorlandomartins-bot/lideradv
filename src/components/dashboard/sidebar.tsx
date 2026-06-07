@@ -210,19 +210,19 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — apenas mobile */}
       <div
-        className={`fixed inset-0 z-20 bg-black/50 backdrop-blur-[1px] transition-opacity duration-200 ${
+        className={`fixed inset-0 z-20 bg-black/50 backdrop-blur-[1px] transition-opacity duration-200 lg:hidden ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Drawer */}
+      {/* Drawer — overlay mobile / fixo desktop */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-shrink-0 flex-col bg-primary shadow-2xl transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-shrink-0 flex-col bg-primary transition-transform duration-300 ease-out lg:translate-x-0 lg:shadow-none lg:border-r lg:border-white/10 ${
+          open ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
         {/* Header: logo + close */}
@@ -238,7 +238,7 @@ export default function Sidebar({ open, onClose, user }: SidebarProps) {
           <button
             onClick={onClose}
             aria-label="Fechar menu"
-            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-white/60 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-white/60 transition-colors duration-150 hover:bg-white/10 hover:text-white lg:hidden"
           >
             <XMarkIcon className="h-5 w-5" />
           </button>

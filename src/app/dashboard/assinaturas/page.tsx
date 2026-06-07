@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { redirect } from "next/navigation";
+import { hasPermission } from "@/lib/permissoes";
+import { notFound, redirect } from "next/navigation";
 import { listarEnvelopes } from "@/lib/assinaturas-db";
 import { PlusIcon, PenSignIcon } from "@/components/icons";
 
@@ -36,6 +37,7 @@ function fmtDate(s: string | null) {
 export default async function AssinaturasPage() {
   const session = await getSession();
   if (!session) redirect("/");
+  if (!hasPermission(session, "assinaturas", "ver")) notFound();
 
   const envelopes = await listarEnvelopes(session.login);
 

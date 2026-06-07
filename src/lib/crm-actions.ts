@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
+import { logAction } from "./audit";
 
 export type CrmFormState = { error?: string; success?: boolean } | null;
 
@@ -11,6 +14,10 @@ export async function createLeadAction(
   _prev: CrmFormState,
   formData: FormData
 ): Promise<CrmFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "criar"))
+    return { error: "Sem permissão." };
+
   const nome = ((formData.get("nome") as string) ?? "").trim();
   const email = ((formData.get("email") as string) ?? "").trim() || null;
   const telefone = ((formData.get("telefone") as string) ?? "").trim() || null;
@@ -45,6 +52,11 @@ export async function createLeadAction(
     return { error: "Erro ao criar lead." };
   }
 
+  await logAction({
+    acao: "criar",
+    entidade: "lead",
+    descricao: `Criou lead: ${nome}`,
+  });
   revalidatePath("/dashboard/crm");
   return { success: true };
 }
@@ -53,6 +65,10 @@ export async function updateLeadAction(
   _prev: CrmFormState,
   formData: FormData
 ): Promise<CrmFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "editar"))
+    return { error: "Sem permissão." };
+
   const id = ((formData.get("id") as string) ?? "").trim();
   const nome = ((formData.get("nome") as string) ?? "").trim();
   const email = ((formData.get("email") as string) ?? "").trim() || null;
@@ -97,6 +113,12 @@ export async function updateLeadAction(
     return { error: "Erro ao atualizar lead." };
   }
 
+  await logAction({
+    acao: "editar",
+    entidade: "lead",
+    entidadeId: id,
+    descricao: `Editou lead: ${nome}`,
+  });
   revalidatePath("/dashboard/crm");
   revalidatePath(`/dashboard/crm/leads/${id}`);
   return { success: true };
@@ -159,6 +181,9 @@ export async function moveLeadEstagioAction(
   id: string,
   estagio: string
 ): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "editar")) return;
+
   await sql`
     UPDATE crm_leads SET estagio = ${estagio}, updated_at = NOW()
     WHERE id = ${id}::uuid
@@ -172,13 +197,26 @@ export async function moveLeadEstagioAction(
 }
 
 export async function deleteLeadAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "excluir")) return;
+
   await sql`DELETE FROM crm_leads WHERE id = ${id}::uuid`;
+  await logAction({
+    acao: "excluir",
+    entidade: "lead",
+    entidadeId: id,
+    descricao: "Excluiu lead",
+  });
   revalidatePath("/dashboard/crm");
 }
 
 export async function convertLeadToClientAction(
   leadId: string
 ): Promise<{ error?: string; clientId?: string; processoId?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "editar"))
+    return { error: "Sem permissão." };
+
   try {
     await sql`UPDATE crm_leads SET estagio = 'fechado', updated_at = NOW() WHERE id = ${leadId}::uuid`;
     await garantirClienteEProcesso(leadId);
@@ -200,6 +238,10 @@ export async function createAtividadeAction(
   _prev: CrmFormState,
   formData: FormData
 ): Promise<CrmFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "criar"))
+    return { error: "Sem permissão." };
+
   const leadId = ((formData.get("lead_id") as string) ?? "").trim();
   const tipo = ((formData.get("tipo") as string) ?? "").trim();
   const titulo = ((formData.get("titulo") as string) ?? "").trim();
@@ -249,6 +291,9 @@ export async function deleteAtividadeAction(
   id: string,
   leadId: string
 ): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "excluir")) return;
+
   await sql`DELETE FROM crm_atividades WHERE id = ${id}::uuid`;
   revalidatePath(`/dashboard/crm/leads/${leadId}`);
 }
@@ -259,6 +304,10 @@ export async function createTarefaAction(
   _prev: CrmFormState,
   formData: FormData
 ): Promise<CrmFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "criar"))
+    return { error: "Sem permissão." };
+
   const leadId = ((formData.get("lead_id") as string) ?? "").trim();
   const titulo = ((formData.get("titulo") as string) ?? "").trim();
   const descricao =
@@ -307,6 +356,9 @@ export async function toggleTarefaAction(
   leadId: string,
   concluida: boolean
 ): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "editar")) return;
+
   await sql`
     UPDATE crm_tarefas SET concluida = ${concluida}, updated_at = NOW()
     WHERE id = ${id}::uuid
@@ -319,6 +371,9 @@ export async function deleteTarefaAction(
   id: string,
   leadId: string
 ): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "excluir")) return;
+
   await sql`DELETE FROM crm_tarefas WHERE id = ${id}::uuid`;
   revalidatePath(`/dashboard/crm/leads/${leadId}`);
 }

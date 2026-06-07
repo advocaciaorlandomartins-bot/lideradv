@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getModeloById } from "@/lib/modelos-db";
 import { updateModeloAction } from "@/lib/modelo-actions";
 import ModeloForm from "@/components/dashboard/modelos/modelo-form";
@@ -12,6 +14,9 @@ export default async function EditarModeloPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "modelos", "editar")) notFound();
+
   const { id } = await params;
   const modelo = await getModeloById(id);
   if (!modelo) notFound();

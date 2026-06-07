@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import sql from "./db";
 import { logAction } from "./audit";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 export type ColaboradorFormState = { error: string } | null;
 
@@ -34,6 +36,10 @@ export async function createColaboradorAction(
   _prev: ColaboradorFormState,
   formData: FormData
 ): Promise<ColaboradorFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "colaboradores", "criar"))
+    return { error: "Sem permissão." };
+
   const f = getFields(formData);
 
   if (!f.nome) return { error: "Informe o nome do colaborador." };
@@ -118,6 +124,10 @@ export async function updateColaboradorAction(
   _prev: ColaboradorFormState,
   formData: FormData
 ): Promise<ColaboradorFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "colaboradores", "editar"))
+    return { error: "Sem permissão." };
+
   const f = getFields(formData);
 
   if (!f.nome) return { error: "Informe o nome do colaborador." };
@@ -156,6 +166,9 @@ export async function updateColaboradorAction(
 }
 
 export async function deleteColaboradorAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "colaboradores", "excluir")) return;
+
   try {
     await sql`DELETE FROM colaboradores WHERE id = ${id}::uuid`;
   } catch (err) {

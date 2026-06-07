@@ -1,10 +1,16 @@
+import { notFound } from "next/navigation";
 import { getAllLeads } from "@/lib/crm-db";
 import CrmContent from "@/components/dashboard/crm/crm-content";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = { title: "CRM — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function CrmPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "ver")) notFound();
+
   const leads = await getAllLeads();
   const ativos = leads.filter(
     (l) => l.estagio !== "fechado" && l.estagio !== "perdido"

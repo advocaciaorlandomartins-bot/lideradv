@@ -1,10 +1,16 @@
+import { notFound } from "next/navigation";
 import { getAllPublicacoes, getAllOabs } from "@/lib/publicacoes-db";
 import PublicacoesContent from "@/components/dashboard/publicacoes/publicacoes-content";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = { title: "Publicações — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function PublicacoesPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "publicacoes", "ver")) notFound();
+
   const [publicacoes, oabs] = await Promise.all([
     getAllPublicacoes(),
     getAllOabs(),

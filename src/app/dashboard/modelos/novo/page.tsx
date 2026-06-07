@@ -1,9 +1,18 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronRightIcon } from "@/components/icons";
 import ModeloForm from "@/components/dashboard/modelos/modelo-form";
 import { createModeloAction } from "@/lib/modelo-actions";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
-export default function NovoModeloPage() {
+export const metadata = { title: "Novo Modelo — AdvMartins" };
+export const dynamic = "force-dynamic";
+
+export default async function NovoModeloPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "modelos", "criar")) notFound();
+
   return (
     <div className="space-y-6">
       <nav className="flex items-center gap-1.5 font-body text-sm text-muted">

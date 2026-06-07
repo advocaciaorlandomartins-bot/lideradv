@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ClipboardListIcon } from "@/components/icons";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import {
   getControleById,
   getClientesForControle,
@@ -12,6 +14,7 @@ import {
 import { getTipoConfig } from "@/lib/controles-types";
 import ControleForm from "@/components/dashboard/controles/controle-form";
 
+export const metadata = { title: "Editar Controle — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function EditarControlePage({
@@ -19,6 +22,9 @@ export default async function EditarControlePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "editar")) notFound();
+
   const { id } = await params;
 
   const [controle, clientes, processos, usuarios, locais, locaisPericia] =

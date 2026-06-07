@@ -11,6 +11,8 @@ function revalidate() {
 }
 
 export async function moverParaProducaoAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "producao", "editar")) return;
   await sql`
     UPDATE processos
     SET estagio_producao = 'producao', data_estagio_at = NOW()
@@ -20,6 +22,8 @@ export async function moverParaProducaoAction(id: string): Promise<void> {
 }
 
 export async function moverParaAdministrativoAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "producao", "editar")) return;
   await sql`
     UPDATE processos
     SET estagio_producao = 'administrativo', data_estagio_at = NOW()
@@ -68,6 +72,8 @@ export async function registrarResultadoJudicialAction(
 }
 
 export async function arquivarProcessoAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "producao", "editar")) return;
   await sql`
     UPDATE processos
     SET estagio_producao = 'arquivado', data_estagio_at = NOW()
@@ -84,6 +90,8 @@ const PREV_ESTAGIO: Record<string, string> = {
 };
 
 export async function voltarEstagioAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "producao", "editar")) return;
   const rows =
     await sql`SELECT estagio_producao FROM processos WHERE id = ${id}::uuid`;
   const atual = String(rows[0]?.estagio_producao ?? "");
@@ -102,6 +110,8 @@ export async function voltarEstagioAction(id: string): Promise<void> {
 }
 
 export async function reabrirProcessoAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "producao", "editar")) return;
   await sql`
     UPDATE processos
     SET estagio_producao          = 'analise',

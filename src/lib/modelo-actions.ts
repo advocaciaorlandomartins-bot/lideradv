@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 export type ModeloFormState = { error: string } | null;
 
@@ -10,6 +12,10 @@ export async function createModeloAction(
   _prev: ModeloFormState,
   formData: FormData
 ): Promise<ModeloFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "modelos", "criar"))
+    return { error: "Sem permissão." };
+
   const titulo = ((formData.get("titulo") as string) ?? "").trim();
   const categoria =
     ((formData.get("categoria") as string) ?? "").trim() || null;
@@ -39,6 +45,10 @@ export async function updateModeloAction(
   _prev: ModeloFormState,
   formData: FormData
 ): Promise<ModeloFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "modelos", "editar"))
+    return { error: "Sem permissão." };
+
   const titulo = ((formData.get("titulo") as string) ?? "").trim();
   const categoria =
     ((formData.get("categoria") as string) ?? "").trim() || null;
@@ -72,6 +82,9 @@ export async function updateModeloAction(
 }
 
 export async function deleteModeloAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "modelos", "excluir")) return;
+
   try {
     await sql`DELETE FROM modelos_documento WHERE id = ${id}::uuid`;
     revalidatePath("/dashboard/modelos");
@@ -84,6 +97,9 @@ export async function toggleModeloAtivoAction(
   id: string,
   ativo: boolean
 ): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "modelos", "editar")) return;
+
   try {
     await sql`
       UPDATE modelos_documento SET ativo = ${ativo}, updated_at = NOW()

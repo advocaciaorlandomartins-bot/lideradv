@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import sql from "./db";
 import { logAction } from "./audit";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 export type ProcessoFormState = { error: string } | null;
 
@@ -10,6 +12,10 @@ export async function createProcessoAction(
   _prev: ProcessoFormState,
   formData: FormData
 ): Promise<ProcessoFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "criar"))
+    return { error: "Sem permissão." };
+
   const clientId = ((formData.get("client_id") as string | null) ?? "").trim();
   const numero =
     ((formData.get("numero") as string | null) ?? "").trim() || null;
@@ -69,6 +75,10 @@ export async function updateProcessoAction(
   _prev: ProcessoFormState,
   formData: FormData
 ): Promise<ProcessoFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
+
   const clientId = ((formData.get("client_id") as string | null) ?? "").trim();
   const numero =
     ((formData.get("numero") as string | null) ?? "").trim() || null;
@@ -132,6 +142,9 @@ export async function updateProcessoAction(
 }
 
 export async function deleteProcessoAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "excluir")) return;
+
   try {
     await sql`DELETE FROM processos WHERE id = ${id}::uuid`;
   } catch (err) {

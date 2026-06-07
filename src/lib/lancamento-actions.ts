@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { logAction } from "./audit";
 import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 export type LancamentoFormState = { error: string } | null;
 
@@ -21,6 +22,10 @@ export async function createLancamentoAction(
   _prev: LancamentoFormState,
   formData: FormData
 ): Promise<LancamentoFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "criar"))
+    return { error: "Sem permissão." };
+
   const tipo = ((formData.get("tipo") as string | null) ?? "entrada") as
     | "entrada"
     | "saida";
@@ -302,6 +307,10 @@ export async function updateLancamentoAction(
   _prev: LancamentoFormState,
   formData: FormData
 ): Promise<LancamentoFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { error: "Sem permissão." };
+
   const tipo = ((formData.get("tipo") as string | null) ?? "entrada") as
     | "entrada"
     | "saida";
@@ -406,6 +415,8 @@ export async function reagendarLancamentoAction(
   id: string,
   novaData: string
 ): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar")) return;
   if (!novaData) return;
   try {
     await sql`
@@ -421,6 +432,7 @@ export async function reagendarLancamentoAction(
 
 export async function markAsPagoAction(id: string): Promise<void> {
   const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar")) return;
   try {
     const rows = await sql`
       UPDATE lancamentos
@@ -452,6 +464,7 @@ export async function markAsPagoAction(id: string): Promise<void> {
 
 export async function deleteLancamentoAction(id: string): Promise<void> {
   const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "excluir")) return;
   try {
     const rows = await sql`
       DELETE FROM lancamentos WHERE id = ${id}::uuid
@@ -479,6 +492,7 @@ export async function deleteLancamentoAction(id: string): Promise<void> {
 
 export async function revertParaPendenteAction(id: string): Promise<void> {
   const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar")) return;
   try {
     const rows = await sql`
       UPDATE lancamentos
@@ -509,6 +523,8 @@ export async function revertParaPendenteAction(id: string): Promise<void> {
 }
 
 export async function deleteGrupoAction(grupoParcelas: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "excluir")) return;
   try {
     await sql`
       DELETE FROM lancamentos

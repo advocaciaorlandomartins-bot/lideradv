@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 export type ComissaoConfigFormState =
   | { error: string }
@@ -12,6 +14,10 @@ export async function createComissaoConfigAction(
   _prev: ComissaoConfigFormState,
   formData: FormData
 ): Promise<ComissaoConfigFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "configuracoes", "editar"))
+    return { error: "Sem permissão." };
+
   const nome = ((formData.get("nome") as string | null) ?? "").trim();
   const tipoOrigem =
     ((formData.get("tipo_origem") as string | null) ?? "").trim() || null;
@@ -64,6 +70,10 @@ export async function updateComissaoConfigAction(
   _prev: ComissaoConfigFormState,
   formData: FormData
 ): Promise<ComissaoConfigFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "configuracoes", "editar"))
+    return { error: "Sem permissão." };
+
   const nome = ((formData.get("nome") as string | null) ?? "").trim();
   const tipoOrigem =
     ((formData.get("tipo_origem") as string | null) ?? "").trim() || null;
@@ -118,6 +128,9 @@ export async function updateComissaoConfigAction(
 }
 
 export async function deleteComissaoConfigAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "configuracoes", "excluir")) return;
+
   try {
     await sql`DELETE FROM comissoes_config WHERE id = ${id}::uuid`;
   } catch (err) {
@@ -130,6 +143,9 @@ export async function toggleComissaoConfigAtivoAction(
   id: string,
   ativo: boolean
 ): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "configuracoes", "editar")) return;
+
   try {
     await sql`UPDATE comissoes_config SET ativo = ${!ativo}, updated_at = NOW() WHERE id = ${id}::uuid`;
   } catch (err) {

@@ -204,7 +204,7 @@ export default function UsuariosList({ usuarios }: Props) {
                 Ver todos
               </button>
             )}
-            {filter === "todos" && !search && vagasRestantes > 0 && (
+            {filter === "todos" && !search && (
               <Link
                 href="/dashboard/usuarios/novo"
                 className="mt-2 flex items-center gap-2 rounded-lg bg-cta px-4 py-2 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover"

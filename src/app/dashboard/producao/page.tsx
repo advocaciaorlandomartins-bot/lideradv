@@ -1,10 +1,16 @@
+import { notFound } from "next/navigation";
 import { getAllProcessosProducao } from "@/lib/producao-db";
 import ProducaoContent from "@/components/dashboard/producao/producao-content";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = { title: "Produção — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function ProducaoPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "producao", "ver")) notFound();
+
   const processos = await getAllProcessosProducao();
   const ativos = processos.filter(
     (p) => p.estagio_producao !== "arquivado"

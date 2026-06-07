@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getClientFull } from "@/lib/clients-db";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import EditClientForm from "@/components/dashboard/clients/edit-client-form";
 import { ChevronRightIcon } from "@/components/icons";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
@@ -12,6 +14,9 @@ export default async function EditarClientePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "editar")) notFound();
+
   const { id } = await params;
   const [client, colaboradores] = await Promise.all([
     getClientFull(id),

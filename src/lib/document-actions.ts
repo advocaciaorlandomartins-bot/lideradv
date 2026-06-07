@@ -1,6 +1,8 @@
 "use server";
 
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 interface CreateDocumentoInput {
   entityType: "processo" | "cliente" | "pericia";
@@ -15,6 +17,10 @@ interface CreateDocumentoInput {
 export async function createDocumentoAction(
   data: CreateDocumentoInput
 ): Promise<{ id: string } | { error: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "criar"))
+    return { error: "Sem permissão." };
+
   try {
     const rows = await sql`
       INSERT INTO documentos (entity_type, entity_id, nome, tipo, tamanho, caminho, url)
@@ -37,6 +43,9 @@ export async function createDocumentoAction(
 }
 
 export async function deleteDocumentoAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "excluir")) return;
+
   try {
     await sql`DELETE FROM documentos WHERE id = ${id}::uuid`;
   } catch (err) {

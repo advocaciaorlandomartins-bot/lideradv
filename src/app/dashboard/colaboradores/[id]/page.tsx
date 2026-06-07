@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getColaboradorFull } from "@/lib/colaboradores-db";
 import { getColaboradorContaPagar } from "@/lib/remuneracoes-db";
 import {
@@ -34,6 +36,9 @@ export default async function ColaboradorDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "colaboradores", "ver")) notFound();
+
   const { id } = await params;
   const [colaborador, conta] = await Promise.all([
     getColaboradorFull(id),

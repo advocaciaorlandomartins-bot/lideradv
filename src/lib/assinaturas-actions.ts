@@ -1,12 +1,14 @@
 "use server";
 
 import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 import { criarEnvelope } from "./assinaturas-db";
 import { revalidatePath } from "next/cache";
 
 export async function salvarEnvelopeAction(formData: FormData) {
   const session = await getSession();
-  if (!session) throw new Error("Não autenticado");
+  if (!session || !hasPermission(session, "assinaturas", "criar"))
+    throw new Error("Sem permissão.");
 
   const nome = formData.get("nome") as string;
   const prazo = (formData.get("prazo") as string) || null;

@@ -5,6 +5,7 @@ import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { getAllComissoesConfig } from "@/lib/comissoes-config-db";
 import ConfigTabs from "@/components/dashboard/configuracoes/config-tabs";
 
+export const metadata = { title: "Configurações — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {

@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import sql from "./db";
 import { logAction } from "./audit";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 export type ClientFormState = { error: string } | null;
 
@@ -10,6 +12,10 @@ export async function createClientAction(
   _prev: ClientFormState,
   formData: FormData
 ): Promise<ClientFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "criar"))
+    return { error: "Sem permissão." };
+
   const type = formData.get("type") as string;
   const name = ((formData.get("name") as string | null) ?? "").trim();
   const doc = ((formData.get("doc") as string | null) ?? "").trim();
@@ -167,6 +173,10 @@ export async function updateClientAction(
   _prev: ClientFormState,
   formData: FormData
 ): Promise<ClientFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "editar"))
+    return { error: "Sem permissão." };
+
   const type = formData.get("type") as string;
   const name = ((formData.get("name") as string | null) ?? "").trim();
   const doc = ((formData.get("doc") as string | null) ?? "").trim();
@@ -350,6 +360,9 @@ export async function updateClientAction(
 }
 
 export async function deleteClientAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "excluir")) return;
+
   try {
     await sql`DELETE FROM clients WHERE id = ${id}::uuid`;
   } catch (err) {

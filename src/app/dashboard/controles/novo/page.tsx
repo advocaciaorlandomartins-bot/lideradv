@@ -1,5 +1,8 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ClipboardListIcon } from "@/components/icons";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import {
   getClientesForControle,
   getProcessosForControle,
@@ -10,11 +13,17 @@ import {
 import { getTipoConfig } from "@/lib/controles-types";
 import ControleForm from "@/components/dashboard/controles/controle-form";
 
+export const metadata = { title: "Novo Controle — AdvMartins" };
+export const dynamic = "force-dynamic";
+
 export default async function NovoControlePage({
   searchParams,
 }: {
   searchParams: Promise<{ tipo?: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "criar")) notFound();
+
   const { tipo = "audiencias" } = await searchParams;
   const tipoConfig = getTipoConfig(tipo);
 

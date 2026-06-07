@@ -1,9 +1,18 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ShieldCheckIcon } from "@/components/icons";
 import UsuarioForm from "@/components/dashboard/usuarios/usuario-form";
 import { getColaboradoresForSelect } from "@/lib/usuarios-db";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
+
+export const metadata = { title: "Novo Usuário — AdvMartins" };
+export const dynamic = "force-dynamic";
 
 export default async function NovoUsuarioPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "usuarios", "criar")) notFound();
+
   const colaboradores = await getColaboradoresForSelect();
 
   return (

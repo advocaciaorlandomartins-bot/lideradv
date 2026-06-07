@@ -1,9 +1,13 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ClipboardListIcon } from "@/components/icons";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getControles } from "@/lib/controles-db";
 import { getTipoConfig } from "@/lib/controles-types";
 import ControlesContent from "@/components/dashboard/controles/controles-content";
 
+export const metadata = { title: "Controles — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function ControlesPage({
@@ -19,6 +23,9 @@ export default async function ControlesPage({
     fim?: string;
   }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "ver")) notFound();
+
   const sp = await searchParams;
   const tipo = sp.tipo ?? "audiencias";
   const status = sp.status ?? "pendente";

@@ -1,7 +1,10 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAllClients } from "@/lib/clients-db";
 import NewProcessoForm from "@/components/dashboard/processos/new-processo-form";
 import { ChevronRightIcon } from "@/components/icons";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = {
   title: "Novo Processo — AdvMartins",
@@ -14,6 +17,9 @@ export default async function NovoProcessoPage({
 }: {
   searchParams: Promise<{ cliente?: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "criar")) notFound();
+
   const { cliente } = await searchParams;
   const clients = await getAllClients();
   const clientOptions = clients.map((c) => ({ id: c.id, name: c.name }));

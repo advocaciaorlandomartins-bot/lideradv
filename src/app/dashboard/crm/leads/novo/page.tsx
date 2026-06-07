@@ -1,10 +1,16 @@
+import { notFound } from "next/navigation";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
 import LeadForm from "@/components/dashboard/crm/lead-form";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = { title: "Novo Lead — CRM — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function NovoLeadPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "criar")) notFound();
+
   const colaboradores = await getAllColaboradores();
 
   return (

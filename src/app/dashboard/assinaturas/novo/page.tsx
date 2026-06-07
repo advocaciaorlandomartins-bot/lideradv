@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { redirect } from "next/navigation";
+import { hasPermission } from "@/lib/permissoes";
+import { notFound, redirect } from "next/navigation";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
 import { getAllClients } from "@/lib/clients-db";
 import NovoEnvelope from "@/components/dashboard/assinaturas/novo-envelope";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function NovoEnvelopePage() {
   const session = await getSession();
   if (!session) redirect("/");
+  if (!hasPermission(session, "assinaturas", "criar")) notFound();
 
   const [colaboradores, clientes] = await Promise.all([
     getAllColaboradores(),

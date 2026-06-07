@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
+import { logAction } from "./audit";
 
 export type ControleFormState = { error?: string; success?: boolean } | null;
 
@@ -212,6 +215,10 @@ export async function createControleAction(
   _prev: ControleFormState,
   formData: FormData
 ): Promise<ControleFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "criar"))
+    return { error: "Sem permissão." };
+
   const tipo = (formData.get("tipo") as string) ?? "";
   const dataEvento =
     ((formData.get("data_evento") as string) ?? "").trim() || null;
@@ -289,6 +296,11 @@ export async function createControleAction(
     return { error: "Erro ao criar controle." };
   }
 
+  await logAction({
+    acao: "criar",
+    entidade: "controle",
+    descricao: `Criou controle: ${tipo}`,
+  });
   revalidatePath("/dashboard/controles");
   return { success: true };
 }
@@ -297,6 +309,10 @@ export async function updateControleAction(
   _prev: ControleFormState,
   formData: FormData
 ): Promise<ControleFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "editar"))
+    return { error: "Sem permissão." };
+
   const id = (formData.get("id") as string) ?? "";
   const tipo = (formData.get("tipo") as string) ?? "";
   const dataEvento =
@@ -394,6 +410,12 @@ export async function updateControleAction(
     return { error: "Erro ao atualizar controle." };
   }
 
+  await logAction({
+    acao: "editar",
+    entidade: "controle",
+    entidadeId: id,
+    descricao: `Editou controle: ${tipo}`,
+  });
   revalidatePath("/dashboard/controles");
   return { success: true };
 }
@@ -402,12 +424,30 @@ export async function updateStatusControleAction(
   id: string,
   novoStatus: "concluido" | "cancelado" | "pendente"
 ): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "editar")) return;
+
   const dbStatus = novoStatus === "pendente" ? null : novoStatus;
   await sql`UPDATE controles SET status = ${dbStatus}, updated_at = NOW() WHERE id = ${id}::uuid`;
+  await logAction({
+    acao: "editar",
+    entidade: "controle",
+    entidadeId: id,
+    descricao: `Status → ${novoStatus}`,
+  });
   revalidatePath("/dashboard/controles");
 }
 
 export async function deleteControleAction(id: string): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "excluir")) return;
+
   await sql`DELETE FROM controles WHERE id = ${id}::uuid`;
+  await logAction({
+    acao: "excluir",
+    entidade: "controle",
+    entidadeId: id,
+    descricao: "Excluiu controle",
+  });
   revalidatePath("/dashboard/controles");
 }

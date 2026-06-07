@@ -1,7 +1,10 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import NewClientForm from "@/components/dashboard/clients/new-client-form";
 import { ChevronRightIcon } from "@/components/icons";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = {
   title: "Novo Cliente — AdvMartins",
@@ -10,6 +13,9 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function NovoClientePage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "criar")) notFound();
+
   const colaboradores = await getAllColaboradores();
   return (
     <div className="space-y-6">

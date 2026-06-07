@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 // ── Fase / Status ──────────────────────────────────────────────
 
@@ -9,6 +11,9 @@ export async function avancarFaseAction(
   processoId: string,
   novaFase: "elaboracao"
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   try {
     await sql`
       UPDATE processos SET
@@ -29,6 +34,9 @@ export async function arquivarProcessoAction(
   resultado: string,
   observacao: string
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   const notas = observacao.trim() || null;
   try {
     await sql`
@@ -54,6 +62,9 @@ export async function updateRelatoAction(
   processoId: string,
   relato: string
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   try {
     await sql`
       UPDATE processos SET relato = ${relato || null}, updated_at = NOW()
@@ -72,6 +83,9 @@ export async function updateResponsavelAction(
   processoId: string,
   responsavelId: string | null
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   try {
     if (responsavelId) {
       await sql`
@@ -102,6 +116,9 @@ export async function createHistoricoRegistroAction(data: {
   situacao: string | null;
   destaque: boolean;
 }): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   if (!data.texto.trim()) return { error: "O texto é obrigatório." };
   try {
     await sql`
@@ -127,6 +144,9 @@ export async function deleteHistoricoRegistroAction(
   id: string,
   processoId: string
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "excluir"))
+    return { error: "Sem permissão." };
   try {
     await sql`DELETE FROM historico_registros WHERE id = ${id}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
@@ -148,6 +168,9 @@ export async function createEventoControleAction(data: {
   linkVirtual: string | null;
   responsavelId: string | null;
 }): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   if (!data.titulo.trim()) return { error: "O título é obrigatório." };
   try {
     await sql`
@@ -174,6 +197,9 @@ export async function deleteEventoControleAction(
   id: string,
   processoId: string
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "excluir"))
+    return { error: "Sem permissão." };
   try {
     await sql`DELETE FROM eventos_controles WHERE id = ${id}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
@@ -195,6 +221,9 @@ export async function createTarefaProcessoAction(data: {
   hora: string | null;
   comentarios: string | null;
 }): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   if (!data.titulo.trim()) return { error: "O título é obrigatório." };
   try {
     await sql`
@@ -222,6 +251,9 @@ export async function updateTarefaStatusAction(
   status: string,
   processoId: string
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   try {
     await sql`UPDATE tarefas_processo SET status = ${status} WHERE id = ${id}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
@@ -235,6 +267,9 @@ export async function deleteTarefaAction(
   id: string,
   processoId: string
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "excluir"))
+    return { error: "Sem permissão." };
   try {
     await sql`DELETE FROM tarefas_processo WHERE id = ${id}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
@@ -251,6 +286,9 @@ export async function createPendenciaAction(data: {
   clientId: string;
   descricao: string;
 }): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   if (!data.descricao.trim()) return { error: "Descreva a pendência." };
   try {
     await sql`
@@ -269,6 +307,9 @@ export async function updatePendenciaStatusAction(
   status: string,
   processoId: string
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   try {
     await sql`UPDATE pendencias_cliente SET status = ${status} WHERE id = ${id}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
@@ -282,6 +323,9 @@ export async function deletePendenciaAction(
   id: string,
   processoId: string
 ): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "excluir"))
+    return { error: "Sem permissão." };
   try {
     await sql`DELETE FROM pendencias_cliente WHERE id = ${id}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);

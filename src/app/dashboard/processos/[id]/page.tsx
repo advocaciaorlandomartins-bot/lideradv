@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import {
   getProcessoExtended,
   getHistoricoByProcesso,
@@ -22,6 +24,9 @@ export default async function ProcessoDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "ver")) notFound();
+
   const { id } = await params;
 
   const [

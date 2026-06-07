@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getColaboradorFull } from "@/lib/colaboradores-db";
 import EditColaboradorForm from "@/components/dashboard/colaboradores/edit-colaborador-form";
 import { ChevronRightIcon } from "@/components/icons";
@@ -15,6 +17,10 @@ export default async function EditarColaboradorPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "colaboradores", "editar"))
+    notFound();
+
   const { id } = await params;
   const colaborador = await getColaboradorFull(id);
   if (!colaborador) notFound();

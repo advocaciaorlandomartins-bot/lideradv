@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getClientById } from "@/lib/clients-db";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getProcessosByClientId } from "@/lib/processos-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 import { getClientDebito } from "@/lib/lancamentos-db";
@@ -35,6 +37,9 @@ export default async function ClienteDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "ver")) notFound();
+
   const { id } = await params;
   const [client, processes, documentos, debito, modelos] = await Promise.all([
     getClientById(id),

@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getProcessoFull } from "@/lib/processos-db";
 import { getAllClients } from "@/lib/clients-db";
 import EditProcessoForm from "@/components/dashboard/processos/edit-processo-form";
@@ -16,6 +18,9 @@ export default async function EditarProcessoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar")) notFound();
+
   const { id } = await params;
   const [processo, clients] = await Promise.all([
     getProcessoFull(id),

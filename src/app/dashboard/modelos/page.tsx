@@ -1,5 +1,8 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAllModelos } from "@/lib/modelos-db";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import DeleteModeloButton from "@/components/dashboard/modelos/delete-modelo-button";
 import { DocumentTextIcon, PlusIcon } from "@/components/icons";
 
@@ -18,6 +21,9 @@ const CATEGORIA_COLORS: Record<string, string> = {
 };
 
 export default async function ModelosPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "modelos", "ver")) notFound();
+
   const modelos = await getAllModelos();
 
   const categorias = Array.from(

@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getPublicacaoById } from "@/lib/publicacoes-db";
 import { ChevronRightIcon } from "@/components/icons";
 import PublicacaoDetalheActions from "./detalhe-actions";
@@ -11,6 +13,9 @@ export default async function PublicacaoDetalhePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "publicacoes", "ver")) notFound();
+
   const { id } = await params;
   const pub = await getPublicacaoById(Number(id));
   if (!pub) notFound();

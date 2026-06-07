@@ -1,9 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ShieldCheckIcon } from "@/components/icons";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getUsuarioById, getColaboradoresForSelect } from "@/lib/usuarios-db";
 import UsuarioForm from "@/components/dashboard/usuarios/usuario-form";
 
+export const metadata = { title: "Editar Usuário — AdvMartins" };
 export const dynamic = "force-dynamic";
 
 export default async function EditarUsuarioPage({
@@ -11,6 +14,9 @@ export default async function EditarUsuarioPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "usuarios", "editar")) notFound();
+
   const { id } = await params;
   const [usuario, colaboradores] = await Promise.all([
     getUsuarioById(id),

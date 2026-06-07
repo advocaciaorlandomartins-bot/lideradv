@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getLeadById } from "@/lib/crm-db";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
 import LeadForm from "@/components/dashboard/crm/lead-form";
@@ -11,6 +13,9 @@ interface Props {
 }
 
 export default async function EditarLeadPage({ params }: Props) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "editar")) notFound();
+
   const { id } = await params;
   const [lead, colaboradores] = await Promise.all([
     getLeadById(id),

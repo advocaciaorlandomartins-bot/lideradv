@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getAllClientsWithOrigin } from "@/lib/clients-db";
 import { getAllProcessos } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
@@ -20,6 +23,9 @@ export default async function NovoLancamentoPage({
     processo_id?: string;
   }>;
 }) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "criar")) notFound();
+
   const { tipo, client_id, processo_id } = await searchParams;
   const defaultTipo: "entrada" | "saida" =
     tipo === "saida" ? "saida" : "entrada";

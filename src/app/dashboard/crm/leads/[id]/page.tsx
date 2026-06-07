@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import {
   getLeadById,
   getAtividadesByLead,
@@ -15,6 +17,9 @@ interface Props {
 }
 
 export default async function LeadDetailPage({ params }: Props) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "crm", "ver")) notFound();
+
   const { id } = await params;
   const [lead, atividades, tarefas, colaboradores] = await Promise.all([
     getLeadById(id),

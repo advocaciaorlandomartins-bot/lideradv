@@ -1,5 +1,8 @@
+import { notFound } from "next/navigation";
 import { getAllClients } from "@/lib/clients-db";
 import ClientsContent from "@/components/dashboard/clients/clients-content";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = {
   title: "Clientes — AdvMartins",
@@ -8,6 +11,9 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "ver")) notFound();
+
   const clients = await getAllClients();
   const ativos = clients.filter((c) => c.status === "ativo").length;
   const total = clients.length;

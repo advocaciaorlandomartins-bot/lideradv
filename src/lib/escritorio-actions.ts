@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import sql from "./db";
+import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 
 export type ConfigFormState = { error?: string; success?: boolean } | null;
 
@@ -9,6 +11,10 @@ export async function saveEscritorioConfigAction(
   _prev: ConfigFormState,
   formData: FormData
 ): Promise<ConfigFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "configuracoes", "editar"))
+    return { error: "Sem permissão." };
+
   const nome = ((formData.get("nome") as string) ?? "").trim();
   const oab = ((formData.get("oab") as string) ?? "").trim() || null;
   const cnpj = ((formData.get("cnpj") as string) ?? "").trim() || null;

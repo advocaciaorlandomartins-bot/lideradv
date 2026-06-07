@@ -1,12 +1,20 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import NewColaboradorForm from "@/components/dashboard/colaboradores/new-colaborador-form";
 import { ChevronRightIcon } from "@/components/icons";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = {
   title: "Novo Colaborador — AdvMartins",
 };
 
-export default function NovoColaboradorPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NovoColaboradorPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "colaboradores", "criar")) notFound();
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}

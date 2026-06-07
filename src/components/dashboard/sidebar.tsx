@@ -24,6 +24,8 @@ import {
   PenSignIcon,
   FileStackIcon,
   InboxArrowDownIcon,
+  ClipboardCheckIcon,
+  PuzzleIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -113,7 +115,7 @@ const NAV_ITEMS = [
     href: "/dashboard/relatorios",
     icon: PrinterIcon,
     label: "Relatórios",
-    modulo: null,
+    modulo: "relatorios",
   },
   {
     href: "/dashboard/usuarios",
@@ -126,6 +128,18 @@ const NAV_ITEMS = [
     icon: CogIcon,
     label: "Configurações",
     modulo: "configuracoes",
+  },
+  {
+    href: "/dashboard/integracoes",
+    icon: PuzzleIcon,
+    label: "Integrações",
+    modulo: "gerenciador",
+  },
+  {
+    href: "/dashboard/gerenciador/auditoria",
+    icon: ClipboardCheckIcon,
+    label: "Auditoria",
+    modulo: "gerenciador",
   },
 ] as const;
 

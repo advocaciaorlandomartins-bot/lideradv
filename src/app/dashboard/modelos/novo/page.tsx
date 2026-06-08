@@ -6,7 +6,7 @@ import { createModeloAction } from "@/lib/modelo-actions";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
-export const metadata = { title: "Novo Modelo — AdvMartins" };
+export const metadata = { title: "Novo Modelo — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function NovoModeloPage() {

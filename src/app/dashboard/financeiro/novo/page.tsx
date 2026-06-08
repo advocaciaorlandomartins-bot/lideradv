@@ -9,7 +9,7 @@ import NewLancamentoForm from "@/components/dashboard/financeiro/new-lancamento-
 import { ChevronRightIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Novo Lançamento — AdvMartins",
+  title: "Novo Lançamento — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

@@ -5,7 +5,7 @@ import { getAllPericias } from "@/lib/pericias-db";
 import PericiasContent from "@/components/dashboard/pericias/pericias-content";
 
 export const metadata = {
-  title: "Perícias — AdvMartins",
+  title: "Perícias — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

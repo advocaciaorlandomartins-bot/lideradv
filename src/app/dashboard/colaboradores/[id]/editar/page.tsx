@@ -7,7 +7,7 @@ import EditColaboradorForm from "@/components/dashboard/colaboradores/edit-colab
 import { ChevronRightIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Editar Colaborador — AdvMartins",
+  title: "Editar Colaborador — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

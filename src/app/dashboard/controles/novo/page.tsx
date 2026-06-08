@@ -13,7 +13,7 @@ import {
 import { getTipoConfig } from "@/lib/controles-types";
 import ControleForm from "@/components/dashboard/controles/controle-form";
 
-export const metadata = { title: "Novo Controle — AdvMartins" };
+export const metadata = { title: "Novo Controle — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function NovoControlePage({

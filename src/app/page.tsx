@@ -7,7 +7,10 @@ const features = [
   { label: "Controle Financeiro", desc: "Honorários, custas e despesas" },
   { label: "Perícias e Documentos", desc: "Organização centralizada" },
   { label: "Cofre de Senhas", desc: "Senhas dos clientes protegidas" },
-  { label: "Busca Automática por OAB", desc: "Consulta nos portais da justiça" },
+  {
+    label: "Busca Automática por OAB",
+    desc: "Consulta nos portais da justiça",
+  },
 ];
 
 export default function LoginPage() {
@@ -16,7 +19,10 @@ export default function LoginPage() {
       {/* ── Left Brand Panel ── */}
       <aside className="hidden lg:flex lg:w-1/2 bg-primary flex-col justify-between p-12 relative overflow-hidden">
         {/* Subtle decorative rings */}
-        <div className="pointer-events-none select-none absolute inset-0 opacity-[0.06]" aria-hidden="true">
+        <div
+          className="pointer-events-none select-none absolute inset-0 opacity-[0.06]"
+          aria-hidden="true"
+        >
           <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full border-2 border-white" />
           <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full border-2 border-white" />
         </div>
@@ -29,7 +35,7 @@ export default function LoginPage() {
             </div>
             <div>
               <div className="font-heading text-3xl font-semibold leading-none text-white">
-                AdvMartins
+                LiderAdv
               </div>
               <div className="mt-1 font-body text-sm text-white/60">
                 Gestão Jurídica
@@ -64,7 +70,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="relative font-body text-xs text-white/40">
-          © {new Date().getFullYear()} AdvMartins. Todos os direitos reservados.
+          © {new Date().getFullYear()} LiderAdv. Todos os direitos reservados.
         </p>
       </aside>
 

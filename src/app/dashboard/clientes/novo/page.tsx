@@ -7,7 +7,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = {
-  title: "Novo Cliente — AdvMartins",
+  title: "Novo Cliente — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

@@ -5,7 +5,7 @@ import { getAllUsuarios } from "@/lib/usuarios-db";
 import UsuariosList from "@/components/dashboard/usuarios/usuarios-list";
 
 export const metadata = {
-  title: "Usuários e Permissões — AdvMartins",
+  title: "Usuários e Permissões — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

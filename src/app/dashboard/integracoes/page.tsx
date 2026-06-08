@@ -3,7 +3,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import IntegracoesContent from "@/components/dashboard/integracoes/integracoes-content";
 
-export const metadata = { title: "Integrações — AdvMartins" };
+export const metadata = { title: "Integrações — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function IntegracoesPage() {

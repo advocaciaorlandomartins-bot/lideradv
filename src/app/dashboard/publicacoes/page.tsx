@@ -4,7 +4,7 @@ import PublicacoesContent from "@/components/dashboard/publicacoes/publicacoes-c
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
-export const metadata = { title: "Publicações — AdvMartins" };
+export const metadata = { title: "Publicações — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function PublicacoesPage() {

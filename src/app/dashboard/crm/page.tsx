@@ -4,7 +4,7 @@ import CrmContent from "@/components/dashboard/crm/crm-content";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
-export const metadata = { title: "CRM — AdvMartins" };
+export const metadata = { title: "CRM — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function CrmPage() {

@@ -4,7 +4,7 @@ import ProducaoContent from "@/components/dashboard/producao/producao-content";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
-export const metadata = { title: "Produção — AdvMartins" };
+export const metadata = { title: "Produção — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function ProducaoPage() {

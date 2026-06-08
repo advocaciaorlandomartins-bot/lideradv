@@ -9,7 +9,7 @@ import NewRemuneracaoForm from "@/components/dashboard/remuneracoes/new-remunera
 import { ChevronRightIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Nova Remuneração — AdvMartins",
+  title: "Nova Remuneração — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

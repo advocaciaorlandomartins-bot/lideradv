@@ -10,7 +10,7 @@ import EditPericiaForm from "@/components/dashboard/pericias/edit-pericia-form";
 import { ChevronRightIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Editar Perícia — AdvMartins",
+  title: "Editar Perícia — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

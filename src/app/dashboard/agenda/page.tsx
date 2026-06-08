@@ -2,7 +2,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import AgendaWrapper from "./agenda-wrapper";
 
-export const metadata = { title: "Agenda — AdvMartins" };
+export const metadata = { title: "Agenda — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function AgendaPage() {

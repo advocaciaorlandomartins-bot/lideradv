@@ -7,7 +7,7 @@ import { getAllClients } from "@/lib/clients-db";
 import NovoEnvelope from "@/components/dashboard/assinaturas/novo-envelope";
 import { ChevronRightIcon } from "@/components/icons";
 
-export const metadata = { title: "Novo Envelope — AdvMartins" };
+export const metadata = { title: "Novo Envelope — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function NovoEnvelopePage() {

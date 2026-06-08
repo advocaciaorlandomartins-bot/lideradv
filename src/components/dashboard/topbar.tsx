@@ -250,7 +250,7 @@ export default function Topbar({
               <ScalesIcon className="h-4 w-4 text-white" />
             </div>
             <span className="font-heading text-base font-semibold text-white">
-              AdvMartins
+              LiderAdv
             </span>
           </Link>
         </div>

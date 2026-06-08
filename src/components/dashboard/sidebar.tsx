@@ -247,7 +247,7 @@ export default function Sidebar({
                 <ScalesIcon className="h-5 w-5 text-white" />
               </div>
               <span className="font-heading text-xl font-semibold text-white">
-                AdvMartins
+                LiderAdv
               </span>
             </div>
           )}

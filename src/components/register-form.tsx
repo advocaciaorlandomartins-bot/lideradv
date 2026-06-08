@@ -90,7 +90,7 @@ export default function RegisterForm() {
           </svg>
         </div>
         <span className="font-heading text-2xl font-semibold text-fg">
-          AdvMartins
+          LiderAdv
         </span>
       </div>
 

@@ -15,7 +15,7 @@ const lato = Lato({
 });
 
 export const metadata: Metadata = {
-  title: "AdvMartins — Sistema de Gestão Jurídica",
+  title: "LiderAdv — Sistema de Gestão Jurídica",
   description:
     "Gestão completa para advogados: clientes, processos, perícias, controle financeiro e busca automática de processos por OAB.",
 };

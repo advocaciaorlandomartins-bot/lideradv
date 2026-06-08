@@ -6,7 +6,7 @@ import { getColaboradoresForSelect } from "@/lib/usuarios-db";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
-export const metadata = { title: "Novo Usuário — AdvMartins" };
+export const metadata = { title: "Novo Usuário — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function NovoUsuarioPage() {

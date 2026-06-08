@@ -42,7 +42,7 @@ export default function RegisterPage() {
             </div>
             <div>
               <div className="font-heading text-3xl font-semibold leading-none text-white">
-                AdvMartins
+                LiderAdv
               </div>
               <div className="mt-1 font-body text-sm text-white/60">
                 Gestão Jurídica
@@ -104,8 +104,7 @@ export default function RegisterPage() {
         {/* Footer */}
         <div className="relative flex items-center justify-between">
           <p className="font-body text-xs text-white/40">
-            © {new Date().getFullYear()} AdvMartins. Todos os direitos
-            reservados.
+            © {new Date().getFullYear()} LiderAdv. Todos os direitos reservados.
           </p>
           <Link
             href="/"

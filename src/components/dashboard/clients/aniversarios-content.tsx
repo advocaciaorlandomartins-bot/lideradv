@@ -18,7 +18,7 @@ import {
 const MESSAGE_KEY = "advmartins:birthday:message";
 
 const DEFAULT_MESSAGE =
-  "Olá, {{cliente_primeiro_nome}}! 🎂\n\nEm nome da equipe AdvMartins, gostaríamos de desejar a você um feliz aniversário!\n\nQue este novo ciclo seja repleto de conquistas, saúde e realizações.\n\nUm abraço,\nEquipe AdvMartins";
+  "Olá, {{cliente_primeiro_nome}}! 🎂\n\nEm nome da equipe LiderAdv, gostaríamos de desejar a você um feliz aniversário!\n\nQue este novo ciclo seja repleto de conquistas, saúde e realizações.\n\nUm abraço,\nEquipe LiderAdv";
 
 const MONTH_NAMES = [
   "Janeiro",

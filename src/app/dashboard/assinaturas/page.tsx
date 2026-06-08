@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { listarEnvelopes } from "@/lib/assinaturas-db";
 import { PlusIcon, PenSignIcon } from "@/components/icons";
 
-export const metadata = { title: "Assinaturas — AdvMartins" };
+export const metadata = { title: "Assinaturas — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 const STATUS_LABEL: Record<string, string> = {

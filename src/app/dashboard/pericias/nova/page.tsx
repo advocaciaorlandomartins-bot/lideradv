@@ -8,7 +8,7 @@ import NewPericiaForm from "@/components/dashboard/pericias/new-pericia-form";
 import { ChevronRightIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Nova Perícia — AdvMartins",
+  title: "Nova Perícia — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

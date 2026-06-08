@@ -5,7 +5,7 @@ import { getAllRemuneracoes, getRemuneracaoKpis } from "@/lib/remuneracoes-db";
 import RemuneracoesContent from "@/components/dashboard/remuneracoes/remuneracoes-content";
 
 export const metadata = {
-  title: "Remunerações — AdvMartins",
+  title: "Remunerações — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

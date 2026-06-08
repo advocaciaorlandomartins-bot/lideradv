@@ -13,7 +13,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import RelatoriosContent from "@/components/dashboard/relatorios/relatorios-content";
 
-export const metadata = { title: "Relatórios — AdvMartins" };
+export const metadata = { title: "Relatórios — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function RelatoriosPage() {

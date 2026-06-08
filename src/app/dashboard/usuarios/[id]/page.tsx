@@ -6,7 +6,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { getUsuarioById, getColaboradoresForSelect } from "@/lib/usuarios-db";
 import UsuarioForm from "@/components/dashboard/usuarios/usuario-form";
 
-export const metadata = { title: "Editar Usuário — AdvMartins" };
+export const metadata = { title: "Editar Usuário — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function EditarUsuarioPage({

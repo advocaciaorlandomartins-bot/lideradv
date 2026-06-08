@@ -9,7 +9,7 @@ import EditLancamentoForm from "@/components/dashboard/financeiro/edit-lancament
 import { ChevronRightIcon, ShieldCheckIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Editar Lançamento — AdvMartins",
+  title: "Editar Lançamento — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

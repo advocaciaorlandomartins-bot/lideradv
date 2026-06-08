@@ -8,7 +8,7 @@ import EditProcessoForm from "@/components/dashboard/processos/edit-processo-for
 import { ChevronRightIcon } from "@/components/icons";
 
 export const metadata = {
-  title: "Editar Processo — AdvMartins",
+  title: "Editar Processo — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

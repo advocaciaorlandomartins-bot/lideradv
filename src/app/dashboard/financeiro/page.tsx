@@ -22,7 +22,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
 export const metadata = {
-  title: "Financeiro — AdvMartins",
+  title: "Financeiro — LiderAdv",
 };
 
 export const dynamic = "force-dynamic";

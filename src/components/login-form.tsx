@@ -24,7 +24,7 @@ export default function LoginForm() {
           <ScalesIcon className="w-5 h-5 text-white" />
         </div>
         <span className="font-heading text-2xl font-semibold text-fg">
-          AdvMartins
+          LiderAdv
         </span>
       </div>
 

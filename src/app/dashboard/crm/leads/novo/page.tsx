@@ -4,7 +4,7 @@ import LeadForm from "@/components/dashboard/crm/lead-form";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
-export const metadata = { title: "Novo Lead — CRM — AdvMartins" };
+export const metadata = { title: "Novo Lead — CRM — LiderAdv" };
 export const dynamic = "force-dynamic";
 
 export default async function NovoLeadPage() {

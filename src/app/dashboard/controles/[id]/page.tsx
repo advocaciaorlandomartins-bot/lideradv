@@ -5,6 +5,8 @@ import { hasPermission } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "Controle — LiderAdv" };
+
 export default async function ControlePage({
   params,
 }: {

@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+
+export const metadata = { title: "Perícia — LiderAdv" };
+
 import { getPericiaFull } from "@/lib/pericias-db";
 import { TIPO_LABELS, TIPO_COLORS } from "@/lib/pericias-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";

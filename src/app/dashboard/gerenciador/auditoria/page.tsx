@@ -6,6 +6,10 @@ import { getAuditLogs, ACAO_META, ENTIDADE_META } from "@/lib/audit-db";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "Auditoria — LiderAdv",
+};
+
 // ── Badge colours ─────────────────────────────────────────────────────────────
 
 const ACAO_STYLE: Record<string, string> = {

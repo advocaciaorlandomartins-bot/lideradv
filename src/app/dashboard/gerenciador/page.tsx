@@ -4,6 +4,10 @@ import { hasPermission } from "@/lib/permissoes";
 import { getGerenciadorData } from "@/lib/gerenciador-db";
 import GerenciadorContent from "@/components/dashboard/gerenciador/gerenciador-content";
 
+export const metadata = {
+  title: "Gerenciador — LiderAdv",
+};
+
 export default async function GerenciadorPage() {
   const user = await getSession();
   if (!user || !hasPermission(user, "gerenciador", "ver")) notFound();

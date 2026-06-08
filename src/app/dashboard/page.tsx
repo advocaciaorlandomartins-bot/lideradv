@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { getGerenciadorData } from "@/lib/gerenciador-db";
+
+export const metadata = {
+  title: "Dashboard — LiderAdv",
+};
 import { getDashboardData } from "@/lib/dashboard-db";
 import { TIPO_LABELS_COMP, TIPO_ICONS_COMP } from "@/lib/compromissos-db";
 import { getSession } from "@/lib/session";

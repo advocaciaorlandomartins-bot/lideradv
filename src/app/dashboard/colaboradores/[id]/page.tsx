@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+
+export const metadata = { title: "Colaborador — LiderAdv" };
+
 import { getColaboradorFull } from "@/lib/colaboradores-db";
 import { getColaboradorContaPagar } from "@/lib/remuneracoes-db";
 import {

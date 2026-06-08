@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getClientFull } from "@/lib/clients-db";
+
+export const metadata = { title: "Editar Cliente — LiderAdv" };
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import EditClientForm from "@/components/dashboard/clients/edit-client-form";

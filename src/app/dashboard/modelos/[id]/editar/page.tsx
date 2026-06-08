@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+
+export const metadata = { title: "Editar Modelo — LiderAdv" };
+
 import { getModeloById } from "@/lib/modelos-db";
 import { updateModeloAction } from "@/lib/modelo-actions";
 import ModeloForm from "@/components/dashboard/modelos/modelo-form";

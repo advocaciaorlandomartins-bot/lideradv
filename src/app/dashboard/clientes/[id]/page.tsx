@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getClientById } from "@/lib/clients-db";
+
+export const metadata = { title: "Cliente — LiderAdv" };
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { getProcessosByClientId } from "@/lib/processos-db";

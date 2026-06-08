@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+
+export const metadata = { title: "Editar Lead — LiderAdv" };
+
 import { getLeadById } from "@/lib/crm-db";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
 import LeadForm from "@/components/dashboard/crm/lead-form";

@@ -8,6 +8,10 @@ import { DocumentTextIcon, PlusIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "Modelos — LiderAdv",
+};
+
 const CATEGORIA_COLORS: Record<string, string> = {
   Contratos: "bg-blue-50 text-blue-700",
   Procurações: "bg-violet-50 text-violet-700",

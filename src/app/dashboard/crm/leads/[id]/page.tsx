@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+
+export const metadata = { title: "Lead — LiderAdv" };
+
 import {
   getLeadById,
   getAtividadesByLead,

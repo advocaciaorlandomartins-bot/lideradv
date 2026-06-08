@@ -167,15 +167,15 @@ export default function ColaboradoresContent({ colaboradores }: Props) {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-0">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <input
                   type="search"
                   placeholder="Buscar nome, e-mail, OAB…"
                   value={search}
                   onChange={(e) => handleSearch(e.target.value)}
-                  className="h-9 w-48 rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 lg:w-56"
+                  className="h-9 w-full rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 sm:w-48 lg:w-56"
                 />
               </div>
               <Link

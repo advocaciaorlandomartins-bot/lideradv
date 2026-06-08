@@ -189,7 +189,14 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
     <div className="space-y-6">
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+        <button
+          onClick={() => setSubTab("receber")}
+          className={`rounded-xl border bg-white p-5 shadow-sm text-left transition-all duration-150 cursor-pointer hover:shadow-md ${
+            subTab === "receber"
+              ? "border-primary ring-2 ring-primary/20"
+              : "border-border hover:border-primary/40"
+          }`}
+        >
           <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
             Total a Cobrar
           </p>
@@ -200,9 +207,16 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
             {clientesPendentes}{" "}
             {clientesPendentes === 1 ? "cliente" : "clientes"} com saldo
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+        <button
+          onClick={() => setSubTab("pagar")}
+          className={`rounded-xl border bg-white p-5 shadow-sm text-left transition-all duration-150 cursor-pointer hover:shadow-md ${
+            subTab === "pagar"
+              ? "border-primary ring-2 ring-primary/20"
+              : "border-border hover:border-primary/40"
+          }`}
+        >
           <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
             Total a Pagar
           </p>
@@ -213,7 +227,7 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
             {colabPendentes}{" "}
             {colabPendentes === 1 ? "colaborador" : "colaboradores"} pendentes
           </p>
-        </div>
+        </button>
 
         <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
           <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">

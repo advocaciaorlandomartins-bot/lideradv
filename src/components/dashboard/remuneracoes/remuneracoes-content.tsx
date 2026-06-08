@@ -28,14 +28,26 @@ function KpiCard({
   value,
   sub,
   color,
+  active,
+  onClick,
 }: {
   label: string;
   value: string;
   sub?: string;
   color: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+    <Wrapper
+      onClick={onClick}
+      className={`rounded-xl border bg-white p-5 shadow-sm transition-all duration-150 text-left w-full ${
+        onClick ? "cursor-pointer" : ""
+      } ${active ? "border-primary ring-2 ring-primary/20" : "border-border"} ${
+        onClick && !active ? "hover:border-primary/40 hover:shadow-md" : ""
+      }`}
+    >
       <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
         {label}
       </p>
@@ -43,7 +55,7 @@ function KpiCard({
         {value}
       </p>
       {sub && <p className="mt-0.5 font-body text-xs text-muted">{sub}</p>}
-    </div>
+    </Wrapper>
   );
 }
 
@@ -149,26 +161,60 @@ export default function RemuneracoesContent({ remuneracoes, kpis }: Props) {
           label="A Pagar"
           value={formatCurrency(kpis.aPagar)}
           color="text-red-600"
+          active={statusFilter === "pendente"}
+          onClick={() =>
+            reset(() =>
+              setStatusFilter(
+                statusFilter === "pendente" ? "todos" : "pendente"
+              )
+            )
+          }
         />
         <KpiCard
           label="Pago"
           value={formatCurrency(kpis.pago)}
           color="text-emerald-600"
+          active={statusFilter === "pago"}
+          onClick={() =>
+            reset(() =>
+              setStatusFilter(statusFilter === "pago" ? "todos" : "pago")
+            )
+          }
         />
         <KpiCard
           label="Salários"
           value={formatCurrency(kpis.salarios)}
           color="text-blue-600"
+          active={tipoFilter === "salario"}
+          onClick={() =>
+            reset(() =>
+              setTipoFilter(tipoFilter === "salario" ? "todos" : "salario")
+            )
+          }
         />
         <KpiCard
           label="Comissões"
           value={formatCurrency(kpis.comissoes)}
           color="text-emerald-700"
+          active={tipoFilter === "comissao"}
+          onClick={() =>
+            reset(() =>
+              setTipoFilter(tipoFilter === "comissao" ? "todos" : "comissao")
+            )
+          }
         />
         <KpiCard
           label="Bonificações"
           value={formatCurrency(kpis.bonificacoes)}
           color="text-amber-700"
+          active={tipoFilter === "bonificacao"}
+          onClick={() =>
+            reset(() =>
+              setTipoFilter(
+                tipoFilter === "bonificacao" ? "todos" : "bonificacao"
+              )
+            )
+          }
         />
       </div>
 

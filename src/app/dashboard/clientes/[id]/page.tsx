@@ -9,6 +9,11 @@ import { getProcessosByClientId } from "@/lib/processos-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 import { getClientDebito } from "@/lib/lancamentos-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
+import {
+  getAddressByClientId,
+  getEmailsByClientId,
+  setupInboundEmailTables,
+} from "@/lib/inbound-emails-db";
 import DeleteClientButton from "@/components/dashboard/clients/delete-client-button";
 import ClienteDetailTabs from "@/components/dashboard/clients/cliente-detail-tabs";
 import { ChevronRightIcon } from "@/components/icons";
@@ -43,14 +48,23 @@ export default async function ClienteDetailPage({
   if (!session || !hasPermission(session, "clientes", "ver")) notFound();
 
   const { id } = await params;
-  const [client, processes, documentos, debito, modelos] = await Promise.all([
-    getClientById(id),
-    getProcessosByClientId(id),
-    getDocumentosByEntityId("cliente", id),
-    getClientDebito(id),
-    getModelosAtivos(),
-  ]);
+  // Garantir que as tabelas de inbound email existam (idempotente)
+  await setupInboundEmailTables().catch(() => null);
+
+  const [client, processes, documentos, debito, modelos, inboundAddress] =
+    await Promise.all([
+      getClientById(id),
+      getProcessosByClientId(id),
+      getDocumentosByEntityId("cliente", id),
+      getClientDebito(id),
+      getModelosAtivos(),
+      getAddressByClientId(id).catch(() => null),
+    ]);
   if (!client) notFound();
+
+  const inboundEmails = inboundAddress
+    ? await getEmailsByClientId(id).catch(() => [])
+    : [];
 
   return (
     <div className="space-y-5">
@@ -134,6 +148,8 @@ export default async function ClienteDetailPage({
         debito={debito}
         documentos={documentos}
         modelos={modelos}
+        inboundAddress={inboundAddress}
+        inboundEmails={inboundEmails}
       />
 
       {/* Danger zone */}

@@ -7,6 +7,10 @@ import type { Processo } from "@/lib/processos-db";
 import type { ClientDebito } from "@/lib/lancamentos-db";
 import type { Documento } from "@/lib/documents-db";
 import type { ModeloDocumento } from "@/lib/modelos-db";
+import type {
+  InboundEmailAddress,
+  InboundEmail,
+} from "@/lib/inbound-emails-db";
 import {
   FolderOpenIcon,
   BanknotesIcon,
@@ -21,10 +25,12 @@ import {
   AlertIcon,
   PlusIcon,
   ArrowRightIcon,
+  InboxArrowDownIcon,
 } from "@/components/icons";
 import ClientDebitsSection from "./client-debits-section";
 import DocumentsSection from "../documents/documents-section";
 import GerarDocumentoButton from "./gerar-documento-button";
+import InboundEmailTab from "./inbound-email-tab";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -32,7 +38,7 @@ function formatCurrency(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-type Tab = "geral" | "processos" | "financeiro" | "documentos";
+type Tab = "geral" | "processos" | "financeiro" | "documentos" | "email";
 
 const TABS: {
   key: Tab;
@@ -43,6 +49,7 @@ const TABS: {
   { key: "processos", label: "Processos", icon: FolderOpenIcon },
   { key: "financeiro", label: "Financeiro", icon: BanknotesIcon },
   { key: "documentos", label: "Documentos", icon: DocumentTextIcon },
+  { key: "email", label: "E-mail Exclusivo", icon: InboxArrowDownIcon },
 ];
 
 // ── Process status badge ──────────────────────────────────────
@@ -103,6 +110,8 @@ interface Props {
   debito: ClientDebito;
   documentos: Documento[];
   modelos: ModeloDocumento[];
+  inboundAddress: InboundEmailAddress | null;
+  inboundEmails: InboundEmail[];
 }
 
 export default function ClienteDetailTabs({
@@ -111,8 +120,11 @@ export default function ClienteDetailTabs({
   debito,
   documentos,
   modelos: _modelos,
+  inboundAddress,
+  inboundEmails,
 }: Props) {
   const [tab, setTab] = useState<Tab>("geral");
+  const naoLidos = inboundEmails.filter((e) => !e.lida).length;
 
   const activeProcesses = processes.filter(
     (p) => p.status === "ativo" || p.status === "em_andamento"
@@ -129,6 +141,8 @@ export default function ClienteDetailTabs({
           if (key === "processos") badge = processes.length;
           if (key === "documentos") badge = documentos.length;
 
+          const emailBadge = key === "email" && naoLidos > 0 ? naoLidos : 0;
+
           return (
             <button
               key={key}
@@ -141,11 +155,11 @@ export default function ClienteDetailTabs({
             >
               <Icon className="h-4 w-4 flex-shrink-0" />
               {label}
-              {badge > 0 && (
+              {(badge > 0 || emailBadge > 0) && (
                 <span
-                  className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold ${active ? "bg-white/20" : "bg-slate-100 text-slate-500"}`}
+                  className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold ${active ? "bg-white/20" : emailBadge > 0 ? "bg-primary text-white" : "bg-slate-100 text-slate-500"}`}
                 >
-                  {badge}
+                  {badge > 0 ? badge : emailBadge}
                 </span>
               )}
             </button>
@@ -498,6 +512,15 @@ export default function ClienteDetailTabs({
             documents={documentos}
           />
         </div>
+      )}
+
+      {tab === "email" && (
+        <InboundEmailTab
+          clientId={client.id}
+          clientName={client.name}
+          address={inboundAddress}
+          emails={inboundEmails}
+        />
       )}
     </div>
   );

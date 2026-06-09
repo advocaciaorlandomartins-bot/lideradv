@@ -2,12 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { loginAction, type LoginState } from "@/lib/auth-actions";
-import {
-  EyeIcon,
-  EyeOffIcon,
-  ScalesIcon,
-  SpinnerIcon,
-} from "@/components/icons";
+import { EyeIcon, EyeOffIcon, SpinnerIcon } from "@/components/icons";
+import Image from "next/image";
 
 export default function LoginForm() {
   const [state, formAction, isPending] = useActionState<LoginState, FormData>(
@@ -18,22 +14,29 @@ export default function LoginForm() {
 
   return (
     <div className="w-full max-w-md">
-      {/* Mobile: compact brand header */}
-      <div className="lg:hidden flex items-center gap-3 mb-10">
-        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-          <ScalesIcon className="w-5 h-5 text-white" />
-        </div>
-        <span className="font-heading text-2xl font-semibold text-fg">
-          LiderAdv
-        </span>
+      {/* Mobile: logo centralizada */}
+      <div className="lg:hidden flex justify-center mb-10">
+        <Image
+          src="/logo1.png"
+          alt="LiderAdv"
+          width={120}
+          height={120}
+          priority
+        />
       </div>
 
       {/* Heading */}
       <div className="mb-8">
-        <h1 className="font-heading text-4xl font-semibold text-fg leading-tight mb-2">
+        <h1
+          className="font-body text-4xl font-extrabold leading-tight mb-2"
+          style={{ color: "#001848" }}
+        >
           Bem-vindo de volta.
         </h1>
-        <p className="font-body text-base text-muted leading-relaxed">
+        <p
+          className="font-body text-base leading-relaxed"
+          style={{ color: "#005DFF" }}
+        >
           Entre com sua conta para acessar o sistema.
         </p>
       </div>
@@ -42,7 +45,7 @@ export default function LoginForm() {
         {state?.error && (
           <div
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700"
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-600"
           >
             {state.error}
           </div>
@@ -52,7 +55,8 @@ export default function LoginForm() {
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="login"
-            className="font-body text-sm font-semibold text-fg"
+            className="font-body text-sm font-bold"
+            style={{ color: "#001848" }}
           >
             Login
           </label>
@@ -64,7 +68,18 @@ export default function LoginForm() {
             required
             placeholder="seu.login"
             disabled={isPending}
-            className="h-12 w-full rounded-lg border border-border bg-white px-4 font-body text-base text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+            className="h-12 w-full rounded-xl px-4 font-body text-base outline-none transition-colors duration-150 disabled:opacity-60"
+            style={{
+              background: "#FFFFFF",
+              border: "1.5px solid #CBD8F0",
+              color: "#001848",
+            }}
+            onFocus={(e) =>
+              (e.currentTarget.style.border = "1.5px solid #005DFF")
+            }
+            onBlur={(e) =>
+              (e.currentTarget.style.border = "1.5px solid #CBD8F0")
+            }
           />
         </div>
 
@@ -72,7 +87,8 @@ export default function LoginForm() {
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="senha"
-            className="font-body text-sm font-semibold text-fg"
+            className="font-body text-sm font-bold"
+            style={{ color: "#001848" }}
           >
             Senha
           </label>
@@ -85,13 +101,25 @@ export default function LoginForm() {
               required
               placeholder="••••••••"
               disabled={isPending}
-              className="h-12 w-full rounded-lg border border-border bg-white px-4 pr-12 font-body text-base text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+              className="h-12 w-full rounded-xl px-4 pr-12 font-body text-base outline-none transition-colors duration-150 disabled:opacity-60"
+              style={{
+                background: "#FFFFFF",
+                border: "1.5px solid #CBD8F0",
+                color: "#001848",
+              }}
+              onFocus={(e) =>
+                (e.currentTarget.style.border = "1.5px solid #005DFF")
+              }
+              onBlur={(e) =>
+                (e.currentTarget.style.border = "1.5px solid #CBD8F0")
+              }
             />
             <button
               type="button"
               onClick={() => setShowSenha((v) => !v)}
               aria-label={showSenha ? "Ocultar senha" : "Mostrar senha"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded p-0.5 text-muted transition-colors duration-150 hover:text-fg focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded p-0.5 transition-colors duration-150 focus:outline-none"
+              style={{ color: "#005DFF" }}
             >
               {showSenha ? (
                 <EyeOffIcon className="h-5 w-5" />
@@ -106,7 +134,13 @@ export default function LoginForm() {
         <button
           type="submit"
           disabled={isPending}
-          className="mt-2 h-12 w-full cursor-pointer rounded-lg bg-cta px-6 font-body text-base font-semibold text-white transition-colors duration-150 hover:bg-cta-hover focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-2 h-12 w-full cursor-pointer px-6 font-body text-base font-bold text-white transition-all duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          style={{
+            background: "#005DFF",
+            borderRadius: "50px",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#0047CC")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "#005DFF")}
         >
           {isPending ? (
             <span className="flex items-center justify-center gap-2">
@@ -119,7 +153,10 @@ export default function LoginForm() {
         </button>
       </form>
 
-      <p className="mt-6 text-center font-body text-xs leading-relaxed text-muted">
+      <p
+        className="mt-6 text-center font-body text-xs leading-relaxed"
+        style={{ color: "#7A94C1" }}
+      >
         Sistema exclusivo para usuários autorizados.
         <br />
         Em caso de problemas, contate o administrador.

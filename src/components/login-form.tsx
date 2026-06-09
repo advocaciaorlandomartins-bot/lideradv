@@ -14,17 +14,6 @@ export default function LoginForm() {
 
   return (
     <div className="w-full max-w-md">
-      {/* Mobile: logo centralizada */}
-      <div className="lg:hidden flex justify-center mb-10">
-        <Image
-          src="/logo1.png"
-          alt="LiderAdv"
-          width={120}
-          height={120}
-          priority
-        />
-      </div>
-
       {/* Heading */}
       <div className="mb-8">
         <h1

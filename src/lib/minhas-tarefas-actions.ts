@@ -51,6 +51,9 @@ export async function darBaixaTarefaAction(
   revalidatePath("/dashboard/minhas-tarefas");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/producao");
+  if (tarefaRows.length > 0) {
+    revalidatePath(`/dashboard/processos/${tarefaRows[0].processo_id}`);
+  }
   return {};
 }
 
@@ -71,7 +74,12 @@ export async function reabrirTarefaAction(
   const session = await getSession();
   if (!session) return { error: "Sem permissão." };
   await sql`UPDATE tarefas_processo SET status = 'Pendente' WHERE id = ${id}::uuid`;
+  const rows =
+    await sql`SELECT processo_id::text FROM tarefas_processo WHERE id = ${id}::uuid`;
   revalidatePath("/dashboard/minhas-tarefas");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/producao");
+  if (rows.length > 0)
+    revalidatePath(`/dashboard/processos/${rows[0].processo_id}`);
   return {};
 }

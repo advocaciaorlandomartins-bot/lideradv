@@ -8,7 +8,6 @@ import { hasPermission } from "@/lib/permissoes";
 import { getProcessosByClientId } from "@/lib/processos-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 import { getClientDebito } from "@/lib/lancamentos-db";
-import { getModelosAtivos } from "@/lib/modelos-db";
 import {
   getAddressByClientId,
   getEmailsByClientId,
@@ -41,23 +40,36 @@ function initials(name: string) {
 
 export default async function ClienteDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "ver")) notFound();
 
   const { id } = await params;
+  const { tab: tabParam } = await searchParams;
+  const validTabs = [
+    "geral",
+    "processos",
+    "financeiro",
+    "documentos",
+    "email",
+  ] as const;
+  type Tab = (typeof validTabs)[number];
+  const initialTab: Tab = validTabs.includes(tabParam as Tab)
+    ? (tabParam as Tab)
+    : "geral";
   // Garantir que as tabelas de inbound email existam (idempotente)
   await setupInboundEmailTables().catch(() => null);
 
-  const [client, processes, documentos, debito, modelos, inboundAddress] =
+  const [client, processes, documentos, debito, inboundAddress] =
     await Promise.all([
       getClientById(id),
       getProcessosByClientId(id),
       getDocumentosByEntityId("cliente", id),
       getClientDebito(id),
-      getModelosAtivos(),
       getAddressByClientId(id).catch(() => null),
     ]);
   if (!client) notFound();
@@ -147,9 +159,9 @@ export default async function ClienteDetailPage({
         processes={processes}
         debito={debito}
         documentos={documentos}
-        modelos={modelos}
         inboundAddress={inboundAddress}
         inboundEmails={inboundEmails}
+        initialTab={initialTab}
       />
 
       {/* Danger zone */}

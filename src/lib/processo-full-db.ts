@@ -46,6 +46,7 @@ export interface EventoControle {
   local: string | null;
   link_virtual: string | null;
   responsavel_nome: string | null;
+  status: string | null;
   created_at_formatted: string;
 }
 
@@ -182,6 +183,7 @@ export async function getEventosByProcesso(
            to_char(e.hora, 'HH24:MI')    AS hora,
            e.local, e.link_virtual,
            col.nome AS responsavel_nome,
+           e.status,
            e.created_at
     FROM eventos_controles e
     LEFT JOIN colaboradores col ON col.id = e.responsavel_id
@@ -198,6 +200,7 @@ export async function getEventosByProcesso(
     local: r.local ?? null,
     link_virtual: r.link_virtual ?? null,
     responsavel_nome: r.responsavel_nome ?? null,
+    status: r.status ? String(r.status) : null,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
   }));
 }

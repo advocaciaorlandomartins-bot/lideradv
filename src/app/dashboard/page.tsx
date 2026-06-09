@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getGerenciadorData } from "@/lib/gerenciador-db";
+import { getAllRecentEmails, countUnreadEmails } from "@/lib/inbound-emails-db";
 
 export const metadata = {
   title: "Dashboard — LiderAdv",
 };
 import { getDashboardData } from "@/lib/dashboard-db";
+import { countMinhasPendentes } from "@/lib/minhas-tarefas-db";
 import { TIPO_LABELS_COMP, TIPO_ICONS_COMP } from "@/lib/compromissos-db";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
@@ -21,6 +23,9 @@ import {
   ChartBarIcon,
   FunnelIcon,
   PhoneIcon,
+  InboxArrowDownIcon,
+  CheckCircleIcon,
+  ArrowRightIcon,
 } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -178,10 +183,16 @@ export default async function DashboardPage() {
     showFinanceiro || showCrm || perm.clientes || perm.processos;
   const needsDashData = showControles || showFinanceiro || perm.clientes;
 
-  const [gerData, dashData] = await Promise.all([
-    needsGerData ? getGerenciadorData() : Promise.resolve(null),
-    needsDashData ? getDashboardData(session.login) : Promise.resolve(null),
-  ]);
+  const [gerData, dashData, emailsRecentes, totalNaoLidos, minhasPendentes] =
+    await Promise.all([
+      needsGerData ? getGerenciadorData() : Promise.resolve(null),
+      needsDashData ? getDashboardData(session.login) : Promise.resolve(null),
+      perm.clientes
+        ? getAllRecentEmails(20).catch(() => [])
+        : Promise.resolve([]),
+      perm.clientes ? countUnreadEmails().catch(() => 0) : Promise.resolve(0),
+      countMinhasPendentes(session.login).catch(() => 0),
+    ]);
 
   const kpis = gerData?.kpis;
   const counts = gerData?.counts;
@@ -199,6 +210,12 @@ export default async function DashboardPage() {
     month: "long",
     year: "numeric",
   });
+
+  const hoje = new Date();
+  const inicioSemana = hoje.toISOString().slice(0, 10);
+  const fimSemana = new Date(hoje.getTime() + 6 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 
   const chartData = receitasPorMes.slice(-6);
   const totalVencido = clientesDevedores.reduce(
@@ -274,6 +291,28 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* ── Banner: minhas tarefas pendentes ────────────────────────────── */}
+      {minhasPendentes > 0 && (
+        <Link
+          href="/dashboard/minhas-tarefas"
+          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 transition-colors hover:bg-amber-100"
+        >
+          <CheckCircleIcon className="h-5 w-5 flex-shrink-0 text-amber-600" />
+          <p className="flex-1 font-body text-sm font-semibold text-amber-800">
+            Você tem{" "}
+            <span className="text-amber-700">
+              {minhasPendentes} tarefa{minhasPendentes !== 1 ? "s" : ""}{" "}
+              pendente{minhasPendentes !== 1 ? "s" : ""}
+            </span>{" "}
+            atribuída{minhasPendentes !== 1 ? "s" : ""} a você
+          </p>
+          <span className="flex items-center gap-1 font-body text-xs font-semibold text-amber-700">
+            Ver minhas tarefas
+            <ArrowRightIcon className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+      )}
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
@@ -362,7 +401,7 @@ export default async function DashboardPage() {
 
         {perm.controles && counts && (
           <Link
-            href="/dashboard/controles"
+            href={`/dashboard/controles?inicio=${inicioSemana}&fim=${fimSemana}&ordem=asc`}
             className={`group rounded-xl border bg-white p-4 shadow-sm transition-all hover:shadow-md ${counts.controlesProximos > 0 ? "border-red-200 hover:border-red-300" : "border-border hover:border-primary/30"}`}
           >
             <div className="flex items-start justify-between">
@@ -664,7 +703,7 @@ export default async function DashboardPage() {
                   return (
                     <Link
                       key={c.id}
-                      href={`/dashboard/controles/${c.id}`}
+                      href={c.href ?? `/dashboard/controles/${c.id}`}
                       className="flex items-center gap-4 px-5 py-3 transition-colors hover:bg-primary/5 cursor-pointer"
                     >
                       <div className="w-12 flex-shrink-0 text-center">
@@ -1001,6 +1040,85 @@ export default async function DashboardPage() {
                 </span>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Caixa de Entrada — E-mails Exclusivos ────────────────────────── */}
+      {perm.clientes && emailsRecentes.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-indigo-100 bg-indigo-50 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <InboxArrowDownIcon className="h-5 w-5 text-indigo-600" />
+              <div>
+                <h2 className="font-heading text-base font-semibold text-indigo-900">
+                  Caixa de Entrada — E-mails Exclusivos
+                </h2>
+                <p className="mt-0.5 font-body text-xs text-indigo-600">
+                  Clique para abrir o e-mail do cliente
+                </p>
+              </div>
+            </div>
+            {totalNaoLidos > 0 && (
+              <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 font-body text-xs font-bold text-white">
+                {totalNaoLidos} não {totalNaoLidos === 1 ? "lido" : "lidos"}
+              </span>
+            )}
+          </div>
+          <div className="divide-y divide-border">
+            {emailsRecentes.map((email) => (
+              <Link
+                key={email.id}
+                href={`/dashboard/clientes/${email.client_id}?tab=email`}
+                className="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-indigo-50 cursor-pointer group"
+              >
+                {/* Avatar */}
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 font-heading text-xs font-bold text-indigo-700 group-hover:bg-indigo-200 transition-colors mt-0.5">
+                  {email.client_name?.charAt(0).toUpperCase() ?? "?"}
+                </div>
+                {/* Conteúdo */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-body text-sm font-semibold text-fg group-hover:text-indigo-700 transition-colors">
+                      {email.client_name ?? "Cliente"}
+                    </p>
+                    {!email.lida && (
+                      <span className="h-2 w-2 flex-shrink-0 rounded-full bg-indigo-500" />
+                    )}
+                  </div>
+                  <p className="truncate font-body text-sm text-fg">
+                    {email.subject || "(sem assunto)"}
+                  </p>
+                  <p className="font-body text-xs text-muted">
+                    {email.from_name
+                      ? `${email.from_name} <${email.from_address}>`
+                      : email.from_address}{" "}
+                    · {email.received_at}
+                  </p>
+                  {email.body_text && (
+                    <p className="mt-0.5 truncate font-body text-xs text-muted">
+                      {email.body_text.trim().slice(0, 120)}
+                    </p>
+                  )}
+                </div>
+                <span className="flex-shrink-0 font-body text-xs text-indigo-400 group-hover:text-indigo-600 transition-colors mt-1">
+                  ver →
+                </span>
+              </Link>
+            ))}
+          </div>
+          <div className="flex items-center justify-between border-t border-border px-5 py-3">
+            <Link
+              href="/dashboard/clientes"
+              className="font-body text-xs font-semibold text-indigo-600 hover:underline"
+            >
+              Ver todos os clientes →
+            </Link>
+            {emailsRecentes.length >= 20 && (
+              <span className="font-body text-xs text-muted">
+                Exibindo os 20 mais recentes
+              </span>
+            )}
           </div>
         </div>
       )}

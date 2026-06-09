@@ -35,6 +35,7 @@ export interface ControleDetalhe {
   processo_numero: string | null;
   processo_id: string | null;
   dias_restantes: number;
+  href?: string;
 }
 
 export interface AniversarianteHoje {
@@ -99,10 +100,10 @@ export async function getDashboardData(login?: string) {
         LIMIT 20
       `,
 
-    // Próximos controles com client_id e processo_id para links
+    // Próximos controles + eventos de processos (UNION) para o mini-calendário
     sql`
         SELECT
-          c.id::text                                        AS id,
+          'ctrl-' || c.id::text                             AS id,
           c.tipo,
           c.data_evento::text                               AS data_evento,
           c.descricao,
@@ -117,7 +118,26 @@ export async function getDashboardData(login?: string) {
         WHERE c.status IS NULL
           AND c.data_evento >= CURRENT_DATE
           AND c.data_evento <= CURRENT_DATE + INTERVAL '14 days'
-        ORDER BY c.data_evento ASC
+
+        UNION ALL
+
+        SELECT
+          'ev-' || ec.id::text                              AS id,
+          COALESCE(ec.tipo, 'prazos')                       AS tipo,
+          ec.data::text                                     AS data_evento,
+          ec.titulo                                         AS descricao,
+          cl.id::text                                       AS cliente_id,
+          cl.name                                           AS cliente_nome,
+          p.id::text                                        AS processo_id,
+          p.numero                                          AS processo_numero,
+          (ec.data - CURRENT_DATE)::int                     AS dias_restantes
+        FROM eventos_controles ec
+        JOIN processos p   ON p.id  = ec.processo_id
+        LEFT JOIN clients cl ON cl.id = p.client_id
+        WHERE ec.data >= CURRENT_DATE
+          AND ec.data <= CURRENT_DATE + INTERVAL '14 days'
+
+        ORDER BY data_evento ASC
         LIMIT 20
       `,
 
@@ -160,18 +180,28 @@ export async function getDashboardData(login?: string) {
     }));
 
   const proximosControles: ControleDetalhe[] = proximosControlesRows.map(
-    (r) => ({
-      id: String(r.id),
-      tipo: String(r.tipo),
-      tipo_label: TIPO_LABELS[String(r.tipo)] ?? String(r.tipo),
-      data_evento: String(r.data_evento).slice(0, 10),
-      descricao: String(r.descricao),
-      cliente_id: r.cliente_id ? String(r.cliente_id) : null,
-      cliente_nome: r.cliente_nome ? String(r.cliente_nome) : null,
-      processo_id: r.processo_id ? String(r.processo_id) : null,
-      processo_numero: r.processo_numero ? String(r.processo_numero) : null,
-      dias_restantes: Number(r.dias_restantes),
-    })
+    (r) => {
+      const id = String(r.id);
+      const isEvento = id.startsWith("ev-");
+      const processoId = r.processo_id ? String(r.processo_id) : null;
+      return {
+        id,
+        tipo: String(r.tipo),
+        tipo_label: TIPO_LABELS[String(r.tipo)] ?? String(r.tipo),
+        data_evento: String(r.data_evento).slice(0, 10),
+        descricao: String(r.descricao),
+        cliente_id: r.cliente_id ? String(r.cliente_id) : null,
+        cliente_nome: r.cliente_nome ? String(r.cliente_nome) : null,
+        processo_id: processoId,
+        processo_numero: r.processo_numero ? String(r.processo_numero) : null,
+        dias_restantes: Number(r.dias_restantes),
+        href: isEvento
+          ? processoId
+            ? `/dashboard/processos/${processoId}`
+            : "/dashboard/processos"
+          : `/dashboard/controles/${id.replace("ctrl-", "")}`,
+      };
+    }
   );
 
   const aniversariantesTodos: AniversarianteHoje[] = aniversariantesRows.map(

@@ -96,6 +96,77 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Eventos de Processos (eventos_controles) ──────────────────────────────
+  if (hasPermission(session, "processos", "ver")) {
+    const evRows = await sql`
+      SELECT
+        ec.id::text,
+        ec.titulo,
+        ec.tipo,
+        ec.data::text       AS data_evento,
+        ec.hora::text       AS hora,
+        p.id::text          AS processo_id,
+        p.numero            AS processo_numero,
+        cl.id::text         AS cliente_id,
+        cl.name             AS cliente_nome
+      FROM eventos_controles ec
+      JOIN processos p   ON p.id  = ec.processo_id
+      LEFT JOIN clients cl ON cl.id = p.client_id
+      WHERE ec.data >= ${startDate}::date
+        AND ec.data <  ${endDate}::date
+      ORDER BY ec.data
+    `;
+
+    const EVENTO_COLORS: Record<string, string> = {
+      audiencias: "#7c3aed",
+      prazos: "#dc2626",
+      pericias: "#0891b2",
+      dcb: "#ea580c",
+      beneficios: "#059669",
+      implantados: "#2563eb",
+      alvaras: "#d97706",
+    };
+    const EVENTO_LABELS: Record<string, string> = {
+      audiencias: "Audiência",
+      prazos: "Prazo",
+      pericias: "Perícia",
+      dcb: "DCB",
+      beneficios: "Benefício",
+      implantados: "Implantado",
+      alvaras: "Alvará",
+    };
+
+    for (const ev of evRows) {
+      const tipo = ev.tipo ? String(ev.tipo) : "outro";
+      const color = EVENTO_COLORS[tipo] ?? "#6b7280";
+      const tipoLabel = EVENTO_LABELS[tipo] ?? "Evento";
+
+      let title = String(ev.titulo);
+      if (ev.cliente_nome)
+        title += ` · ${String(ev.cliente_nome).split(" ")[0]}`;
+
+      events.push({
+        id: `ev-${ev.id}`,
+        title,
+        start: String(ev.data_evento).slice(0, 10),
+        allDay: true,
+        backgroundColor: color,
+        borderColor: "transparent",
+        textColor: "#ffffff",
+        extendedProps: {
+          source: "evento_processo",
+          tipo,
+          tipoLabel,
+          clienteNome: ev.cliente_nome ?? null,
+          clienteId: ev.cliente_id ?? null,
+          processoId: ev.processo_id ?? null,
+          processoNumero: ev.processo_numero ?? null,
+          href: `/dashboard/processos/${ev.processo_id}`,
+        },
+      });
+    }
+  }
+
   // ── Lançamentos financeiros vencimentos pendentes ─────────────────────────
   if (hasPermission(session, "financeiro", "ver")) {
     const rows = await sql`

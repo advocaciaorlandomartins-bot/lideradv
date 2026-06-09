@@ -231,3 +231,43 @@ export async function markEmailAsRead(emailId: string): Promise<void> {
     WHERE id = ${emailId}::uuid
   `;
 }
+
+export interface RecentEmailWithClient extends InboundEmail {
+  client_name: string;
+}
+
+export async function getAllRecentEmails(
+  limit = 30
+): Promise<RecentEmailWithClient[]> {
+  const rows = await sql`
+    SELECT
+      ie.id::text,
+      ie.address_id::text,
+      ie.client_id::text,
+      ie.from_address,
+      ie.from_name,
+      ie.to_address,
+      ie.subject,
+      ie.body_text,
+      ie.body_html,
+      ie.attachments,
+      ie.lida,
+      to_char(ie.received_at AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS received_at,
+      c.name AS client_name
+    FROM inbound_emails ie
+    LEFT JOIN clients c ON c.id = ie.client_id
+    ORDER BY ie.received_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => ({
+    ...r,
+    attachments: Array.isArray(r.attachments) ? r.attachments : [],
+  })) as RecentEmailWithClient[];
+}
+
+export async function countUnreadEmails(): Promise<number> {
+  const rows = await sql`
+    SELECT COUNT(*) AS total FROM inbound_emails WHERE lida = false
+  `;
+  return Number(rows[0]?.total ?? 0);
+}

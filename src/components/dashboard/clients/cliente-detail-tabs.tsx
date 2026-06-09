@@ -6,7 +6,6 @@ import type { Client } from "@/lib/clients-db";
 import type { Processo } from "@/lib/processos-db";
 import type { ClientDebito } from "@/lib/lancamentos-db";
 import type { Documento } from "@/lib/documents-db";
-import type { ModeloDocumento } from "@/lib/modelos-db";
 import type {
   InboundEmailAddress,
   InboundEmail,
@@ -109,9 +108,9 @@ interface Props {
   processes: Processo[];
   debito: ClientDebito;
   documentos: Documento[];
-  modelos: ModeloDocumento[];
   inboundAddress: InboundEmailAddress | null;
   inboundEmails: InboundEmail[];
+  initialTab?: Tab;
 }
 
 export default function ClienteDetailTabs({
@@ -119,11 +118,11 @@ export default function ClienteDetailTabs({
   processes,
   debito,
   documentos,
-  modelos: _modelos,
   inboundAddress,
   inboundEmails,
+  initialTab,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("geral");
+  const [tab, setTab] = useState<Tab>(initialTab ?? "geral");
   const naoLidos = inboundEmails.filter((e) => !e.lida).length;
 
   const activeProcesses = processes.filter(
@@ -181,6 +180,7 @@ export default function ClienteDetailTabs({
                   sub: `${activeProcesses.length} ativos`,
                   color: "text-primary",
                   bg: "bg-primary/5",
+                  tab: "processos",
                 },
                 {
                   icon: BanknotesIcon,
@@ -189,6 +189,7 @@ export default function ClienteDetailTabs({
                   sub: `${processes.filter((p) => p.valor_causa).length} com valor`,
                   color: "text-emerald-600",
                   bg: "bg-emerald-50",
+                  tab: "processos",
                 },
                 {
                   icon: AlertIcon,
@@ -204,6 +205,7 @@ export default function ClienteDetailTabs({
                       ? "text-red-600"
                       : "text-emerald-600",
                   bg: debito.totalPendente > 0 ? "bg-red-50" : "bg-emerald-50",
+                  tab: "financeiro",
                 },
                 {
                   icon: DocumentTextIcon,
@@ -212,24 +214,36 @@ export default function ClienteDetailTabs({
                   sub: "arquivos",
                   color: "text-indigo-600",
                   bg: "bg-indigo-50",
+                  tab: "documentos",
                 },
-              ].map(({ icon: Icon, label, value, sub, color, bg }) => (
-                <div
-                  key={label}
-                  className={`rounded-xl border border-border ${bg} px-4 py-4`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon className={`h-4 w-4 ${color}`} />
-                    <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      {label}
+              ].map(
+                ({
+                  icon: Icon,
+                  label,
+                  value,
+                  sub,
+                  color,
+                  bg,
+                  tab: targetTab,
+                }) => (
+                  <button
+                    key={label}
+                    onClick={() => setTab(targetTab as Tab)}
+                    className={`rounded-xl border border-border ${bg} px-4 py-4 text-left w-full transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Icon className={`h-4 w-4 ${color}`} />
+                      <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        {label}
+                      </p>
+                    </div>
+                    <p className={`font-heading text-xl font-bold ${color}`}>
+                      {value}
                     </p>
-                  </div>
-                  <p className={`font-heading text-xl font-bold ${color}`}>
-                    {value}
-                  </p>
-                  <p className="font-body text-xs text-muted">{sub}</p>
-                </div>
-              ))}
+                    <p className="font-body text-xs text-muted">{sub}</p>
+                  </button>
+                )
+              )}
             </div>
           </div>
 

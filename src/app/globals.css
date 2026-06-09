@@ -22,6 +22,16 @@ body {
   color: #0f172a;
 }
 
+/* Login right panel: dark gradient on mobile, light on desktop */
+.login-form-panel {
+  background: linear-gradient(135deg, #000d25 0%, #001848 60%, #003080 100%);
+}
+@media (min-width: 1024px) {
+  .login-form-panel {
+    background: #eef5ff;
+  }
+}
+
 /* Hide scrollbar but keep functionality */
 .scrollbar-none {
   scrollbar-width: none;

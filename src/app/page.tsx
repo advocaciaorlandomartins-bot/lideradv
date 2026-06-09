@@ -82,31 +82,8 @@ export default function LoginPage() {
       </aside>
 
       {/* ── Right Form Panel ── */}
-      <main
-        className="flex flex-1 flex-col lg:items-center lg:justify-center lg:w-1/2 overflow-auto"
-        style={{ background: "#EEF5FF" }}
-      >
-        {/* Mobile: header escuro com logo */}
-        <div
-          className="lg:hidden w-full flex justify-center py-10"
-          style={{
-            background:
-              "linear-gradient(135deg, #000D25 0%, #001848 60%, #003080 100%)",
-          }}
-        >
-          <Image
-            src="/logo1.png"
-            alt="LiderAdv"
-            width={150}
-            height={150}
-            className="drop-shadow-[0_0_24px_rgba(143,190,255,0.4)]"
-            priority
-          />
-        </div>
-        {/* Formulário */}
-        <div className="flex flex-1 items-center justify-center p-8 w-full">
-          <LoginForm />
-        </div>
+      <main className="login-form-panel flex flex-1 items-center justify-center p-8 lg:w-1/2 overflow-auto">
+        <LoginForm />
       </main>
     </div>
   );

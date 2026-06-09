@@ -14,18 +14,24 @@ export default function LoginForm() {
 
   return (
     <div className="w-full max-w-md">
-      {/* Heading */}
+      {/* Mobile: logo grande centralizada sobre fundo escuro */}
+      <div className="lg:hidden flex justify-center mb-10">
+        <Image
+          src="/logo1.png"
+          alt="LiderAdv"
+          width={200}
+          height={200}
+          className="drop-shadow-[0_0_32px_rgba(143,190,255,0.5)]"
+          priority
+        />
+      </div>
+
+      {/* Heading — branco no mobile, azul escuro no desktop */}
       <div className="mb-8">
-        <h1
-          className="font-body text-4xl font-extrabold leading-tight mb-2"
-          style={{ color: "#001848" }}
-        >
+        <h1 className="font-body text-4xl font-extrabold leading-tight mb-2 text-white lg:text-[#001848]">
           Bem-vindo de volta.
         </h1>
-        <p
-          className="font-body text-base leading-relaxed"
-          style={{ color: "#005DFF" }}
-        >
+        <p className="font-body text-base leading-relaxed text-[#8FBEFF] lg:text-[#005DFF]">
           Entre com sua conta para acessar o sistema.
         </p>
       </div>
@@ -34,7 +40,7 @@ export default function LoginForm() {
         {state?.error && (
           <div
             role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-600"
+            className="rounded-xl border border-red-400/30 bg-red-950/40 lg:bg-red-50 lg:border-red-200 px-4 py-3 font-body text-sm text-red-400 lg:text-red-600"
           >
             {state.error}
           </div>
@@ -44,8 +50,7 @@ export default function LoginForm() {
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="login"
-            className="font-body text-sm font-bold"
-            style={{ color: "#001848" }}
+            className="font-body text-sm font-bold text-white/80 lg:text-[#001848]"
           >
             Login
           </label>
@@ -76,8 +81,7 @@ export default function LoginForm() {
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="senha"
-            className="font-body text-sm font-bold"
-            style={{ color: "#001848" }}
+            className="font-body text-sm font-bold text-white/80 lg:text-[#001848]"
           >
             Senha
           </label>
@@ -124,10 +128,7 @@ export default function LoginForm() {
           type="submit"
           disabled={isPending}
           className="mt-2 h-12 w-full cursor-pointer px-6 font-body text-base font-bold text-white transition-all duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-          style={{
-            background: "#005DFF",
-            borderRadius: "50px",
-          }}
+          style={{ background: "#005DFF", borderRadius: "50px" }}
           onMouseEnter={(e) => (e.currentTarget.style.background = "#0047CC")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "#005DFF")}
         >
@@ -142,10 +143,7 @@ export default function LoginForm() {
         </button>
       </form>
 
-      <p
-        className="mt-6 text-center font-body text-xs leading-relaxed"
-        style={{ color: "#7A94C1" }}
-      >
+      <p className="mt-6 text-center font-body text-xs leading-relaxed text-white/30 lg:text-[#7A94C1]">
         Sistema exclusivo para usuários autorizados.
         <br />
         Em caso de problemas, contate o administrador.

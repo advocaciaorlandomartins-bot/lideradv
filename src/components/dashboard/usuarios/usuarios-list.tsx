@@ -229,6 +229,9 @@ export default function UsuariosList({ usuarios }: Props) {
                     Validade
                   </th>
                   <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                    Pendências
+                  </th>
+                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
                     Último acesso
                   </th>
                   <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
@@ -282,6 +285,28 @@ export default function UsuariosList({ usuarios }: Props) {
                         new Date(u.validade).toLocaleDateString("pt-BR")
                       ) : (
                         <span className="text-slate-300">Sem prazo</span>
+                      )}
+                    </td>
+
+                    {/* Pendências */}
+                    <td className="px-4 py-3.5">
+                      {u.tarefas_pendentes + u.controles_pendentes === 0 ? (
+                        <span className="font-body text-xs text-slate-300">
+                          —
+                        </span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {u.tarefas_pendentes > 0 && (
+                            <span className="rounded-full bg-teal-50 px-2 py-0.5 font-body text-[11px] font-semibold text-teal-700">
+                              {u.tarefas_pendentes}T
+                            </span>
+                          )}
+                          {u.controles_pendentes > 0 && (
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-body text-[11px] font-semibold text-amber-700">
+                              {u.controles_pendentes}C
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
 

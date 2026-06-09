@@ -28,6 +28,7 @@ import {
   PuzzleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CheckCircleIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -81,6 +82,12 @@ const GROUPS: {
         label: "Controles",
         modulo: "controles",
       },
+      {
+        href: "/dashboard/pericias",
+        icon: ScalesIcon,
+        label: "Perícias",
+        modulo: "controles",
+      },
     ],
   },
   {
@@ -128,6 +135,12 @@ const GROUPS: {
     label: "Equipe",
     items: [
       {
+        href: "/dashboard/minhas-tarefas",
+        icon: CheckCircleIcon,
+        label: "Minhas Tarefas",
+        modulo: null,
+      },
+      {
         href: "/dashboard/colaboradores",
         icon: UserPlusIcon,
         label: "Colaboradores",
@@ -142,7 +155,7 @@ const GROUPS: {
         href: "/dashboard/gerenciador",
         icon: ChartBarIcon,
         label: "Gerenciador",
-        modulo: null,
+        modulo: "gerenciador",
       },
       {
         href: "/dashboard/gerenciador/auditoria",

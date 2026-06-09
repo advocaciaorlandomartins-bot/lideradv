@@ -209,6 +209,62 @@ export async function deleteEventoControleAction(
   }
 }
 
+export async function updateEventoControleAction(data: {
+  id: string;
+  processoId: string;
+  titulo: string;
+  tipo: string | null;
+  data: string | null;
+  hora: string | null;
+  local: string | null;
+}): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
+  if (!data.titulo.trim()) return { error: "O título é obrigatório." };
+  try {
+    await sql`
+      UPDATE eventos_controles
+      SET titulo = ${data.titulo.trim()},
+          tipo   = ${data.tipo || null},
+          data   = ${data.data ? data.data : null}::date,
+          hora   = ${data.hora ? data.hora : null}::time,
+          local  = ${data.local || null}
+      WHERE id = ${data.id}::uuid
+    `;
+    revalidatePath(`/dashboard/processos/${data.processoId}`);
+    return {};
+  } catch {
+    return { error: "Erro ao atualizar evento." };
+  }
+}
+
+export async function darBaixaEventoControleAction(
+  id: string,
+  processoId: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
+  await sql`UPDATE eventos_controles SET status = 'concluido' WHERE id = ${id}::uuid`;
+  revalidatePath(`/dashboard/processos/${processoId}`);
+  revalidatePath("/dashboard");
+  return {};
+}
+
+export async function reabrirEventoControleAction(
+  id: string,
+  processoId: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
+  await sql`UPDATE eventos_controles SET status = NULL WHERE id = ${id}::uuid`;
+  revalidatePath(`/dashboard/processos/${processoId}`);
+  revalidatePath("/dashboard");
+  return {};
+}
+
 // ── Tarefas ────────────────────────────────────────────────────
 
 export async function createTarefaProcessoAction(data: {
@@ -257,10 +313,55 @@ export async function updateTarefaStatusAction(
   try {
     await sql`UPDATE tarefas_processo SET status = ${status} WHERE id = ${id}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
+    revalidatePath("/dashboard/minhas-tarefas");
+    revalidatePath("/dashboard/producao");
     return {};
   } catch {
     return { error: "Erro ao atualizar tarefa." };
   }
+}
+
+// Dar baixa integrada — usa status padrão 'Concluída' e verifica auto-avanço de estágio
+export async function darBaixaTarefaProcessoAction(
+  id: string,
+  processoId: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+  await sql`UPDATE tarefas_processo SET status = 'Concluída' WHERE id = ${id}::uuid`;
+
+  // Auto-avanço: se todas as tarefas do processo estão concluídas e está em analise → producao
+  const rows =
+    await sql`SELECT estagio_producao FROM processos WHERE id = ${processoId}::uuid`;
+  if (rows[0]?.estagio_producao === "analise") {
+    const remaining = await sql`
+      SELECT COUNT(*)::int AS n FROM tarefas_processo
+      WHERE processo_id = ${processoId}::uuid AND status IN ('Pendente', 'Em andamento')
+    `;
+    if (Number(remaining[0]?.n ?? 1) === 0) {
+      await sql`UPDATE processos SET estagio_producao = 'producao', data_estagio_at = NOW() WHERE id = ${processoId}::uuid`;
+    }
+  }
+
+  revalidatePath(`/dashboard/processos/${processoId}`);
+  revalidatePath("/dashboard/minhas-tarefas");
+  revalidatePath("/dashboard/producao");
+  revalidatePath("/dashboard");
+  return {};
+}
+
+// Reabrir tarefa do processo
+export async function reabrirTarefaProcessoAction(
+  id: string,
+  processoId: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+  await sql`UPDATE tarefas_processo SET status = 'Pendente' WHERE id = ${id}::uuid`;
+  revalidatePath(`/dashboard/processos/${processoId}`);
+  revalidatePath("/dashboard/minhas-tarefas");
+  revalidatePath("/dashboard");
+  return {};
 }
 
 export async function deleteTarefaAction(

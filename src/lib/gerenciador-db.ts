@@ -113,6 +113,37 @@ export interface ProducaoStats {
   totalAtivos: number;
 }
 
+export interface EquipeTarefa {
+  id: string;
+  titulo: string;
+  prioridade: string;
+  status: string;
+  prazo: string | null;
+  processo_numero: string | null;
+  client_name: string | null;
+  processo_id: string | null;
+  client_id: string | null;
+}
+
+export interface EquipeControle {
+  id: string;
+  descricao: string;
+  tipo: string;
+  data_evento: string | null;
+  client_name: string | null;
+  processo_id: string | null;
+  client_id: string | null;
+}
+
+export interface EquipeMembro {
+  id: string;
+  login: string;
+  nome: string;
+  categoria: string;
+  tarefas: EquipeTarefa[];
+  controles: EquipeControle[];
+}
+
 export interface GerenciadorData {
   kpis: FinanceiroKpis;
   receitasPorMes: MesData[];
@@ -126,6 +157,7 @@ export interface GerenciadorData {
   novosClientesPorMes: NovoClienteMes[];
   crm: CrmStats;
   producao: ProducaoStats;
+  equipe: EquipeMembro[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -213,6 +245,9 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
     crmAreaRows,
     producaoEstagioRows,
     producaoUrgentesRows,
+    equipeUsuariosRows,
+    equipeTarefasRows,
+    equipeControlesRows,
   ] = await Promise.all([
     // 1. KPIs financeiros
     sql`
@@ -455,6 +490,43 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
       ORDER BY p.data_estagio_at ASC
       LIMIT 8
     `,
+
+    // 17. Equipe — usuários ativos
+    sql`
+      SELECT id::text, login, nome, categoria
+      FROM usuarios
+      WHERE ativo = TRUE
+      ORDER BY nome ASC
+    `,
+
+    // 18. Equipe — tarefas pendentes por responsável
+    sql`
+      SELECT
+        t.id::text, t.titulo, t.responsavel, t.prioridade, t.prazo::text, t.status,
+        t.processo_id::text, t.client_id::text,
+        p.numero AS processo_numero,
+        c.name AS client_name
+      FROM tarefas_processo t
+      LEFT JOIN processos p ON p.id = t.processo_id
+      LEFT JOIN clients c ON c.id = t.client_id
+      WHERE t.status IN ('Pendente', 'Em andamento') AND t.responsavel IS NOT NULL
+      ORDER BY t.responsavel, t.prazo ASC NULLS LAST
+    `,
+
+    // 19. Equipe — controles pendentes por responsável
+    sql`
+      SELECT
+        ec.id::text, ec.descricao, ec.tipo, ec.data_evento::text,
+        ec.responsavel_id::text,
+        u.login AS responsavel_login,
+        cl.name AS client_name,
+        ec.processo_id::text, ec.cliente_id::text AS client_id
+      FROM controles ec
+      JOIN usuarios u ON u.id = ec.responsavel_id
+      LEFT JOIN clients cl ON cl.id = ec.cliente_id
+      WHERE ec.status IS NULL OR ec.status = 'em_andamento'
+      ORDER BY u.login, ec.data_evento ASC NULLS LAST
+    `,
   ]);
 
   const kr = kpisRows[0];
@@ -598,5 +670,43 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
     ),
     crm,
     producao,
+    equipe: equipeUsuariosRows.map((u) => {
+      const login = String(u.login);
+      const uid = String(u.id);
+      return {
+        id: uid,
+        login,
+        nome: String(u.nome),
+        categoria: String(u.categoria),
+        tarefas: equipeTarefasRows
+          .filter((t) => String(t.responsavel) === login)
+          .map((t) => ({
+            id: String(t.id),
+            titulo: String(t.titulo),
+            prioridade: String(t.prioridade),
+            status: String(t.status),
+            prazo: t.prazo ? String(t.prazo).slice(0, 10) : null,
+            processo_numero: t.processo_numero
+              ? String(t.processo_numero)
+              : null,
+            client_name: t.client_name ? String(t.client_name) : null,
+            processo_id: t.processo_id ? String(t.processo_id) : null,
+            client_id: t.client_id ? String(t.client_id) : null,
+          })),
+        controles: equipeControlesRows
+          .filter((c) => String(c.responsavel_id) === uid)
+          .map((c) => ({
+            id: String(c.id),
+            descricao: String(c.descricao),
+            tipo: String(c.tipo),
+            data_evento: c.data_evento
+              ? String(c.data_evento).slice(0, 10)
+              : null,
+            client_name: c.client_name ? String(c.client_name) : null,
+            processo_id: c.processo_id ? String(c.processo_id) : null,
+            client_id: c.client_id ? String(c.client_id) : null,
+          })),
+      };
+    }),
   };
 }

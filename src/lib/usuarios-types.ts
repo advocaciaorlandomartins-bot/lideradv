@@ -21,6 +21,8 @@ export interface Usuario {
   ativo: boolean;
   permissoes: Permissoes | null;
   created_at: string;
+  tarefas_pendentes: number;
+  controles_pendentes: number;
 }
 
 export interface ColaboradorOption {

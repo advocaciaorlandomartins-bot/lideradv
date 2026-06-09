@@ -20,10 +20,15 @@ import {
   createHistoricoRegistroAction,
   deleteHistoricoRegistroAction,
   createEventoControleAction,
+  updateEventoControleAction,
   deleteEventoControleAction,
+  darBaixaEventoControleAction,
+  reabrirEventoControleAction,
   createTarefaProcessoAction,
   updateTarefaStatusAction,
   deleteTarefaAction,
+  darBaixaTarefaProcessoAction,
+  reabrirTarefaProcessoAction,
   createPendenciaAction,
   updatePendenciaStatusAction,
   deletePendenciaAction,
@@ -68,6 +73,7 @@ interface Props {
   pendencias: PendenciaCliente[];
   colaboradores: ColaboradorSimples[];
   modelos: ModeloDocumento[];
+  sessionLogin?: string;
 }
 
 type Tab = "dados" | "relato" | "linha_do_tempo";
@@ -883,6 +889,199 @@ const TIPO_EVENTO_CORES: Record<string, string> = {
   Reunião: "bg-amber-50 text-amber-700",
 };
 
+function EventoRow({
+  ev,
+  processo,
+}: {
+  ev: EventoControle;
+  processo: ProcessoExtended;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [titulo, setTitulo] = useState(ev.titulo);
+  const [tipo, setTipo] = useState(ev.tipo ?? "");
+  const [data, setData] = useState(
+    ev.data ? ev.data.split("/").reverse().join("-") : ""
+  );
+  const [hora, setHora] = useState(ev.hora ?? "");
+  const [local, setLocal] = useState(ev.local ?? "");
+  const [saving, setSaving] = useState(false);
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+
+  const concluido = ev.status === "concluido";
+
+  function handleDarBaixa() {
+    startTransition(async () => {
+      await darBaixaEventoControleAction(ev.id, processo.id);
+      router.refresh();
+    });
+  }
+
+  function handleReabrir() {
+    startTransition(async () => {
+      await reabrirEventoControleAction(ev.id, processo.id);
+      router.refresh();
+    });
+  }
+
+  function handleDelete() {
+    if (!confirm("Excluir evento?")) return;
+    startTransition(async () => {
+      await deleteEventoControleAction(ev.id, processo.id);
+      router.refresh();
+    });
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await updateEventoControleAction({
+      id: ev.id,
+      processoId: processo.id,
+      titulo,
+      tipo: tipo || null,
+      data: data || null,
+      hora: hora || null,
+      local: local || null,
+    });
+    setSaving(false);
+    setEditing(false);
+    router.refresh();
+  }
+
+  const inputSm =
+    "rounded-lg border border-border bg-white px-2.5 py-1.5 font-body text-sm text-fg focus:border-primary focus:outline-none w-full";
+
+  if (editing) {
+    return (
+      <li className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value)}
+          placeholder="Título *"
+          className={inputSm}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value)}
+            className={inputSm}
+          >
+            <option value="">— Tipo —</option>
+            {Object.keys(TIPO_EVENTO_CORES).map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => setData(e.target.value)}
+            className={inputSm}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="time"
+            value={hora}
+            onChange={(e) => setHora(e.target.value)}
+            className={inputSm}
+          />
+          <input
+            value={local}
+            onChange={(e) => setLocal(e.target.value)}
+            placeholder="Local"
+            className={inputSm}
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving || !titulo.trim()}
+            className="flex-1 rounded-lg bg-primary px-3 py-1.5 font-body text-xs font-semibold text-white disabled:opacity-50"
+          >
+            {saving ? "Salvando…" : "Salvar"}
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
+          >
+            Cancelar
+          </button>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li
+      className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+        concluido ? "border-border bg-slate-50 opacity-70" : "border-border"
+      }`}
+    >
+      {/* Checkbox de status */}
+      <button
+        onClick={concluido ? handleReabrir : handleDarBaixa}
+        title={concluido ? "Reabrir" : "Dar baixa"}
+        style={{ touchAction: "manipulation" }}
+        className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
+          concluido
+            ? "bg-emerald-500 border-emerald-500"
+            : "border-border hover:border-emerald-500"
+        }`}
+      >
+        {concluido && <CheckIcon className="h-2.5 w-2.5 text-white" />}
+      </button>
+
+      {/* Conteúdo */}
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`font-body text-sm font-semibold ${concluido ? "line-through text-muted" : "text-fg"}`}
+          >
+            {ev.titulo}
+          </span>
+          {ev.tipo && (
+            <span
+              className={`rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${TIPO_EVENTO_CORES[ev.tipo] ?? "bg-slate-100 text-slate-500"}`}
+            >
+              {ev.tipo}
+            </span>
+          )}
+          {concluido && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-body text-[10px] font-semibold text-emerald-700">
+              Concluído
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-3 mt-1 font-body text-xs text-muted">
+          {ev.data && (
+            <span>
+              {ev.data}
+              {ev.hora ? ` às ${ev.hora}` : ""}
+            </span>
+          )}
+          {ev.local && <span>📍 {ev.local}</span>}
+          {ev.responsavel_nome && <span>👤 {ev.responsavel_nome}</span>}
+        </div>
+      </div>
+
+      {/* Ações */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <button
+          onClick={() => setEditing(true)}
+          className="rounded px-2 py-1 font-body text-[11px] text-muted hover:text-primary transition-colors"
+        >
+          Editar
+        </button>
+        <button onClick={handleDelete} className={btnDanger}>
+          ×
+        </button>
+      </div>
+    </li>
+  );
+}
+
 function EventosSection({
   eventos,
   processo,
@@ -892,22 +1091,13 @@ function EventosSection({
   processo: ProcessoExtended;
   onNovo: () => void;
 }) {
-  const [, startTransition] = useTransition();
-  const router = useRouter();
-
-  function handleDelete(id: string) {
-    if (!confirm("Excluir evento?")) return;
-    startTransition(async () => {
-      await deleteEventoControleAction(id, processo.id);
-      router.refresh();
-    });
-  }
+  const ativos = eventos.filter((e) => e.status !== "concluido").length;
 
   return (
     <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-heading text-base font-semibold text-fg">
-          Eventos / Controles ({eventos.length})
+          Eventos / Controles ({ativos}/{eventos.length})
         </h2>
         <button onClick={onNovo} className={btnOutline}>
           <PlusIcon className="h-3.5 w-3.5" />
@@ -922,39 +1112,7 @@ function EventosSection({
       ) : (
         <ul className="space-y-2">
           {eventos.map((ev) => (
-            <li
-              key={ev.id}
-              className="flex items-start gap-3 rounded-lg border border-border p-3"
-            >
-              <CalendarIcon className="h-4 w-4 text-muted flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-body text-sm font-semibold text-fg">
-                    {ev.titulo}
-                  </span>
-                  {ev.tipo && (
-                    <span
-                      className={`rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${TIPO_EVENTO_CORES[ev.tipo] ?? "bg-slate-100 text-slate-500"}`}
-                    >
-                      {ev.tipo}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-3 mt-1 font-body text-xs text-muted">
-                  {ev.data && (
-                    <span>
-                      {ev.data}
-                      {ev.hora ? ` às ${ev.hora}` : ""}
-                    </span>
-                  )}
-                  {ev.local && <span>📍 {ev.local}</span>}
-                  {ev.responsavel_nome && <span>👤 {ev.responsavel_nome}</span>}
-                </div>
-              </div>
-              <button onClick={() => handleDelete(ev.id)} className={btnDanger}>
-                Excluir
-              </button>
-            </li>
+            <EventoRow key={ev.id} ev={ev} processo={processo} />
           ))}
         </ul>
       )}
@@ -1018,18 +1176,26 @@ function TarefasSection({
   tarefas,
   processo,
   onNova,
+  sessionLogin,
 }: {
   tarefas: TarefaProcesso[];
   processo: ProcessoExtended;
   onNova: () => void;
+  sessionLogin?: string;
 }) {
   const [, startTransition] = useTransition();
   const router = useRouter();
 
+  const isConcluida = (t: TarefaProcesso) =>
+    t.status === "Concluída" || t.status === "concluida";
+
   function toggleStatus(t: TarefaProcesso) {
-    const next = t.status === "pendente" ? "concluida" : "pendente";
     startTransition(async () => {
-      await updateTarefaStatusAction(t.id, next, processo.id);
+      if (isConcluida(t)) {
+        await reabrirTarefaProcessoAction(t.id, processo.id);
+      } else {
+        await darBaixaTarefaProcessoAction(t.id, processo.id);
+      }
       router.refresh();
     });
   }
@@ -1048,11 +1214,13 @@ function TarefasSection({
     Baixa: "bg-slate-400",
   };
 
+  const pendentes = tarefas.filter((t) => !isConcluida(t));
+
   return (
     <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-heading text-sm font-semibold text-fg">
-          Tarefas ({tarefas.length})
+          Tarefas ({pendentes.length}/{tarefas.length})
         </h3>
         <button
           onClick={onNova}
@@ -1068,41 +1236,71 @@ function TarefasSection({
         </p>
       ) : (
         <ul className="space-y-2">
-          {tarefas.map((t) => (
-            <li key={t.id} className="flex items-start gap-2">
-              <button
-                onClick={() => toggleStatus(t)}
-                className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
-                  t.status === "concluida"
-                    ? "bg-primary border-primary"
-                    : "border-border hover:border-primary"
-                }`}
+          {tarefas.map((t) => {
+            const done = isConcluida(t);
+            const isMinha = sessionLogin && t.responsavel === sessionLogin;
+            return (
+              <li
+                key={t.id}
+                className={`flex items-start gap-2 rounded-lg px-1.5 py-1 -mx-1.5 transition-colors ${isMinha && !done ? "bg-amber-50/70" : ""}`}
               >
-                {t.status === "concluida" && (
-                  <CheckIcon className="h-2.5 w-2.5 text-white" />
-                )}
-              </button>
-              <div className="flex-1 min-w-0">
-                <p
-                  className={`font-body text-sm leading-tight ${t.status === "concluida" ? "line-through text-muted" : "text-fg"}`}
+                <button
+                  onClick={() => toggleStatus(t)}
+                  title={done ? "Reabrir tarefa" : "Dar baixa"}
+                  style={{ touchAction: "manipulation" }}
+                  className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
+                    done
+                      ? "bg-emerald-600 border-emerald-600"
+                      : "border-border hover:border-emerald-500"
+                  }`}
                 >
-                  <span
-                    className={`inline-block h-1.5 w-1.5 rounded-full mr-1.5 ${PRIORIDADE_DOT[t.prioridade] ?? "bg-slate-400"}`}
-                  />
-                  {t.titulo}
-                </p>
-                <div className="flex gap-2 mt-0.5 font-body text-[11px] text-muted">
-                  {t.responsavel && <span>{t.responsavel}</span>}
-                  {t.prazo && <span>· {t.prazo}</span>}
+                  {done && <CheckIcon className="h-2.5 w-2.5 text-white" />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={`font-body text-sm leading-tight ${done ? "line-through text-muted" : "text-fg"}`}
+                  >
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full mr-1.5 ${PRIORIDADE_DOT[t.prioridade] ?? "bg-slate-400"}`}
+                    />
+                    {t.titulo}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-0.5 font-body text-[11px] text-muted">
+                    {t.responsavel && (
+                      <span
+                        className={
+                          isMinha ? "font-semibold text-amber-700" : ""
+                        }
+                      >
+                        {isMinha ? "Você" : t.responsavel}
+                      </span>
+                    )}
+                    {t.prazo && <span>· {t.prazo}</span>}
+                    {done && (
+                      <span className="text-emerald-600 font-semibold">
+                        ✓ Concluída
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <button onClick={() => handleDelete(t.id)} className={btnDanger}>
-                ×
-              </button>
-            </li>
-          ))}
+                <button
+                  onClick={() => handleDelete(t.id)}
+                  className={btnDanger}
+                >
+                  ×
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
+
+      {sessionLogin &&
+        pendentes.some((t) => t.responsavel === sessionLogin) && (
+          <p className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 font-body text-xs font-semibold text-amber-700">
+            Você tem tarefas pendentes. Clique no checkbox para dar baixa.
+          </p>
+        )}
     </div>
   );
 }
@@ -2131,6 +2329,7 @@ export default function ProcessoDetailClient({
   pendencias,
   colaboradores,
   modelos,
+  sessionLogin,
 }: Props) {
   const [tab, setTab] = useState<Tab>("dados");
   const [avancarOpen, setAvancarOpen] = useState(false);
@@ -2282,6 +2481,7 @@ export default function ProcessoDetailClient({
             tarefas={tarefas}
             processo={processo}
             onNova={() => setNovaTarefaOpen(true)}
+            sessionLogin={sessionLogin}
           />
           <PendenciasSection
             pendencias={pendencias}

@@ -104,4 +104,5 @@ export interface ProcessoProducao {
   resultado_judicial: ResultadoJudicial | null;
   dias_no_estagio: number;
   created_at_formatted: string;
+  tarefas_pendentes: number;
 }

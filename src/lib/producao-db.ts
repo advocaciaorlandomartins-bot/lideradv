@@ -27,6 +27,7 @@ function mapRow(r: any): ProcessoProducao {
       null) as ResultadoJudicial | null,
     dias_no_estagio: dias,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
+    tarefas_pendentes: Number(r.tarefas_pendentes ?? 0),
   };
 }
 
@@ -43,9 +44,12 @@ export async function getAllProcessosProducao(): Promise<ProcessoProducao[]> {
       p.resultado_administrativo,
       p.resultado_judicial,
       p.data_estagio_at,
-      p.created_at
+      p.created_at,
+      COUNT(t.id) FILTER (WHERE t.status IN ('Pendente', 'Em andamento'))::int AS tarefas_pendentes
     FROM processos p
     JOIN clients c ON c.id = p.client_id
+    LEFT JOIN tarefas_processo t ON t.processo_id = p.id AND t.status != 'Cancelada'
+    GROUP BY p.id, c.name
     ORDER BY p.data_estagio_at ASC
   `;
   return rows.map(mapRow);

@@ -22,15 +22,23 @@ function mapRow(r: any): Usuario {
     ativo: Boolean(r.ativo),
     permissoes: r.permissoes ? (r.permissoes as Permissoes) : null,
     created_at: String(r.created_at),
+    tarefas_pendentes: Number(r.tarefas_pendentes ?? 0),
+    controles_pendentes: Number(r.controles_pendentes ?? 0),
   };
 }
 
 export async function getAllUsuarios(): Promise<Usuario[]> {
   const rows = await sql`
-    SELECT id::text, login, nome, categoria, colaborador_id::text,
-           validade::text, ultimo_acesso::text, ativo, permissoes, created_at::text
-    FROM usuarios
-    ORDER BY nome ASC
+    SELECT
+      u.id::text, u.login, u.nome, u.categoria, u.colaborador_id::text,
+      u.validade::text, u.ultimo_acesso::text, u.ativo, u.permissoes, u.created_at::text,
+      COUNT(t.id) FILTER (WHERE t.status IN ('Pendente', 'Em andamento'))::int AS tarefas_pendentes,
+      COUNT(c.id) FILTER (WHERE c.status IS NULL OR c.status = 'em_andamento')::int AS controles_pendentes
+    FROM usuarios u
+    LEFT JOIN tarefas_processo t ON t.responsavel = u.login AND t.status != 'Cancelada'
+    LEFT JOIN controles c ON c.responsavel_id = u.id AND (c.status IS NULL OR c.status = 'em_andamento')
+    GROUP BY u.id
+    ORDER BY u.nome ASC
   `;
   return rows.map(mapRow);
 }

@@ -23,7 +23,7 @@ import type {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = "operacional" | "tatico" | "estrategico" | "analitico";
+type Tab = "operacional" | "tatico" | "estrategico" | "analitico" | "equipe";
 
 interface Props {
   data: GerenciadorData;
@@ -1510,6 +1510,246 @@ function AnaliticoTab({ data }: { data: GerenciadorData }) {
   );
 }
 
+// ── Aba Equipe ────────────────────────────────────────────────────────────────
+
+const TIPO_LABELS_CONTROLE: Record<string, string> = {
+  audiencias: "Audiência",
+  prazos: "Prazo",
+  pericias: "Perícia",
+  dcb: "DCB",
+  beneficios: "Benefício",
+  implantados: "Implantado",
+  alvaras: "Alvará",
+};
+
+function EquipeTab({ data }: { data: GerenciadorData }) {
+  const { equipe } = data;
+  const comPendencias = equipe.filter(
+    (m) => m.tarefas.length + m.controles.length > 0
+  );
+  const semPendencias = equipe.filter(
+    (m) => m.tarefas.length + m.controles.length === 0
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Resumo geral */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="font-body text-xs text-muted">Colaboradores</p>
+          <p className="mt-1 font-heading text-2xl font-bold text-fg">
+            {equipe.length}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="font-body text-xs text-muted">Com pendências</p>
+          <p className="mt-1 font-heading text-2xl font-bold text-amber-600">
+            {comPendencias.length}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="font-body text-xs text-muted">Tarefas pendentes</p>
+          <p className="mt-1 font-heading text-2xl font-bold text-teal-600">
+            {equipe.reduce((s, m) => s + m.tarefas.length, 0)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="font-body text-xs text-muted">Controles pendentes</p>
+          <p className="mt-1 font-heading text-2xl font-bold text-violet-600">
+            {equipe.reduce((s, m) => s + m.controles.length, 0)}
+          </p>
+        </div>
+      </div>
+
+      {/* Cards por membro */}
+      {comPendencias.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-slate-50 py-16 text-center">
+          <p className="font-heading text-base font-semibold text-fg">
+            Equipe em dia!
+          </p>
+          <p className="mt-1 font-body text-sm text-muted">
+            Nenhum colaborador tem pendências no momento.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {comPendencias.map((m) => (
+            <div
+              key={m.id}
+              className="overflow-hidden rounded-xl border border-border bg-white shadow-sm"
+            >
+              {/* Header do membro */}
+              <div className="flex items-center gap-3 border-b border-border bg-slate-50 px-4 py-3">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-heading text-sm font-bold text-primary">
+                  {m.nome.slice(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-heading text-sm font-semibold text-fg truncate">
+                    {m.nome}
+                  </p>
+                  <p className="font-body text-xs text-muted">{m.categoria}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {m.tarefas.length > 0 && (
+                    <span className="rounded-full bg-teal-50 px-2 py-0.5 font-body text-[11px] font-bold text-teal-700">
+                      {m.tarefas.length}T
+                    </span>
+                  )}
+                  {m.controles.length > 0 && (
+                    <span className="rounded-full bg-violet-50 px-2 py-0.5 font-body text-[11px] font-bold text-violet-700">
+                      {m.controles.length}C
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Lista de itens */}
+              <ul className="divide-y divide-border">
+                {m.tarefas.map((t) => (
+                  <li
+                    key={`t-${t.id}`}
+                    className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="mt-0.5 flex-shrink-0 rounded px-1.5 py-0.5 font-body text-[10px] font-semibold bg-teal-100 text-teal-700">
+                      Tarefa
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-body text-sm font-semibold text-fg leading-snug truncate">
+                        {t.titulo}
+                      </p>
+                      {t.client_name && (
+                        <p className="font-body text-xs text-primary font-semibold truncate">
+                          {t.client_name}
+                        </p>
+                      )}
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                        {t.processo_numero && (
+                          <span className="font-body text-[10px] text-muted">
+                            Proc. {t.processo_numero}
+                          </span>
+                        )}
+                        {t.prazo && (
+                          <span className="font-body text-[10px] text-muted">
+                            Prazo:{" "}
+                            {new Date(t.prazo + "T00:00:00").toLocaleDateString(
+                              "pt-BR"
+                            )}
+                          </span>
+                        )}
+                        <span
+                          className={`rounded px-1 py-0.5 font-body text-[10px] font-semibold ${
+                            t.prioridade === "Alta"
+                              ? "bg-red-100 text-red-700"
+                              : t.prioridade === "Normal"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {t.prioridade}
+                        </span>
+                        <span
+                          className={`rounded px-1 py-0.5 font-body text-[10px] font-semibold ${
+                            t.status === "Em andamento"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {t.status}
+                        </span>
+                      </div>
+                    </div>
+                    {t.processo_id ? (
+                      <Link
+                        href={`/dashboard/processos/${t.processo_id}`}
+                        className="flex-shrink-0 rounded-lg border border-border px-2 py-1 font-body text-[11px] font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Ver
+                      </Link>
+                    ) : t.client_id ? (
+                      <Link
+                        href={`/dashboard/clientes/${t.client_id}`}
+                        className="flex-shrink-0 rounded-lg border border-border px-2 py-1 font-body text-[11px] font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Ver
+                      </Link>
+                    ) : null}
+                  </li>
+                ))}
+                {m.controles.map((c) => (
+                  <li
+                    key={`c-${c.id}`}
+                    className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="mt-0.5 flex-shrink-0 rounded px-1.5 py-0.5 font-body text-[10px] font-semibold bg-violet-100 text-violet-700">
+                      {TIPO_LABELS_CONTROLE[c.tipo] ?? c.tipo}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-body text-sm font-semibold text-fg leading-snug truncate">
+                        {c.descricao}
+                      </p>
+                      {c.client_name && (
+                        <p className="font-body text-xs text-primary font-semibold truncate">
+                          {c.client_name}
+                        </p>
+                      )}
+                      {c.data_evento && (
+                        <p className="mt-0.5 font-body text-[10px] text-muted">
+                          {new Date(
+                            c.data_evento + "T00:00:00"
+                          ).toLocaleDateString("pt-BR")}
+                        </p>
+                      )}
+                    </div>
+                    {c.processo_id ? (
+                      <Link
+                        href={`/dashboard/processos/${c.processo_id}`}
+                        className="flex-shrink-0 rounded-lg border border-border px-2 py-1 font-body text-[11px] font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Ver
+                      </Link>
+                    ) : c.client_id ? (
+                      <Link
+                        href={`/dashboard/clientes/${c.client_id}`}
+                        className="flex-shrink-0 rounded-lg border border-border px-2 py-1 font-body text-[11px] font-semibold text-muted transition-colors hover:border-primary hover:text-primary"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Ver
+                      </Link>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sem pendências */}
+      {semPendencias.length > 0 && (
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="mb-2 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+            Em dia ({semPendencias.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {semPendencias.map((m) => (
+              <span
+                key={m.id}
+                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 font-body text-xs font-semibold text-emerald-700"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {m.nome}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function GerenciadorContent({ data }: Props) {
@@ -1565,6 +1805,16 @@ export default function GerenciadorContent({ data }: Props) {
       activeLabel: "text-emerald-800",
       activeSub: "text-emerald-600",
     },
+    {
+      key: "equipe",
+      label: "Equipe",
+      sub: "Tarefas por colaborador",
+      activeBorder: "border-teal-500",
+      activeBg: "bg-teal-50",
+      dot: "bg-teal-500",
+      activeLabel: "text-teal-800",
+      activeSub: "text-teal-600",
+    },
   ];
 
   return (
@@ -1573,7 +1823,7 @@ export default function GerenciadorContent({ data }: Props) {
       <PipelineFluxo data={data} />
 
       {/* Tab Buttons */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
         {tabs.map((t) => {
           const isActive = tab === t.key;
           return (
@@ -1615,6 +1865,7 @@ export default function GerenciadorContent({ data }: Props) {
       {tab === "tatico" && <TaticoTab data={data} />}
       {tab === "estrategico" && <EstrategicoTab data={data} />}
       {tab === "analitico" && <AnaliticoTab data={data} />}
+      {tab === "equipe" && <EquipeTab data={data} />}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTransition } from "react";
+import Image from "next/image";
 import {
   ScalesIcon,
   HomeIcon,
@@ -244,7 +245,7 @@ export default function Sidebar({
 
       {/* Drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex flex-shrink-0 flex-col bg-primary transition-all duration-300 ease-out lg:border-r lg:border-white/10 lg:shadow-none lg:translate-x-0 ${
+        className={`sidebar-bg fixed inset-y-0 left-0 z-30 flex flex-shrink-0 flex-col transition-all duration-300 ease-out lg:border-r lg:border-white/10 lg:shadow-none lg:translate-x-0 ${
           open ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         } ${collapsed ? "w-16" : "w-72"}`}
       >
@@ -255,20 +256,30 @@ export default function Sidebar({
           }`}
         >
           {!collapsed && (
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-                <ScalesIcon className="h-5 w-5 text-white" />
-              </div>
-              <span className="font-heading text-xl font-semibold text-white">
+            <div className="flex items-center gap-2">
+              <Image
+                src="/logo1.png"
+                alt="LiderAdv"
+                width={42}
+                height={42}
+                className="drop-shadow-[0_0_8px_rgba(143,190,255,0.4)]"
+                priority
+              />
+              <span className="font-body text-lg font-bold text-white tracking-wide">
                 LiderAdv
               </span>
             </div>
           )}
 
           {collapsed && (
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-              <ScalesIcon className="h-5 w-5 text-white" />
-            </div>
+            <Image
+              src="/logo1.png"
+              alt="LiderAdv"
+              width={34}
+              height={34}
+              className="drop-shadow-[0_0_6px_rgba(143,190,255,0.4)]"
+              priority
+            />
           )}
 
           {/* Toggle collapse — desktop only */}

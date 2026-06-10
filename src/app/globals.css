@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #1e3a8a;
-  --color-primary-dark: #162d6e;
-  --color-primary-light: #2547b0;
-  --color-cta: #b45309;
-  --color-cta-hover: #92400e;
+  --color-primary: #001848;
+  --color-primary-dark: #000d25;
+  --color-primary-light: #003080;
+  --color-cta: #005dff;
+  --color-cta-hover: #0047cc;
   --color-bg: #f8fafc;
   --color-fg: #0f172a;
   --color-muted: #475569;
@@ -20,6 +20,11 @@
 body {
   background-color: #f8fafc;
   color: #0f172a;
+}
+
+/* Sidebar gradient background */
+.sidebar-bg {
+  background: linear-gradient(180deg, #000d25 0%, #001848 60%, #003080 100%);
 }
 
 /* Login right panel: dark gradient on mobile, light on desktop */

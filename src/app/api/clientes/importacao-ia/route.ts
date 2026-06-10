@@ -63,6 +63,112 @@ function isSupportedImage(t: string): t is SupportedImageMime {
   return ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(t);
 }
 
+type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail: "high" } };
+
+async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
+  // pdfjs-dist legacy build is required for Node.js (no DOMMatrix dependency)
+  type PdfjsModule = {
+    GlobalWorkerOptions: { workerSrc: string };
+    getDocument: (opts: {
+      data: Uint8Array;
+      useSystemFonts?: boolean;
+      verbosity?: number;
+    }) => { promise: Promise<PdfDoc> };
+  };
+  type TextItem = { str: string };
+  type PdfPage = {
+    getViewport: (opts: { scale: number }) => {
+      width: number;
+      height: number;
+    };
+    getTextContent: () => Promise<{ items: TextItem[] }>;
+    render: (opts: {
+      canvasContext: unknown;
+      viewport: { width: number; height: number };
+    }) => { promise: Promise<void> };
+  };
+  type PdfDoc = {
+    numPages: number;
+    getPage: (n: number) => Promise<PdfPage>;
+  };
+
+  const pdfjsLib =
+    (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfjsModule;
+
+  // Disable web worker — runs in-thread in Node.js
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(buffer),
+    useSystemFonts: true,
+    verbosity: 0,
+  });
+
+  const pdfDoc = await loadingTask.promise;
+  const numPages = Math.min(pdfDoc.numPages, 8);
+
+  // ── 1. Attempt text extraction ─────────────────────────────────────────────
+  let fullText = "";
+  for (let p = 1; p <= numPages; p++) {
+    const page = await pdfDoc.getPage(p);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((i) => i.str)
+      .join(" ")
+      .trim();
+    if (pageText) fullText += pageText + "\n";
+  }
+
+  fullText = fullText.trim();
+  if (fullText.length > 80) {
+    return [
+      {
+        type: "text",
+        text: `Texto extraído do documento PDF:\n\n${fullText}\n\n${EXTRACTION_PROMPT}`,
+      },
+    ];
+  }
+
+  // ── 2. Scanned PDF — render pages as JPEG images ───────────────────────────
+  const { createCanvas } = (await import("@napi-rs/canvas")) as {
+    createCanvas: (
+      w: number,
+      h: number
+    ) => {
+      getContext: (type: "2d") => unknown;
+      toDataURL: (mime: string, quality: number) => string;
+    };
+  };
+
+  const parts: ContentPart[] = [{ type: "text", text: EXTRACTION_PROMPT }];
+  const renderPages = Math.min(pdfDoc.numPages, 2);
+
+  for (let p = 1; p <= renderPages; p++) {
+    const page = await pdfDoc.getPage(p);
+    const viewport = page.getViewport({ scale: 2.0 });
+    const w = Math.ceil(viewport.width);
+    const h = Math.ceil(viewport.height);
+
+    const canvas = createCanvas(w, h);
+    const ctx = canvas.getContext("2d");
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    parts.push({
+      type: "image_url",
+      image_url: { url: canvas.toDataURL("image/jpeg", 0.85), detail: "high" },
+    });
+  }
+
+  if (parts.length < 2) {
+    throw new Error("PDF sem conteúdo extraível.");
+  }
+
+  return parts;
+}
+
 function parseJson(raw: string): AiExtractedData | null {
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -144,33 +250,16 @@ export async function POST(request: Request) {
 
       rawText = res.choices[0]?.message?.content ?? "";
     } else if (fileType === "application/pdf") {
-      // ── PDF: extrair texto com import dinâmico e enviar como mensagem ─────
-      let pdfText = "";
+      // ── PDF: extrai texto ou renderiza páginas como imagem ────────────────
+      let pdfContent: ContentPart[];
       try {
-        // Dynamic import evita problemas de bundling no Next.js
-        const mod = await import("pdf-parse");
-        // pdf-parse exports differently depending on bundler
-        type PdfParseFn = (buf: Buffer) => Promise<{ text: string }>;
-        const pdfParse = ((mod as { default?: PdfParseFn }).default ??
-          mod) as PdfParseFn;
-        const parsed = await pdfParse(buffer);
-        pdfText = (parsed.text as string).trim();
+        pdfContent = await processPdf(buffer);
       } catch (e) {
-        console.error("pdf-parse error:", e);
+        console.error("PDF processing error:", e);
         return NextResponse.json(
           {
             error:
-              "Não foi possível ler o PDF. Tente enviar uma foto do documento (JPEG ou PNG).",
-          },
-          { status: 422 }
-        );
-      }
-
-      if (!pdfText) {
-        return NextResponse.json(
-          {
-            error:
-              "O PDF não contém texto legível (documento escaneado como imagem). Tire uma foto e envie como JPEG ou PNG.",
+              "Não foi possível processar o PDF. Verifique se o arquivo não está corrompido ou protegido por senha.",
           },
           { status: 422 }
         );
@@ -179,17 +268,7 @@ export async function POST(request: Request) {
       const res = await openai.chat.completions.create({
         model: "gpt-4o",
         max_tokens: 1024,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você extrai dados de documentos de identificação brasileiros. Responda APENAS com JSON válido.",
-          },
-          {
-            role: "user",
-            content: `Texto extraído do documento:\n\n${pdfText}\n\n${EXTRACTION_PROMPT}`,
-          },
-        ],
+        messages: [{ role: "user", content: pdfContent }],
       });
 
       rawText = res.choices[0]?.message?.content ?? "";

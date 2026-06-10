@@ -17,11 +17,11 @@ export default function LoginForm() {
       {/* Mobile: logo grande centralizada sobre fundo escuro */}
       <div className="lg:hidden flex justify-center mb-10">
         <Image
-          src="/logo1.png"
+          src="/logo.png"
           alt="LiderAdv"
-          width={200}
-          height={200}
-          className="brightness-[1.7] contrast-[1.1] drop-shadow-[0_0_40px_rgba(201,168,76,0.8)]"
+          width={160}
+          height={160}
+          className="rounded-3xl"
           priority
         />
       </div>

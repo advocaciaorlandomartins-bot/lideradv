@@ -38,11 +38,11 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="flex justify-center">
             <Image
-              src="/logo1.png"
+              src="/logo.png"
               alt="LiderAdv"
-              width={240}
-              height={240}
-              className="brightness-[1.7] contrast-[1.1] drop-shadow-[0_0_45px_rgba(201,168,76,0.75)]"
+              width={220}
+              height={220}
+              className="rounded-3xl"
               priority
             />
           </div>

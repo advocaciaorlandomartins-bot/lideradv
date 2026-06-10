@@ -258,11 +258,11 @@ export default function Sidebar({
           {!collapsed && (
             <div className="flex items-center gap-2">
               <Image
-                src="/logo1.png"
+                src="/logo.png"
                 alt="LiderAdv"
-                width={52}
-                height={52}
-                className="brightness-[1.9] contrast-[1.15] drop-shadow-[0_0_22px_rgba(201,168,76,0.85)]"
+                width={48}
+                height={48}
+                className="rounded-xl"
                 priority
               />
               <span className="font-body text-lg font-bold text-white tracking-wide">
@@ -273,11 +273,11 @@ export default function Sidebar({
 
           {collapsed && (
             <Image
-              src="/logo1.png"
+              src="/logo.png"
               alt="LiderAdv"
               width={40}
               height={40}
-              className="brightness-[1.9] contrast-[1.15] drop-shadow-[0_0_18px_rgba(201,168,76,0.85)]"
+              className="rounded-xl"
               priority
             />
           )}

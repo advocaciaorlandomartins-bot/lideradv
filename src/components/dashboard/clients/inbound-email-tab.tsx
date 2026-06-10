@@ -109,17 +109,29 @@ function EmailCard({
       </button>
 
       {open && (
-        <div className="border-t border-border px-4 pb-4 pt-3">
-          {email.body_html ? (
-            <div
-              className="prose prose-sm max-w-none font-body text-sm text-fg"
-              dangerouslySetInnerHTML={{ __html: email.body_html }}
-            />
-          ) : (
-            <pre className="whitespace-pre-wrap font-body text-sm text-fg">
-              {email.body_text || "(sem conteúdo)"}
-            </pre>
+        <div className="border-t border-border px-4 pb-4 pt-3 space-y-3">
+          {email.ai_summary && (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5">
+              <p className="mb-1 font-body text-[10px] font-bold uppercase tracking-wider text-blue-500">
+                ✨ Resumo IA
+              </p>
+              <p className="font-body text-sm leading-relaxed text-blue-900">
+                {email.ai_summary}
+              </p>
+            </div>
           )}
+          <div>
+            {email.body_html ? (
+              <div
+                className="prose prose-sm max-w-none font-body text-sm text-fg"
+                dangerouslySetInnerHTML={{ __html: email.body_html }}
+              />
+            ) : (
+              <pre className="whitespace-pre-wrap font-body text-sm text-fg">
+                {email.body_text || "(sem conteúdo)"}
+              </pre>
+            )}
+          </div>
 
           {email.attachments.length > 0 && (
             <div className="mt-3 space-y-1">

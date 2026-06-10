@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { getAddressByEmail, saveInboundEmail } from "@/lib/inbound-emails-db";
 import type { InboundAttachment } from "@/lib/inbound-emails-db";
+import { getEscritorioConfig } from "@/lib/escritorio-db";
+import { resumirEmail } from "@/lib/ai";
+import { notificarEmailRecebido } from "@/lib/email";
+import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 // ── Normaliza payload de diferentes provedores ─────────────────────────────────
-// Suporta: Mailgun, SendGrid Inbound Parse, Postmark
 
 interface NormalizedEmail {
   toAddress: string;
@@ -82,13 +85,23 @@ function parsePostmark(body: Record<string, unknown>): NormalizedEmail | null {
 }
 
 function normalize(body: Record<string, unknown>): NormalizedEmail | null {
-  // Postmark: tem campo "MessageID"
   if (body.MessageID) return parsePostmark(body);
-  // SendGrid: tem campo "envelope"
   if (body.envelope || (body.to && body.from && !body.sender))
     return parseSendGrid(body);
-  // Mailgun (default)
   return parseMailgun(body);
+}
+
+// ── Busca nome do cliente pelo address_id ─────────────────────────────────────
+
+async function getClientName(clientId: string): Promise<string> {
+  try {
+    const rows = await sql`
+      SELECT name FROM clients WHERE id = ${clientId}::uuid LIMIT 1
+    `;
+    return (rows[0]?.name as string) ?? "Cliente";
+  } catch {
+    return "Cliente";
+  }
 }
 
 // ── Webhook handler ───────────────────────────────────────────────────────────
@@ -100,7 +113,6 @@ export async function POST(request: Request) {
   if (contentType.includes("application/json")) {
     body = await request.json();
   } else {
-    // Mailgun envia como form-urlencoded
     const text = await request.text();
     const params = new URLSearchParams(text);
     body = Object.fromEntries(params.entries());
@@ -114,12 +126,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // Identificar cliente pelo endereço destinatário
   const addr = await getAddressByEmail(email.toAddress);
   if (!addr) {
-    // Endereço não cadastrado no sistema — aceitar mas não salvar como cliente
     return NextResponse.json({ status: "ignored", reason: "unknown_address" });
   }
+
+  // ── Gera resumo IA e salva em paralelo ────────────────────────────────────
+  const [aiSummary, clientName, config] = await Promise.all([
+    resumirEmail(email.subject, email.bodyText).catch(() => null),
+    getClientName(addr.client_id),
+    getEscritorioConfig().catch(() => null),
+  ]);
 
   await saveInboundEmail({
     addressId: addr.id,
@@ -131,7 +148,22 @@ export async function POST(request: Request) {
     bodyText: email.bodyText,
     bodyHtml: email.bodyHtml,
     attachments: email.attachments,
+    aiSummary,
   });
+
+  // ── Notificação por e-mail (não bloqueia a resposta) ──────────────────────
+  if (config?.email) {
+    notificarEmailRecebido({
+      para: config.email,
+      cliente: clientName,
+      clienteId: addr.client_id,
+      de: email.fromAddress,
+      deNome: email.fromName,
+      assunto: email.subject,
+      resumoIA: aiSummary,
+      corpo: email.bodyText,
+    }).catch((err) => console.error("[webhook] notificarEmailRecebido:", err));
+  }
 
   return NextResponse.json({ status: "ok" });
 }

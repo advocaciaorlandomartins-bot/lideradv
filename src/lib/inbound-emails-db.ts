@@ -19,6 +19,7 @@ export interface InboundEmail {
   body_text: string | null;
   body_html: string | null;
   attachments: InboundAttachment[];
+  ai_summary: string | null;
   lida: boolean;
   received_at: string;
 }
@@ -66,6 +67,11 @@ export async function setupInboundEmailTables() {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_ie_client_id
       ON inbound_emails(client_id)
+  `;
+  // Migration: add ai_summary column if not exists (idempotent)
+  await sql`
+    ALTER TABLE inbound_emails
+      ADD COLUMN IF NOT EXISTS ai_summary TEXT
   `;
 }
 
@@ -174,6 +180,7 @@ export async function getEmailsByClientId(
       body_text,
       body_html,
       attachments,
+      ai_summary,
       lida,
       to_char(received_at AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS received_at
     FROM inbound_emails
@@ -197,29 +204,29 @@ export async function saveInboundEmail(data: {
   bodyText: string | null;
   bodyHtml: string | null;
   attachments: InboundAttachment[];
+  aiSummary?: string | null;
 }): Promise<string> {
-  // Neon tagged literals: cast em SQL, não no valor JS
   const rows = data.addressId
     ? await sql`
         INSERT INTO inbound_emails
           (address_id, client_id, from_address, from_name, to_address,
-           subject, body_text, body_html, attachments)
+           subject, body_text, body_html, attachments, ai_summary)
         VALUES
           (${data.addressId}::uuid, ${data.clientId}::uuid,
            ${data.fromAddress}, ${data.fromName}, ${data.toAddress},
            ${data.subject}, ${data.bodyText}, ${data.bodyHtml},
-           ${JSON.stringify(data.attachments)})
+           ${JSON.stringify(data.attachments)}, ${data.aiSummary ?? null})
         RETURNING id::text
       `
     : await sql`
         INSERT INTO inbound_emails
           (client_id, from_address, from_name, to_address,
-           subject, body_text, body_html, attachments)
+           subject, body_text, body_html, attachments, ai_summary)
         VALUES
           (${data.clientId}::uuid,
            ${data.fromAddress}, ${data.fromName}, ${data.toAddress},
            ${data.subject}, ${data.bodyText}, ${data.bodyHtml},
-           ${JSON.stringify(data.attachments)})
+           ${JSON.stringify(data.attachments)}, ${data.aiSummary ?? null})
         RETURNING id::text
       `;
   return rows[0].id as string;
@@ -251,6 +258,7 @@ export async function getAllRecentEmails(
       ie.body_text,
       ie.body_html,
       ie.attachments,
+      ie.ai_summary,
       ie.lida,
       to_char(ie.received_at AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI') AS received_at,
       c.name AS client_name

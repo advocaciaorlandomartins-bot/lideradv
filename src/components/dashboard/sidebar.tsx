@@ -262,7 +262,7 @@ export default function Sidebar({
                 alt="LiderAdv"
                 width={42}
                 height={42}
-                className="drop-shadow-[0_0_8px_rgba(143,190,255,0.4)]"
+                className="brightness-125 drop-shadow-[0_0_18px_rgba(255,255,255,0.5)]"
                 priority
               />
               <span className="font-body text-lg font-bold text-white tracking-wide">
@@ -277,7 +277,7 @@ export default function Sidebar({
               alt="LiderAdv"
               width={34}
               height={34}
-              className="drop-shadow-[0_0_6px_rgba(143,190,255,0.4)]"
+              className="brightness-125 drop-shadow-[0_0_14px_rgba(255,255,255,0.5)]"
               priority
             />
           )}

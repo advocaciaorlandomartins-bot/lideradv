@@ -141,7 +141,7 @@ ${texto.slice(0, 4000)}`;
 
     await sql`
       UPDATE publicacoes
-      SET resumo_ia = ${sql.json(resumo)}, updated_at = now()
+      SET resumo_ia = ${JSON.stringify(resumo)}::jsonb, updated_at = now()
       WHERE id = ${id}
     `;
 

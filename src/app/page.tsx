@@ -42,7 +42,7 @@ export default function LoginPage() {
               alt="LiderAdv"
               width={240}
               height={240}
-              className="drop-shadow-[0_0_30px_rgba(143,190,255,0.3)]"
+              className="brightness-[1.7] contrast-[1.1] drop-shadow-[0_0_45px_rgba(201,168,76,0.75)]"
               priority
             />
           </div>

@@ -21,7 +21,7 @@ export default function LoginForm() {
           alt="LiderAdv"
           width={200}
           height={200}
-          className="drop-shadow-[0_0_32px_rgba(143,190,255,0.5)]"
+          className="brightness-[1.7] contrast-[1.1] drop-shadow-[0_0_40px_rgba(201,168,76,0.8)]"
           priority
         />
       </div>

@@ -260,9 +260,9 @@ export default function Sidebar({
               <Image
                 src="/logo1.png"
                 alt="LiderAdv"
-                width={42}
-                height={42}
-                className="brightness-125 drop-shadow-[0_0_18px_rgba(255,255,255,0.5)]"
+                width={52}
+                height={52}
+                className="brightness-[1.9] contrast-[1.15] drop-shadow-[0_0_22px_rgba(201,168,76,0.85)]"
                 priority
               />
               <span className="font-body text-lg font-bold text-white tracking-wide">
@@ -275,9 +275,9 @@ export default function Sidebar({
             <Image
               src="/logo1.png"
               alt="LiderAdv"
-              width={34}
-              height={34}
-              className="brightness-125 drop-shadow-[0_0_14px_rgba(255,255,255,0.5)]"
+              width={40}
+              height={40}
+              className="brightness-[1.9] contrast-[1.15] drop-shadow-[0_0_18px_rgba(201,168,76,0.85)]"
               priority
             />
           )}

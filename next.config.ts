@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "pdf-parse",
     "pdfjs-dist",
     "@napi-rs/canvas",
+    "pdf-parse/worker",
   ],
   turbopack: {
     root: path.resolve(__dirname),

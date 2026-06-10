@@ -68,60 +68,41 @@ type ContentPart =
   | { type: "image_url"; image_url: { url: string; detail: "high" } };
 
 async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
-  // pdfjs-dist legacy build is required for Node.js (no DOMMatrix dependency)
-  type PdfjsModule = {
-    GlobalWorkerOptions: { workerSrc: string };
-    getDocument: (opts: {
-      data: Uint8Array;
-      useSystemFonts?: boolean;
-      verbosity?: number;
-    }) => { promise: Promise<PdfDoc> };
+  // pdf-parse v2 API: PDFParse class + pdf-parse/worker for Node.js worker thread
+  type PDFParseClass = new (opts: Record<string, unknown>) => {
+    load: () => Promise<unknown>;
+    getText: () => Promise<{ pages: { text: string }[] }>;
+    getScreenshot: (opts: {
+      pageNumbers?: number[];
+      imageDataUrl?: boolean;
+      imageBuffer?: boolean;
+      scale?: number;
+    }) => Promise<{ pages: { dataUrl?: string }[] }>;
   };
-  type TextItem = { str: string };
-  type PdfPage = {
-    getViewport: (opts: { scale: number }) => {
-      width: number;
-      height: number;
-    };
-    getTextContent: () => Promise<{ items: TextItem[] }>;
-    render: (opts: {
-      canvasContext: unknown;
-      viewport: { width: number; height: number };
-    }) => { promise: Promise<void> };
+  type PdfParseModule = {
+    PDFParse: PDFParseClass & { setWorker: (src: string) => void };
   };
-  type PdfDoc = {
-    numPages: number;
-    getPage: (n: number) => Promise<PdfPage>;
+  type WorkerModule = {
+    getPath: () => string;
+    CanvasFactory: new () => unknown;
   };
 
-  const pdfjsLib =
-    (await import("pdfjs-dist/legacy/build/pdf.mjs")) as unknown as PdfjsModule;
+  const { PDFParse } = (await import("pdf-parse")) as unknown as PdfParseModule;
+  const { getPath, CanvasFactory } =
+    (await import("pdf-parse/worker")) as unknown as WorkerModule;
 
-  // Disable web worker — runs in-thread in Node.js
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-
-  const loadingTask = pdfjsLib.getDocument({
-    data: new Uint8Array(buffer),
-    useSystemFonts: true,
-    verbosity: 0,
-  });
-
-  const pdfDoc = await loadingTask.promise;
-  const numPages = Math.min(pdfDoc.numPages, 8);
+  // Configure worker (required for pdfjs-dist v6 to work in Node.js)
+  PDFParse.setWorker(getPath());
 
   // ── 1. Attempt text extraction ─────────────────────────────────────────────
-  let fullText = "";
-  for (let p = 1; p <= numPages; p++) {
-    const page = await pdfDoc.getPage(p);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((i) => i.str)
-      .join(" ")
-      .trim();
-    if (pageText) fullText += pageText + "\n";
-  }
+  const textParser = new PDFParse({ data: buffer });
+  await textParser.load();
+  const textResult = await textParser.getText();
+  const fullText = textResult.pages
+    .map((p) => p.text)
+    .join("\n")
+    .trim();
 
-  fullText = fullText.trim();
   if (fullText.length > 80) {
     return [
       {
@@ -131,35 +112,26 @@ async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
     ];
   }
 
-  // ── 2. Scanned PDF — render pages as JPEG images ───────────────────────────
-  const { createCanvas } = (await import("@napi-rs/canvas")) as {
-    createCanvas: (
-      w: number,
-      h: number
-    ) => {
-      getContext: (type: "2d") => unknown;
-      toDataURL: (mime: string, quality: number) => string;
-    };
-  };
+  // ── 2. Scanned PDF — render pages as PNG images via getScreenshot() ────────
+  const screenshotParser = new PDFParse({
+    data: buffer,
+    canvasFactory: new CanvasFactory(),
+  });
+  await screenshotParser.load();
+  const screenshots = await screenshotParser.getScreenshot({
+    imageDataUrl: true,
+    imageBuffer: false,
+    scale: 2.0,
+  });
 
   const parts: ContentPart[] = [{ type: "text", text: EXTRACTION_PROMPT }];
-  const renderPages = Math.min(pdfDoc.numPages, 2);
-
-  for (let p = 1; p <= renderPages; p++) {
-    const page = await pdfDoc.getPage(p);
-    const viewport = page.getViewport({ scale: 2.0 });
-    const w = Math.ceil(viewport.width);
-    const h = Math.ceil(viewport.height);
-
-    const canvas = createCanvas(w, h);
-    const ctx = canvas.getContext("2d");
-
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    parts.push({
-      type: "image_url",
-      image_url: { url: canvas.toDataURL("image/jpeg", 0.85), detail: "high" },
-    });
+  for (const pg of screenshots.pages.slice(0, 2)) {
+    if (pg.dataUrl) {
+      parts.push({
+        type: "image_url",
+        image_url: { url: pg.dataUrl, detail: "high" },
+      });
+    }
   }
 
   if (parts.length < 2) {

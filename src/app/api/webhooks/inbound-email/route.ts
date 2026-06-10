@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getAddressByEmail, saveInboundEmail } from "@/lib/inbound-emails-db";
+import {
+  getAddressByEmail,
+  saveInboundEmail,
+  setupInboundEmailTables,
+} from "@/lib/inbound-emails-db";
 import type { InboundAttachment } from "@/lib/inbound-emails-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { resumirEmail } from "@/lib/ai";
@@ -130,6 +134,9 @@ export async function POST(request: Request) {
   if (!addr) {
     return NextResponse.json({ status: "ignored", reason: "unknown_address" });
   }
+
+  // Garante que a coluna ai_summary existe (migration idempotente)
+  await setupInboundEmailTables().catch(() => null);
 
   // ── Gera resumo IA e salva em paralelo ────────────────────────────────────
   const [aiSummary, clientName, config] = await Promise.all([

@@ -4,6 +4,7 @@ import sql from "./db";
 import { revalidatePath } from "next/cache";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import OpenAI from "openai";
 
 // ── Publicações ───────────────────────────────────────────────────────────────
 
@@ -69,6 +70,89 @@ export async function removerOabAction(id: string) {
 
   await sql`DELETE FROM oabs_monitoradas WHERE id = ${id}::uuid`;
   revalidatePath("/dashboard/publicacoes");
+}
+
+export async function gerarResumoIaAction(id: number): Promise<{
+  ok: boolean;
+  mensagem: string;
+}> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "publicacoes", "ver")) {
+    return { ok: false, mensagem: "Sem permissão." };
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return { ok: false, mensagem: "OPENAI_API_KEY não configurada." };
+  }
+
+  const rows = await sql`
+    SELECT id, tipo, orgao, tribunal, conteudo, conteudo_completo,
+           TO_CHAR(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao
+    FROM publicacoes WHERE id = ${id} LIMIT 1
+  `;
+  if (!rows[0]) return { ok: false, mensagem: "Publicação não encontrada." };
+
+  const pub = rows[0];
+  const texto = String(pub.conteudo_completo ?? pub.conteudo ?? "").trim();
+
+  if (!texto) {
+    return {
+      ok: false,
+      mensagem:
+        "Esta publicação não possui texto para analisar. Aguarde a captura do conteúdo completo.",
+    };
+  }
+
+  const prompt = `Você é um assistente jurídico brasileiro. Analise esta publicação do Diário de Justiça e retorne SOMENTE um JSON válido no formato abaixo. Campos desconhecidos devem ser null.
+
+{
+  "texto": "Resumo em português claro em 2-3 frases explicando o que a publicação determina",
+  "prazo_dias": <número inteiro de dias úteis do prazo processual, ou null se não houver>,
+  "acao_necessaria": "<ação necessária: Recurso | Manifestação | Contestação | Pagamento | Audiência | Cumprimento de sentença | Petição | Nenhuma ação imediata | ou outra ação concisa>",
+  "audiencia": "<data da audiência no formato DD/MM/YYYY, ou null se não houver>"
+}
+
+Publicação:
+Tipo: ${pub.tipo}
+Órgão: ${pub.orgao} · ${pub.tribunal}
+Data: ${pub.disponibilizacao}
+
+${texto.slice(0, 4000)}`;
+
+  try {
+    const openai = new OpenAI({ apiKey });
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 512,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const raw = res.choices[0]?.message?.content ?? "";
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return { ok: false, mensagem: "IA não retornou JSON válido." };
+
+    const resumo = JSON.parse(match[0]) as {
+      texto: string;
+      prazo_dias: number | null;
+      acao_necessaria: string | null;
+      audiencia: string | null;
+    };
+
+    await sql`
+      UPDATE publicacoes
+      SET resumo_ia = ${sql.json(resumo)}, updated_at = now()
+      WHERE id = ${id}
+    `;
+
+    revalidatePath(`/dashboard/publicacoes/${id}`);
+    revalidatePath("/dashboard/publicacoes");
+
+    return { ok: true, mensagem: "Resumo gerado com sucesso!" };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Erro desconhecido.";
+    return { ok: false, mensagem: `Erro: ${msg}` };
+  }
 }
 
 export async function registrarBuscaOabAction(id: string) {

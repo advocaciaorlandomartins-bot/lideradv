@@ -13,6 +13,7 @@ import {
   SparklesIcon,
 } from "@/components/icons";
 import PublicacaoDetalheActions from "./detalhe-actions";
+import ResumoIaButton from "./resumo-ia-button";
 
 export const dynamic = "force-dynamic";
 
@@ -223,16 +224,7 @@ export default async function PublicacaoDetalhePage({
               Analise esta publicação com IA para extrair prazo processual, ação
               necessária e data de audiência.
             </p>
-            <button
-              disabled
-              className="mt-4 flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-primary/80 px-4 py-2 font-body text-sm font-semibold text-white opacity-60"
-            >
-              <SparklesIcon className="h-4 w-4" />
-              Gerar Resumo
-              <span className="rounded bg-white/20 px-1.5 py-0.5 text-xs leading-none">
-                Em breve
-              </span>
-            </button>
+            <ResumoIaButton pubId={pub.id} />
           </div>
         )}
 

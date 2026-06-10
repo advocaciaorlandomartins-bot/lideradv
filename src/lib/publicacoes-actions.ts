@@ -80,3 +80,62 @@ export async function registrarBuscaOabAction(id: string) {
   `;
   revalidatePath("/dashboard/publicacoes");
 }
+
+export async function verificarPublicacoesAction(): Promise<{
+  ok: boolean;
+  mensagem: string;
+  inseridos: number;
+}> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "publicacoes", "ver")) {
+    return { ok: false, mensagem: "Sem permissão.", inseridos: 0 };
+  }
+
+  const apiKey = process.env.DATAJUD_API_KEY;
+  if (!apiKey) {
+    return {
+      ok: false,
+      mensagem:
+        "DATAJUD_API_KEY não configurada. Cadastre-se em datajud-wiki.cnj.jus.br e adicione a chave no Vercel.",
+      inseridos: 0,
+    };
+  }
+
+  const rows = await sql`
+    SELECT id::text, numero, estado, nome_advogado
+    FROM oabs_monitoradas WHERE ativa = true
+  `;
+
+  if (rows.length === 0) {
+    return {
+      ok: true,
+      mensagem: "Nenhuma OAB ativa cadastrada para monitorar.",
+      inseridos: 0,
+    };
+  }
+
+  const { buscarPublicacoesPorOab } = await import("./datajud");
+  let total = 0;
+  for (const row of rows) {
+    total += await buscarPublicacoesPorOab(
+      {
+        id: String(row.id),
+        numero: String(row.numero),
+        estado: String(row.estado),
+        nome_advogado: row.nome_advogado ? String(row.nome_advogado) : null,
+      },
+      apiKey
+    );
+  }
+
+  revalidatePath("/dashboard/publicacoes");
+
+  return {
+    ok: true,
+    mensagem:
+      total > 0
+        ? `${total} nova${total !== 1 ? "s publicações encontradas" : " publicação encontrada"}!`
+        : "Nenhuma publicação nova encontrada.",
+    inseridos: total,
+  };
+}

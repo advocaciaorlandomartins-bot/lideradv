@@ -10,6 +10,7 @@ import {
   adicionarOabAction,
   toggleOabAction,
   removerOabAction,
+  verificarPublicacoesAction,
 } from "@/lib/publicacoes-actions";
 import {
   SpinnerIcon,
@@ -573,18 +574,21 @@ function TabOabs({ oabs }: { oabs: OabMonitorada[] }) {
       </div>
 
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-2 justify-between">
         <p className="font-body text-sm font-semibold text-fg">
           {oabs.length} OAB{oabs.length !== 1 ? "s" : ""} monitorada
           {oabs.length !== 1 ? "s" : ""}
         </p>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90"
-        >
-          <PlusIcon className="h-4 w-4" />
-          {showForm ? "Cancelar" : "Adicionar OAB"}
-        </button>
+        <div className="flex items-center gap-2">
+          <BotaoVerificar />
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <PlusIcon className="h-4 w-4" />
+            {showForm ? "Cancelar" : "Adicionar OAB"}
+          </button>
+        </div>
       </div>
 
       {/* Formulário de cadastro */}
@@ -760,6 +764,48 @@ function TabOabs({ oabs }: { oabs: OabMonitorada[] }) {
   );
 }
 
+// ── Botão Verificar Agora ─────────────────────────────────────────────────────
+
+function BotaoVerificar() {
+  const [isPending, startTransition] = useTransition();
+  const [resultado, setResultado] = useState<{
+    ok: boolean;
+    mensagem: string;
+  } | null>(null);
+
+  function handleVerificar() {
+    setResultado(null);
+    startTransition(async () => {
+      const res = await verificarPublicacoesAction();
+      setResultado(res);
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={handleVerificar}
+        disabled={isPending}
+        className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+      >
+        {isPending ? (
+          <SpinnerIcon className="h-4 w-4 animate-spin" />
+        ) : (
+          <span>🔍</span>
+        )}
+        {isPending ? "Verificando..." : "Verificar agora"}
+      </button>
+      {resultado && (
+        <p
+          className={`font-body text-xs font-semibold ${resultado.ok ? "text-emerald-600" : "text-red-600"}`}
+        >
+          {resultado.ok ? "✅" : "❌"} {resultado.mensagem}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Tab: Status ───────────────────────────────────────────────────────────────
 
 function TabStatus({
@@ -862,6 +908,26 @@ function TabStatus({
           💡 Para adicionar OABs ao monitoramento automático, acesse a aba{" "}
           <strong>OABs</strong>. As publicações são capturadas do DJe/PJe e
           disponibilizadas aqui automaticamente.
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2">
+          <p className="font-body text-xs font-semibold text-fg">
+            Verificar publicações agora
+          </p>
+          <BotaoVerificar />
+          <p className="font-body text-xs text-muted">
+            Requer <strong>DATAJUD_API_KEY</strong> configurada no Vercel.
+            Cadastro gratuito em{" "}
+            <a
+              href="https://datajud-wiki.cnj.jus.br/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline"
+            >
+              datajud-wiki.cnj.jus.br
+            </a>
+            .
+          </p>
         </div>
       </div>
     </div>

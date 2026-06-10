@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import type { AsaasConfig } from "@/app/api/integracoes/asaas/route";
 
+interface EmailInboundStatus {
+  domain: string;
+  configured: boolean;
+  webhookUrl: string;
+}
+
 // ── Status badge ──────────────────────────────────────────────────────────────
 
 type Status = "configurado" | "nao_configurado" | "em_breve" | "conectado";
@@ -334,6 +340,184 @@ function LogoZapSign() {
   );
 }
 
+function LogoEmail() {
+  return (
+    <svg
+      className="h-6 w-6 text-blue-600"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+      />
+    </svg>
+  );
+}
+
+// ── Card Email Inbound ────────────────────────────────────────────────────────
+
+function EmailInboundCard({ status }: { status: EmailInboundStatus | null }) {
+  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  function copyWebhook() {
+    if (!status?.webhookUrl) return;
+    navigator.clipboard.writeText(status.webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const configured = status?.configured ?? false;
+  const cardStatus: Status = configured ? "configurado" : "nao_configurado";
+
+  return (
+    <IntegrationCard
+      logo={<LogoEmail />}
+      name="E-mail Exclusivo (Mailgun)"
+      status={cardStatus}
+      description="Cada cliente recebe um endereço de e-mail exclusivo. Mensagens enviadas a esse endereço chegam automaticamente na ficha do cliente."
+    >
+      <div className="space-y-3">
+        {configured ? (
+          <div className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 flex-shrink-0" />
+            <p className="font-body text-xs font-semibold text-emerald-700">
+              Domínio configurado:{" "}
+              <span className="font-mono">{status?.domain}</span>
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 font-body text-xs text-amber-700">
+            Configure o{" "}
+            <code className="rounded bg-amber-100 px-1">
+              INBOUND_EMAIL_DOMAIN
+            </code>{" "}
+            no Vercel para ativar.
+          </div>
+        )}
+
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        >
+          {open ? "Ocultar instruções" : "Ver como configurar"}
+        </button>
+
+        {open && (
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 space-y-4">
+            <p className="font-heading text-sm font-semibold text-primary">
+              Passo a passo — Mailgun (gratuito, sem precisar de domínio
+              próprio)
+            </p>
+
+            <ol className="space-y-3 font-body text-xs text-slate-700">
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  1
+                </span>
+                <span>
+                  Acesse <strong>mailgun.com</strong> → crie uma conta gratuita.
+                  Ao entrar, copie o seu <strong>Sandbox Domain</strong> (ex.:{" "}
+                  <code className="rounded bg-blue-100 px-1">
+                    sandboxABC123.mailgun.org
+                  </code>
+                  ).
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  2
+                </span>
+                <span>
+                  No Mailgun, vá em{" "}
+                  <strong>Receiving → Routes → Create a Route</strong>. Em{" "}
+                  <em>Expression Type</em> escolha <strong>Catch All</strong>.
+                  Em <em>Actions</em> escolha <strong>Forward</strong> e cole o
+                  URL abaixo:
+                </span>
+              </li>
+            </ol>
+
+            {/* Webhook URL */}
+            <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2">
+              <code className="flex-1 font-mono text-[11px] text-slate-800 break-all">
+                {status?.webhookUrl ??
+                  "https://lideradv.vercel.app/api/webhooks/inbound-email"}
+              </code>
+              <button
+                onClick={copyWebhook}
+                className="flex-shrink-0 rounded-lg border border-border px-2.5 py-1 font-body text-xs font-semibold text-primary transition-colors hover:bg-blue-50"
+              >
+                {copied ? "✓ Copiado!" : "Copiar"}
+              </button>
+            </div>
+
+            <ol
+              className="space-y-3 font-body text-xs text-slate-700"
+              start={3}
+            >
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  3
+                </span>
+                <span>
+                  No painel do <strong>Vercel</strong> (Settings → Environment
+                  Variables), adicione:
+                  <div className="mt-1.5 space-y-1">
+                    <div className="flex items-center gap-2 rounded bg-slate-100 px-2 py-1">
+                      <code className="text-[11px] font-semibold text-primary">
+                        INBOUND_EMAIL_DOMAIN
+                      </code>
+                      <span className="text-slate-400">=</span>
+                      <code className="text-[11px] text-slate-700">
+                        sandboxABC123.mailgun.org
+                      </code>
+                    </div>
+                  </div>
+                  <span className="text-slate-500">
+                    (substitua pelo seu sandbox domain real)
+                  </span>
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  4
+                </span>
+                <span>
+                  No Vercel clique em <strong>Redeploy</strong> para aplicar a
+                  variável. Pronto! Cada cliente poderá ter um e-mail como{" "}
+                  <code className="rounded bg-blue-100 px-1">
+                    joao2026@sandboxABC123.mailgun.org
+                  </code>
+                  .
+                </span>
+              </li>
+            </ol>
+
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 font-body text-[11px] text-emerald-700">
+              <strong>Domínio próprio (opcional):</strong> se quiser e-mails
+              como{" "}
+              <code className="rounded bg-emerald-100 px-1">
+                joao@seuescritorio.com.br
+              </code>
+              , adicione o domínio no Mailgun e configure os registros MX
+              apontando para o Mailgun. Depois troque o{" "}
+              <code className="rounded bg-emerald-100 px-1">
+                INBOUND_EMAIL_DOMAIN
+              </code>{" "}
+              no Vercel.
+            </div>
+          </div>
+        )}
+      </div>
+    </IntegrationCard>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface GoogleStatus {
@@ -345,6 +529,9 @@ interface GoogleStatus {
 export default function IntegracoesContent() {
   const [asaasConfig, setAsaasConfig] = useState<AsaasConfig | null>(null);
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
+  const [emailStatus, setEmailStatus] = useState<EmailInboundStatus | null>(
+    null
+  );
   const [modalAsaasOpen, setModalAsaasOpen] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(
@@ -363,6 +550,11 @@ export default function IntegracoesContent() {
       .catch(() =>
         setGoogleStatus({ connected: false, configured: false, email: null })
       );
+
+    fetch("/api/integracoes/email-inbound")
+      .then((r) => r.json())
+      .then(setEmailStatus)
+      .catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -484,6 +676,9 @@ export default function IntegracoesContent() {
             </a>
           )}
         </IntegrationCard>
+
+        {/* ── E-mail Exclusivo ── */}
+        <EmailInboundCard status={emailStatus} />
 
         {/* ── ZapSign ── */}
         <IntegrationCard

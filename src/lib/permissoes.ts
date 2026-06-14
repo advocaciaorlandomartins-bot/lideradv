@@ -208,7 +208,7 @@ export function resolvePermissoes(
   for (const { key, parent } of MODULOS) {
     if (stored && key in stored) {
       // Valor explicitamente armazenado (inclui arrays vazios = sem acesso)
-      result[key] = stored[key];
+      result[key] = Array.isArray(stored[key]) ? stored[key] : NONE;
     } else if (key in defaults) {
       // Padrão da categoria
       result[key] = defaults[key];
@@ -233,7 +233,7 @@ export function hasPermission(
   acao: string
 ): boolean {
   const perms = user.permissoes[modulo];
-  if (perms !== undefined) return perms.includes(acao);
+  if (perms != null) return (Array.isArray(perms) ? perms : []).includes(acao);
 
   // Sub-módulo não presente na sessão: herda do pai
   const parent = MODULOS.find((m) => m.key === modulo)?.parent;

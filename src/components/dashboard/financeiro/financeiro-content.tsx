@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -288,8 +288,22 @@ function RowActions({
   const [novaData, setNovaData] = useState(() =>
     ddmmyyyyToISO(lancamento.data_vencimento)
   );
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handler(e: PointerEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [menuOpen]);
 
   function handlePago() {
+    setMenuOpen(false);
     setAction("pago");
     startTransition(async () => {
       await markAsPagoAction(lancamento.id);
@@ -299,6 +313,7 @@ function RowActions({
   }
 
   function handleDesfazer() {
+    setMenuOpen(false);
     if (!confirm("Reverter este lançamento para pendente?")) return;
     setAction("desfazer");
     startTransition(async () => {
@@ -320,6 +335,7 @@ function RowActions({
   }
 
   function handleDelete() {
+    setMenuOpen(false);
     if (!singleDeleteOnly && lancamento.grupo_parcelas) {
       const choice = confirm(
         `Este lançamento faz parte de um grupo.\n\n• OK = excluir TODOS\n• Cancelar = excluir só este`
@@ -349,8 +365,9 @@ function RowActions({
 
   const loading = isPending && action !== null;
 
-  return (
-    <div className="flex items-center gap-1.5">
+  // ── Desktop inline actions ─────────────────────────────────────────────────
+  const desktopActions = (
+    <div className="hidden sm:flex items-center gap-1.5">
       {lancamento.status === "pago" && (
         <button
           onClick={handleDesfazer}
@@ -424,6 +441,139 @@ function RowActions({
         {loading && action === "del" ? "…" : "Excluir"}
       </button>
     </div>
+  );
+
+  // ── Mobile ⋮ dropdown ──────────────────────────────────────────────────────
+  const mobileMenu = (
+    <div ref={menuRef} className="relative sm:hidden">
+      <button
+        type="button"
+        onClick={() => setMenuOpen((v) => !v)}
+        disabled={loading}
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-40"
+      >
+        {loading ? (
+          <SpinnerIcon className="h-3.5 w-3.5" />
+        ) : (
+          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+            <circle cx="10" cy="4" r="1.5" />
+            <circle cx="10" cy="10" r="1.5" />
+            <circle cx="10" cy="16" r="1.5" />
+          </svg>
+        )}
+      </button>
+
+      {menuOpen && (
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl">
+          {lancamento.status === "pendente" && (
+            <button
+              onClick={handlePago}
+              className="flex w-full items-center gap-2.5 px-4 py-2.5 font-body text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              <BanknotesIcon className="h-4 w-4 flex-shrink-0" />
+              {lancamento.tipo === "entrada" ? "Recebi" : "Paguei"}
+            </button>
+          )}
+          {lancamento.status === "pendente" && (
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setReagendando(true);
+              }}
+              className="flex w-full items-center gap-2.5 px-4 py-2.5 font-body text-sm font-semibold text-amber-700 hover:bg-amber-50"
+            >
+              <CalendarIcon className="h-4 w-4 flex-shrink-0" />
+              Reagendar
+            </button>
+          )}
+          {lancamento.status === "pago" && (
+            <button
+              onClick={handleDesfazer}
+              className="flex w-full items-center gap-2.5 px-4 py-2.5 font-body text-sm font-semibold text-amber-700 hover:bg-amber-50"
+            >
+              <SpinnerIcon className="h-4 w-4 flex-shrink-0" />
+              Desfazer
+            </button>
+          )}
+          {lancamento.status !== "cancelado" && (
+            <Link
+              href={`/dashboard/financeiro/${lancamento.id}/editar`}
+              onClick={() => setMenuOpen(false)}
+              className="flex w-full items-center gap-2.5 px-4 py-2.5 font-body text-sm font-semibold text-fg hover:bg-slate-50"
+            >
+              <svg
+                className="h-4 w-4 flex-shrink-0 text-muted"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828A2 2 0 019 16.657V19h2.343a2 2 0 001.415-.586l6.586-6.586"
+                />
+              </svg>
+              Abrir / Editar
+            </Link>
+          )}
+          <div className="mx-3 my-1 border-t border-border" />
+          <button
+            onClick={handleDelete}
+            className="flex w-full items-center gap-2.5 px-4 py-2.5 font-body text-sm font-semibold text-red-600 hover:bg-red-50"
+          >
+            <svg
+              className="h-4 w-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"
+              />
+            </svg>
+            Excluir
+          </button>
+        </div>
+      )}
+
+      {/* Reagendar inline (mobile) */}
+      {reagendando && (
+        <div className="absolute right-0 top-full z-50 mt-1 flex flex-col gap-2 rounded-xl border border-border bg-white p-3 shadow-xl">
+          <input
+            type="date"
+            value={novaData}
+            onChange={(e) => setNovaData(e.target.value)}
+            className="h-9 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleReagendar}
+              disabled={loading || !novaData}
+              className="flex-1 rounded-lg bg-primary py-1.5 font-body text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
+            >
+              {loading && action === "reagendar" ? "…" : "Confirmar"}
+            </button>
+            <button
+              onClick={() => setReagendando(false)}
+              className="rounded-lg bg-slate-100 px-3 py-1.5 font-body text-sm text-muted hover:bg-slate-200"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      {desktopActions}
+      {mobileMenu}
+    </>
   );
 }
 
@@ -512,6 +662,59 @@ function LancamentoRow({
   );
 }
 
+// ── MobileFab ─────────────────────────────────────────────────────────────────
+
+function MobileFab() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: PointerEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    }
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [open]);
+
+  return (
+    <div
+      ref={ref}
+      className="fixed bottom-6 right-4 z-40 flex flex-col items-end gap-2 lg:hidden"
+    >
+      {open && (
+        <>
+          <Link
+            href="/dashboard/financeiro/novo?tipo=entrada"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-full bg-emerald-600 py-2.5 pl-4 pr-5 font-body text-sm font-semibold text-white shadow-lg transition-all hover:bg-emerald-700"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Nova Receita
+          </Link>
+          <Link
+            href="/dashboard/financeiro/novo?tipo=saida"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-full bg-red-600 py-2.5 pl-4 pr-5 font-body text-sm font-semibold text-white shadow-lg transition-all hover:bg-red-700"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Nova Despesa
+          </Link>
+        </>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex h-14 w-14 items-center justify-center rounded-full shadow-xl transition-all duration-200 ${open ? "rotate-45 bg-slate-700" : "bg-primary"}`}
+        aria-label="Novo lançamento"
+      >
+        <PlusIcon className="h-6 w-6 text-white" />
+      </button>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 interface Props {
@@ -535,6 +738,15 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [pageSizeAtrasados, setPageSizeAtrasados] = useState(10);
   const [pageConcluidas, setPageConcluidas] = useState(1);
   const [pageSizeConcluidas, setPageSizeConcluidas] = useState(10);
+  const [categoryFilter, setCategoryFilter] = useState<string>("todas");
+
+  const categorias = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of lancamentos) {
+      if (l.categoria) set.add(l.categoria);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [lancamentos]);
 
   const today = useMemo(() => {
     const n = new Date();
@@ -626,14 +838,15 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           l.status === "pendente" &&
           parseDMY(l.data_vencimento) <= today &&
           matchesSearch(l, q) &&
-          (tipoFilter === "todos" || l.tipo === tipoFilter)
+          (tipoFilter === "todos" || l.tipo === tipoFilter) &&
+          (categoryFilter === "todas" || l.categoria === categoryFilter)
       )
       .sort(
         (a, b) =>
           parseDMY(a.data_vencimento).getTime() -
           parseDMY(b.data_vencimento).getTime()
       );
-  }, [lancamentos, today, search, tipoFilter]);
+  }, [lancamentos, today, search, tipoFilter, categoryFilter]);
 
   const pendentesNaoVencidos = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -643,14 +856,15 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           l.status === "pendente" &&
           parseDMY(l.data_vencimento) > today &&
           matchesSearch(l, q) &&
-          (tipoFilter === "todos" || l.tipo === tipoFilter)
+          (tipoFilter === "todos" || l.tipo === tipoFilter) &&
+          (categoryFilter === "todas" || l.categoria === categoryFilter)
       )
       .sort(
         (a, b) =>
           parseDMY(a.data_vencimento).getTime() -
           parseDMY(b.data_vencimento).getTime()
       );
-  }, [dateFiltered, today, search, tipoFilter]);
+  }, [dateFiltered, today, search, tipoFilter, categoryFilter]);
 
   const concluidas = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -659,14 +873,15 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         (l) =>
           l.status !== "pendente" &&
           matchesSearch(l, q) &&
-          (tipoFilter === "todos" || l.tipo === tipoFilter)
+          (tipoFilter === "todos" || l.tipo === tipoFilter) &&
+          (categoryFilter === "todas" || l.categoria === categoryFilter)
       )
       .sort(
         (a, b) =>
           parseDMY(b.data_vencimento).getTime() -
           parseDMY(a.data_vencimento).getTime()
       );
-  }, [dateFiltered, search, tipoFilter]);
+  }, [dateFiltered, search, tipoFilter, categoryFilter]);
 
   const concluidasTotals = useMemo(() => {
     let receitas = 0,
@@ -717,6 +932,13 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   function handleKpiClick(tab: MainTab, tipo: "entrada" | "saida") {
     setMainTab(tab);
     setTipoFilter(tipo);
+    setPageConcluidas(1);
+    setPagePendentes(1);
+    setPageAtrasados(1);
+  }
+
+  function handleCategoryFilter(cat: string) {
+    setCategoryFilter(cat);
     setPageConcluidas(1);
     setPagePendentes(1);
     setPageAtrasados(1);
@@ -925,6 +1147,25 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
             })}
           </div>
         </div>
+
+        {/* Filtro de categoria */}
+        {categorias.length > 0 && (
+          <div className="relative">
+            <select
+              value={categoryFilter}
+              onChange={(e) => handleCategoryFilter(e.target.value)}
+              className="h-9 cursor-pointer appearance-none rounded-lg border border-border bg-white pl-3 pr-8 font-body text-sm text-fg outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="todas">Todas as categorias</option>
+              {categorias.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+          </div>
+        )}
 
         {/* Exportar */}
         <button
@@ -1157,6 +1398,9 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           </>
         )}
       </div>
+
+      {/* ── FAB mobile ────────────────────────────────────────────────────── */}
+      {canEdit && <MobileFab />}
 
       {/* ── Chart ─────────────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-white p-5 shadow-sm">

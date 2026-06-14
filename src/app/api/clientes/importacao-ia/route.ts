@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -63,12 +63,14 @@ function isSupportedImage(t: string): t is SupportedImageMime {
   return ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(t);
 }
 
-type ContentPart =
-  | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string; detail: "high" } };
+type ImageBlock = {
+  type: "image";
+  source: { type: "base64"; media_type: SupportedImageMime; data: string };
+};
+type TextBlock = { type: "text"; text: string };
+type ContentPart = TextBlock | ImageBlock;
 
 async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
-  // pdf-parse v2 API: PDFParse class + pdf-parse/worker for Node.js worker thread
   type PDFParseClass = new (opts: Record<string, unknown>) => {
     load: () => Promise<unknown>;
     getText: () => Promise<{ pages: { text: string }[] }>;
@@ -91,10 +93,8 @@ async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
   const { getPath, CanvasFactory } =
     (await import("pdf-parse/worker")) as unknown as WorkerModule;
 
-  // Configure worker (required for pdfjs-dist v6 to work in Node.js)
   PDFParse.setWorker(getPath());
 
-  // ── 1. Attempt text extraction ─────────────────────────────────────────────
   const textParser = new PDFParse({ data: buffer });
   await textParser.load();
   const textResult = await textParser.getText();
@@ -112,7 +112,7 @@ async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
     ];
   }
 
-  // ── 2. Scanned PDF — render pages as PNG images via getScreenshot() ────────
+  // Scanned PDF — render pages as PNG images
   const screenshotParser = new PDFParse({
     data: buffer,
     canvasFactory: new CanvasFactory(),
@@ -127,10 +127,13 @@ async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
   const parts: ContentPart[] = [{ type: "text", text: EXTRACTION_PROMPT }];
   for (const pg of screenshots.pages.slice(0, 2)) {
     if (pg.dataUrl) {
-      parts.push({
-        type: "image_url",
-        image_url: { url: pg.dataUrl, detail: "high" },
-      });
+      const [, b64] = pg.dataUrl.split(",");
+      if (b64) {
+        parts.push({
+          type: "image",
+          source: { type: "base64", media_type: "image/png", data: b64 },
+        });
+      }
     }
   }
 
@@ -152,12 +155,12 @@ function parseJson(raw: string): AiExtractedData | null {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       {
         error:
-          "OPENAI_API_KEY não configurada no servidor. Adicione-a ao .env.local.",
+          "ANTHROPIC_API_KEY não configurada no servidor. Adicione-a ao .env.local.",
       },
       { status: 500 }
     );
@@ -193,36 +196,32 @@ export async function POST(request: Request) {
 
   const fileType = file.type === "image/jpg" ? "image/jpeg" : file.type;
   const buffer = Buffer.from(await file.arrayBuffer());
-  const openai = new OpenAI({ apiKey });
+  const client = new Anthropic({ apiKey });
 
   try {
     let rawText = "";
 
     if (isSupportedImage(fileType)) {
-      // ── Imagem: enviar como vision ────────────────────────────────────────
       const base64 = buffer.toString("base64");
-      const dataUrl = `data:${fileType};base64,${base64}`;
-
-      const res = await openai.chat.completions.create({
-        model: "gpt-4o",
+      const res = await client.messages.create({
+        model: "claude-sonnet-4-6",
         max_tokens: 1024,
         messages: [
           {
             role: "user",
             content: [
               {
-                type: "image_url",
-                image_url: { url: dataUrl, detail: "high" },
+                type: "image",
+                source: { type: "base64", media_type: fileType, data: base64 },
               },
               { type: "text", text: EXTRACTION_PROMPT },
             ],
           },
         ],
       });
-
-      rawText = res.choices[0]?.message?.content ?? "";
+      const block = res.content[0];
+      rawText = block?.type === "text" ? block.text : "";
     } else if (fileType === "application/pdf") {
-      // ── PDF: extrai texto ou renderiza páginas como imagem ────────────────
       let pdfContent: ContentPart[];
       try {
         pdfContent = await processPdf(buffer);
@@ -237,13 +236,13 @@ export async function POST(request: Request) {
         );
       }
 
-      const res = await openai.chat.completions.create({
-        model: "gpt-4o",
+      const res = await client.messages.create({
+        model: "claude-sonnet-4-6",
         max_tokens: 1024,
         messages: [{ role: "user", content: pdfContent }],
       });
-
-      rawText = res.choices[0]?.message?.content ?? "";
+      const block = res.content[0];
+      rawText = block?.type === "text" ? block.text : "";
     } else {
       return NextResponse.json(
         {
@@ -266,7 +265,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: extracted });
   } catch (err: unknown) {
-    console.error("OpenAI extraction error:", err);
+    console.error("Anthropic extraction error:", err);
     const msg = err instanceof Error ? err.message : "Erro desconhecido.";
     return NextResponse.json(
       { error: `Erro ao processar: ${msg}` },

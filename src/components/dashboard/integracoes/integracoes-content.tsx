@@ -344,15 +344,11 @@ function LogoZapSign() {
   );
 }
 
-function LogoOpenAI() {
+function LogoAnthropic() {
   return (
-    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
-      <path
-        d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.032.067L9.73 19.95a4.5 4.5 0 0 1-6.13-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.896zm16.597 3.855l-5.833-3.387 2.019-1.168a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.41-.663zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"
-        fill="currentColor"
-        className="text-slate-700"
-      />
-    </svg>
+    <span className="font-heading text-lg font-extrabold text-slate-800">
+      ◆
+    </span>
   );
 }
 
@@ -364,16 +360,16 @@ function LogoResend() {
   );
 }
 
-// ── Card OpenAI ───────────────────────────────────────────────────────────────
+// ── Card Anthropic ────────────────────────────────────────────────────────────
 
-function OpenAICard({ status }: { status: SimpleStatus | null }) {
+function AnthropicCard({ status }: { status: SimpleStatus | null }) {
   const [open, setOpen] = useState(false);
   const configured = status?.configured ?? false;
 
   return (
     <IntegrationCard
-      logo={<LogoOpenAI />}
-      name="OpenAI (ChatGPT)"
+      logo={<LogoAnthropic />}
+      name="Anthropic (Claude)"
       status={configured ? "configurado" : "nao_configurado"}
       description="Usado para importar dados de documentos (RG, CPF, CNH) via IA e gerar resumos automáticos de e-mails recebidos dos clientes."
     >
@@ -397,7 +393,7 @@ function OpenAICard({ status }: { status: SimpleStatus | null }) {
         {!configured && open && (
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 space-y-3">
             <p className="font-heading text-sm font-semibold text-primary">
-              Adicionar OPENAI_API_KEY no Vercel
+              Adicionar ANTHROPIC_API_KEY no Vercel
             </p>
             <ol className="space-y-3 font-body text-xs text-slate-700">
               <li className="flex gap-2">
@@ -405,8 +401,8 @@ function OpenAICard({ status }: { status: SimpleStatus | null }) {
                   1
                 </span>
                 <span>
-                  Acesse <strong>platform.openai.com</strong> → API Keys → crie
-                  uma nova chave.
+                  Acesse <strong>console.anthropic.com</strong> → API Keys →
+                  crie uma nova chave.
                 </span>
               </li>
               <li className="flex gap-2">
@@ -418,11 +414,11 @@ function OpenAICard({ status }: { status: SimpleStatus | null }) {
                   Variables) adicione:
                   <div className="mt-1.5 rounded bg-slate-100 px-2 py-1">
                     <code className="text-[11px] font-semibold text-primary">
-                      OPENAI_API_KEY
+                      ANTHROPIC_API_KEY
                     </code>
                     <span className="text-slate-400 mx-1">=</span>
                     <code className="text-[11px] text-slate-700">
-                      sk-proj-...
+                      sk-ant-...
                     </code>
                   </div>
                 </span>
@@ -732,7 +728,9 @@ export default function IntegracoesContent() {
   const [emailStatus, setEmailStatus] = useState<EmailInboundStatus | null>(
     null
   );
-  const [openaiStatus, setOpenaiStatus] = useState<SimpleStatus | null>(null);
+  const [anthropicStatus, setAnthropicStatus] = useState<SimpleStatus | null>(
+    null
+  );
   const [resendStatus, setResendStatus] = useState<SimpleStatus | null>(null);
   const [modalAsaasOpen, setModalAsaasOpen] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -758,9 +756,9 @@ export default function IntegracoesContent() {
       .then(setEmailStatus)
       .catch(() => null);
 
-    fetch("/api/integracoes/openai")
+    fetch("/api/integracoes/anthropic")
       .then((r) => r.json())
-      .then(setOpenaiStatus)
+      .then(setAnthropicStatus)
       .catch(() => null);
 
     fetch("/api/integracoes/resend")
@@ -892,8 +890,8 @@ export default function IntegracoesContent() {
         {/* ── E-mail Exclusivo ── */}
         <EmailInboundCard status={emailStatus} />
 
-        {/* ── OpenAI ── */}
-        <OpenAICard status={openaiStatus} />
+        {/* ── Anthropic ── */}
+        <AnthropicCard status={anthropicStatus} />
 
         {/* ── Resend ── */}
         <ResendCard status={resendStatus} />

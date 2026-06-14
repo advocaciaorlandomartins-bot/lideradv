@@ -431,14 +431,6 @@ export default function ControlesContent({
               >
                 {showFilter ? "✕ Fechar" : "⚙ Filtros"}
               </button>
-
-              {/* Novo */}
-              <Link
-                href={`/dashboard/controles/novo?tipo=${tipo}`}
-                className="h-8 flex items-center gap-1.5 rounded-lg bg-cta px-3 font-body text-xs font-semibold text-white hover:bg-cta-hover transition-colors whitespace-nowrap"
-              >
-                + {tipoConfig.label_novo}
-              </Link>
             </div>
           </div>
 

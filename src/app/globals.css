@@ -22,9 +22,16 @@ body {
   color: #0f172a;
 }
 
-/* Sidebar gradient background */
+/* Sidebar — dark (padrão) */
 .sidebar-bg {
   background: linear-gradient(180deg, #000d25 0%, #001848 60%, #003080 100%);
+}
+
+/* Sidebar — light */
+[data-theme="light"] .sidebar-bg {
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.06);
 }
 
 /* Login right panel: dark gradient on mobile, light on desktop */

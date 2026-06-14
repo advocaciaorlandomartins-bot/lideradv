@@ -31,7 +31,6 @@ import ProcessosFiltroModal, {
 import ProcessosSettingsModal, {
   useProcessosSettings,
 } from "./processos-settings-modal";
-import CadastroSimplesModal from "./cadastro-simples-modal";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -254,7 +253,7 @@ const QUICK_FILTERS_KEY = "advmartins:processos:quick-filters";
 
 export default function ProcessosContent({
   processos,
-  clients,
+  clients: _clients,
 }: ProcessosContentProps) {
   const router = useRouter();
   const novoRef = useRef<HTMLDivElement>(null);
@@ -307,7 +306,6 @@ export default function ProcessosContent({
   const [filtroLocal, setFiltroLocal] =
     useState<FiltroAvancado>(FILTRO_INICIAL);
   const [showSettings, setShowSettings] = useState(false);
-  const [showCadastro, setShowCadastro] = useState(false);
   const [showNovo, setShowNovo] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showQuick, setShowQuick] = useState(false);
@@ -649,15 +647,6 @@ export default function ProcessosContent({
               </button>
               <DropdownMenu open={showNovo}>
                 <DropdownItem
-                  icon={PlusIcon}
-                  label="Cadastro simples"
-                  description="Modal rápido de cadastro"
-                  onClick={() => {
-                    setShowNovo(false);
-                    setShowCadastro(true);
-                  }}
-                />
-                <DropdownItem
                   icon={DocumentTextIcon}
                   label="Cadastro avançado"
                   description="Formulário completo"
@@ -878,13 +867,13 @@ export default function ProcessosContent({
               statusFilter === "todos" &&
               !search &&
               activeFiltrosCount === 0 && (
-                <button
-                  onClick={() => setShowCadastro(true)}
+                <Link
+                  href="/dashboard/processos/novo"
                   className="mt-2 flex items-center gap-2 rounded-lg bg-cta px-4 py-2 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover"
                 >
                   <PlusIcon className="h-4 w-4" />
                   Cadastrar primeiro processo
-                </button>
+                </Link>
               )}
           </div>
         ) : (
@@ -1233,13 +1222,6 @@ export default function ProcessosContent({
         onClose={() => setShowSettings(false)}
         settings={settings}
         onSave={saveSettings}
-      />
-
-      <CadastroSimplesModal
-        open={showCadastro}
-        onClose={() => setShowCadastro(false)}
-        clients={clients}
-        onSuccess={() => router.refresh()}
       />
     </div>
   );

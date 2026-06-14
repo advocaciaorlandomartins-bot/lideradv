@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/auth-actions";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
+import { useTheme } from "@/lib/theme";
 import {
   ScalesIcon,
   HomeIcon,
@@ -179,6 +180,8 @@ export default function Topbar({
   const [gerOpen, setGerOpen] = useState(false);
   const pathname = usePathname();
   const gerRef = useRef<HTMLLIElement>(null);
+  const { theme, toggle } = useTheme();
+  const dk = theme === "dark";
 
   // Fecha dropdown do Gerenciador ao clicar fora
   useEffect(() => {
@@ -256,7 +259,44 @@ export default function Topbar({
         </div>
 
         {/* Usuário */}
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex items-center gap-1">
+          {/* Toggle tema */}
+          <button
+            type="button"
+            onClick={toggle}
+            title={dk ? "Tema claro" : "Tema escuro"}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            {dk ? (
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path
+                  strokeLinecap="round"
+                  d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"
+                />
+              </svg>
+            )}
+          </button>
           <button
             type="button"
             onClick={() => setUserOpen((v) => !v)}

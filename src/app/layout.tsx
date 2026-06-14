@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import { EB_Garamond, Lato } from "next/font/google";
+import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/lib/theme";
 
-const garamond = EB_Garamond({
+const garamond = Plus_Jakarta_Sans({
   variable: "--font-garamond",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const lato = Lato({
+const lato = Inter({
   variable: "--font-lato",
   subsets: ["latin"],
-  weight: ["300", "400", "700"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -30,7 +31,15 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${garamond.variable} ${lato.variable} h-full`}
     >
-      <body className="h-full antialiased">{children}</body>
+      <body className="h-full antialiased">
+        {/* Aplica tema antes da hidratação para evitar flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('lideradv-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
+          }}
+        />
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

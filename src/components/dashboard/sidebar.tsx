@@ -34,6 +34,7 @@ import {
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
 import { logoutAction } from "@/lib/auth-actions";
+import { useTheme } from "@/lib/theme";
 
 const GROUPS: {
   label: string | null;
@@ -209,6 +210,46 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const [, startTransition] = useTransition();
+  const { theme, toggle } = useTheme();
+  const dk = theme === "dark";
+
+  const tc = {
+    sidebarBorderR: dk ? "lg:border-white/10" : "lg:border-slate-200",
+    logoText: dk ? "text-white" : "text-slate-800",
+    collapseBtn: dk
+      ? "text-white/50 hover:bg-white/10 hover:text-white"
+      : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
+    closeBtn: dk
+      ? "text-white/60 hover:bg-white/10 hover:text-white"
+      : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
+    userCard: dk ? "bg-white/10" : "bg-slate-100",
+    avatar: dk ? "bg-white/20 text-white" : "bg-primary/10 text-primary",
+    userName: dk ? "text-white" : "text-slate-800",
+    userRole: dk ? "text-white/60" : "text-slate-500",
+    divider: dk ? "border-white/10" : "border-slate-200",
+    groupLabel: dk ? "text-white/40" : "text-slate-400",
+    collapsedActive: dk
+      ? "bg-white/20 text-white"
+      : "bg-primary/10 text-primary",
+    collapsedInactive: dk
+      ? "text-white/60 hover:bg-white/10 hover:text-white"
+      : "text-slate-500 hover:bg-primary/[0.07] hover:text-primary",
+    itemActive: dk
+      ? "bg-white/20 font-semibold text-white ring-1 ring-inset ring-white/20"
+      : "bg-primary/10 font-semibold text-primary ring-1 ring-inset ring-primary/20",
+    itemInactive: dk
+      ? "text-white/70 hover:bg-white/[0.13] hover:text-white hover:ring-1 hover:ring-inset hover:ring-white/15"
+      : "text-slate-600 hover:bg-primary/[0.07] hover:text-primary hover:ring-1 hover:ring-inset hover:ring-primary/10",
+    iconActive: dk ? "text-white" : "text-primary",
+    iconInactive: dk ? "text-white/60" : "text-slate-400",
+    activeDot: dk ? "bg-white/80" : "bg-primary",
+    toggleBtn: dk
+      ? "text-white/50 hover:bg-white/10 hover:text-white"
+      : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
+    logoutBtn: dk
+      ? "text-white/60 hover:bg-white/10 hover:text-white"
+      : "text-slate-500 hover:bg-slate-100 hover:text-slate-800",
+  };
 
   function handleLogout() {
     startTransition(async () => {
@@ -245,7 +286,7 @@ export default function Sidebar({
 
       {/* Drawer */}
       <aside
-        className={`sidebar-bg fixed inset-y-0 left-0 z-30 flex flex-shrink-0 flex-col transition-all duration-300 ease-out lg:border-r lg:border-white/10 lg:shadow-none lg:translate-x-0 ${
+        className={`sidebar-bg fixed inset-y-0 left-0 z-30 flex flex-shrink-0 flex-col transition-all duration-300 ease-out lg:border-r ${tc.sidebarBorderR} lg:shadow-none lg:translate-x-0 ${
           open ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         } ${collapsed ? "w-16" : "w-72"}`}
       >
@@ -265,7 +306,9 @@ export default function Sidebar({
                 className="rounded-xl"
                 priority
               />
-              <span className="font-body text-lg font-bold text-white tracking-wide">
+              <span
+                className={`font-body text-lg font-bold tracking-wide ${tc.logoText}`}
+              >
                 LiderAdv
               </span>
             </div>
@@ -287,7 +330,7 @@ export default function Sidebar({
             <button
               onClick={onToggleCollapse}
               aria-label="Recolher menu"
-              className="hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white lg:flex"
+              className={`hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors lg:flex ${tc.collapseBtn}`}
             >
               <ChevronLeftIcon className="h-4 w-4" />
             </button>
@@ -298,7 +341,7 @@ export default function Sidebar({
             <button
               onClick={onClose}
               aria-label="Fechar menu"
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-white/60 transition-colors duration-150 hover:bg-white/10 hover:text-white lg:hidden"
+              className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150 lg:hidden ${tc.closeBtn}`}
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
@@ -310,7 +353,7 @@ export default function Sidebar({
           <button
             onClick={onToggleCollapse}
             aria-label="Expandir menu"
-            className="mx-auto mb-2 hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white lg:flex"
+            className={`mx-auto mb-2 hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors lg:flex ${tc.collapseBtn}`}
           >
             <ChevronRightIcon className="h-4 w-4" />
           </button>
@@ -318,29 +361,35 @@ export default function Sidebar({
 
         {/* User card */}
         {!collapsed ? (
-          <div className="mx-3 mb-2 rounded-xl bg-white/10 px-3 py-2.5">
+          <div className={`mx-3 mb-2 rounded-xl px-3 py-2.5 ${tc.userCard}`}>
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/20 font-heading text-sm font-bold text-white select-none">
+              <div
+                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full font-heading text-sm font-bold select-none ${tc.avatar}`}
+              >
                 {initials}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-body text-sm font-semibold text-white">
+                <p
+                  className={`truncate font-body text-sm font-semibold ${tc.userName}`}
+                >
                   {displayName}
                 </p>
-                <p className="font-body text-[11px] text-white/60">
+                <p className={`font-body text-[11px] ${tc.userRole}`}>
                   {user.categoria}
                 </p>
               </div>
             </div>
           </div>
         ) : (
-          <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 font-heading text-sm font-bold text-white select-none">
+          <div
+            className={`mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full font-heading text-sm font-bold select-none ${tc.avatar}`}
+          >
             {initials}
           </div>
         )}
 
         <div
-          className={`border-t border-white/10 ${collapsed ? "mx-2" : "mx-4"}`}
+          className={`border-t ${tc.divider} ${collapsed ? "mx-2" : "mx-4"}`}
         />
 
         {/* Skip link */}
@@ -375,9 +424,7 @@ export default function Sidebar({
                         aria-label={label}
                         aria-current={active ? "page" : undefined}
                         className={`flex items-center justify-center rounded-lg py-2.5 transition-colors duration-150 ${
-                          active
-                            ? "bg-white/20 text-white"
-                            : "text-white/60 hover:bg-white/10 hover:text-white"
+                          active ? tc.collapsedActive : tc.collapsedInactive
                         }`}
                       >
                         <Icon className="h-5 w-5 flex-shrink-0" />
@@ -392,7 +439,9 @@ export default function Sidebar({
             visibleGroups.map((group, gi) => (
               <div key={gi} className={gi > 0 ? "mt-4" : ""}>
                 {group.label && (
-                  <p className="mb-1 px-3 font-body text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                  <p
+                    className={`mb-1 px-3 font-body text-[10px] font-semibold uppercase tracking-wider ${tc.groupLabel}`}
+                  >
                     {group.label}
                   </p>
                 )}
@@ -405,18 +454,18 @@ export default function Sidebar({
                           href={href}
                           onClick={onClose}
                           aria-current={active ? "page" : undefined}
-                          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 font-body text-sm transition-colors duration-150 ${
-                            active
-                              ? "bg-white/20 font-semibold text-white"
-                              : "text-white/70 hover:bg-white/10 hover:text-white"
+                          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 font-body text-sm transition-all duration-150 ${
+                            active ? tc.itemActive : tc.itemInactive
                           }`}
                         >
                           <Icon
-                            className={`h-4 w-4 flex-shrink-0 ${active ? "text-white" : "text-white/60"}`}
+                            className={`h-4 w-4 flex-shrink-0 ${active ? tc.iconActive : tc.iconInactive}`}
                           />
                           {label}
                           {active && (
-                            <span className="ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full bg-white/80" />
+                            <span
+                              className={`ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full ${tc.activeDot}`}
+                            />
                           )}
                         </Link>
                       </li>
@@ -428,14 +477,55 @@ export default function Sidebar({
           )}
         </nav>
 
-        {/* Logout */}
+        {/* Rodapé: tema + logout */}
         <div
-          className={`mb-4 border-t border-white/10 pt-3 ${collapsed ? "mx-1" : "mx-2"}`}
+          className={`mb-4 border-t ${tc.divider} pt-3 ${collapsed ? "mx-1" : "mx-2"}`}
         >
+          {/* Toggle dark/light */}
+          <button
+            onClick={toggle}
+            title={dk ? "Mudar para tema claro" : "Mudar para tema escuro"}
+            className={`flex w-full items-center rounded-lg font-body text-sm transition-colors duration-150 mb-1 ${tc.toggleBtn} ${
+              collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5"
+            }`}
+          >
+            {dk ? (
+              <svg
+                className="h-4 w-4 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path
+                  strokeLinecap="round"
+                  d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="h-4 w-4 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"
+                />
+              </svg>
+            )}
+            {!collapsed && (dk ? "Tema claro" : "Tema escuro")}
+          </button>
+
+          {/* Logout */}
           <button
             onClick={handleLogout}
             title="Sair da conta"
-            className={`flex w-full items-center rounded-lg font-body text-sm text-white/60 transition-colors duration-150 hover:bg-white/10 hover:text-white ${
+            className={`flex w-full items-center rounded-lg font-body text-sm transition-colors duration-150 ${tc.logoutBtn} ${
               collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5"
             }`}
           >

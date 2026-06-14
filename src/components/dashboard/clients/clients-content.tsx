@@ -28,7 +28,6 @@ import ClientesFiltroModal, {
   FILTRO_CLIENTE_INICIAL,
   countFiltrosCliente,
 } from "./clientes-filtro-modal";
-import ClienteRapidoModal from "./cliente-rapido-modal";
 import AiDocumentImport from "./ai-document-import";
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -243,7 +242,6 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
   const [pageSize, setPageSize] = useState(20);
 
   const [showFiltro, setShowFiltro] = useState(false);
-  const [showRapido, setShowRapido] = useState(false);
   const [showAiImport, setShowAiImport] = useState(false);
   const [showNovo, setShowNovo] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -558,15 +556,6 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                 <ChevronDownIcon className="h-3.5 w-3.5" />
               </button>
               <DropdownMenu open={showNovo}>
-                <DropdownItem
-                  icon={UserPlusIcon}
-                  label="Cadastro rápido"
-                  description="Modal com campos essenciais"
-                  onClick={() => {
-                    setShowNovo(false);
-                    setShowRapido(true);
-                  }}
-                />
                 <DropdownItem
                   icon={UsersIcon}
                   label="Cadastro completo"
@@ -1138,12 +1127,6 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
         onDeleteSaved={(nome) =>
           persistQuickFilters(quickFilters.filter((q) => q.nome !== nome))
         }
-      />
-
-      <ClienteRapidoModal
-        open={showRapido}
-        onClose={() => setShowRapido(false)}
-        onSuccess={() => router.refresh()}
       />
     </div>
   );

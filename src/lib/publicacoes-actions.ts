@@ -4,7 +4,7 @@ import sql from "./db";
 import { revalidatePath } from "next/cache";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 // ── Publicações ───────────────────────────────────────────────────────────────
 
@@ -81,9 +81,9 @@ export async function gerarResumoIaAction(id: number): Promise<{
     return { ok: false, mensagem: "Sem permissão." };
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return { ok: false, mensagem: "OPENAI_API_KEY não configurada." };
+    return { ok: false, mensagem: "ANTHROPIC_API_KEY não configurada." };
   }
 
   const rows = await sql`
@@ -121,14 +121,15 @@ Data: ${pub.disponibilizacao}
 ${texto.slice(0, 4000)}`;
 
   try {
-    const openai = new OpenAI({ apiKey });
-    const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const anthropic = new Anthropic({ apiKey });
+    const res = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     });
 
-    const raw = res.choices[0]?.message?.content ?? "";
+    const block = res.content[0];
+    const raw = block?.type === "text" ? block.text : "";
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return { ok: false, mensagem: "IA não retornou JSON válido." };
 

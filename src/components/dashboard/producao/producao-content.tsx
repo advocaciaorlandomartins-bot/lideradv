@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import {
   SpinnerIcon,
@@ -8,6 +8,7 @@ import {
   FolderOpenIcon,
   ArchiveBoxIcon,
   ArrowRightIcon,
+  MagnifyingGlassIcon,
 } from "@/components/icons";
 import {
   ESTAGIOS_PRODUCAO,
@@ -635,6 +636,7 @@ export default function ProducaoContent({
   const [filterEstagio, setFilterEstagio] = useState<EstagioProducao | null>(
     null
   );
+  const [search, setSearch] = useState("");
 
   function handleStatsFilter(estagio: EstagioProducao) {
     if (estagio === "arquivado") {
@@ -650,29 +652,50 @@ export default function ProducaoContent({
       : ESTAGIOS_PRODUCAO.filter((e) => e !== "arquivado");
   })();
 
+  const processosFiltrados = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return processos;
+    return processos.filter(
+      (p) =>
+        p.client_name.toLowerCase().includes(q) ||
+        p.tipo_acao.toLowerCase().includes(q) ||
+        (p.numero ?? "").toLowerCase().includes(q)
+    );
+  }, [processos, search]);
+
   const byEstagio = Object.fromEntries(
     ESTAGIOS_PRODUCAO.map((e) => [
       e,
-      processos.filter((p) => p.estagio_producao === e),
+      processosFiltrados.filter((p) => p.estagio_producao === e),
     ])
   ) as Record<EstagioProducao, ProcessoProducao[]>;
 
   return (
     <div className="space-y-5">
       <StatsBar
-        processos={processos}
+        processos={processosFiltrados}
         activeFilter={filterEstagio}
         onFilter={handleStatsFilter}
       />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/dashboard/processos/novo"
           className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
           + Novo Processo
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-[160px] max-w-xs">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            placeholder="Buscar cliente, ação, número…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 w-full rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+        <div className="ml-auto flex items-center gap-2">
           {filterEstagio && (
             <button
               onClick={() => setFilterEstagio(null)}

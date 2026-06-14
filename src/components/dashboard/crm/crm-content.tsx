@@ -478,14 +478,55 @@ function LeadsTab({
               )}
             </span>
           </div>
-          <div className="relative ml-auto">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <input
-              value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Buscar leads..."
-              className="h-8 rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-muted focus:border-primary focus:outline-none"
-            />
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={() => {
+                const header = [
+                  "Nome",
+                  "Empresa",
+                  "Telefone",
+                  "E-mail",
+                  "Área",
+                  "Estágio",
+                  "Responsável",
+                ];
+                const rows = filtered.map((l) => [
+                  l.nome,
+                  l.empresa ?? "",
+                  l.telefone ?? "",
+                  l.email ?? "",
+                  l.area_interesse ?? "",
+                  ESTAGIO_META[l.estagio].label,
+                  l.responsavel_nome ?? "",
+                ]);
+                const csv = [header, ...rows]
+                  .map((r) =>
+                    r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")
+                  )
+                  .join("\n");
+                const blob = new Blob(["﻿" + csv], {
+                  type: "text/csv;charset=utf-8;",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "leads.csv";
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-1.5 font-body text-xs font-semibold text-muted transition-colors hover:border-primary/40 hover:text-primary whitespace-nowrap"
+            >
+              ↓ CSV
+            </button>
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+              <input
+                value={search}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Buscar leads..."
+                className="h-8 rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-muted focus:border-primary focus:outline-none"
+              />
+            </div>
           </div>
         </div>
         {/* Stage filter pills */}

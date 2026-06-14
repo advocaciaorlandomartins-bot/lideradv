@@ -178,6 +178,45 @@ export default function ColaboradoresContent({ colaboradores }: Props) {
                   className="h-9 w-full rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 sm:w-48 lg:w-56"
                 />
               </div>
+              <button
+                onClick={() => {
+                  const header = [
+                    "Nome",
+                    "Cargo",
+                    "E-mail",
+                    "Telefone",
+                    "OAB",
+                    "Admissão",
+                    "Status",
+                  ];
+                  const rows = filtered.map((c) => [
+                    c.nome,
+                    cargoLabel(c.cargo),
+                    c.email ?? "",
+                    c.telefone ?? "",
+                    c.oab ?? "",
+                    c.data_admissao ?? "",
+                    c.status === "ativo" ? "Ativo" : "Inativo",
+                  ]);
+                  const csv = [header, ...rows]
+                    .map((r) =>
+                      r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")
+                    )
+                    .join("\n");
+                  const blob = new Blob(["﻿" + csv], {
+                    type: "text/csv;charset=utf-8;",
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "colaboradores.csv";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-3 font-body text-sm font-semibold text-muted transition-colors hover:border-primary/40 hover:text-primary whitespace-nowrap"
+              >
+                ↓ CSV
+              </button>
               <Link
                 href="/dashboard/colaboradores/novo"
                 className="flex h-9 items-center gap-1.5 rounded-lg bg-cta px-3 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1 whitespace-nowrap"

@@ -326,6 +326,7 @@ function TabelaPublicacoes({
 
 function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("nao_lida");
+  const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const naoLidas = useMemo(
@@ -342,7 +343,18 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
       ),
     [publicacoes]
   );
-  const exibindo = statusFilter === "nao_lida" ? naoLidas : tratadas;
+  const baseList = statusFilter === "nao_lida" ? naoLidas : tratadas;
+  const exibindo = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return baseList;
+    return baseList.filter(
+      (p) =>
+        p.processo.toLowerCase().includes(q) ||
+        p.destinatario.toLowerCase().includes(q) ||
+        p.advogados.some((a) => a.toLowerCase().includes(q)) ||
+        p.orgao.toLowerCase().includes(q)
+    );
+  }, [baseList, search]);
 
   function handleTratarTodas() {
     if (
@@ -388,11 +400,21 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
             {tratadas.length}
           </span>
         </button>
+        <div className="relative ml-auto">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar processo, advogado…"
+            className="h-9 rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
         {statusFilter === "nao_lida" && naoLidas.length > 0 && (
           <button
             onClick={handleTratarTodas}
             disabled={isPending}
-            className="ml-auto flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-body text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-body text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
           >
             {isPending ? <SpinnerIcon className="h-3 w-3" /> : "✅"}
             Marcar todas as {naoLidas.length} como tratadas
@@ -401,8 +423,9 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
       </div>
 
       <p className="font-body text-xs text-muted">
-        {exibindo.length} publicação{exibindo.length !== 1 ? "ões" : ""} ·
-        Mostrando {exibindo.length > 0 ? `1 a ${exibindo.length}` : "0"}
+        {exibindo.length} publicação{exibindo.length !== 1 ? "ões" : ""}
+        {search ? ` para "${search}"` : ""} · Mostrando{" "}
+        {exibindo.length > 0 ? `1 a ${exibindo.length}` : "0"}
       </p>
 
       <TabelaPublicacoes

@@ -133,6 +133,7 @@ interface Props {
   defaultTipo?: "entrada" | "saida";
   defaultClientId?: string;
   defaultProcessoId?: string;
+  redirectTo?: string;
 }
 
 export default function NewLancamentoForm({
@@ -142,6 +143,7 @@ export default function NewLancamentoForm({
   defaultTipo = "entrada",
   defaultClientId,
   defaultProcessoId,
+  redirectTo,
 }: Props) {
   const [state, formAction, isPending] = useActionState<
     LancamentoFormState,
@@ -222,7 +224,7 @@ export default function NewLancamentoForm({
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("avista");
   const [valor, setValor] = useState("");
   const [valorEntrada, setValorEntrada] = useState("");
-  const [totalParcelas, setTotalParcelas] = useState("2");
+  const [totalParcelas, setTotalParcelas] = useState("1");
   const [periodicidade, setPeriodicidade] = useState("mensal");
   const [numRecorrencias, setNumRecorrencias] = useState("12");
   const [numSalarios, setNumSalarios] = useState("1");
@@ -236,6 +238,7 @@ export default function NewLancamentoForm({
   const [valorRetroativo, setValorRetroativo] = useState("");
   const [percentualAdv, setPercentualAdv] = useState("30");
   const [valorMensalidade, setValorMensalidade] = useState("");
+  const [percentualSalario, setPercentualSalario] = useState("");
 
   // ── Salário base ───────────────────────────────────────────
   const salarioMode = salarioBase !== "none";
@@ -248,13 +251,17 @@ export default function NewLancamentoForm({
     return salarioMinimo;
   }, [salarioBase, salarioCustomInput, salarioMinimo]);
 
+  const pctSalario = parseFloat(percentualSalario) || 0;
+  const salarioMensal =
+    pctSalario > 0 ? salarioBaseValor * (pctSalario / 100) : salarioBaseValor;
+
   const salarioValor = useMemo(() => {
     if (salarioBase === "none") return null;
     const n = parseFloat(numSalarios.replace(",", ".")) || 1;
-    return (salarioBaseValor * n).toLocaleString("pt-BR", {
+    return (salarioMensal * n).toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
     });
-  }, [salarioBase, numSalarios, salarioBaseValor]);
+  }, [salarioBase, numSalarios, salarioMensal]);
 
   // ── Cálculo Retroativo ─────────────────────────────────────
   const retroativoCalc = useMemo(() => {
@@ -266,11 +273,11 @@ export default function NewLancamentoForm({
       salarioBase !== "none"
         ? Math.round(
             (parseFloat(numSalarios.replace(",", ".")) || 0) *
-              salarioBaseValor *
+              salarioMensal *
               100
           ) / 100
         : 0;
-    const total = percValor + salarioPart;
+    const total = percValor; // salarioPart é informativo — lançamento à parte
     return { vRetro, pct, percValor, salarioPart, total };
   }, [
     paymentMode,
@@ -278,7 +285,7 @@ export default function NewLancamentoForm({
     percentualAdv,
     salarioBase,
     numSalarios,
-    salarioBaseValor,
+    salarioMensal,
   ]);
 
   // ── Valor efetivo (base para cálculos) ─────────────────────
@@ -289,7 +296,7 @@ export default function NewLancamentoForm({
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })
-        : ""
+        : valor // sem retroativo calculado, usa valor manual
       : salarioMode
         ? (salarioValor ?? "")
         : valor;
@@ -308,14 +315,24 @@ export default function NewLancamentoForm({
   const previewParcelas = useMemo(() => {
     if (paymentMode !== "parcelado" && paymentMode !== "retroativo")
       return null;
-    const v = parseFloat(parseMoney(effectiveValor));
+    // Retroativo: parcela o honorário mensal (salarioPart), não o retroativo
+    const v =
+      paymentMode === "retroativo"
+        ? (retroativoCalc?.salarioPart ?? 0)
+        : parseFloat(parseMoney(effectiveValor));
     const e = parseFloat(parseMoney(valorEntrada)) || 0;
     const n = parseInt(totalParcelas) || 1;
     if (!v || v <= 0) return null;
     const restante = v - e;
     if (restante <= 0) return null;
-    return { entrada: e, valorParcela: restante / n, n };
-  }, [paymentMode, effectiveValor, valorEntrada, totalParcelas]);
+    return { entrada: e, valorParcela: restante / n, n, total: v };
+  }, [
+    paymentMode,
+    effectiveValor,
+    valorEntrada,
+    totalParcelas,
+    retroativoCalc,
+  ]);
 
   const previewRecorrente = useMemo(() => {
     if (paymentMode !== "recorrente") return null;
@@ -336,7 +353,11 @@ export default function NewLancamentoForm({
     if (!selectedClient?.indicador_id) return null;
     if (!selectedClient.comissao_tipo || selectedClient.comissao_valor == null)
       return null;
-    const baseValor = parseFloat(parseMoney(effectiveValor)) || 0;
+    // Usa valor total (retroativo + salário) como base da comissão
+    const baseValor =
+      paymentMode === "retroativo" && retroativoCalc
+        ? retroativoCalc.percValor + retroativoCalc.salarioPart
+        : parseFloat(parseMoney(effectiveValor)) || 0;
     let comissaoValorCalculado = 0;
     if (selectedClient.comissao_tipo === "percentual") {
       comissaoValorCalculado =
@@ -359,24 +380,48 @@ export default function NewLancamentoForm({
       ? String(mensalidadeCalc.numParcelas)
       : totalParcelas;
 
+  // ── Valores corrigidos para submissão ao backend (modo retroativo) ──────
+  // No modo retroativo: valor total = percValor + salarioPart;
+  // a entrada enviada = percValor (retroativo vira entrada) + extraEntrada do usuário.
+  // Quando não há salário, retroativo é avista.
+  const retroHasSalario =
+    paymentMode === "retroativo" &&
+    retroativoCalc != null &&
+    retroativoCalc.salarioPart > 0;
+
+  const valorSubmit = (() => {
+    if (!retroHasSalario) return parseMoney(effectiveValor);
+    const total =
+      (retroativoCalc?.percValor ?? 0) + (retroativoCalc?.salarioPart ?? 0);
+    return String(Math.round(total * 100) / 100);
+  })();
+
+  const valorEntradaSubmit = (() => {
+    if (!retroHasSalario) return parseMoney(valorEntrada);
+    const extra = parseFloat(parseMoney(valorEntrada)) || 0;
+    const entradaTotal = (retroativoCalc?.percValor ?? 0) + extra;
+    return String(Math.round(entradaTotal * 100) / 100);
+  })();
+
+  // Retroativo sem salário → avista (não parcelado)
+  const paymentModeSubmit =
+    paymentMode === "retroativo" && !retroHasSalario ? "avista" : paymentMode;
+
   return (
     <form action={formAction} className="space-y-8" noValidate>
       {/* Hidden fields */}
-      <input type="hidden" name="payment_mode" value={paymentMode} />
+      <input type="hidden" name="payment_mode" value={paymentModeSubmit} />
       <input
         type="hidden"
         name="parcelado"
         value={String(
-          paymentMode === "parcelado" || paymentMode === "retroativo"
+          paymentModeSubmit === "parcelado" ||
+            paymentModeSubmit === "retroativo"
         )}
       />
       <input type="hidden" name="descricao" value={autoDescricao} />
-      <input type="hidden" name="valor" value={parseMoney(effectiveValor)} />
-      <input
-        type="hidden"
-        name="valor_entrada"
-        value={parseMoney(valorEntrada)}
-      />
+      <input type="hidden" name="valor" value={valorSubmit} />
+      <input type="hidden" name="valor_entrada" value={valorEntradaSubmit} />
       <input type="hidden" name="categoria" value={finalCategoria} />
       <input type="hidden" name="client_id" value={selectedClient?.id ?? ""} />
       <input
@@ -416,6 +461,9 @@ export default function NewLancamentoForm({
             : ""
         }
       />
+      {redirectTo && (
+        <input type="hidden" name="redirect_to" value={redirectTo} />
+      )}
 
       {state?.error && (
         <div
@@ -751,7 +799,7 @@ export default function NewLancamentoForm({
                   {
                     key: "retroativo",
                     label: "Retroativo + Parcelado",
-                    desc: "% sobre retroativo + salários",
+                    desc: "% s/ retroativo + mensal opcional",
                   },
                   {
                     key: "mensalidade",
@@ -792,7 +840,7 @@ export default function NewLancamentoForm({
             {/* ── Campos exclusivos do modo RETROATIVO ── */}
             {paymentMode === "retroativo" && (
               <>
-                <Field label="Valor retroativo a receber pelo cliente" required>
+                <Field label="Valor retroativo a receber pelo cliente">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
                       R$
@@ -843,7 +891,7 @@ export default function NewLancamentoForm({
                 <div>
                   <label className={labelClass}>
                     {paymentMode === "retroativo"
-                      ? "Acrescentar salários ao honorário"
+                      ? "Honorário mensal sobre salários"
                       : "Base do valor"}
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
@@ -863,7 +911,7 @@ export default function NewLancamentoForm({
                       }`}
                     >
                       {paymentMode === "retroativo"
-                        ? "Não acrescentar"
+                        ? "Sem pagamento mensal"
                         : "Valor livre"}
                     </button>
 
@@ -927,40 +975,122 @@ export default function NewLancamentoForm({
                   </div>
                 </div>
 
-                {/* Quantidade × base = total (só quando uma base está ativa) */}
+                {/* Percentual + quantidade (só quando uma base está ativa) */}
                 {salarioBase !== "none" && (
-                  <div>
-                    <label className={labelClass}>Quantidade de salários</label>
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={numSalarios}
-                        onChange={(e) =>
-                          setNumSalarios(
-                            e.target.value.replace(/[^0-9.,]/g, "")
-                          )
-                        }
-                        disabled={isPending}
-                        className={`${inputClass} max-w-[120px]`}
-                      />
-                      <span className="font-body text-sm text-muted">
-                        ×{" "}
-                        {salarioBase === "custom" &&
-                        parseFloat(parseMoney(salarioCustomInput)) > 0
-                          ? fmt(parseFloat(parseMoney(salarioCustomInput)))
-                          : fmt(salarioMinimo)}
-                      </span>
-                      {salarioValor && (
-                        <span className="font-body text-sm font-semibold text-emerald-700">
-                          ={" "}
-                          {fmt(
-                            (parseFloat(numSalarios.replace(",", ".")) || 0) *
-                              salarioBaseValor
-                          )}
+                  <div className="space-y-3">
+                    {/* % sobre salário (opcional) */}
+                    <div>
+                      <label className={labelClass}>
+                        Percentual sobre o salário{" "}
+                        <span className="font-normal text-slate-400">
+                          — deixe vazio para salário cheio
                         </span>
-                      )}
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.5"
+                          placeholder="—"
+                          value={percentualSalario}
+                          onChange={(e) => setPercentualSalario(e.target.value)}
+                          disabled={isPending}
+                          className={`${inputClass} max-w-[120px]`}
+                        />
+                        <span className="font-body text-sm text-muted">%</span>
+                        {pctSalario > 0 ? (
+                          <span className="font-body text-sm font-semibold text-blue-700">
+                            = {fmt(salarioMensal)}/mês
+                          </span>
+                        ) : (
+                          <span className="font-body text-sm text-slate-400">
+                            (salário cheio: {fmt(salarioBaseValor)}/mês)
+                          </span>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Quantidade de meses / salários */}
+                    <div>
+                      <label className={labelClass}>
+                        {paymentMode === "retroativo"
+                          ? "Quantidade de meses"
+                          : "Quantidade de salários"}
+                      </label>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={numSalarios}
+                          onChange={(e) =>
+                            setNumSalarios(
+                              e.target.value.replace(/[^0-9.,]/g, "")
+                            )
+                          }
+                          disabled={isPending}
+                          className={`${inputClass} max-w-[120px]`}
+                        />
+                        <span className="font-body text-sm text-muted">
+                          × {fmt(salarioMensal)}
+                        </span>
+                        {salarioValor && (
+                          <span className="font-body text-sm font-semibold text-emerald-700">
+                            ={" "}
+                            {fmt(
+                              (parseFloat(numSalarios.replace(",", ".")) || 0) *
+                                salarioMensal
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Entrada + Parcelas — só no modo retroativo */}
+                    {paymentMode === "retroativo" && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className={labelClass}>Valor de entrada</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                              R$
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0,00"
+                              value={valorEntrada}
+                              onChange={(e) =>
+                                setValorEntrada(
+                                  formatMoneyInput(e.target.value)
+                                )
+                              }
+                              onBlur={() =>
+                                setValorEntrada(
+                                  normalizeMoneyBlur(valorEntrada)
+                                )
+                              }
+                              disabled={isPending}
+                              className={`${inputClass} pl-10`}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className={labelClass}>
+                            Número de parcelas
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="120"
+                            value={totalParcelas}
+                            onChange={(e) => setTotalParcelas(e.target.value)}
+                            disabled={isPending}
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -969,54 +1099,73 @@ export default function NewLancamentoForm({
             {/* ── Resumo do cálculo retroativo ── */}
             {paymentMode === "retroativo" &&
               retroativoCalc &&
-              retroativoCalc.total > 0 && (
-                <div className="sm:col-span-2">
+              retroativoCalc.percValor > 0 && (
+                <div className="sm:col-span-2 space-y-2">
+                  {/* Bloco 1: honorário retroativo — este lançamento */}
                   <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
                     <p className="font-body text-xs font-semibold uppercase tracking-wide text-violet-700 mb-2">
-                      Composição do honorário
+                      Honorário retroativo — este lançamento
                     </p>
-                    <div className="flex flex-wrap gap-5">
+                    <div className="flex flex-wrap gap-5 items-end">
                       <div>
                         <span className="font-body text-xs text-muted">
-                          {retroativoCalc.pct}% do retroativo
-                        </span>
-                        <p className="font-heading text-base font-semibold text-fg">
-                          {fmt(retroativoCalc.percValor)}
-                        </p>
-                      </div>
-                      {retroativoCalc.salarioPart > 0 && (
-                        <div>
-                          <span className="font-body text-xs text-muted">
-                            + {parseFloat(numSalarios.replace(",", ".")) || 0}×{" "}
-                            {salarioBase === "custom" ? "sal. cliente" : "SM"}
-                          </span>
-                          <p className="font-heading text-base font-semibold text-fg">
-                            {fmt(retroativoCalc.salarioPart)}
-                          </p>
-                        </div>
-                      )}
-                      <div>
-                        <span className="font-body text-xs font-semibold text-violet-600">
-                          Total do honorário
+                          {retroativoCalc.pct}% do retroativo (
+                          {fmt(retroativoCalc.vRetro)})
                         </span>
                         <p className="font-heading text-xl font-bold text-violet-700">
-                          {fmt(retroativoCalc.total)}
+                          {fmt(retroativoCalc.percValor)}
                         </p>
                       </div>
                     </div>
                   </div>
+
+                  {/* Bloco 2: honorário mensal — informativo */}
+                  {retroativoCalc.salarioPart > 0 && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                      <p className="font-body text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">
+                        Honorário mensal estimado — lançar separadamente
+                      </p>
+                      <div className="flex flex-wrap gap-5 items-end">
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            Por mês{" "}
+                            {pctSalario > 0
+                              ? `(${pctSalario}% × ${salarioBase === "custom" ? "sal. cliente" : "SM"})`
+                              : `(${salarioBase === "custom" ? "sal. cliente" : "SM vigente"} cheio)`}
+                          </span>
+                          <p className="font-heading text-base font-semibold text-amber-800">
+                            {fmt(salarioMensal)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-body text-xs text-muted">
+                            × {parseFloat(numSalarios.replace(",", ".")) || 0}{" "}
+                            meses
+                          </span>
+                          <p className="font-heading text-base font-semibold text-amber-800">
+                            {fmt(retroativoCalc.salarioPart)} total est.
+                          </p>
+                        </div>
+                      </div>
+                      <p className="font-body text-xs text-amber-600 mt-2">
+                        Crie um lançamento em <strong>Recorrente</strong> para
+                        registrar os pagamentos mensais.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
-            {/* ── Valor total (oculto no modo retroativo) ── */}
-            {paymentMode !== "retroativo" && (
+            {/* ── Valor total (oculto no modo retroativo quando percValor calculado) ── */}
+            {(paymentMode !== "retroativo" ||
+              !retroativoCalc ||
+              retroativoCalc.percValor === 0) && (
               <Field
                 label={
                   paymentMode === "mensalidade"
                     ? "Valor total cobrado"
                     : "Valor total"
                 }
-                required
               >
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
@@ -1042,8 +1191,8 @@ export default function NewLancamentoForm({
               </Field>
             )}
 
-            {/* ── Campos do modo PARCELADO e RETROATIVO ── */}
-            {(paymentMode === "parcelado" || paymentMode === "retroativo") && (
+            {/* ── Campos do modo PARCELADO (entrada + parcelas) ── */}
+            {paymentMode === "parcelado" && (
               <>
                 <Field label="Valor de entrada">
                   <div className="relative">
@@ -1070,7 +1219,7 @@ export default function NewLancamentoForm({
                 <Field label="Número de parcelas">
                   <input
                     type="number"
-                    min="2"
+                    min="1"
                     max="120"
                     value={totalParcelas}
                     onChange={(e) => setTotalParcelas(e.target.value)}
@@ -1078,15 +1227,40 @@ export default function NewLancamentoForm({
                     className={inputClass}
                   />
                 </Field>
+              </>
+            )}
 
-                {previewParcelas && (
-                  <div className="sm:col-span-2">
-                    <div className="rounded-lg border border-border bg-slate-50 px-4 py-3">
-                      <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-2">
-                        Resumo do parcelamento
-                      </p>
-                      <div className="flex flex-wrap gap-6">
-                        {previewParcelas.entrada > 0 && (
+            {/* ── Resumo de recebimento (parcelado e retroativo) ── */}
+            {(paymentMode === "parcelado" || paymentMode === "retroativo") &&
+              previewParcelas && (
+                <div className="sm:col-span-2">
+                  <div className="rounded-lg border border-border bg-slate-50 px-4 py-3">
+                    <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-3">
+                      Resumo de recebimento
+                    </p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      {/* Retroativo (se houver) */}
+                      {paymentMode === "retroativo" &&
+                        retroativoCalc &&
+                        retroativoCalc.percValor > 0 && (
+                          <>
+                            <div>
+                              <span className="font-body text-xs text-muted">
+                                Retroativo
+                              </span>
+                              <p className="font-heading text-base font-semibold text-violet-700">
+                                {fmt(retroativoCalc.percValor)}
+                              </p>
+                            </div>
+                            <span className="font-body text-sm text-muted mb-1">
+                              +
+                            </span>
+                          </>
+                        )}
+
+                      {/* Entrada (se houver) */}
+                      {previewParcelas.entrada > 0 && (
+                        <>
                           <div>
                             <span className="font-body text-xs text-muted">
                               Entrada
@@ -1095,29 +1269,44 @@ export default function NewLancamentoForm({
                               {fmt(previewParcelas.entrada)}
                             </p>
                           </div>
-                        )}
-                        <div>
-                          <span className="font-body text-xs text-muted">
-                            {previewParcelas.n}× parcelas
+                          <span className="font-body text-sm text-muted mb-1">
+                            +
                           </span>
-                          <p className="font-heading text-base font-semibold text-fg">
-                            {fmt(previewParcelas.valorParcela)}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-body text-xs text-muted">
-                            Total
-                          </span>
-                          <p className="font-heading text-base font-semibold text-primary">
-                            {fmt(parseFloat(parseMoney(effectiveValor)) || 0)}
-                          </p>
-                        </div>
+                        </>
+                      )}
+
+                      {/* Parcelas mensais */}
+                      <div>
+                        <span className="font-body text-xs text-muted">
+                          {previewParcelas.n}× parcelas
+                        </span>
+                        <p className="font-heading text-base font-semibold text-fg">
+                          {fmt(previewParcelas.valorParcela)}
+                        </p>
+                      </div>
+
+                      {/* = Total geral */}
+                      <span className="font-body text-sm text-muted mb-1">
+                        =
+                      </span>
+                      <div>
+                        <span className="font-body text-xs font-semibold text-muted">
+                          Total
+                        </span>
+                        <p className="font-heading text-xl font-bold text-primary">
+                          {fmt(
+                            (paymentMode === "retroativo" && retroativoCalc
+                              ? retroativoCalc.percValor
+                              : 0) +
+                              previewParcelas.entrada +
+                              previewParcelas.n * previewParcelas.valorParcela
+                          )}
+                        </p>
                       </div>
                     </div>
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              )}
 
             {/* ── Campos do modo MENSALIDADE FIXA ── */}
             {paymentMode === "mensalidade" && (

@@ -34,7 +34,7 @@ export async function createLancamentoAction(
   const descricao =
     ((formData.get("descricao") as string | null) ?? "").trim() || "Lançamento";
   const valorStr = ((formData.get("valor") as string | null) ?? "").trim();
-  const valor = parseFloat(valorStr);
+  const valor = valorStr ? parseFloat(valorStr) : 0;
   const clientId =
     ((formData.get("client_id") as string | null) ?? "").trim() || null;
   const processoId =
@@ -85,8 +85,7 @@ export async function createLancamentoAction(
     ? parseFloat(comissaoValorConfigStr)
     : null;
 
-  if (!valorStr || isNaN(valor) || valor <= 0)
-    return { error: "Informe um valor válido." };
+  if (valorStr && isNaN(valor)) return { error: "Informe um valor válido." };
   if (mensalidade && (isNaN(valorMensalidade) || valorMensalidade <= 0))
     return { error: "Informe o valor da mensalidade." };
 
@@ -169,7 +168,7 @@ export async function createLancamentoAction(
         parcelaLancamentoIds.push(rows[0].id as string);
       }
     } else if (!parcelado) {
-      const dataVenc = dataVencimento || null;
+      const dataVenc = dataVencimento || todayBR();
       const rows = await sql`
         INSERT INTO lancamentos
           (tipo, categoria, descricao, valor, client_id, processo_id,
@@ -178,7 +177,7 @@ export async function createLancamentoAction(
           (${tipo}, ${categoria}, ${descricao}, ${valor},
            ${clientId ? clientId : null}::uuid,
            ${processoId ? processoId : null}::uuid,
-           ${status}, ${dataVenc ? dataVenc : null}::date, ${observacoes})
+           ${status}, ${dataVenc}::date, ${observacoes})
         RETURNING id
       `;
       firstLancamentoId = rows[0].id as string;
@@ -288,6 +287,10 @@ export async function createLancamentoAction(
     return { error: "Erro ao salvar lançamento. Tente novamente." };
   }
 
+  const redirectTo =
+    ((formData.get("redirect_to") as string | null) ?? "").trim() ||
+    "/dashboard/financeiro";
+
   const valorFmt = valor.toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -299,7 +302,7 @@ export async function createLancamentoAction(
     detalhes: { paymentMode, valor, tipo },
   });
 
-  redirect("/dashboard/financeiro");
+  redirect(redirectTo);
 }
 
 export async function updateLancamentoAction(

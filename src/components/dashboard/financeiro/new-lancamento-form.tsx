@@ -221,7 +221,7 @@ export default function NewLancamentoForm({
   }, [finalCategoria, selectedClient, tipo]);
 
   // ── Valores ────────────────────────────────────────────────
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>("avista");
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("retroativo");
   const [valor, setValor] = useState("");
   const [valorEntrada, setValorEntrada] = useState("");
   const [totalParcelas, setTotalParcelas] = useState("1");
@@ -766,11 +766,10 @@ export default function NewLancamentoForm({
             <label className={labelClass}>Modo de pagamento</label>
             <div className="flex gap-2">
               {(
-                [
-                  { key: "avista", label: "À vista" },
-                  { key: "parcelado", label: "Parcelado" },
-                  { key: "recorrente", label: "Recorrente" },
-                ] as { key: PaymentMode; label: string }[]
+                [{ key: "recorrente", label: "Recorrente" }] as {
+                  key: PaymentMode;
+                  label: string;
+                }[]
               ).map((m) => (
                 <button
                   key={m.key}
@@ -798,7 +797,7 @@ export default function NewLancamentoForm({
                 [
                   {
                     key: "retroativo",
-                    label: "Retroativo + Parcelado",
+                    label: "Avista, Avista+Retroativo+Parcelado",
                     desc: "% s/ retroativo + mensal opcional",
                   },
                   {

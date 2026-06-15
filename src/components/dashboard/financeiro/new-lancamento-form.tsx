@@ -764,40 +764,14 @@ export default function NewLancamentoForm({
           {/* ── Modo de pagamento — linha 1: modos padrão ── */}
           <div>
             <label className={labelClass}>Modo de pagamento</label>
-            <div className="flex gap-2">
-              {(
-                [{ key: "recorrente", label: "Recorrente" }] as {
-                  key: PaymentMode;
-                  label: string;
-                }[]
-              ).map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  onClick={() => {
-                    setPaymentMode(m.key);
-                    setValorRetroativo("");
-                    setValorMensalidade("");
-                  }}
-                  disabled={isPending}
-                  className={`flex-1 rounded-lg border-2 px-3 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
-                    paymentMode === m.key
-                      ? "border-primary bg-blue-50 text-primary"
-                      : "border-border text-muted hover:border-slate-300 hover:text-fg"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
 
-            {/* ── Linha 2: modos especiais ── */}
-            <div className="mt-2 flex gap-2">
+            {/* ── Linha 1: modos principais ── */}
+            <div className="flex gap-2">
               {(
                 [
                   {
                     key: "retroativo",
-                    label: "Avista, Avista+Retroativo+Parcelado",
+                    label: "Avista, Retroativo+Parcelado",
                     desc: "% s/ retroativo + mensal opcional",
                   },
                   {
@@ -829,6 +803,34 @@ export default function NewLancamentoForm({
                   >
                     {m.desc}
                   </p>
+                </button>
+              ))}
+            </div>
+
+            {/* ── Linha 2: Recorrente ── */}
+            <div className="mt-2 flex gap-2">
+              {(
+                [{ key: "recorrente", label: "Recorrente" }] as {
+                  key: PaymentMode;
+                  label: string;
+                }[]
+              ).map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => {
+                    setPaymentMode(m.key);
+                    setValorRetroativo("");
+                    setValorMensalidade("");
+                  }}
+                  disabled={isPending}
+                  className={`flex-1 rounded-lg border-2 px-3 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                    paymentMode === m.key
+                      ? "border-primary bg-blue-50 text-primary"
+                      : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                  }`}
+                >
+                  {m.label}
                 </button>
               ))}
             </div>

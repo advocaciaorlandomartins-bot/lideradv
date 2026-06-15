@@ -142,10 +142,32 @@ export async function createLancamentoAction(
         if (i === 0) firstLancamentoId = rows[0].id as string;
       }
     } else if (mensalidade) {
-      // Mensalidade fixa: N lancamentos de valor fixo = valorMensalidade cada
+      // Mensalidade fixa: entrada opcional + N parcelas de valorMensalidade cada
       const grupoParcelas = crypto.randomUUID();
-      const numParcelas = Math.ceil(valor / valorMensalidade);
+      const valorParcelar =
+        valorEntrada > 0 ? Math.max(valor - valorEntrada, 0) : valor;
+      const numParcelas =
+        valorParcelar > 0 ? Math.ceil(valorParcelar / valorMensalidade) : 0;
       const baseDate = new Date(`${baseDateStr}T12:00:00`);
+
+      if (valorEntrada > 0) {
+        const descEntrada = `${descricao} — Entrada`;
+        const rowsEnt = await sql`
+          INSERT INTO lancamentos
+            (tipo, categoria, descricao, valor, client_id, processo_id,
+             status, data_vencimento, parcela_atual, total_parcelas,
+             grupo_parcelas, observacoes)
+          VALUES
+            (${tipo}, ${categoria}, ${descEntrada}, ${valorEntrada},
+             ${clientId ? clientId : null}::uuid,
+             ${processoId ? processoId : null}::uuid,
+             ${status}, ${baseDateStr}::date, 0, ${numParcelas},
+             ${grupoParcelas}::uuid, ${observacoes})
+          RETURNING id
+        `;
+        firstLancamentoId = rowsEnt[0].id as string;
+      }
+
       for (let i = 1; i <= numParcelas; i++) {
         const parcDate = new Date(baseDate);
         parcDate.setMonth(parcDate.getMonth() + i);

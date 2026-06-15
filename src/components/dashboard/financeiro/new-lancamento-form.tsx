@@ -21,18 +21,7 @@ const CATEGORIAS: Record<string, string[]> = {
   ],
 };
 
-const PERIODICIDADES = [
-  { key: "mensal", label: "Mensalmente" },
-  { key: "semanal", label: "Semanalmente" },
-  { key: "anual", label: "Anualmente" },
-];
-
-type PaymentMode =
-  | "avista"
-  | "parcelado"
-  | "recorrente"
-  | "retroativo"
-  | "mensalidade";
+type PaymentMode = "avista" | "parcelado" | "retroativo" | "mensalidade";
 
 const inputClass =
   "h-11 w-full rounded-lg border border-border bg-white px-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
@@ -225,8 +214,7 @@ export default function NewLancamentoForm({
   const [valor, setValor] = useState("");
   const [valorEntrada, setValorEntrada] = useState("");
   const [totalParcelas, setTotalParcelas] = useState("1");
-  const [periodicidade, setPeriodicidade] = useState("mensal");
-  const [numRecorrencias, setNumRecorrencias] = useState("12");
+  const [valorEntradaMensalidade, setValorEntradaMensalidade] = useState("");
   const [numSalarios, setNumSalarios] = useState("1");
   const [salarioBase, setSalarioBase] = useState<"none" | "minimo" | "custom">(
     "none"
@@ -306,10 +294,12 @@ export default function NewLancamentoForm({
     if (paymentMode !== "mensalidade") return null;
     const total = parseFloat(parseMoney(effectiveValor)) || 0;
     const mens = parseFloat(parseMoney(valorMensalidade)) || 0;
+    const entrada = parseFloat(parseMoney(valorEntradaMensalidade)) || 0;
     if (!total || !mens || mens <= 0) return null;
-    const numParcelas = Math.ceil(total / mens);
-    return { total, mens, numParcelas };
-  }, [paymentMode, effectiveValor, valorMensalidade]);
+    const valorParcelar = entrada > 0 ? Math.max(total - entrada, 0) : total;
+    const numParcelas = valorParcelar > 0 ? Math.ceil(valorParcelar / mens) : 0;
+    return { total, mens, numParcelas, entrada };
+  }, [paymentMode, effectiveValor, valorMensalidade, valorEntradaMensalidade]);
 
   // ── Preview Parcelado (inclui modo retroativo) ─────────────
   const previewParcelas = useMemo(() => {
@@ -333,18 +323,6 @@ export default function NewLancamentoForm({
     totalParcelas,
     retroativoCalc,
   ]);
-
-  const previewRecorrente = useMemo(() => {
-    if (paymentMode !== "recorrente") return null;
-    const v = parseFloat(parseMoney(effectiveValor));
-    const n = parseInt(numRecorrencias) || 12;
-    if (!v || v <= 0) return null;
-    return {
-      valorTotal: v * n,
-      n,
-      periodo: PERIODICIDADES.find((p) => p.key === periodicidade)?.label ?? "",
-    };
-  }, [paymentMode, effectiveValor, numRecorrencias, periodicidade]);
 
   // ── Comissão de indicador ──────────────────────────────────
   const commissionInfo = useMemo(() => {
@@ -372,7 +350,14 @@ export default function NewLancamentoForm({
       comissao_valor_config: selectedClient.comissao_valor,
       comissao_calculada: comissaoValorCalculado,
     };
-  }, [tipo, processoId, selectedClient, effectiveValor]);
+  }, [
+    tipo,
+    processoId,
+    selectedClient,
+    effectiveValor,
+    paymentMode,
+    retroativoCalc,
+  ]);
 
   // ── Número total de parcelas para modo mensalidade ─────────
   const totalParcelasEfetivo =
@@ -421,7 +406,15 @@ export default function NewLancamentoForm({
       />
       <input type="hidden" name="descricao" value={autoDescricao} />
       <input type="hidden" name="valor" value={valorSubmit} />
-      <input type="hidden" name="valor_entrada" value={valorEntradaSubmit} />
+      <input
+        type="hidden"
+        name="valor_entrada"
+        value={
+          paymentMode === "mensalidade"
+            ? parseMoney(valorEntradaMensalidade)
+            : valorEntradaSubmit
+        }
+      />
       <input type="hidden" name="categoria" value={finalCategoria} />
       <input type="hidden" name="client_id" value={selectedClient?.id ?? ""} />
       <input
@@ -429,13 +422,6 @@ export default function NewLancamentoForm({
         name="status"
         value={jaRecebida ? "pago" : "pendente"}
       />
-      <input
-        type="hidden"
-        name="recorrente"
-        value={String(paymentMode === "recorrente")}
-      />
-      <input type="hidden" name="periodicidade" value={periodicidade} />
-      <input type="hidden" name="num_recorrencias" value={numRecorrencias} />
       <input type="hidden" name="total_parcelas" value={totalParcelasEfetivo} />
       <input
         type="hidden"
@@ -789,6 +775,7 @@ export default function NewLancamentoForm({
                     setValor("");
                     setSalarioBase("none");
                     setSalarioCustomInput("");
+                    setValorEntradaMensalidade("");
                   }}
                   disabled={isPending}
                   className={`flex-1 rounded-lg border-2 px-3 py-2 font-body transition-colors duration-150 ${
@@ -803,34 +790,6 @@ export default function NewLancamentoForm({
                   >
                     {m.desc}
                   </p>
-                </button>
-              ))}
-            </div>
-
-            {/* ── Linha 2: Recorrente ── */}
-            <div className="mt-2 flex gap-2">
-              {(
-                [{ key: "recorrente", label: "Recorrente" }] as {
-                  key: PaymentMode;
-                  label: string;
-                }[]
-              ).map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  onClick={() => {
-                    setPaymentMode(m.key);
-                    setValorRetroativo("");
-                    setValorMensalidade("");
-                  }}
-                  disabled={isPending}
-                  className={`flex-1 rounded-lg border-2 px-3 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
-                    paymentMode === m.key
-                      ? "border-primary bg-blue-50 text-primary"
-                      : "border-border text-muted hover:border-slate-300 hover:text-fg"
-                  }`}
-                >
-                  {m.label}
                 </button>
               ))}
             </div>
@@ -1149,8 +1108,8 @@ export default function NewLancamentoForm({
                         </div>
                       </div>
                       <p className="font-body text-xs text-amber-600 mt-2">
-                        Crie um lançamento em <strong>Recorrente</strong> para
-                        registrar os pagamentos mensais.
+                        Honorário mensal incluído neste lançamento. Defina o
+                        número de parcelas mensais abaixo.
                       </p>
                     </div>
                   )}
@@ -1339,6 +1298,32 @@ export default function NewLancamentoForm({
                   </div>
                 </Field>
 
+                <Field label="Valor de entrada (opcional)">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                      R$
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={valorEntradaMensalidade}
+                      onChange={(e) =>
+                        setValorEntradaMensalidade(
+                          formatMoneyInput(e.target.value)
+                        )
+                      }
+                      onBlur={() =>
+                        setValorEntradaMensalidade(
+                          normalizeMoneyBlur(valorEntradaMensalidade)
+                        )
+                      }
+                      disabled={isPending}
+                      className={`${inputClass} pl-10`}
+                    />
+                  </div>
+                </Field>
+
                 {mensalidadeCalc && (
                   <div className="sm:col-span-2">
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
@@ -1354,6 +1339,21 @@ export default function NewLancamentoForm({
                             {fmt(mensalidadeCalc.total)}
                           </p>
                         </div>
+                        {mensalidadeCalc.entrada > 0 && (
+                          <>
+                            <div className="text-muted font-body text-lg">
+                              −
+                            </div>
+                            <div>
+                              <span className="font-body text-xs text-muted">
+                                Entrada
+                              </span>
+                              <p className="font-heading text-base font-semibold text-fg">
+                                {fmt(mensalidadeCalc.entrada)}
+                              </p>
+                            </div>
+                          </>
+                        )}
                         <div className="text-muted font-body text-lg">÷</div>
                         <div>
                           <span className="font-body text-xs text-muted">
@@ -1375,86 +1375,23 @@ export default function NewLancamentoForm({
                       </div>
                       <div className="mt-3 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2">
                         <p className="font-body text-sm font-semibold text-amber-900">
-                          O cliente ficará devendo{" "}
+                          {mensalidadeCalc.entrada > 0 && (
+                            <>
+                              Entrada de{" "}
+                              <strong>{fmt(mensalidadeCalc.entrada)}</strong>{" "}
+                              +{" "}
+                            </>
+                          )}
                           <strong>
                             {mensalidadeCalc.numParcelas} parcelas
                           </strong>{" "}
                           de <strong>{fmt(mensalidadeCalc.mens)}</strong>
                         </p>
                         <p className="font-body text-xs text-amber-700 mt-0.5">
-                          Serão criados {mensalidadeCalc.numParcelas}{" "}
-                          lançamentos mensais de {fmt(mensalidadeCalc.mens)}{" "}
-                          cada
+                          {mensalidadeCalc.entrada > 0
+                            ? `Entrada de ${fmt(mensalidadeCalc.entrada)} + ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada`
+                            : `Serão criados ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada`}
                         </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* ── Campos do modo RECORRENTE ── */}
-            {paymentMode === "recorrente" && (
-              <>
-                <Field label="Repetir a cada">
-                  <select
-                    value={periodicidade}
-                    onChange={(e) => setPeriodicidade(e.target.value)}
-                    disabled={isPending}
-                    className={selectClass}
-                  >
-                    {PERIODICIDADES.map((p) => (
-                      <option key={p.key} value={p.key}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Número de recorrências">
-                  <input
-                    type="number"
-                    min="2"
-                    max="120"
-                    value={numRecorrencias}
-                    onChange={(e) => setNumRecorrencias(e.target.value)}
-                    disabled={isPending}
-                    className={inputClass}
-                  />
-                </Field>
-
-                {previewRecorrente && (
-                  <div className="sm:col-span-2">
-                    <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-                      <p className="font-body text-xs font-semibold uppercase tracking-wide text-blue-600 mb-2">
-                        Resumo da recorrência
-                      </p>
-                      <div className="flex flex-wrap gap-6">
-                        <div>
-                          <span className="font-body text-xs text-muted">
-                            Valor por período
-                          </span>
-                          <p className="font-heading text-base font-semibold text-fg">
-                            {fmt(parseFloat(parseMoney(effectiveValor)) || 0)}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-body text-xs text-muted">
-                            {previewRecorrente.n}×{" "}
-                            {previewRecorrente.periodo.toLowerCase()}
-                          </span>
-                          <p className="font-heading text-base font-semibold text-fg">
-                            {previewRecorrente.n} lançamentos criados
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-body text-xs text-muted">
-                            Total previsto
-                          </span>
-                          <p className="font-heading text-base font-semibold text-primary">
-                            {fmt(previewRecorrente.valorTotal)}
-                          </p>
-                        </div>
                       </div>
                     </div>
                   </div>

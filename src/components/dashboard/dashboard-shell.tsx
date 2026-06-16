@@ -40,7 +40,7 @@ export default function DashboardShell({
       />
       <main
         id="main-content"
-        className={`flex-1 overflow-x-hidden p-4 pb-20 transition-[margin] duration-300 lg:p-8 lg:pb-8 ${
+        className={`flex-1 min-w-0 overflow-x-hidden p-4 pb-20 transition-[margin] duration-300 lg:p-8 lg:pb-8 ${
           collapsed ? "lg:ml-16" : "lg:ml-72"
         }`}
       >

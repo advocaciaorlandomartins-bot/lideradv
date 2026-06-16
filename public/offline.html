@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiderAdv — Sem Conexão</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 40px 32px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+    }
+    .icon {
+      width: 72px;
+      height: 72px;
+      background: #eff6ff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 32px;
+    }
+    h1 { font-size: 1.375rem; font-weight: 700; margin-bottom: 8px; color: #0f172a; }
+    p { font-size: 0.9375rem; color: #64748b; line-height: 1.6; margin-bottom: 28px; }
+    .back-btn {
+      display: inline-block;
+      background: #1d4ed8;
+      color: #fff;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      padding: 12px 28px;
+      border-radius: 10px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+    }
+    .back-btn:active { background: #1e40af; }
+    .hint {
+      margin-top: 20px;
+      font-size: 0.8125rem;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>Sem conexão com a internet</h1>
+    <p>Você está offline. As páginas que já visitou continuam disponíveis.</p>
+    <button class="back-btn" onclick="history.back()">Voltar à última página</button>
+    <p class="hint">Quando a conexão voltar, o app atualiza automaticamente.</p>
+  </div>
+</body>
+</html>

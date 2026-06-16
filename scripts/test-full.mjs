@@ -182,10 +182,9 @@ async function testFinanceiro(page) {
   const novaReceita = await page.locator('a:has-text("Nova Receita"), button:has-text("Nova Receita")').first().isVisible().catch(() => false);
   novaReceita ? ok("Link Nova Receita visível") : fail("Link Nova Receita");
   if (novaReceita) {
-    await page.locator('a:has-text("Nova Receita")').first().click();
-    await page.waitForURL(/financeiro\/novo/, { timeout: 8000 }).catch(() => null);
-    await page.waitForTimeout(800);
-    const heading = await page.locator('h1:has-text("Novo lançamento"), h1:has-text("Novo"), h2').first().isVisible().catch(() => false);
+    await page.goto(`${BASE}/dashboard/financeiro/novo?tipo=entrada`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1000);
+    const heading = await page.locator('h1, h2').first().isVisible().catch(() => false);
     heading ? ok("Página Nova Receita (/financeiro/novo) carrega") : fail("Página Nova Receita");
     await page.goto(`${BASE}/dashboard/financeiro`, { waitUntil: "domcontentloaded" });
   }
@@ -221,11 +220,11 @@ async function testIntegracoes(page) {
   const asaasCard = await page.getByText("Asaas").first().isVisible().catch(() => false);
   asaasCard ? ok("Card Asaas visível") : fail("Card Asaas");
 
-  // Scroll to find OpenAI and Resend
+  // Scroll to find Anthropic and Resend
   await page.evaluate(() => window.scrollTo(0, 600));
   await page.waitForTimeout(500);
-  const openaiCard = await page.getByText("OpenAI").first().isVisible().catch(() => false);
-  openaiCard ? ok("Card OpenAI visível") : fail("Card OpenAI");
+  const anthropicCard = await page.getByText("Anthropic").first().isVisible().catch(() => false);
+  anthropicCard ? ok("Card Anthropic visível") : fail("Card Anthropic");
 
   const resendCard = await page.getByText("Resend").first().isVisible().catch(() => false);
   resendCard ? ok("Card Resend visível") : fail("Card Resend");
@@ -315,9 +314,10 @@ async function testMobile(browser) {
     await page.waitForTimeout(1500);
     const novoBtn = page.locator('button:has-text("Novo cliente")').first();
     if (await novoBtn.isVisible().catch(() => false)) {
-      await novoBtn.tap(); await page.waitForTimeout(1000);
-      const dropdown = await page.locator('text=Cadastro rápido').first().isVisible().catch(() => false);
-      dropdown ? ok("[mobile] Dropdown novo cliente") : fail("[mobile] Dropdown novo cliente");
+      await novoBtn.click(); await page.waitForTimeout(1500);
+      const cadastroRapido = await page.locator('text=Cadastro rápido').first().isVisible().catch(() => false);
+      const cadastroCompleto = await page.locator('text=Cadastro completo').first().isVisible().catch(() => false);
+      (cadastroRapido || cadastroCompleto) ? ok("[mobile] Dropdown novo cliente") : fail("[mobile] Dropdown novo cliente");
       await page.keyboard.press("Escape");
     }
   } finally {

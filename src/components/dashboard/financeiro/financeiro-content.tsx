@@ -114,23 +114,23 @@ function KpiCard({
   return (
     <Wrapper
       onClick={onClick}
-      className={`rounded-xl border bg-white p-5 shadow-sm transition-all duration-150 ${
+      className={`rounded-xl border bg-white p-3 sm:p-5 shadow-sm transition-all duration-150 min-w-0 ${
         onClick ? "cursor-pointer" : ""
       } ${active ? "border-primary ring-2 ring-primary/20" : "border-border"} ${
         onClick && !active ? "hover:border-primary/40 hover:shadow-md" : ""
       }`}
     >
       <div className="flex items-center justify-between">
-        <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+        <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted leading-tight">
           {label}
         </p>
         <div
-          className={`flex h-8 w-8 items-center justify-center rounded-lg ${color}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${color}`}
         >
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="mt-3 font-heading text-2xl font-semibold text-fg">
+      <p className="mt-2 font-heading text-sm sm:text-xl font-semibold text-fg break-all leading-tight">
         {fmt(value)}
       </p>
       {sub && <p className="mt-0.5 font-body text-xs text-muted">{sub}</p>}

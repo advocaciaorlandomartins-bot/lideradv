@@ -385,7 +385,7 @@ export default async function DashboardPage() {
                 {kpis.saldoMes >= 0 ? "▲" : "▼"} Saldo
               </span>
             </div>
-            <p className="mt-3 font-heading text-xl font-bold text-fg sm:text-2xl">
+            <p className="mt-3 font-heading text-sm font-bold text-fg sm:text-xl break-all leading-tight">
               {fmt(kpis.recebidoMes)}
             </p>
             <p className="mt-0.5 font-body text-xs font-semibold text-muted">
@@ -893,9 +893,13 @@ export default async function DashboardPage() {
                 cls: kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-600",
               },
             ].map(({ label, value, cls }) => (
-              <div key={label} className="rounded-lg bg-slate-50 p-3">
-                <p className="font-body text-xs text-muted">{label}</p>
-                <p className={`mt-1 font-heading text-lg font-bold ${cls}`}>
+              <div key={label} className="rounded-lg bg-slate-50 p-3 min-w-0">
+                <p className="font-body text-xs text-muted leading-tight">
+                  {label}
+                </p>
+                <p
+                  className={`mt-1 font-heading text-sm sm:text-base font-bold break-all leading-tight ${cls}`}
+                >
                   {fmt(value)}
                 </p>
               </div>
@@ -956,10 +960,12 @@ export default async function DashboardPage() {
                       : "text-red-600",
                 },
               ].map(({ label, value, cls }) => (
-                <div key={label} className="text-center">
-                  <p className="font-body text-xs text-muted">{label}</p>
+                <div key={label} className="text-center min-w-0">
+                  <p className="font-body text-xs text-muted leading-tight">
+                    {label}
+                  </p>
                   <p
-                    className={`mt-0.5 font-heading text-base font-bold ${cls}`}
+                    className={`mt-0.5 font-heading text-xs sm:text-sm font-bold break-all leading-tight ${cls}`}
                   >
                     {fmt(value)}
                   </p>

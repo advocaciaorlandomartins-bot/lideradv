@@ -245,14 +245,16 @@ function KpiCard({
   color: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
-      <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+    <div className="rounded-xl border border-border bg-white p-3 sm:p-5 shadow-sm min-w-0">
+      <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted leading-tight">
         {label}
       </p>
-      <p className={`mt-1 font-heading text-2xl font-bold ${color}`}>
+      <p
+        className={`mt-1 font-heading text-base sm:text-xl lg:text-2xl font-bold break-all leading-tight ${color}`}
+      >
         {fmt(value)}
       </p>
-      {sub && <p className="mt-1 font-body text-xs text-muted">{sub}</p>}
+      {sub && <p className="mt-0.5 font-body text-xs text-muted">{sub}</p>}
     </div>
   );
 }
@@ -281,19 +283,19 @@ function LancamentosTable({ rows }: { rows: RelatorioLancamento[] }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
         <span className="font-body text-xs text-muted">
           {rows.length} lançamento{rows.length !== 1 ? "s" : ""}
         </span>
-        <div className="flex items-center gap-4">
-          <span className="font-body text-xs text-emerald-600">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
+          <span className="font-body text-xs text-emerald-600 whitespace-nowrap">
             Receitas: {fmt(totalEntradas)}
           </span>
-          <span className="font-body text-xs text-red-600">
+          <span className="font-body text-xs text-red-600 whitespace-nowrap">
             Despesas: {fmt(totalSaidas)}
           </span>
           <span
-            className={`font-body text-sm font-semibold ${saldo >= 0 ? "text-emerald-700" : "text-red-700"}`}
+            className={`font-body text-sm font-semibold whitespace-nowrap ${saldo >= 0 ? "text-emerald-700" : "text-red-700"}`}
           >
             Saldo: {saldo < 0 ? "-" : ""}
             {fmt(Math.abs(saldo))}
@@ -721,7 +723,7 @@ function ClientesTab({
       {filtroCliente ? (
         <div className="space-y-4">
           {filtered.length > 0 && (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
                 {
                   label: "Total Recebido",
@@ -749,12 +751,14 @@ function ClientesTab({
               ].map(({ label, value, color }) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-border bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-border bg-white p-3 sm:p-4 shadow-sm min-w-0"
                 >
                   <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
                     {label}
                   </p>
-                  <p className={`mt-1 font-heading text-xl font-bold ${color}`}>
+                  <p
+                    className={`mt-1 font-heading text-base sm:text-xl font-bold break-all leading-tight ${color}`}
+                  >
                     {fmt(value)}
                   </p>
                 </div>
@@ -905,7 +909,7 @@ function FolhaTab({
         />
       </FilterBar>
       {filtered.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             {
               label: "Total Pago",
@@ -925,12 +929,14 @@ function FolhaTab({
           ].map(({ label, value, color }) => (
             <div
               key={label}
-              className="rounded-xl border border-border bg-white p-4 shadow-sm"
+              className="rounded-xl border border-border bg-white p-3 sm:p-4 shadow-sm min-w-0"
             >
               <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
                 {label}
               </p>
-              <p className={`mt-1 font-heading text-xl font-bold ${color}`}>
+              <p
+                className={`mt-1 font-heading text-base sm:text-xl font-bold break-all leading-tight ${color}`}
+              >
                 {fmt(value)}
               </p>
             </div>
@@ -1111,7 +1117,7 @@ function FluxoTab({ fluxo }: { fluxo: FluxoMensal[] }) {
   const saldoGeral = totalReceitas - totalDespesas;
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
           {
             label: "Receitas pagas",
@@ -1133,12 +1139,14 @@ function FluxoTab({ fluxo }: { fluxo: FluxoMensal[] }) {
         ].map(({ label, value, color }) => (
           <div
             key={label}
-            className="rounded-xl border border-border bg-white p-4 shadow-sm"
+            className="rounded-xl border border-border bg-white p-3 sm:p-4 shadow-sm min-w-0"
           >
-            <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+            <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted leading-tight">
               {label}
             </p>
-            <p className={`mt-1 font-heading text-xl font-bold ${color}`}>
+            <p
+              className={`mt-1 font-heading text-sm sm:text-lg font-bold break-all leading-tight ${color}`}
+            >
               {fmt(value)}
             </p>
           </div>

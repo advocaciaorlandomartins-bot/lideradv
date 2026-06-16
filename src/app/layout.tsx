@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme";
@@ -27,9 +27,13 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "LiderAdv",
   },
-  other: {
-    "mobile-web-app-capable": "yes",
+  icons: {
+    apple: "/logo.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1d4ed8",
 };
 
 export default function RootLayout({
@@ -42,10 +46,6 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${garamond.variable} ${lato.variable} h-full`}
     >
-      <head>
-        <meta name="theme-color" content="#1d4ed8" />
-        <link rel="apple-touch-icon" href="/logo.png" />
-      </head>
       <body className="h-full antialiased">
         {/* Aplica tema antes da hidratação para evitar flash */}
         <script

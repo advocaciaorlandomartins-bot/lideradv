@@ -84,6 +84,15 @@ export async function createLancamentoAction(
   const comissaoValorConfig = comissaoValorConfigStr
     ? parseFloat(comissaoValorConfigStr)
     : null;
+  const comissaoModoPagamento = (
+    (formData.get("comissao_modo_pagamento") as string | null) ?? "auto"
+  ).trim();
+  const comissaoValorCustomStr = (
+    (formData.get("comissao_valor_custom") as string | null) ?? ""
+  ).trim();
+  const comissaoValorCustom = comissaoValorCustomStr
+    ? parseFloat(comissaoValorCustomStr)
+    : null;
 
   if (valorStr && isNaN(valor)) return { error: "Informe um valor válido." };
   if (mensalidade && (isNaN(valorMensalidade) || valorMensalidade <= 0))
@@ -258,8 +267,18 @@ export async function createLancamentoAction(
     // Auto-create commission remuneração(ões) when applicable
     if (shouldCreateComissao && comissaoValorFinal > 0) {
       const descComissao = `Comissão — ${descricao}`;
+      const comissaoAvista = comissaoModoPagamento === "avista";
+      // When paying à vista with a negotiated value, use it; otherwise fall back to calculated
+      const comissaoValorAvista =
+        comissaoAvista && comissaoValorCustom && comissaoValorCustom > 0
+          ? comissaoValorCustom
+          : comissaoValorFinal;
 
-      if ((parcelado || mensalidade) && parcelaLancamentoIds.length > 0) {
+      if (
+        (parcelado || mensalidade) &&
+        parcelaLancamentoIds.length > 0 &&
+        !comissaoAvista
+      ) {
         // One commission remuneração per installment, linked to each lancamento
         const commPerParcela =
           Math.round((comissaoValorFinal / parcelaLancamentoIds.length) * 100) /
@@ -286,12 +305,15 @@ export async function createLancamentoAction(
           `;
         }
       } else if (firstLancamentoId) {
-        // Single commission for avista / recorrente
+        // Single commission: avista (with optional negotiated value), or avista for non-parcelado modes
+        const valorParaUsar = comissaoAvista
+          ? comissaoValorAvista
+          : comissaoValorFinal;
         const remRows = await sql`
           INSERT INTO remuneracoes
             (colaborador_id, tipo, valor, status, descricao, processo_id, client_id)
           VALUES
-            (${indicadorId}::uuid, 'comissao', ${comissaoValorFinal},
+            (${indicadorId}::uuid, 'comissao', ${valorParaUsar},
              'pendente', ${descComissao},
              ${processoId ? processoId : null}::uuid,
              ${clientId ? clientId : null}::uuid)

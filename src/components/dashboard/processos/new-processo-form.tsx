@@ -95,9 +95,14 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 interface Props {
   clients: { id: string; name: string }[];
   defaultClientId?: string;
+  redirectTo?: string;
 }
 
-export default function NewProcessoForm({ clients, defaultClientId }: Props) {
+export default function NewProcessoForm({
+  clients,
+  defaultClientId,
+  redirectTo,
+}: Props) {
   const [state, formAction, isPending] = useActionState<
     ProcessoFormState,
     FormData
@@ -108,6 +113,9 @@ export default function NewProcessoForm({ clients, defaultClientId }: Props) {
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
+      {redirectTo && (
+        <input type="hidden" name="redirect_to" value={redirectTo} />
+      )}
       {state?.error && (
         <div
           role="alert"

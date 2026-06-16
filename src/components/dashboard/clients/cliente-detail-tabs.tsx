@@ -307,7 +307,7 @@ export default function ClienteDetailTabs({
                 <FolderOpenIcon className="h-8 w-8 text-slate-300" />
                 <p className="font-body text-sm text-muted">Nenhum processo</p>
                 <Link
-                  href={`/dashboard/processos/novo?cliente=${client.id}`}
+                  href={`/dashboard/processos/novo?cliente=${client.id}&back=${encodeURIComponent(`/dashboard/clientes/${client.id}?tab=processos`)}`}
                   className="mt-1 flex items-center gap-1.5 rounded-lg bg-cta px-3 py-1.5 font-body text-xs font-semibold text-white hover:bg-cta-hover"
                 >
                   <PlusIcon className="h-3.5 w-3.5" />
@@ -377,7 +377,7 @@ export default function ClienteDetailTabs({
               </div>
             </div>
             <Link
-              href={`/dashboard/processos/novo?cliente=${client.id}`}
+              href={`/dashboard/processos/novo?cliente=${client.id}&back=${encodeURIComponent(`/dashboard/clientes/${client.id}?tab=processos`)}`}
               className="flex h-9 items-center gap-1.5 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover"
             >
               <PlusIcon className="h-4 w-4" />
@@ -392,7 +392,7 @@ export default function ClienteDetailTabs({
                 Nenhum processo cadastrado
               </p>
               <Link
-                href={`/dashboard/processos/novo?cliente=${client.id}`}
+                href={`/dashboard/processos/novo?cliente=${client.id}&back=${encodeURIComponent(`/dashboard/clientes/${client.id}?tab=processos`)}`}
                 className="flex items-center gap-2 rounded-lg bg-cta px-4 py-2 font-body text-sm font-semibold text-white hover:bg-cta-hover"
               >
                 <PlusIcon className="h-4 w-4" />

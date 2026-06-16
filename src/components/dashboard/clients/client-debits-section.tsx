@@ -34,15 +34,15 @@ export default function ClientDebitsSection({ clientId, debito }: Props) {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="font-heading text-base font-semibold text-fg">
-            Débitos do cliente
+            Lançamentos do cliente
           </h2>
           <p className="mt-0.5 font-body text-xs text-muted">
-            Despesas vinculadas a este cliente
+            Receitas e despesas vinculadas
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           {totalPendente > 0 && (
-            <div className="text-right">
+            <div className="text-right mr-2">
               <p className="font-body text-xs text-muted">Pendente</p>
               <p className="font-heading text-base font-semibold text-red-600">
                 {fmt(totalPendente)}
@@ -50,15 +50,21 @@ export default function ClientDebitsSection({ clientId, debito }: Props) {
             </div>
           )}
           {totalPago > 0 && (
-            <div className="text-right">
-              <p className="font-body text-xs text-muted">Ressarcido</p>
+            <div className="text-right mr-2">
+              <p className="font-body text-xs text-muted">Recebido</p>
               <p className="font-heading text-base font-semibold text-emerald-600">
                 {fmt(totalPago)}
               </p>
             </div>
           )}
           <Link
-            href={`/dashboard/financeiro/novo?tipo=saida&client_id=${clientId}`}
+            href={`/dashboard/financeiro/novo?tipo=entrada&client_id=${clientId}&back=${encodeURIComponent(`/dashboard/clientes/${clientId}?tab=financeiro`)}`}
+            className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-emerald-700"
+          >
+            + Receita
+          </Link>
+          <Link
+            href={`/dashboard/financeiro/novo?tipo=saida&client_id=${clientId}&back=${encodeURIComponent(`/dashboard/clientes/${clientId}?tab=financeiro`)}`}
             className="flex h-9 items-center gap-1.5 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover"
           >
             + Despesa
@@ -150,19 +156,13 @@ export default function ClientDebitsSection({ clientId, debito }: Props) {
       )}
 
       {items.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-border flex justify-between items-center">
+        <div className="mt-4 pt-3 border-t border-border">
           <p className="font-body text-xs text-muted">
             Total geral:{" "}
             <span className="font-semibold text-fg">
               {fmt(totalPendente + totalPago)}
             </span>
           </p>
-          <Link
-            href="/dashboard/financeiro?tab=contas"
-            className="font-body text-xs text-primary hover:text-primary-dark transition-colors"
-          >
-            Ver contas completas →
-          </Link>
         </div>
       )}
     </div>

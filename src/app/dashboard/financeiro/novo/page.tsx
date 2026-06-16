@@ -21,12 +21,13 @@ export default async function NovoLancamentoPage({
     tipo?: string;
     client_id?: string;
     processo_id?: string;
+    back?: string;
   }>;
 }) {
   const session = await getSession();
   if (!session || !hasPermission(session, "financeiro", "criar")) notFound();
 
-  const { tipo, client_id, processo_id } = await searchParams;
+  const { tipo, client_id, processo_id, back } = await searchParams;
   const defaultTipo: "entrada" | "saida" =
     tipo === "saida" ? "saida" : "entrada";
 
@@ -88,6 +89,7 @@ export default async function NovoLancamentoPage({
           defaultTipo={defaultTipo}
           defaultClientId={client_id}
           defaultProcessoId={processo_id}
+          redirectTo={back}
         />
       </div>
     </div>

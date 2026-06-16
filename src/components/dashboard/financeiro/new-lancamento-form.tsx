@@ -221,6 +221,10 @@ export default function NewLancamentoForm({
   );
   const [salarioCustomInput, setSalarioCustomInput] = useState("");
   const [jaRecebida, setJaRecebida] = useState(false);
+  const [comissaoModoPag, setComissaoModoPag] = useState<"auto" | "avista">(
+    "auto"
+  );
+  const [comissaoValorCustomInput, setComissaoValorCustomInput] = useState("");
 
   // ── Novos modos ────────────────────────────────────────────
   const [valorRetroativo, setValorRetroativo] = useState("");
@@ -359,6 +363,18 @@ export default function NewLancamentoForm({
     retroativoCalc,
   ]);
 
+  // ── Opção de pagamento da comissão ────────────────────────
+  const canChooseComissaoMode =
+    !!commissionInfo &&
+    (paymentMode === "parcelado" || paymentMode === "mensalidade");
+
+  const comissaoValorCustomEffective =
+    canChooseComissaoMode &&
+    comissaoModoPag === "avista" &&
+    comissaoValorCustomInput
+      ? parseMoney(comissaoValorCustomInput)
+      : "";
+
   // ── Número total de parcelas para modo mensalidade ─────────
   const totalParcelasEfetivo =
     paymentMode === "mensalidade" && mensalidadeCalc
@@ -446,6 +462,16 @@ export default function NewLancamentoForm({
             ? String(commissionInfo.comissao_valor_config)
             : ""
         }
+      />
+      <input
+        type="hidden"
+        name="comissao_modo_pagamento"
+        value={canChooseComissaoMode ? comissaoModoPag : "auto"}
+      />
+      <input
+        type="hidden"
+        name="comissao_valor_custom"
+        value={comissaoValorCustomEffective}
       />
       {redirectTo && (
         <input type="hidden" name="redirect_to" value={redirectTo} />
@@ -630,17 +656,14 @@ export default function NewLancamentoForm({
 
           {commissionInfo && (
             <div className="sm:col-span-2">
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1.5">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 space-y-3">
+                {/* Cabeçalho */}
                 <p className="font-body text-xs font-semibold uppercase tracking-wide text-amber-700">
-                  Comissão do indicador — será criada automaticamente
-                  {(paymentMode === "parcelado" ||
-                    paymentMode === "retroativo" ||
-                    paymentMode === "mensalidade") &&
-                  totalParcelasEfetivo
-                    ? ` (${totalParcelasEfetivo}× parcelas)`
-                    : ""}
+                  Comissão do indicador
                 </p>
-                <div className="flex flex-wrap items-center gap-4">
+
+                {/* Indicador + Regra + Total */}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                   <div>
                     <span className="font-body text-xs text-amber-600">
                       Indicador
@@ -660,37 +683,146 @@ export default function NewLancamentoForm({
                     </p>
                   </div>
                   {commissionInfo.comissao_calculada > 0 && (
-                    <>
-                      <div>
-                        <span className="font-body text-xs text-amber-600">
-                          Total da comissão
-                        </span>
-                        <p className="font-heading text-base font-semibold text-amber-800">
-                          {fmt(commissionInfo.comissao_calculada)}
-                        </p>
-                      </div>
-                      {(paymentMode === "parcelado" ||
-                        paymentMode === "retroativo" ||
-                        paymentMode === "mensalidade") &&
-                        parseInt(totalParcelasEfetivo) > 1 && (
-                          <div>
-                            <span className="font-body text-xs text-amber-600">
-                              Por parcela
-                            </span>
-                            <p className="font-heading text-sm font-semibold text-amber-700">
-                              {fmt(
-                                Math.round(
-                                  (commissionInfo.comissao_calculada /
-                                    parseInt(totalParcelasEfetivo)) *
-                                    100
-                                ) / 100
-                              )}
-                            </p>
-                          </div>
-                        )}
-                    </>
+                    <div>
+                      <span className="font-body text-xs text-amber-600">
+                        Total calculado
+                      </span>
+                      <p className="font-heading text-base font-semibold text-amber-800">
+                        {fmt(commissionInfo.comissao_calculada)}
+                      </p>
+                    </div>
                   )}
                 </div>
+
+                {/* Escolha do modo de pagamento (parcelado / mensalidade) */}
+                {canChooseComissaoMode &&
+                  commissionInfo.comissao_calculada > 0 && (
+                    <div className="space-y-2.5 pt-1 border-t border-amber-200">
+                      <p className="font-body text-xs font-semibold text-amber-800 pt-2">
+                        Como pagar a comissão?
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setComissaoModoPag("auto")}
+                          disabled={isPending}
+                          className={`flex-1 rounded-lg border-2 px-3 py-2 font-body text-xs font-semibold transition-colors duration-150 ${
+                            comissaoModoPag === "auto"
+                              ? "border-amber-400 bg-amber-100 text-amber-900"
+                              : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                          }`}
+                        >
+                          Acompanhar parcelas do cliente
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setComissaoModoPag("avista")}
+                          disabled={isPending}
+                          className={`flex-1 rounded-lg border-2 px-3 py-2 font-body text-xs font-semibold transition-colors duration-150 ${
+                            comissaoModoPag === "avista"
+                              ? "border-amber-400 bg-amber-100 text-amber-900"
+                              : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                          }`}
+                        >
+                          À vista — valor acordado
+                        </button>
+                      </div>
+
+                      {/* Campo de valor personalizado (à vista com desconto) */}
+                      {comissaoModoPag === "avista" && (
+                        <div>
+                          <label className="block font-body text-xs font-semibold text-amber-800 mb-1">
+                            Valor da comissão à vista
+                            <span className="font-normal text-amber-600 ml-1">
+                              — pode ser menor se houver desconto
+                            </span>
+                          </label>
+                          <div className="relative max-w-[200px]">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                              R$
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0,00"
+                              value={comissaoValorCustomInput}
+                              onChange={(e) =>
+                                setComissaoValorCustomInput(
+                                  formatMoneyInput(e.target.value)
+                                )
+                              }
+                              onBlur={() =>
+                                setComissaoValorCustomInput(
+                                  normalizeMoneyBlur(comissaoValorCustomInput)
+                                )
+                              }
+                              disabled={isPending}
+                              className={`${inputClass} pl-10`}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Resumo do pagamento */}
+                      <div className="rounded-lg bg-amber-100 border border-amber-200 px-3 py-2">
+                        {comissaoModoPag === "avista"
+                          ? (() => {
+                              const valorEfetivo = comissaoValorCustomInput
+                                ? parseFloat(
+                                    parseMoney(comissaoValorCustomInput)
+                                  ) || commissionInfo.comissao_calculada
+                                : commissionInfo.comissao_calculada;
+                              return (
+                                <p className="font-body text-xs font-semibold text-amber-900">
+                                  1 remuneração à vista de{" "}
+                                  <strong>{fmt(valorEfetivo)}</strong> para{" "}
+                                  {commissionInfo.indicador_nome}
+                                </p>
+                              );
+                            })()
+                          : (() => {
+                              const n = parseInt(totalParcelasEfetivo) || 1;
+                              const porParcela =
+                                Math.round(
+                                  (commissionInfo.comissao_calculada / n) * 100
+                                ) / 100;
+                              return (
+                                <p className="font-body text-xs font-semibold text-amber-900">
+                                  {n} remuneração{n > 1 ? "ões" : ""} de{" "}
+                                  <strong>{fmt(porParcela)}</strong> para{" "}
+                                  {commissionInfo.indicador_nome}
+                                </p>
+                              );
+                            })()}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Info automática para modos sem escolha */}
+                {!canChooseComissaoMode &&
+                  commissionInfo.comissao_calculada > 0 && (
+                    <div className="rounded-lg bg-amber-100 border border-amber-200 px-3 py-2">
+                      {paymentMode === "avista" ||
+                      (paymentMode === "retroativo" && !retroHasSalario) ? (
+                        <p className="font-body text-xs font-semibold text-amber-900">
+                          1 remuneração à vista de{" "}
+                          <strong>
+                            {fmt(commissionInfo.comissao_calculada)}
+                          </strong>{" "}
+                          para {commissionInfo.indicador_nome}
+                        </p>
+                      ) : (
+                        <p className="font-body text-xs font-semibold text-amber-900">
+                          Comissão acompanha parcelas —{" "}
+                          <strong>
+                            {fmt(commissionInfo.comissao_calculada)}
+                          </strong>{" "}
+                          ÷ {totalParcelasEfetivo} para{" "}
+                          {commissionInfo.indicador_nome}
+                        </p>
+                      )}
+                    </div>
+                  )}
               </div>
             </div>
           )}
@@ -776,6 +908,8 @@ export default function NewLancamentoForm({
                     setSalarioBase("none");
                     setSalarioCustomInput("");
                     setValorEntradaMensalidade("");
+                    setComissaoModoPag("auto");
+                    setComissaoValorCustomInput("");
                   }}
                   disabled={isPending}
                   className={`flex-1 rounded-lg border-2 px-3 py-2 font-body transition-colors duration-150 ${

@@ -15,12 +15,12 @@ export const dynamic = "force-dynamic";
 export default async function NovoProcessoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cliente?: string }>;
+  searchParams: Promise<{ cliente?: string; back?: string }>;
 }) {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "criar")) notFound();
 
-  const { cliente } = await searchParams;
+  const { cliente, back } = await searchParams;
   const clients = await getAllClients();
   const clientOptions = clients.map((c) => ({ id: c.id, name: c.name }));
 
@@ -50,7 +50,11 @@ export default async function NovoProcessoPage({
 
       {/* Form card */}
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:p-8">
-        <NewProcessoForm clients={clientOptions} defaultClientId={cliente} />
+        <NewProcessoForm
+          clients={clientOptions}
+          defaultClientId={cliente}
+          redirectTo={back}
+        />
       </div>
     </div>
   );

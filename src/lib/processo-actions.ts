@@ -60,6 +60,10 @@ export async function createProcessoAction(
     return { error: "Erro ao salvar processo. Tente novamente." };
   }
 
+  const redirectTo =
+    ((formData.get("redirect_to") as string | null) ?? "").trim() ||
+    "/dashboard/processos";
+
   await logAction({
     acao: "criar",
     entidade: "processo",
@@ -67,7 +71,7 @@ export async function createProcessoAction(
     detalhes: { tipoAcao, area },
   });
 
-  redirect("/dashboard/processos");
+  redirect(redirectTo);
 }
 
 export async function updateProcessoAction(

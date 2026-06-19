@@ -4,6 +4,12 @@ import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { criarEnvelope } from "./assinaturas-db";
 import { revalidatePath } from "next/cache";
+import {
+  tramitaSignAtivo,
+  tramitaCriarCliente,
+  tramitaCriarNota,
+  tramitaObterUserId,
+} from "./tramitasign";
 
 export async function salvarEnvelopeAction(formData: FormData) {
   const session = await getSession();
@@ -35,6 +41,55 @@ export async function salvarEnvelopeAction(formData: FormData) {
     documentos,
   });
 
+  // Sincroniza com TramitaSign quando envelope é enviado para assinatura
+  if (enviar && tramitaSignAtivo() && assinantes.length > 0) {
+    sincronizarTramitaSign(id, nome, assinantes).catch((e) =>
+      console.error("[TramitaSign] sincronização falhou:", e)
+    );
+  }
+
   revalidatePath("/dashboard/assinaturas");
   return { id };
+}
+
+async function sincronizarTramitaSign(
+  envelopeId: string,
+  nomeEnvelope: string,
+  assinantes: Array<{
+    nome: string;
+    email: string;
+    papel: string;
+    tipo: string;
+  }>
+) {
+  try {
+    const userId = await tramitaObterUserId();
+
+    // Para cada assinante externo (não "eu_mesmo"), cria no TramitaSign
+    for (const a of assinantes) {
+      if (a.tipo === "eu_mesmo") continue;
+
+      const cliente = await tramitaCriarCliente({
+        nome: a.nome,
+        email: a.email || null,
+        telefone: null,
+        cpf: null,
+      });
+
+      if (cliente?.id && userId) {
+        const dataEnvio = new Date().toLocaleString("pt-BR");
+        await tramitaCriarNota(
+          cliente.id,
+          userId,
+          `Envelope de assinatura enviado via LiderAdv\n` +
+            `Documento: ${nomeEnvelope}\n` +
+            `Papel: ${a.papel}\n` +
+            `Data: ${dataEnvio}\n` +
+            `Ref: ${envelopeId}`
+        );
+      }
+    }
+  } catch (e) {
+    console.error("[TramitaSign] sincronizarTramitaSign error:", e);
+  }
 }

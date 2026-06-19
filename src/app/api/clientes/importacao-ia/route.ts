@@ -204,7 +204,7 @@ export async function POST(request: Request) {
     if (isSupportedImage(fileType)) {
       const base64 = buffer.toString("base64");
       const res = await client.messages.create({
-        model: "claude-sonnet-4-6",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,
         messages: [
           {
@@ -237,7 +237,7 @@ export async function POST(request: Request) {
       }
 
       const res = await client.messages.create({
-        model: "claude-sonnet-4-6",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,
         messages: [{ role: "user", content: pdfContent }],
       });

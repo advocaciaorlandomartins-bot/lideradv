@@ -336,10 +336,10 @@ function LogoGoogle() {
   );
 }
 
-function LogoZapSign() {
+function LogoTramitaSign() {
   return (
-    <span className="font-heading text-lg font-extrabold text-violet-600">
-      Z
+    <span className="font-heading text-lg font-extrabold text-blue-700">
+      TS
     </span>
   );
 }
@@ -896,19 +896,27 @@ export default function IntegracoesContent() {
         {/* ── Resend ── */}
         <ResendCard status={resendStatus} />
 
-        {/* ── ZapSign ── */}
+        {/* ── TramitaSign ── */}
         <IntegrationCard
-          logo={<LogoZapSign />}
-          name="ZapSign"
-          status="em_breve"
-          description="Colete assinaturas digitais de forma simples e com validade jurídica. Envie documentos para assinar em segundos."
+          logo={<LogoTramitaSign />}
+          name="TramitaSign"
+          status={
+            typeof window === "undefined"
+              ? "em_breve"
+              : process.env.NEXT_PUBLIC_TRAMITASIGN_ATIVO === "true"
+                ? "conectado"
+                : "em_breve"
+          }
+          description="Assinaturas digitais com validade jurídica via tramitacaointeligente.com.br. Clientes assinam pelo WhatsApp ou e-mail."
         >
-          <button
-            disabled
-            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-slate-50 px-4 py-2 font-body text-sm font-semibold text-muted opacity-60"
+          <a
+            href="https://planilha.tramitacaointeligente.com.br/assinaturas"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 font-body text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
           >
-            Em breve
-          </button>
+            Acessar painel
+          </a>
         </IntegrationCard>
       </div>
 

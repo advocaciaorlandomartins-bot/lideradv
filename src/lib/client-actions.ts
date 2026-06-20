@@ -90,6 +90,13 @@ export async function createClientAction(
     return { error: "Informe um e-mail válido." };
   }
 
+  if (email) {
+    const dup =
+      await sql`SELECT id FROM clients WHERE email = ${email} LIMIT 1`;
+    if (dup.length > 0)
+      return { error: "Este e-mail já está cadastrado em outro cliente." };
+  }
+
   {
     const missingAddr: string[] = [];
     if (!cep) missingAddr.push("CEP");
@@ -261,6 +268,13 @@ export async function updateClientAction(
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "Informe um e-mail válido." };
+  }
+
+  if (email) {
+    const dup =
+      await sql`SELECT id FROM clients WHERE email = ${email} AND id != ${id}::uuid LIMIT 1`;
+    if (dup.length > 0)
+      return { error: "Este e-mail já está cadastrado em outro cliente." };
   }
 
   {

@@ -110,6 +110,19 @@ export default function NewProcessoForm({
 
   const [tipoAcaoSel, setTipoAcaoSel] = useState("");
   const [tipoAcaoManual, setTipoAcaoManual] = useState("");
+  const [cnpjWarning, setCnpjWarning] = useState("");
+
+  const CNJ_REGEX = /^\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}$/;
+  const todayISO = new Date().toISOString().split("T")[0];
+
+  function handleNumeroBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const v = e.target.value.trim();
+    if (v && !CNJ_REGEX.test(v)) {
+      setCnpjWarning("Formato esperado: 0000000-00.0000.0.00.0000");
+    } else {
+      setCnpjWarning("");
+    }
+  }
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
@@ -158,9 +171,16 @@ export default function NewProcessoForm({
                 name="numero"
                 type="text"
                 placeholder="0000000-00.0000.0.00.0000"
+                onBlur={handleNumeroBlur}
+                onChange={() => setCnpjWarning("")}
                 disabled={isPending}
-                className={inputClass}
+                className={`${inputClass} ${cnpjWarning ? "border-amber-400 focus:border-amber-400 focus:ring-amber-100" : ""}`}
               />
+              {cnpjWarning && (
+                <p className="mt-1 font-body text-xs text-amber-600">
+                  {cnpjWarning}
+                </p>
+              )}
             </Field>
           </div>
           <div className="sm:col-span-2">
@@ -228,6 +248,16 @@ export default function NewProcessoForm({
                 </option>
               ))}
             </select>
+          </Field>
+
+          <Field label="Data de distribuição">
+            <input
+              name="data_distribuicao"
+              type="date"
+              max={todayISO}
+              disabled={isPending}
+              className={inputClass}
+            />
           </Field>
         </div>
       </div>

@@ -82,12 +82,15 @@ export const STATUS_CONTROLE = {
 
 export type StatusControle = keyof typeof STATUS_CONTROLE;
 
+export type PrioridadeControle = "baixa" | "media" | "alta";
+
 export interface Controle {
   id: string;
   tipo: TipoControle;
   data_evento: string | null;
   descricao: string;
   status: StatusControle;
+  prioridade: PrioridadeControle | null;
   cliente_id: string | null;
   cliente_nome: string | null;
   processo_id: string | null;

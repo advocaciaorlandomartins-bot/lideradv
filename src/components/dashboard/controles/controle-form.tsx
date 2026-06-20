@@ -97,6 +97,8 @@ export default function ControleForm({
   const [prazoInterno, setPrazoInterno] = useState(
     controle?.prazo_interno ?? ""
   );
+  const todayISO = new Date().toISOString().split("T")[0];
+  const dataPassada = dataEvento && dataEvento < todayISO;
 
   const tipoConfig = getTipoConfig(tipo);
   const isAudiencia = tipo === "audiencias";
@@ -268,8 +270,13 @@ export default function ControleForm({
               name="data_evento"
               value={dataEvento}
               onChange={(e) => setDataEvento(e.target.value)}
-              className={inputCls}
+              className={`${inputCls} ${dataPassada ? "border-amber-400" : ""}`}
             />
+            {dataPassada && (
+              <p className="mt-1 font-body text-xs text-amber-600">
+                Data no passado — este controle será registrado como vencido.
+              </p>
+            )}
           </div>
 
           {/* Hora — audiências e perícias */}
@@ -533,6 +540,20 @@ export default function ControleForm({
               </div>
             </>
           )}
+
+          {/* Prioridade */}
+          <div>
+            <label className={labelCls}>Prioridade</label>
+            <select
+              name="prioridade"
+              defaultValue={controle?.prioridade ?? "media"}
+              className={selectCls}
+            >
+              <option value="baixa">Baixa</option>
+              <option value="media">Média</option>
+              <option value="alta">Alta</option>
+            </select>
+          </div>
 
           {/* Tipo Demanda */}
           <div>

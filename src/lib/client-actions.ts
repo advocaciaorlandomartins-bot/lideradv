@@ -90,8 +90,19 @@ export async function createClientAction(
     return { error: "Informe um e-mail válido." };
   }
 
-  if (!cep || !street || !addrNumber || !neighborhood || !city || !state) {
-    return { error: "Preencha o endereço completo." };
+  {
+    const missingAddr: string[] = [];
+    if (!cep) missingAddr.push("CEP");
+    if (!street) missingAddr.push("logradouro");
+    if (!addrNumber) missingAddr.push("número");
+    if (!neighborhood) missingAddr.push("bairro");
+    if (!city) missingAddr.push("cidade");
+    if (!state) missingAddr.push("estado");
+    if (missingAddr.length > 0) {
+      return {
+        error: `Preencha os campos de endereço: ${missingAddr.join(", ")}.`,
+      };
+    }
   }
 
   try {
@@ -252,8 +263,19 @@ export async function updateClientAction(
     return { error: "Informe um e-mail válido." };
   }
 
-  if (!cep || !street || !addrNumber || !neighborhood || !city || !state) {
-    return { error: "Preencha o endereço completo." };
+  {
+    const missingAddr: string[] = [];
+    if (!cep) missingAddr.push("CEP");
+    if (!street) missingAddr.push("logradouro");
+    if (!addrNumber) missingAddr.push("número");
+    if (!neighborhood) missingAddr.push("bairro");
+    if (!city) missingAddr.push("cidade");
+    if (!state) missingAddr.push("estado");
+    if (missingAddr.length > 0) {
+      return {
+        error: `Preencha os campos de endereço: ${missingAddr.join(", ")}.`,
+      };
+    }
   }
 
   try {
@@ -359,21 +381,33 @@ export async function updateClientAction(
   redirect(`/dashboard/clientes/${id}`);
 }
 
-export async function deleteClientAction(id: string): Promise<void> {
+export async function deleteClientAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "clientes", "excluir")) return;
+  if (!session || !hasPermission(session, "clientes", "excluir")) {
+    return { error: "Sem permissão para excluir clientes." };
+  }
 
   try {
     await sql`DELETE FROM clients WHERE id = ${id}::uuid`;
   } catch (err) {
     console.error("deleteClientAction DB error:", err);
-    return;
+    return {
+      error: "Erro ao excluir cliente. Verifique se ele não possui vínculos.",
+    };
   }
-  await logAction({
-    acao: "excluir",
-    entidade: "cliente",
-    entidadeId: id,
-    descricao: "Excluiu cliente",
-  });
-  redirect("/dashboard/clientes");
+
+  try {
+    await logAction({
+      acao: "excluir",
+      entidade: "cliente",
+      entidadeId: id,
+      descricao: "Excluiu cliente",
+    });
+  } catch {
+    // log failure is non-critical
+  }
+
+  return {};
 }

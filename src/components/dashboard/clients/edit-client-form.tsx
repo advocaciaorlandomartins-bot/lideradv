@@ -93,6 +93,23 @@ function maskCPFSimple(v: string) {
     .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 }
 
+function validarCPF(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, "");
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  let s = 0;
+  for (let i = 0; i < 9; i++) s += +d[i] * (10 - i);
+  let r = (s * 10) % 11;
+  if (r >= 10) r = 0;
+  if (r !== +d[9]) return false;
+  s = 0;
+  for (let i = 0; i < 10; i++) s += +d[i] * (11 - i);
+  r = (s * 10) % 11;
+  if (r >= 10) r = 0;
+  return r === +d[10];
+}
+
+const todayISO = new Date().toISOString().split("T")[0];
+
 const ESTADOS_UF = [
   "AC",
   "AL",
@@ -220,6 +237,7 @@ export default function EditClientForm({
   const [nameValue, setNameValue] = useState(client.name);
   const [tradeNameValue, setTradeNameValue] = useState(client.trade_name ?? "");
   const [docValue, setDocValue] = useState(client.doc);
+  const [cpfError, setCpfError] = useState("");
   const [phoneValue, setPhoneValue] = useState(client.phone);
   const [emailValue, setEmailValue] = useState(client.email);
 
@@ -275,6 +293,14 @@ export default function EditClientForm({
     setDocValue(
       type === "PF" ? maskCPF(e.target.value) : maskCNPJ(e.target.value)
     );
+    if (type === "PF") setCpfError("");
+  }
+
+  function handleDocBlur() {
+    if (type === "PF" && docValue.replace(/\D/g, "").length === 11) {
+      if (!validarCPF(docValue))
+        setCpfError("CPF inválido. Verifique os dígitos.");
+    }
   }
 
   async function handleCepBlur(e: React.FocusEvent<HTMLInputElement>) {
@@ -390,9 +416,13 @@ export default function EditClientForm({
               required
               value={docValue}
               onChange={handleDocChange}
+              onBlur={handleDocBlur}
               disabled={isPending}
-              className={inputClass}
+              className={`${inputClass} ${cpfError ? "border-red-400 focus:border-red-400 focus:ring-red-100" : ""}`}
             />
+            {cpfError && (
+              <p className="mt-1 font-body text-xs text-red-600">{cpfError}</p>
+            )}
           </Field>
 
           {/* Telefone */}
@@ -457,6 +487,7 @@ export default function EditClientForm({
               <input
                 name="birth_date"
                 type="date"
+                max={todayISO}
                 value={birthDate}
                 onChange={(e) => {
                   const val = e.target.value;

@@ -49,6 +49,23 @@ function maskCPFSimple(v: string) {
     .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 }
 
+function validarCPF(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, "");
+  if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
+  let s = 0;
+  for (let i = 0; i < 9; i++) s += +d[i] * (10 - i);
+  let r = (s * 10) % 11;
+  if (r >= 10) r = 0;
+  if (r !== +d[9]) return false;
+  s = 0;
+  for (let i = 0; i < 10; i++) s += +d[i] * (11 - i);
+  r = (s * 10) % 11;
+  if (r >= 10) r = 0;
+  return r === +d[10];
+}
+
+const todayISO = new Date().toISOString().split("T")[0];
+
 const ESTADOS_UF = [
   "AC",
   "AL",
@@ -213,6 +230,7 @@ export default function NewClientForm({
   const [nameValue, setNameValue] = useState("");
   const [tradeNameValue, setTradeNameValue] = useState("");
   const [docValue, setDocValue] = useState("");
+  const [cpfError, setCpfError] = useState("");
   const [phoneValue, setPhoneValue] = useState("");
   const [emailValue, setEmailValue] = useState("");
 
@@ -244,6 +262,7 @@ export default function NewClientForm({
   function handleTypeChange(t: "PF" | "PJ") {
     setType(t);
     setDocValue("");
+    setCpfError("");
   }
 
   async function fetchCnpj(digits: string) {
@@ -275,10 +294,18 @@ export default function NewClientForm({
     const raw = e.target.value;
     if (type === "PF") {
       setDocValue(maskCPF(raw));
+      setCpfError("");
     } else {
       const digits = raw.replace(/\D/g, "").slice(0, 14);
       setDocValue(maskCNPJ(raw));
       if (digits.length === 14) fetchCnpj(digits);
+    }
+  }
+
+  function handleDocBlur() {
+    if (type === "PF" && docValue.replace(/\D/g, "").length === 11) {
+      if (!validarCPF(docValue))
+        setCpfError("CPF inválido. Verifique os dígitos.");
     }
   }
 
@@ -403,13 +430,17 @@ export default function NewClientForm({
                 }
                 value={docValue}
                 onChange={handleDocChange}
+                onBlur={handleDocBlur}
                 disabled={isPending}
-                className={`${inputClass} pr-10`}
+                className={`${inputClass} pr-10 ${cpfError ? "border-red-400 focus:border-red-400 focus:ring-red-100" : ""}`}
               />
               {cnpjLoading && (
                 <SpinnerIcon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
               )}
             </div>
+            {cpfError && (
+              <p className="mt-1 font-body text-xs text-red-600">{cpfError}</p>
+            )}
           </Field>
 
           {/* Telefone */}
@@ -474,6 +505,7 @@ export default function NewClientForm({
               <input
                 name="birth_date"
                 type="date"
+                max={todayISO}
                 value={birthDate}
                 onChange={(e) => {
                   const val = e.target.value;

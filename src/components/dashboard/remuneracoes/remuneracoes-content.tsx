@@ -52,7 +52,8 @@ function KpiCard({
         {label}
       </p>
       <p
-        className={`mt-2 font-heading text-sm sm:text-xl font-semibold break-all leading-tight ${color}`}
+        className={`mt-2 font-heading text-sm sm:text-xl font-semibold whitespace-nowrap overflow-hidden text-ellipsis leading-tight ${color}`}
+        title={String(value)}
       >
         {value}
       </p>

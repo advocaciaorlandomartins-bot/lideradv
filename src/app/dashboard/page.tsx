@@ -465,7 +465,10 @@ export default async function DashboardPage() {
                 {kpis.saldoMes >= 0 ? "▲" : "▼"} Saldo
               </span>
             </div>
-            <p className="mt-3 font-heading text-sm font-bold text-fg sm:text-xl break-all leading-tight">
+            <p
+              className="mt-3 font-heading text-sm font-bold text-fg sm:text-xl whitespace-nowrap overflow-hidden text-ellipsis leading-tight"
+              title={fmt(kpis.recebidoMes)}
+            >
               {fmt(kpis.recebidoMes)}
             </p>
             <p className="mt-0.5 font-body text-xs font-semibold text-muted">
@@ -978,7 +981,8 @@ export default async function DashboardPage() {
                   {label}
                 </p>
                 <p
-                  className={`mt-1 font-heading text-sm sm:text-base font-bold break-all leading-tight ${cls}`}
+                  className={`mt-1 font-heading text-sm sm:text-base font-bold whitespace-nowrap overflow-hidden text-ellipsis leading-tight ${cls}`}
+                  title={fmt(value)}
                 >
                   {fmt(value)}
                 </p>
@@ -1045,7 +1049,8 @@ export default async function DashboardPage() {
                     {label}
                   </p>
                   <p
-                    className={`mt-0.5 font-heading text-xs sm:text-sm font-bold break-all leading-tight ${cls}`}
+                    className={`mt-0.5 font-heading text-xs sm:text-sm font-bold whitespace-nowrap overflow-hidden text-ellipsis leading-tight ${cls}`}
+                    title={fmt(value)}
                   >
                     {fmt(value)}
                   </p>

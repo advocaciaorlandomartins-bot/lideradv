@@ -130,7 +130,10 @@ function KpiCard({
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="mt-2 font-heading text-sm sm:text-xl font-semibold text-fg break-all leading-tight">
+      <p
+        className="mt-2 font-heading text-sm sm:text-xl font-semibold text-fg whitespace-nowrap overflow-hidden text-ellipsis leading-tight"
+        title={fmt(value)}
+      >
         {fmt(value)}
       </p>
       {sub && <p className="mt-0.5 font-body text-xs text-muted">{sub}</p>}

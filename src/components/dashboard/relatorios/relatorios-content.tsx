@@ -758,7 +758,8 @@ function ClientesTab({
                     {label}
                   </p>
                   <p
-                    className={`mt-1 font-heading text-base sm:text-xl font-bold break-all leading-tight ${color}`}
+                    className={`mt-1 font-heading text-base sm:text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis leading-tight ${color}`}
+                    title={fmt(value)}
                   >
                     {fmt(value)}
                   </p>
@@ -936,7 +937,8 @@ function FolhaTab({
                 {label}
               </p>
               <p
-                className={`mt-1 font-heading text-base sm:text-xl font-bold break-all leading-tight ${color}`}
+                className={`mt-1 font-heading text-base sm:text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis leading-tight ${color}`}
+                title={fmt(value)}
               >
                 {fmt(value)}
               </p>
@@ -1146,7 +1148,8 @@ function FluxoTab({ fluxo }: { fluxo: FluxoMensal[] }) {
               {label}
             </p>
             <p
-              className={`mt-1 font-heading text-sm sm:text-lg font-bold break-all leading-tight ${color}`}
+              className={`mt-1 font-heading text-sm sm:text-lg font-bold whitespace-nowrap overflow-hidden text-ellipsis leading-tight ${color}`}
+              title={fmt(value)}
             >
               {fmt(value)}
             </p>

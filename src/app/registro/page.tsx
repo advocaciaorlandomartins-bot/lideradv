@@ -107,7 +107,7 @@ export default function RegisterPage() {
             © {new Date().getFullYear()} LiderAdv. Todos os direitos reservados.
           </p>
           <Link
-            href="/"
+            href="/login"
             className="font-body text-xs text-white/50 hover:text-white/80 transition-colors duration-150"
           >
             ← Já tenho conta

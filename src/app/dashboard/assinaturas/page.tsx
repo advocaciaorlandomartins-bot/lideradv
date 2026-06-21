@@ -36,7 +36,7 @@ function fmtDate(s: string | null) {
 
 export default async function AssinaturasPage() {
   const session = await getSession();
-  if (!session) redirect("/");
+  if (!session) redirect("/login");
   if (!hasPermission(session, "assinaturas", "ver")) notFound();
 
   const envelopes = await listarEnvelopes(session.login);

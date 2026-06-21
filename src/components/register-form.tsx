@@ -324,7 +324,7 @@ export default function RegisterForm() {
       <p className="mt-6 text-center font-body text-sm text-muted">
         Já tem conta?{" "}
         <Link
-          href="/"
+          href="/login"
           className="font-semibold text-primary hover:text-primary-dark transition-colors duration-150"
         >
           Entrar

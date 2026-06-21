@@ -96,7 +96,7 @@ export async function logoutAction(): Promise<void> {
     _login: session?.login ?? "sistema",
     _cat: session?.categoria,
   });
-  redirect("/");
+  redirect("/login");
 }
 
 export type RegisterState = { error: string } | { success: true } | null;

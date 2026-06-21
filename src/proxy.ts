@@ -5,7 +5,7 @@ const COOKIE = "adv_session";
 export function proxy(req: NextRequest) {
   const session = req.cookies.get(COOKIE)?.value;
   if (!session) {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/login", req.url));
   }
   return NextResponse.next();
 }

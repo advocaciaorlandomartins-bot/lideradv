@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NovoEnvelopePage() {
   const session = await getSession();
-  if (!session) redirect("/");
+  if (!session) redirect("/login");
   if (!hasPermission(session, "assinaturas", "criar")) notFound();
 
   const [colaboradores, clientes] = await Promise.all([

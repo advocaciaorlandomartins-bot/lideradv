@@ -150,6 +150,7 @@ export default function LandingPage() {
         style={{
           background: "rgba(10,20,50,0.96)",
           backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
         }}
       >
         <Link href="/" className="flex items-center gap-3">
@@ -182,7 +183,7 @@ export default function LandingPage() {
           href="/registro"
           className="rounded-full bg-gradient-to-r from-[#5b8fee] to-[#0066ff] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_15px_rgba(91,143,238,0.35)] hover:-translate-y-0.5 hover:shadow-[0_6px_25px_rgba(91,143,238,0.45)] transition-all duration-200"
         >
-          Começar Grátis
+          <span className="whitespace-nowrap">Começar Grátis</span>
         </Link>
       </nav>
 
@@ -248,12 +249,12 @@ export default function LandingPage() {
           {/* Dashboard mock */}
           <div className="flex justify-center lg:justify-end">
             <div
-              className="w-full max-w-xs sm:max-w-sm rounded-3xl border border-[#5b8fee]/40 p-5 shadow-[0_30px_60px_rgba(0,0,0,0.35)]"
+              className="animate-float w-full max-w-xs sm:max-w-sm rounded-3xl border border-[#5b8fee]/40 p-5 shadow-[0_30px_60px_rgba(0,0,0,0.35)]"
               style={{
                 background:
                   "linear-gradient(135deg, rgba(91,143,238,0.2), rgba(0,102,255,0.1))",
                 backdropFilter: "blur(20px)",
-                animation: "floatY 4s ease-in-out infinite",
+                WebkitBackdropFilter: "blur(20px)",
               }}
             >
               {/* fake top bar */}
@@ -288,13 +289,6 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-
-        <style>{`
-          @keyframes floatY {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-18px); }
-          }
-        `}</style>
       </section>
 
       {/* ── STATS ── */}

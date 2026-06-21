@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Client } from "@/lib/clients-db";
+import type { ClientFull } from "@/lib/clients-db";
 import type { Processo } from "@/lib/processos-db";
 import type { ClientDebito } from "@/lib/lancamentos-db";
 import type { Documento } from "@/lib/documents-db";
@@ -104,7 +104,7 @@ function InfoRow({
 // ── Main component ────────────────────────────────────────────
 
 interface Props {
-  client: Client;
+  client: ClientFull;
   processes: Processo[];
   debito: ClientDebito;
   documentos: Documento[];
@@ -355,6 +355,146 @@ export default function ClienteDetailTabs({
               </ul>
             )}
           </div>
+
+          {/* Card previdenciário — só aparece se houver dados */}
+          {client.type === "PF" &&
+            (client.nis ||
+              client.num_beneficio ||
+              client.status_beneficio ||
+              client.cid_principal ||
+              client.filiacao_mae ||
+              client.naturalidade_cidade) && (
+              <div className="lg:col-span-3 rounded-xl border border-blue-100 bg-blue-50/40 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white font-body text-[10px] font-bold">
+                    INSS
+                  </span>
+                  <h3 className="font-heading text-sm font-bold text-fg">
+                    Dados Previdenciários
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {client.nis && (
+                    <InfoRow label="NIS / PIS" value={client.nis} />
+                  )}
+                  {client.num_beneficio && (
+                    <InfoRow
+                      label="Nº Benefício"
+                      value={client.num_beneficio}
+                    />
+                  )}
+                  {client.status_beneficio && (
+                    <InfoRow
+                      label="Status benefício"
+                      value={
+                        {
+                          ativo: "Ativo",
+                          suspenso: "Suspenso",
+                          cessado: "Cessado",
+                          nao_recebe: "Não recebe",
+                        }[client.status_beneficio] ?? client.status_beneficio
+                      }
+                    />
+                  )}
+                  {client.tipo_beneficio && (
+                    <InfoRow
+                      label="Tipo de benefício"
+                      value={client.tipo_beneficio}
+                    />
+                  )}
+                  {client.data_inicio_beneficio && (
+                    <InfoRow
+                      label="Início benefício"
+                      value={new Date(
+                        client.data_inicio_beneficio + "T12:00:00"
+                      ).toLocaleDateString("pt-BR")}
+                    />
+                  )}
+                  {client.valor_beneficio != null && (
+                    <InfoRow
+                      label="Valor benefício"
+                      value={client.valor_beneficio.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    />
+                  )}
+                  {client.categoria_contribuinte && (
+                    <InfoRow
+                      label="Categoria contribuinte"
+                      value={
+                        {
+                          empregado: "Empregado",
+                          individual: "Contribuinte individual",
+                          especial: "Segurado especial",
+                          avulso: "Trabalhador avulso",
+                          facultativo: "Facultativo",
+                        }[client.categoria_contribuinte] ??
+                        client.categoria_contribuinte
+                      }
+                    />
+                  )}
+                  {client.carencia_atingida != null && (
+                    <InfoRow
+                      label="Carência atingida"
+                      value={client.carencia_atingida ? "Sim" : "Não"}
+                    />
+                  )}
+                  {client.cid_principal && (
+                    <InfoRow
+                      label="CID principal"
+                      value={client.cid_principal}
+                    />
+                  )}
+                  {client.tipo_incapacidade && (
+                    <InfoRow
+                      label="Incapacidade"
+                      value={
+                        {
+                          permanente: "Permanente",
+                          temporaria: "Temporária",
+                          nao_se_aplica: "Não se aplica",
+                        }[client.tipo_incapacidade] ?? client.tipo_incapacidade
+                      }
+                    />
+                  )}
+                  {client.data_diagnostico && (
+                    <InfoRow
+                      label="Data diagnóstico"
+                      value={new Date(
+                        client.data_diagnostico + "T12:00:00"
+                      ).toLocaleDateString("pt-BR")}
+                    />
+                  )}
+                  {client.data_afastamento && (
+                    <InfoRow
+                      label="Data afastamento"
+                      value={new Date(
+                        client.data_afastamento + "T12:00:00"
+                      ).toLocaleDateString("pt-BR")}
+                    />
+                  )}
+                  {client.atividade_anterior && (
+                    <InfoRow
+                      label="Atividade anterior"
+                      value={client.atividade_anterior}
+                    />
+                  )}
+                  {client.naturalidade_cidade && (
+                    <InfoRow
+                      label="Naturalidade"
+                      value={`${client.naturalidade_cidade}${client.naturalidade_estado ? ` / ${client.naturalidade_estado}` : ""}`}
+                    />
+                  )}
+                  {client.filiacao_mae && (
+                    <InfoRow label="Nome da mãe" value={client.filiacao_mae} />
+                  )}
+                  {client.filiacao_pai && (
+                    <InfoRow label="Nome do pai" value={client.filiacao_pai} />
+                  )}
+                </div>
+              </div>
+            )}
         </div>
       )}
 

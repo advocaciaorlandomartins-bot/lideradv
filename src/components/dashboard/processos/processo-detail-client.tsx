@@ -708,6 +708,130 @@ function DadosTab({ processo }: { processo: ProcessoExtended }) {
       {processo.notas && (
         <DadosField label="Observações" value={processo.notas} />
       )}
+
+      {/* Bloco INSS — só exibe se houver ao menos um campo preenchido */}
+      {(processo.der ||
+        processo.dib ||
+        processo.dcb ||
+        processo.protocolo_inss ||
+        processo.resultado_admin ||
+        processo.modelo_honorario) && (
+        <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/40 p-5 space-y-3">
+          <p className="font-body text-xs font-bold uppercase tracking-wide text-blue-700 mb-2">
+            Previdenciário — INSS & Honorários
+          </p>
+          {processo.der && (
+            <DadosField
+              label="DER"
+              value={new Date(processo.der + "T12:00:00").toLocaleDateString(
+                "pt-BR"
+              )}
+            />
+          )}
+          {processo.dib && (
+            <DadosField
+              label="DIB"
+              value={new Date(processo.dib + "T12:00:00").toLocaleDateString(
+                "pt-BR"
+              )}
+            />
+          )}
+          {processo.dcb && (
+            <DadosField
+              label="DCB"
+              value={new Date(processo.dcb + "T12:00:00").toLocaleDateString(
+                "pt-BR"
+              )}
+            />
+          )}
+          {processo.data_protocolo_inss && (
+            <DadosField
+              label="Requerimento INSS"
+              value={new Date(
+                processo.data_protocolo_inss + "T12:00:00"
+              ).toLocaleDateString("pt-BR")}
+            />
+          )}
+          {processo.protocolo_inss && (
+            <DadosField
+              label="Protocolo INSS"
+              value={processo.protocolo_inss}
+            />
+          )}
+          {processo.agencia_inss && (
+            <DadosField label="Agência INSS" value={processo.agencia_inss} />
+          )}
+          {processo.resultado_admin && (
+            <DadosField
+              label="Resultado admin."
+              value={
+                processo.resultado_admin === "deferido"
+                  ? "Deferido"
+                  : processo.resultado_admin === "indeferido"
+                    ? "Indeferido"
+                    : processo.resultado_admin === "em_analise"
+                      ? "Em análise"
+                      : processo.resultado_admin === "recurso"
+                        ? "Em recurso"
+                        : processo.resultado_admin
+              }
+            />
+          )}
+          {processo.data_resultado_admin && (
+            <DadosField
+              label="Data resultado"
+              value={new Date(
+                processo.data_resultado_admin + "T12:00:00"
+              ).toLocaleDateString("pt-BR")}
+            />
+          )}
+          {processo.motivo_indeferimento && (
+            <DadosField
+              label="Motivo indeferi."
+              value={processo.motivo_indeferimento}
+            />
+          )}
+          {processo.num_beneficio_concedido && (
+            <DadosField
+              label="NB concedido"
+              value={processo.num_beneficio_concedido}
+            />
+          )}
+          {processo.modelo_honorario && (
+            <DadosField
+              label="Honorários"
+              value={
+                processo.modelo_honorario === "fixo"
+                  ? "Fixo"
+                  : processo.modelo_honorario === "percentual"
+                    ? "Percentual"
+                    : processo.modelo_honorario === "misto"
+                      ? "Misto"
+                      : processo.modelo_honorario === "sucumbencia"
+                        ? "Sucumbência"
+                        : processo.modelo_honorario === "risco"
+                          ? "Sem custo (risco)"
+                          : processo.modelo_honorario
+              }
+            />
+          )}
+          {processo.valor_honorario != null && (
+            <DadosField
+              label="Valor honorário"
+              value={processo.valor_honorario.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
+            />
+          )}
+          {processo.percentual_honorario != null && (
+            <DadosField
+              label="Percentual"
+              value={`${processo.percentual_honorario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%`}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

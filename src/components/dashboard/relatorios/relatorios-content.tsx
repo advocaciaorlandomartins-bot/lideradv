@@ -245,12 +245,13 @@ function KpiCard({
   color: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-white p-3 sm:p-5 shadow-sm min-w-0">
-      <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted leading-tight">
+    <div className="rounded-xl border border-border bg-white p-3 sm:p-4 shadow-sm min-w-0 overflow-hidden">
+      <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted leading-tight truncate">
         {label}
       </p>
       <p
-        className={`mt-1 font-heading text-base sm:text-xl lg:text-2xl font-bold break-all leading-tight ${color}`}
+        className={`mt-1 font-heading text-sm sm:text-base font-bold leading-tight whitespace-nowrap overflow-hidden text-ellipsis ${color}`}
+        title={fmt(value)}
       >
         {fmt(value)}
       </p>

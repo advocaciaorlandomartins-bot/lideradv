@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import sql from "./db";
 import {
   listarCompromissosProximos,
@@ -56,7 +57,7 @@ const TIPO_LABELS: Record<string, string> = {
   alvaras: "Alvará",
 };
 
-export async function getDashboardData(login?: string) {
+async function _getDashboardData(login?: string) {
   const [
     clientesDevedoresRows,
     lancamentosVencidosRows,
@@ -225,3 +226,74 @@ export async function getDashboardData(login?: string) {
     compromissosProximos,
   };
 }
+
+export const getDashboardData = unstable_cache(
+  _getDashboardData,
+  ["dashboard-data"],
+  { revalidate: 30 }
+);
+
+export interface AlertaPrevidenciario {
+  id: string;
+  tipo: "dcb_proxima" | "indeferimento";
+  processo_id: string;
+  client_id: string;
+  client_name: string;
+  tipo_acao: string;
+  data_ref: string;
+  dias: number;
+}
+
+async function _getAlertasPrevidenciarios(): Promise<AlertaPrevidenciario[]> {
+  const rows = await sql`
+    SELECT
+      p.id::text           AS processo_id,
+      p.client_id::text    AS client_id,
+      c.name               AS client_name,
+      p.tipo_acao,
+      'dcb_proxima'        AS tipo,
+      to_char(p.dcb, 'DD/MM/YYYY') AS data_ref,
+      (p.dcb - CURRENT_DATE)::int  AS dias
+    FROM processos p
+    JOIN clients c ON c.id = p.client_id
+    WHERE p.dcb IS NOT NULL
+      AND p.dcb BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE + INTERVAL '60 days'
+      AND p.status = 'ativo'
+
+    UNION ALL
+
+    SELECT
+      p.id::text           AS processo_id,
+      p.client_id::text    AS client_id,
+      c.name               AS client_name,
+      p.tipo_acao,
+      'indeferimento'      AS tipo,
+      to_char(COALESCE(p.data_resultado_admin, p.updated_at::date), 'DD/MM/YYYY') AS data_ref,
+      0                    AS dias
+    FROM processos p
+    JOIN clients c ON c.id = p.client_id
+    WHERE p.resultado_admin = 'indeferido'
+      AND p.status = 'ativo'
+      AND (p.fase IS NULL OR p.fase NOT IN ('Conhecimento','Instrução','Julgamento','Recurso','Execução','Cumprimento de Sentença'))
+
+    ORDER BY dias ASC
+    LIMIT 15
+  `;
+
+  return rows.map((r) => ({
+    id: `${r.tipo}-${r.processo_id}`,
+    tipo: r.tipo as "dcb_proxima" | "indeferimento",
+    processo_id: String(r.processo_id),
+    client_id: String(r.client_id),
+    client_name: String(r.client_name),
+    tipo_acao: String(r.tipo_acao),
+    data_ref: String(r.data_ref),
+    dias: Number(r.dias),
+  }));
+}
+
+export const getAlertasPrevidenciarios = unstable_cache(
+  _getAlertasPrevidenciarios,
+  ["alertas-previdenciarios"],
+  { revalidate: 60 }
+);

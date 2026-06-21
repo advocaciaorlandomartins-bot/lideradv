@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import sql from "./db";
 import { TIPOS_CONTROLE } from "./controles-types";
 
@@ -227,7 +228,7 @@ function tipoLabelShort(tipo: string): string {
 
 // ── Main Query ────────────────────────────────────────────────────────────────
 
-export async function getGerenciadorData(): Promise<GerenciadorData> {
+async function _getGerenciadorData(): Promise<GerenciadorData> {
   const [
     kpisRows,
     mesRows,
@@ -710,3 +711,9 @@ export async function getGerenciadorData(): Promise<GerenciadorData> {
     }),
   };
 }
+
+export const getGerenciadorData = unstable_cache(
+  _getGerenciadorData,
+  ["gerenciador-data"],
+  { revalidate: 30 }
+);

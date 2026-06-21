@@ -117,6 +117,7 @@ export async function createLancamentoAction(
 
   try {
     let firstLancamentoId: string | null = null;
+    let entradaLancamentoId: string | null = null;
     // For parcelado: track each parcela ID so commission is split per installment
     const parcelaLancamentoIds: string[] = [];
 
@@ -175,6 +176,7 @@ export async function createLancamentoAction(
           RETURNING id
         `;
         firstLancamentoId = rowsEnt[0].id as string;
+        entradaLancamentoId = rowsEnt[0].id as string;
       }
 
       for (let i = 1; i <= numParcelas; i++) {
@@ -220,7 +222,6 @@ export async function createLancamentoAction(
           ? Math.round((valorRestante / totalParcelas) * 100) / 100
           : valorRestante;
 
-      // Entrada (down payment) — not tracked for commission split
       if (valorEntrada > 0) {
         const descEntrada = `${descricao} — Entrada`;
         const rows = await sql`
@@ -237,6 +238,7 @@ export async function createLancamentoAction(
           RETURNING id
         `;
         firstLancamentoId = rows[0].id as string;
+        entradaLancamentoId = rows[0].id as string;
       }
 
       // Parcelas mensais
@@ -279,33 +281,73 @@ export async function createLancamentoAction(
         parcelaLancamentoIds.length > 0 &&
         !comissaoAvista
       ) {
-        // One commission remuneração per installment, linked to each lancamento
-        const commPerParcela =
-          Math.round((comissaoValorFinal / parcelaLancamentoIds.length) * 100) /
-          100;
-        for (let i = 0; i < parcelaLancamentoIds.length; i++) {
-          const descParc =
-            parcelaLancamentoIds.length > 1
-              ? `${descComissao} (${i + 1}/${parcelaLancamentoIds.length})`
-              : descComissao;
-          const remRows = await sql`
-            INSERT INTO remuneracoes
-              (colaborador_id, tipo, valor, status, descricao, processo_id, client_id)
-            VALUES
-              (${indicadorId}::uuid, 'comissao', ${commPerParcela},
-               'pendente', ${descParc},
-               ${processoId ? processoId : null}::uuid,
-               ${clientId ? clientId : null}::uuid)
-            RETURNING id
-          `;
-          const remuneracaoId = remRows[0].id as string;
-          await sql`
-            UPDATE lancamentos SET remuneracao_id = ${remuneracaoId}::uuid
-            WHERE id = ${parcelaLancamentoIds[i]}::uuid
-          `;
+        // Per-installment commission: proportional to each component's value
+        const valorParcela = mensalidade
+          ? valorMensalidade
+          : totalParcelas > 0
+            ? Math.round(((valor - valorEntrada) / totalParcelas) * 100) / 100
+            : 0;
+
+        const calcComm = (componentValue: number) =>
+          comissaoTipo === "percentual"
+            ? Math.round(componentValue * (comissaoValorConfig! / 100) * 100) /
+              100
+            : valor > 0
+              ? Math.round(
+                  comissaoValorFinal * (componentValue / valor) * 100
+                ) / 100
+              : 0;
+
+        // Commission on entrada, linked to its lancamento
+        if (entradaLancamentoId && valorEntrada > 0) {
+          const commEntrada = calcComm(valorEntrada);
+          if (commEntrada > 0) {
+            const descEnt = `${descComissao} — Entrada`;
+            const remRowsEnt = await sql`
+              INSERT INTO remuneracoes
+                (colaborador_id, tipo, valor, status, descricao, processo_id, client_id)
+              VALUES
+                (${indicadorId}::uuid, 'comissao', ${commEntrada},
+                 'pendente', ${descEnt},
+                 ${processoId ? processoId : null}::uuid,
+                 ${clientId ? clientId : null}::uuid)
+              RETURNING id
+            `;
+            const remIdEnt = remRowsEnt[0].id as string;
+            await sql`
+              UPDATE lancamentos SET remuneracao_id = ${remIdEnt}::uuid
+              WHERE id = ${entradaLancamentoId}::uuid
+            `;
+          }
+        }
+
+        // Commission per parcela
+        const commParcela = calcComm(valorParcela);
+        if (commParcela > 0) {
+          for (let i = 0; i < parcelaLancamentoIds.length; i++) {
+            const descParc =
+              parcelaLancamentoIds.length > 1
+                ? `${descComissao} (${i + 1}/${parcelaLancamentoIds.length})`
+                : descComissao;
+            const remRows = await sql`
+              INSERT INTO remuneracoes
+                (colaborador_id, tipo, valor, status, descricao, processo_id, client_id)
+              VALUES
+                (${indicadorId}::uuid, 'comissao', ${commParcela},
+                 'pendente', ${descParc},
+                 ${processoId ? processoId : null}::uuid,
+                 ${clientId ? clientId : null}::uuid)
+              RETURNING id
+            `;
+            const remuneracaoId = remRows[0].id as string;
+            await sql`
+              UPDATE lancamentos SET remuneracao_id = ${remuneracaoId}::uuid
+              WHERE id = ${parcelaLancamentoIds[i]}::uuid
+            `;
+          }
         }
       } else if (firstLancamentoId) {
-        // Single commission: avista (with optional negotiated value), or avista for non-parcelado modes
+        // Single à vista commission (all non-parcelado modes, or when user chose à vista)
         const valorParaUsar = comissaoAvista
           ? comissaoValorAvista
           : comissaoValorFinal;

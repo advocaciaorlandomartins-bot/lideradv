@@ -5,7 +5,10 @@ import { getAllRecentEmails, countUnreadEmails } from "@/lib/inbound-emails-db";
 export const metadata = {
   title: "Dashboard — LiderAdv",
 };
-import { getDashboardData } from "@/lib/dashboard-db";
+import {
+  getDashboardData,
+  getAlertasPrevidenciarios,
+} from "@/lib/dashboard-db";
 import { countMinhasPendentes } from "@/lib/minhas-tarefas-db";
 import { TIPO_LABELS_COMP, TIPO_ICONS_COMP } from "@/lib/compromissos-db";
 import { getSession } from "@/lib/session";
@@ -183,16 +186,25 @@ export default async function DashboardPage() {
     showFinanceiro || showCrm || perm.clientes || perm.processos;
   const needsDashData = showControles || showFinanceiro || perm.clientes;
 
-  const [gerData, dashData, emailsRecentes, totalNaoLidos, minhasPendentes] =
-    await Promise.all([
-      needsGerData ? getGerenciadorData() : Promise.resolve(null),
-      needsDashData ? getDashboardData(session.login) : Promise.resolve(null),
-      perm.clientes
-        ? getAllRecentEmails(20).catch(() => [])
-        : Promise.resolve([]),
-      perm.clientes ? countUnreadEmails().catch(() => 0) : Promise.resolve(0),
-      countMinhasPendentes(session.login).catch(() => 0),
-    ]);
+  const [
+    gerData,
+    dashData,
+    emailsRecentes,
+    totalNaoLidos,
+    minhasPendentes,
+    alertasPrevidenciarios,
+  ] = await Promise.all([
+    needsGerData ? getGerenciadorData() : Promise.resolve(null),
+    needsDashData ? getDashboardData(session.login) : Promise.resolve(null),
+    perm.clientes
+      ? getAllRecentEmails(20).catch(() => [])
+      : Promise.resolve([]),
+    perm.clientes ? countUnreadEmails().catch(() => 0) : Promise.resolve(0),
+    countMinhasPendentes(session.login).catch(() => 0),
+    perm.processos
+      ? getAlertasPrevidenciarios().catch(() => [])
+      : Promise.resolve([]),
+  ]);
 
   const kpis = gerData?.kpis;
   const counts = gerData?.counts;
@@ -312,6 +324,74 @@ export default async function DashboardPage() {
             <ArrowRightIcon className="h-3.5 w-3.5" />
           </span>
         </Link>
+      )}
+
+      {/* ── Alertas Previdenciários ─────────────────────────────────────── */}
+      {alertasPrevidenciarios.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-orange-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-orange-100 bg-orange-50 px-5 py-3">
+            <div className="flex items-center gap-2">
+              <AlertIcon className="h-4 w-4 text-orange-600" />
+              <h2 className="font-heading text-sm font-semibold text-orange-900">
+                Alertas Previdenciários
+              </h2>
+            </div>
+            <span className="rounded-full bg-orange-100 px-2.5 py-0.5 font-body text-xs font-bold text-orange-700">
+              {alertasPrevidenciarios.length}
+            </span>
+          </div>
+          <div className="divide-y divide-border">
+            {alertasPrevidenciarios.map((a) => (
+              <Link
+                key={a.id}
+                href={`/dashboard/processos/${a.processo_id}`}
+                className="flex items-center gap-4 px-5 py-3 transition-colors hover:bg-orange-50 cursor-pointer"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span
+                      className={`rounded px-2 py-0.5 font-body text-[11px] font-semibold ${
+                        a.tipo === "dcb_proxima"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {a.tipo === "dcb_proxima" ? "DCB Próxima" : "Indeferido"}
+                    </span>
+                    <span className="font-body text-xs text-muted truncate">
+                      {a.tipo_acao}
+                    </span>
+                  </div>
+                  <p className="font-body text-sm font-semibold text-fg">
+                    {a.client_name}
+                  </p>
+                </div>
+                <div className="flex-shrink-0 text-right">
+                  <p className="font-body text-xs font-semibold text-orange-700">
+                    {a.data_ref}
+                  </p>
+                  {a.tipo === "dcb_proxima" && (
+                    <p
+                      className={`font-body text-xs ${a.dias <= 0 ? "text-red-600 font-bold" : a.dias <= 15 ? "text-orange-600" : "text-muted"}`}
+                    >
+                      {a.dias <= 0
+                        ? `${Math.abs(a.dias)}d atrás`
+                        : `em ${a.dias}d`}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+          <div className="border-t border-border px-5 py-3">
+            <Link
+              href="/dashboard/processos"
+              className="font-body text-xs font-semibold text-orange-700 hover:underline"
+            >
+              Ver todos os processos →
+            </Link>
+          </div>
+        </div>
       )}
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}

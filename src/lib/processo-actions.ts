@@ -38,6 +38,41 @@ export async function createProcessoAction(
     (formData.get("data_distribuicao") as string | null) || null;
   const notas = ((formData.get("notas") as string | null) ?? "").trim() || null;
 
+  // Campos previdenciários
+  const dataProtocoloInss =
+    (formData.get("data_protocolo_inss") as string | null) || null;
+  const protocoloInss =
+    ((formData.get("protocolo_inss") as string | null) ?? "").trim() || null;
+  const agenciaInss =
+    ((formData.get("agencia_inss") as string | null) ?? "").trim() || null;
+  const resultadoAdmin =
+    ((formData.get("resultado_admin") as string | null) ?? "").trim() || null;
+  const dataResultadoAdmin =
+    (formData.get("data_resultado_admin") as string | null) || null;
+  const motivoIndeferimento =
+    ((formData.get("motivo_indeferimento") as string | null) ?? "").trim() ||
+    null;
+  const modeloHonorario =
+    ((formData.get("modelo_honorario") as string | null) ?? "").trim() || null;
+  const valorHonorarioRaw = (
+    (formData.get("valor_honorario") as string | null) ?? ""
+  )
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const valorHonorario = valorHonorarioRaw ? Number(valorHonorarioRaw) : null;
+  const percentualHonorarioRaw = (
+    (formData.get("percentual_honorario") as string | null) ?? ""
+  ).replace(",", ".");
+  const percentualHonorario = percentualHonorarioRaw
+    ? Number(percentualHonorarioRaw)
+    : null;
+  const numBeneficioConcedido =
+    ((formData.get("num_beneficio_concedido") as string | null) ?? "").trim() ||
+    null;
+  const der = (formData.get("der") as string | null) || null;
+  const dib = (formData.get("dib") as string | null) || null;
+  const dcb = (formData.get("dcb") as string | null) || null;
+
   if (!clientId) return { error: "Selecione um cliente." };
   if (!tipoAcao) return { error: "Informe o tipo de ação." };
   if (!area) return { error: "Selecione a área jurídica." };
@@ -47,13 +82,21 @@ export async function createProcessoAction(
       INSERT INTO processos
         (client_id, numero, tipo_acao, area, fase, vara, comarca,
          parte_contraria, parte_contraria_doc, valor_causa,
-         data_distribuicao, notas)
+         data_distribuicao, notas,
+         data_protocolo_inss, protocolo_inss, agencia_inss,
+         resultado_admin, data_resultado_admin, motivo_indeferimento,
+         modelo_honorario, valor_honorario, percentual_honorario,
+         num_beneficio_concedido, der, dib, dcb)
       VALUES
         (${clientId}::uuid, ${numero}, ${tipoAcao}, ${area}, ${fase},
          ${vara}, ${comarca}, ${parteContraria}, ${parteContrariaDoc},
          ${valorCausa},
          ${dataDistribuicao ? dataDistribuicao : null}::date,
-         ${notas})
+         ${notas},
+         ${dataProtocoloInss}::date, ${protocoloInss}, ${agenciaInss},
+         ${resultadoAdmin}, ${dataResultadoAdmin}::date, ${motivoIndeferimento},
+         ${modeloHonorario}, ${valorHonorario}, ${percentualHonorario},
+         ${numBeneficioConcedido}, ${der}::date, ${dib}::date, ${dcb}::date)
     `;
   } catch (err) {
     console.error("createProcessoAction DB error:", err);
@@ -106,6 +149,41 @@ export async function updateProcessoAction(
   const notas = ((formData.get("notas") as string | null) ?? "").trim() || null;
   const status = ((formData.get("status") as string | null) ?? "ativo").trim();
 
+  // Campos previdenciários
+  const dataProtocoloInss =
+    (formData.get("data_protocolo_inss") as string | null) || null;
+  const protocoloInss =
+    ((formData.get("protocolo_inss") as string | null) ?? "").trim() || null;
+  const agenciaInss =
+    ((formData.get("agencia_inss") as string | null) ?? "").trim() || null;
+  const resultadoAdmin =
+    ((formData.get("resultado_admin") as string | null) ?? "").trim() || null;
+  const dataResultadoAdmin =
+    (formData.get("data_resultado_admin") as string | null) || null;
+  const motivoIndeferimento =
+    ((formData.get("motivo_indeferimento") as string | null) ?? "").trim() ||
+    null;
+  const modeloHonorario =
+    ((formData.get("modelo_honorario") as string | null) ?? "").trim() || null;
+  const valorHonorarioRaw = (
+    (formData.get("valor_honorario") as string | null) ?? ""
+  )
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const valorHonorario = valorHonorarioRaw ? Number(valorHonorarioRaw) : null;
+  const percentualHonorarioRaw = (
+    (formData.get("percentual_honorario") as string | null) ?? ""
+  ).replace(",", ".");
+  const percentualHonorario = percentualHonorarioRaw
+    ? Number(percentualHonorarioRaw)
+    : null;
+  const numBeneficioConcedido =
+    ((formData.get("num_beneficio_concedido") as string | null) ?? "").trim() ||
+    null;
+  const der = (formData.get("der") as string | null) || null;
+  const dib = (formData.get("dib") as string | null) || null;
+  const dcb = (formData.get("dcb") as string | null) || null;
+
   if (!clientId) return { error: "Selecione um cliente." };
   if (!tipoAcao) return { error: "Informe o tipo de ação." };
   if (!area) return { error: "Selecione a área jurídica." };
@@ -113,20 +191,33 @@ export async function updateProcessoAction(
   try {
     await sql`
       UPDATE processos SET
-        client_id           = ${clientId}::uuid,
-        numero              = ${numero},
-        tipo_acao           = ${tipoAcao},
-        area                = ${area},
-        fase                = ${fase},
-        vara                = ${vara},
-        comarca             = ${comarca},
-        parte_contraria     = ${parteContraria},
-        parte_contraria_doc = ${parteContrariaDoc},
-        valor_causa         = ${valorCausa},
-        data_distribuicao   = ${dataDistribuicao ? dataDistribuicao : null}::date,
-        notas               = ${notas},
-        status              = ${status},
-        updated_at          = NOW()
+        client_id               = ${clientId}::uuid,
+        numero                  = ${numero},
+        tipo_acao               = ${tipoAcao},
+        area                    = ${area},
+        fase                    = ${fase},
+        vara                    = ${vara},
+        comarca                 = ${comarca},
+        parte_contraria         = ${parteContraria},
+        parte_contraria_doc     = ${parteContrariaDoc},
+        valor_causa             = ${valorCausa},
+        data_distribuicao       = ${dataDistribuicao ? dataDistribuicao : null}::date,
+        notas                   = ${notas},
+        status                  = ${status},
+        data_protocolo_inss     = ${dataProtocoloInss}::date,
+        protocolo_inss          = ${protocoloInss},
+        agencia_inss            = ${agenciaInss},
+        resultado_admin         = ${resultadoAdmin},
+        data_resultado_admin    = ${dataResultadoAdmin}::date,
+        motivo_indeferimento    = ${motivoIndeferimento},
+        modelo_honorario        = ${modeloHonorario},
+        valor_honorario         = ${valorHonorario},
+        percentual_honorario    = ${percentualHonorario},
+        num_beneficio_concedido = ${numBeneficioConcedido},
+        der                     = ${der}::date,
+        dib                     = ${dib}::date,
+        dcb                     = ${dcb}::date,
+        updated_at              = NOW()
       WHERE id = ${id}::uuid
     `;
   } catch (err) {

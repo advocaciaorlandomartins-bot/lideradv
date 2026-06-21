@@ -82,6 +82,61 @@ export async function createClientAction(
     ((formData.get("responsavel_parentesco") as string | null) ?? "").trim() ||
     null;
 
+  // Campos previdenciários
+  const nis =
+    ((formData.get("nis") as string | null) ?? "").replace(/\D/g, "") || null;
+  const numBeneficio =
+    ((formData.get("num_beneficio") as string | null) ?? "").trim() || null;
+  const statusBeneficio =
+    ((formData.get("status_beneficio") as string | null) ?? "").trim() || null;
+  const tipoBeneficio =
+    ((formData.get("tipo_beneficio") as string | null) ?? "").trim() || null;
+  const dataInicioBeneficio =
+    (formData.get("data_inicio_beneficio") as string | null) || null;
+  const valorBeneficioRaw =
+    ((formData.get("valor_beneficio") as string | null) ?? "")
+      .replace(/\./g, "")
+      .replace(",", ".") || null;
+  const valorBeneficio = valorBeneficioRaw ? valorBeneficioRaw : null;
+  const categoriaContribuinte =
+    ((formData.get("categoria_contribuinte") as string | null) ?? "").trim() ||
+    null;
+  const carenciaAtingida =
+    formData.get("carencia_atingida") === "true"
+      ? true
+      : formData.get("carencia_atingida") === "false"
+        ? false
+        : null;
+  const cidPrincipal =
+    ((formData.get("cid_principal") as string | null) ?? "")
+      .trim()
+      .toUpperCase() || null;
+  const tipoIncapacidade =
+    ((formData.get("tipo_incapacidade") as string | null) ?? "").trim() || null;
+  const dataDiagnostico =
+    (formData.get("data_diagnostico") as string | null) || null;
+  const naturalidadeCidade =
+    ((formData.get("naturalidade_cidade") as string | null) ?? "").trim() ||
+    null;
+  const naturalidadeEstado =
+    ((formData.get("naturalidade_estado") as string | null) ?? "").trim() ||
+    null;
+  const filiacaoMae =
+    ((formData.get("filiacao_mae") as string | null) ?? "").trim() || null;
+  const filiacaoPai =
+    ((formData.get("filiacao_pai") as string | null) ?? "").trim() || null;
+  const dataAfastamento =
+    (formData.get("data_afastamento") as string | null) || null;
+  const atividadeAnterior =
+    ((formData.get("atividade_anterior") as string | null) ?? "").trim() ||
+    null;
+  const numContribuicoesRaw = (
+    (formData.get("num_contribuicoes") as string | null) ?? ""
+  ).trim();
+  const numContribuicoes = numContribuicoesRaw
+    ? parseInt(numContribuicoesRaw, 10)
+    : null;
+
   if (!type || !name || !doc || !phone) {
     return { error: "Preencha todos os campos obrigatórios." };
   }
@@ -124,7 +179,12 @@ export async function createClientAction(
          responsavel_rg_orgao, responsavel_telefone, responsavel_email,
          responsavel_parentesco,
          cep, street, addr_number, complement, neighborhood,
-         city, state, notes)
+         city, state, notes,
+         nis, num_beneficio, status_beneficio, tipo_beneficio,
+         data_inicio_beneficio, valor_beneficio, categoria_contribuinte,
+         carencia_atingida, cid_principal, tipo_incapacidade, data_diagnostico,
+         naturalidade_cidade, naturalidade_estado, filiacao_mae, filiacao_pai,
+         data_afastamento, atividade_anterior, num_contribuicoes)
       VALUES
         (${type}, ${name}, ${doc}, ${tradeName},
          ${birthDate ? birthDate : null}::date,
@@ -137,7 +197,14 @@ export async function createClientAction(
          ${responsavelRgOrgao}, ${responsavelTelefone}, ${responsavelEmail},
          ${responsavelParentesco},
          ${cep}, ${street}, ${addrNumber},
-         ${complement}, ${neighborhood}, ${city}, ${state}, ${notes})
+         ${complement}, ${neighborhood}, ${city}, ${state}, ${notes},
+         ${nis}, ${numBeneficio}, ${statusBeneficio}, ${tipoBeneficio},
+         ${dataInicioBeneficio}::date, ${valorBeneficio},
+         ${categoriaContribuinte}, ${carenciaAtingida},
+         ${cidPrincipal}, ${tipoIncapacidade}, ${dataDiagnostico}::date,
+         ${naturalidadeCidade}, ${naturalidadeEstado},
+         ${filiacaoMae}, ${filiacaoPai},
+         ${dataAfastamento}::date, ${atividadeAnterior}, ${numContribuicoes})
     `;
   } catch (err: unknown) {
     // If new origin columns don't exist yet, fall back to insert without them
@@ -262,6 +329,61 @@ export async function updateClientAction(
     ((formData.get("responsavel_parentesco") as string | null) ?? "").trim() ||
     null;
 
+  // Campos previdenciários
+  const nis =
+    ((formData.get("nis") as string | null) ?? "").replace(/\D/g, "") || null;
+  const numBeneficio =
+    ((formData.get("num_beneficio") as string | null) ?? "").trim() || null;
+  const statusBeneficio =
+    ((formData.get("status_beneficio") as string | null) ?? "").trim() || null;
+  const tipoBeneficio =
+    ((formData.get("tipo_beneficio") as string | null) ?? "").trim() || null;
+  const dataInicioBeneficio =
+    (formData.get("data_inicio_beneficio") as string | null) || null;
+  const valorBeneficioRaw =
+    ((formData.get("valor_beneficio") as string | null) ?? "")
+      .replace(/\./g, "")
+      .replace(",", ".") || null;
+  const valorBeneficio = valorBeneficioRaw ? valorBeneficioRaw : null;
+  const categoriaContribuinte =
+    ((formData.get("categoria_contribuinte") as string | null) ?? "").trim() ||
+    null;
+  const carenciaAtingida =
+    formData.get("carencia_atingida") === "true"
+      ? true
+      : formData.get("carencia_atingida") === "false"
+        ? false
+        : null;
+  const cidPrincipal =
+    ((formData.get("cid_principal") as string | null) ?? "")
+      .trim()
+      .toUpperCase() || null;
+  const tipoIncapacidade =
+    ((formData.get("tipo_incapacidade") as string | null) ?? "").trim() || null;
+  const dataDiagnostico =
+    (formData.get("data_diagnostico") as string | null) || null;
+  const naturalidadeCidade =
+    ((formData.get("naturalidade_cidade") as string | null) ?? "").trim() ||
+    null;
+  const naturalidadeEstado =
+    ((formData.get("naturalidade_estado") as string | null) ?? "").trim() ||
+    null;
+  const filiacaoMae =
+    ((formData.get("filiacao_mae") as string | null) ?? "").trim() || null;
+  const filiacaoPai =
+    ((formData.get("filiacao_pai") as string | null) ?? "").trim() || null;
+  const dataAfastamento =
+    (formData.get("data_afastamento") as string | null) || null;
+  const atividadeAnterior =
+    ((formData.get("atividade_anterior") as string | null) ?? "").trim() ||
+    null;
+  const numContribuicoesRaw = (
+    (formData.get("num_contribuicoes") as string | null) ?? ""
+  ).trim();
+  const numContribuicoes = numContribuicoesRaw
+    ? parseInt(numContribuicoesRaw, 10)
+    : null;
+
   if (!type || !name || !doc || !phone) {
     return { error: "Preencha todos os campos obrigatórios." };
   }
@@ -331,7 +453,25 @@ export async function updateClientAction(
         city                    = ${city},
         state                   = ${state},
         notes                   = ${notes},
-        status                  = ${status}
+        status                  = ${status},
+        nis                     = ${nis},
+        num_beneficio           = ${numBeneficio},
+        status_beneficio        = ${statusBeneficio},
+        tipo_beneficio          = ${tipoBeneficio},
+        data_inicio_beneficio   = ${dataInicioBeneficio}::date,
+        valor_beneficio         = ${valorBeneficio},
+        categoria_contribuinte  = ${categoriaContribuinte},
+        carencia_atingida       = ${carenciaAtingida},
+        cid_principal           = ${cidPrincipal},
+        tipo_incapacidade       = ${tipoIncapacidade},
+        data_diagnostico        = ${dataDiagnostico}::date,
+        naturalidade_cidade     = ${naturalidadeCidade},
+        naturalidade_estado     = ${naturalidadeEstado},
+        filiacao_mae            = ${filiacaoMae},
+        filiacao_pai            = ${filiacaoPai},
+        data_afastamento        = ${dataAfastamento}::date,
+        atividade_anterior      = ${atividadeAnterior},
+        num_contribuicoes       = ${numContribuicoes}
       WHERE id = ${id}::uuid
     `;
   } catch (err: unknown) {

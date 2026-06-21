@@ -105,6 +105,25 @@ export interface ClientFull {
   since: string;
   lastContact: string;
   processes: number;
+  // Campos previdenciários
+  nis: string | null;
+  num_beneficio: string | null;
+  status_beneficio: string | null;
+  tipo_beneficio: string | null;
+  data_inicio_beneficio: string | null;
+  valor_beneficio: number | null;
+  categoria_contribuinte: string | null;
+  carencia_atingida: boolean | null;
+  cid_principal: string | null;
+  tipo_incapacidade: string | null;
+  data_diagnostico: string | null;
+  naturalidade_cidade: string | null;
+  naturalidade_estado: string | null;
+  filiacao_mae: string | null;
+  filiacao_pai: string | null;
+  data_afastamento: string | null;
+  atividade_anterior: string | null;
+  num_contribuicoes: number | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -159,6 +178,32 @@ function mapClientFull(r: any, hasOrigemCols: boolean): ClientFull {
     since: formatSince(new Date(r.created_at)),
     lastContact: formatDate(new Date(r.created_at)),
     processes: r.process_count ?? 0,
+    nis: r.nis ?? null,
+    num_beneficio: r.num_beneficio ?? null,
+    status_beneficio: r.status_beneficio ?? null,
+    tipo_beneficio: r.tipo_beneficio ?? null,
+    data_inicio_beneficio: r.data_inicio_beneficio
+      ? String(r.data_inicio_beneficio).slice(0, 10)
+      : null,
+    valor_beneficio:
+      r.valor_beneficio != null ? Number(r.valor_beneficio) : null,
+    categoria_contribuinte: r.categoria_contribuinte ?? null,
+    carencia_atingida: r.carencia_atingida ?? null,
+    cid_principal: r.cid_principal ?? null,
+    tipo_incapacidade: r.tipo_incapacidade ?? null,
+    data_diagnostico: r.data_diagnostico
+      ? String(r.data_diagnostico).slice(0, 10)
+      : null,
+    naturalidade_cidade: r.naturalidade_cidade ?? null,
+    naturalidade_estado: r.naturalidade_estado ?? null,
+    filiacao_mae: r.filiacao_mae ?? null,
+    filiacao_pai: r.filiacao_pai ?? null,
+    data_afastamento: r.data_afastamento
+      ? String(r.data_afastamento).slice(0, 10)
+      : null,
+    atividade_anterior: r.atividade_anterior ?? null,
+    num_contribuicoes:
+      r.num_contribuicoes != null ? Number(r.num_contribuicoes) : null,
   };
 }
 
@@ -186,6 +231,16 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         c.indicador_tipo_trabalho,
         c.comissao_tipo,
         c.comissao_valor,
+        c.nis, c.num_beneficio, c.status_beneficio, c.tipo_beneficio,
+        to_char(c.data_inicio_beneficio, 'YYYY-MM-DD') AS data_inicio_beneficio,
+        c.valor_beneficio, c.categoria_contribuinte, c.carencia_atingida,
+        c.cid_principal, c.tipo_incapacidade,
+        to_char(c.data_diagnostico, 'YYYY-MM-DD') AS data_diagnostico,
+        c.naturalidade_cidade, c.naturalidade_estado,
+        c.filiacao_mae, c.filiacao_pai,
+        to_char(c.data_afastamento, 'YYYY-MM-DD') AS data_afastamento,
+        c.atividade_anterior,
+        c.num_contribuicoes,
         (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id) AS process_count
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
@@ -213,6 +268,16 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       c.responsavel_email, c.responsavel_parentesco,
       c.cep, c.street, c.addr_number, c.complement,
       c.neighborhood, c.city, c.state, c.notes, c.status, c.created_at,
+      c.nis, c.num_beneficio, c.status_beneficio, c.tipo_beneficio,
+      to_char(c.data_inicio_beneficio, 'YYYY-MM-DD') AS data_inicio_beneficio,
+      c.valor_beneficio, c.categoria_contribuinte, c.carencia_atingida,
+      c.cid_principal, c.tipo_incapacidade,
+      to_char(c.data_diagnostico, 'YYYY-MM-DD') AS data_diagnostico,
+      c.naturalidade_cidade, c.naturalidade_estado,
+      c.filiacao_mae, c.filiacao_pai,
+      to_char(c.data_afastamento, 'YYYY-MM-DD') AS data_afastamento,
+      c.atividade_anterior,
+      c.num_contribuicoes,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id) AS process_count
     FROM clients c
     WHERE c.id = ${id}::uuid

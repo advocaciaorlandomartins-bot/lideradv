@@ -105,7 +105,15 @@ export async function getProcessoExtended(
       COALESCE(p.estagio_producao, 'analise')             AS estagio_producao,
       p.resultado_administrativo,
       p.resultado_judicial,
-      EXTRACT(EPOCH FROM (NOW() - p.data_estagio_at))::int / 86400 AS dias_no_estagio
+      EXTRACT(EPOCH FROM (NOW() - p.data_estagio_at))::int / 86400 AS dias_no_estagio,
+      to_char(p.data_protocolo_inss, 'YYYY-MM-DD')        AS data_protocolo_inss,
+      p.protocolo_inss, p.agencia_inss, p.resultado_admin,
+      to_char(p.data_resultado_admin, 'YYYY-MM-DD')        AS data_resultado_admin,
+      p.motivo_indeferimento, p.modelo_honorario,
+      p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
+      to_char(p.der, 'YYYY-MM-DD')                         AS der,
+      to_char(p.dib, 'YYYY-MM-DD')                         AS dib,
+      to_char(p.dcb, 'YYYY-MM-DD')                         AS dcb
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     LEFT JOIN colaboradores col ON col.id = p.responsavel_id
@@ -147,6 +155,25 @@ export async function getProcessoExtended(
     resultado_judicial: r.resultado_judicial ?? null,
     dias_no_estagio: Number(r.dias_no_estagio ?? 0),
     updated_at: r.updated_at ? new Date(r.updated_at) : null,
+    data_protocolo_inss: r.data_protocolo_inss
+      ? String(r.data_protocolo_inss).slice(0, 10)
+      : null,
+    protocolo_inss: r.protocolo_inss ?? null,
+    agencia_inss: r.agencia_inss ?? null,
+    resultado_admin: r.resultado_admin ?? null,
+    data_resultado_admin: r.data_resultado_admin
+      ? String(r.data_resultado_admin).slice(0, 10)
+      : null,
+    motivo_indeferimento: r.motivo_indeferimento ?? null,
+    modelo_honorario: r.modelo_honorario ?? null,
+    valor_honorario:
+      r.valor_honorario != null ? Number(r.valor_honorario) : null,
+    percentual_honorario:
+      r.percentual_honorario != null ? Number(r.percentual_honorario) : null,
+    num_beneficio_concedido: r.num_beneficio_concedido ?? null,
+    der: r.der ? String(r.der).slice(0, 10) : null,
+    dib: r.dib ? String(r.dib).slice(0, 10) : null,
+    dcb: r.dcb ? String(r.dcb).slice(0, 10) : null,
   };
 }
 

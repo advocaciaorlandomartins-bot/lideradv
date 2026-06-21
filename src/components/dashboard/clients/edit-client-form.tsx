@@ -698,9 +698,298 @@ export default function EditClientForm({
         </div>
       )}
 
-      {/* ── Etapa 3 — Endereço ── */}
+      {/* ── Etapa Previdenciária (PF only) ── */}
+      {type === "PF" && (
+        <div className="space-y-4">
+          <EtapaTitle num={3}>Dados Previdenciários (INSS)</EtapaTitle>
+          <p className="font-body text-xs text-muted -mt-2">
+            Preencha apenas os campos aplicáveis ao caso do cliente.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="NIS / PIS / PASEP">
+              <input
+                name="nis"
+                type="text"
+                inputMode="numeric"
+                placeholder="000.00000.00-0"
+                maxLength={11}
+                defaultValue={client.nis ?? ""}
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Número do Benefício INSS">
+              <input
+                name="num_beneficio"
+                type="text"
+                inputMode="numeric"
+                placeholder="Ex: 123456789-0"
+                defaultValue={client.num_beneficio ?? ""}
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Status do Benefício">
+              <select
+                name="status_beneficio"
+                defaultValue={client.status_beneficio ?? ""}
+                disabled={isPending}
+                className={selectClass}
+              >
+                <option value="">— Selecione —</option>
+                <option value="ativo">Ativo</option>
+                <option value="suspenso">Suspenso</option>
+                <option value="cessado">Cessado</option>
+                <option value="nao_recebe">Não recebe benefício</option>
+              </select>
+            </Field>
+
+            <Field label="Tipo de Benefício">
+              <select
+                name="tipo_beneficio"
+                defaultValue={client.tipo_beneficio ?? ""}
+                disabled={isPending}
+                className={selectClass}
+              >
+                <option value="">— Selecione —</option>
+                <option value="B32 - Aposentadoria por invalidez">
+                  B32 - Aposentadoria por invalidez
+                </option>
+                <option value="B41 - Aposentadoria por idade">
+                  B41 - Aposentadoria por idade
+                </option>
+                <option value="B42 - Aposentadoria por tempo de contribuição">
+                  B42 - Aposentadoria por tempo de contribuição
+                </option>
+                <option value="B46 - Aposentadoria especial">
+                  B46 - Aposentadoria especial
+                </option>
+                <option value="B21 - Pensão por morte">
+                  B21 - Pensão por morte
+                </option>
+                <option value="B31 - Auxílio-doença">
+                  B31 - Auxílio-doença
+                </option>
+                <option value="B94 - Auxílio-acidente">
+                  B94 - Auxílio-acidente
+                </option>
+                <option value="B80 - Salário maternidade">
+                  B80 - Salário maternidade
+                </option>
+                <option value="B87 - BPC pessoa com deficiência">
+                  B87 - BPC pessoa com deficiência
+                </option>
+                <option value="B88 - BPC pessoa idosa">
+                  B88 - BPC pessoa idosa
+                </option>
+                <option value="Outro">Outro</option>
+              </select>
+            </Field>
+
+            <Field label="Data de início do benefício">
+              <input
+                name="data_inicio_beneficio"
+                type="date"
+                max={todayISO}
+                defaultValue={client.data_inicio_beneficio ?? ""}
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Valor do benefício (R$)">
+              <input
+                name="valor_beneficio"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                defaultValue={
+                  client.valor_beneficio != null
+                    ? client.valor_beneficio.toLocaleString("pt-BR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : ""
+                }
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Categoria contribuinte">
+              <select
+                name="categoria_contribuinte"
+                defaultValue={client.categoria_contribuinte ?? ""}
+                disabled={isPending}
+                className={selectClass}
+              >
+                <option value="">— Selecione —</option>
+                <option value="empregado">Empregado</option>
+                <option value="individual">Contribuinte individual</option>
+                <option value="especial">Segurado especial</option>
+                <option value="avulso">Trabalhador avulso</option>
+                <option value="facultativo">Contribuinte facultativo</option>
+              </select>
+            </Field>
+
+            <Field label="Qtd. de contribuições (meses)">
+              <input
+                name="num_contribuicoes"
+                type="number"
+                min={0}
+                max={600}
+                placeholder="Ex.: 180"
+                defaultValue={client.num_contribuicoes ?? ""}
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Carência atingida?">
+              <select
+                name="carencia_atingida"
+                defaultValue={
+                  client.carencia_atingida == null
+                    ? ""
+                    : client.carencia_atingida
+                      ? "true"
+                      : "false"
+                }
+                disabled={isPending}
+                className={selectClass}
+              >
+                <option value="">— Selecione —</option>
+                <option value="true">Sim</option>
+                <option value="false">Não</option>
+              </select>
+            </Field>
+
+            <Field label="Naturalidade (cidade)">
+              <input
+                name="naturalidade_cidade"
+                type="text"
+                placeholder="Ex.: Maceió"
+                defaultValue={client.naturalidade_cidade ?? ""}
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Estado de naturalidade">
+              <select
+                name="naturalidade_estado"
+                defaultValue={client.naturalidade_estado ?? ""}
+                disabled={isPending}
+                className={selectClass}
+              >
+                <option value="">— UF —</option>
+                {ESTADOS_UF.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Nome da mãe">
+              <input
+                name="filiacao_mae"
+                type="text"
+                placeholder="Nome completo da mãe"
+                defaultValue={client.filiacao_mae ?? ""}
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Nome do pai">
+              <input
+                name="filiacao_pai"
+                type="text"
+                placeholder="Nome completo do pai"
+                defaultValue={client.filiacao_pai ?? ""}
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+
+          {/* Saúde */}
+          <div className="rounded-xl border border-border bg-slate-50 p-4 space-y-4">
+            <p className="font-body text-sm font-semibold text-fg">
+              Dados de saúde e incapacidade
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="CID principal">
+                <input
+                  name="cid_principal"
+                  type="text"
+                  placeholder="Ex.: M54.5"
+                  maxLength={10}
+                  defaultValue={client.cid_principal ?? ""}
+                  disabled={isPending}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Tipo de incapacidade">
+                <select
+                  name="tipo_incapacidade"
+                  defaultValue={client.tipo_incapacidade ?? ""}
+                  disabled={isPending}
+                  className={selectClass}
+                >
+                  <option value="">— Selecione —</option>
+                  <option value="permanente">Permanente</option>
+                  <option value="temporaria">Temporária</option>
+                  <option value="nao_se_aplica">Não se aplica</option>
+                </select>
+              </Field>
+
+              <Field label="Data do diagnóstico">
+                <input
+                  name="data_diagnostico"
+                  type="date"
+                  max={todayISO}
+                  defaultValue={client.data_diagnostico ?? ""}
+                  disabled={isPending}
+                  className={inputClass}
+                />
+              </Field>
+
+              <Field label="Data de afastamento do trabalho">
+                <input
+                  name="data_afastamento"
+                  type="date"
+                  max={todayISO}
+                  defaultValue={client.data_afastamento ?? ""}
+                  disabled={isPending}
+                  className={inputClass}
+                />
+              </Field>
+
+              <div className="sm:col-span-2">
+                <Field label="Atividade laboral anterior">
+                  <input
+                    name="atividade_anterior"
+                    type="text"
+                    placeholder="Ex.: Agricultora, Pedreiro, Costureira…"
+                    defaultValue={client.atividade_anterior ?? ""}
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Etapa 3/4 — Endereço ── */}
       <div className="space-y-4">
-        <EtapaTitle num={type === "PF" ? 3 : 2}>Endereço</EtapaTitle>
+        <EtapaTitle num={type === "PF" ? 4 : 2}>Endereço</EtapaTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
           <div className="sm:col-span-2">
             <Field label="CEP" required>
@@ -849,7 +1138,7 @@ export default function EditClientForm({
 
       {/* ── Acesso e parceria ── */}
       <div className="space-y-4">
-        <EtapaTitle num={type === "PF" ? 4 : 3}>Acesso e parceria</EtapaTitle>
+        <EtapaTitle num={type === "PF" ? 5 : 3}>Acesso e parceria</EtapaTitle>
 
         <input type="hidden" name="origem_tipo" value={origemTipo} />
         <input type="hidden" name="origem_texto" value={origemTexto} />

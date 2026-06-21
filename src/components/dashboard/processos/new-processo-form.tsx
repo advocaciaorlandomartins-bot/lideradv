@@ -262,6 +262,157 @@ export default function NewProcessoForm({
         </div>
       </div>
 
+      {/* ── Previdenciário INSS ── */}
+      <div className="space-y-4">
+        <SectionTitle>Previdenciário — INSS & Honorários</SectionTitle>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="DER — Data de Entrada do Requerimento">
+            <input
+              name="der"
+              type="date"
+              max={todayISO}
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="DIB — Data de Início do Benefício">
+            <input
+              name="dib"
+              type="date"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="DCB — Data de Cessação do Benefício">
+            <input
+              name="dcb"
+              type="date"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Data do requerimento no INSS">
+            <input
+              name="data_protocolo_inss"
+              type="date"
+              max={todayISO}
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Nº protocolo INSS">
+            <input
+              name="protocolo_inss"
+              type="text"
+              placeholder="Ex: 1234567890"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <div className="sm:col-span-2">
+            <Field label="Agência INSS">
+              <input
+                name="agencia_inss"
+                type="text"
+                placeholder="Ex: APS Maceió Centro"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+
+          <Field label="Resultado administrativo">
+            <select
+              name="resultado_admin"
+              defaultValue=""
+              disabled={isPending}
+              className={selectClass}
+            >
+              <option value="">— Aguardando —</option>
+              <option value="deferido">Deferido</option>
+              <option value="indeferido">Indeferido</option>
+              <option value="em_analise">Em análise</option>
+              <option value="recurso">Em recurso administrativo</option>
+            </select>
+          </Field>
+
+          <Field label="Data do resultado">
+            <input
+              name="data_resultado_admin"
+              type="date"
+              max={todayISO}
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <div className="sm:col-span-2">
+            <Field label="Motivo do indeferimento (se aplicável)">
+              <textarea
+                name="motivo_indeferimento"
+                rows={2}
+                placeholder="Descreva o motivo informado pelo INSS…"
+                disabled={isPending}
+                className="w-full rounded-lg border border-border bg-white px-4 py-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60 resize-none"
+              />
+            </Field>
+          </div>
+
+          <Field label="Nº benefício concedido (pós-deferimento)">
+            <input
+              name="num_beneficio_concedido"
+              type="text"
+              placeholder="Ex: 123456789-0"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Modelo de honorários">
+            <select
+              name="modelo_honorario"
+              defaultValue=""
+              disabled={isPending}
+              className={selectClass}
+            >
+              <option value="">— Selecione —</option>
+              <option value="fixo">Fixo</option>
+              <option value="percentual">Percentual sobre diferença</option>
+              <option value="misto">Misto (fixo + percentual)</option>
+              <option value="sucumbencia">Sucumbência (UNIÃO paga)</option>
+              <option value="risco">Sem custo inicial (risco)</option>
+            </select>
+          </Field>
+
+          <Field label="Valor honorário fixo (R$)">
+            <input
+              name="valor_honorario"
+              type="text"
+              inputMode="decimal"
+              placeholder="0,00"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Percentual de honorários (%)">
+            <input
+              name="percentual_honorario"
+              type="text"
+              inputMode="decimal"
+              placeholder="Ex: 20,00"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+        </div>
+      </div>
+
       {/* ── Tribunal ── */}
       <div className="space-y-4">
         <SectionTitle>Tribunal</SectionTitle>

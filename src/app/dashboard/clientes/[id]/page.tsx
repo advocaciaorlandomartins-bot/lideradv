@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getClientById } from "@/lib/clients-db";
+import { getClientFull } from "@/lib/clients-db";
 
 export const metadata = { title: "Cliente — LiderAdv" };
 import { getSession } from "@/lib/session";
@@ -66,7 +66,7 @@ export default async function ClienteDetailPage({
 
   const [client, processes, documentos, debito, inboundAddress] =
     await Promise.all([
-      getClientById(id),
+      getClientFull(id),
       getProcessosByClientId(id),
       getDocumentosByEntityId("cliente", id),
       getClientDebito(id),

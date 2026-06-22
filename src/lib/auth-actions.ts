@@ -147,5 +147,43 @@ export async function registerAction(
     return { error: "As senhas não coincidem." };
   }
 
+  const login = email.toLowerCase();
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto
+    .createHash("sha256")
+    .update(password + salt)
+    .digest("hex");
+  const senhaHash = `sha256:${salt}:${hash}`;
+
+  try {
+    const rows = await sql`
+      INSERT INTO usuarios (login, nome, senha_hash, categoria)
+      VALUES (${login}, ${name}, ${senhaHash}, 'advogado')
+      RETURNING id::text, login, categoria
+    `;
+    const user = rows[0];
+    const permissoes = resolvePermissoes("advogado", null);
+    await createSession({
+      id: String(user.id),
+      login: String(user.login),
+      categoria: String(user.categoria),
+      permissoes,
+    });
+    await logAction({
+      acao: "criar",
+      entidade: "usuario",
+      descricao: `Registro de nova conta — ${login}`,
+      _login: login,
+      _cat: "advogado",
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("unique") || msg.includes("duplicate")) {
+      return { error: "Este e-mail já está cadastrado." };
+    }
+    console.error("registerAction:", err);
+    return { error: "Erro ao criar conta. Tente novamente." };
+  }
+
   redirect("/dashboard");
 }

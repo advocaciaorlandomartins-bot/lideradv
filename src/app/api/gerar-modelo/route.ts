@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/session";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { createElement, type ReactElement } from "react";
 import { getModeloById } from "@/lib/modelos-db";
@@ -11,6 +12,10 @@ import { ModeloPdfDoc } from "@/lib/modelo-pdf";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(request.url);
   const modeloId = searchParams.get("modeloId");
   const clienteId = searchParams.get("clienteId");

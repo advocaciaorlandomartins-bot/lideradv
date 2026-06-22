@@ -90,15 +90,22 @@ export async function GET(request: Request) {
     size: 3,
   };
 
-  // Query 3: busca geral sem filtro OAB — apenas para ver a estrutura dos campos
+  // Query 3: match_all — ver quantos docs existem no índice e estrutura real
   const q3 = {
-    query: { range: { dataHoraUltimaAtualizacao: { gte: `now-${dias}d` } } },
+    query: { match_all: {} },
     sort: [{ dataHoraUltimaAtualizacao: { order: "desc" } }],
     size: 1,
-    _source: ["numero", "tribunal", "partes"],
+    _source: ["numero", "tribunal", "partes", "dataHoraUltimaAtualizacao"],
   };
 
-  const [r1, r2, r3] = await Promise.all([
+  // Query 4: match_all com campo @timestamp
+  const q4 = {
+    query: { match_all: {} },
+    size: 1,
+    _source: true,
+  };
+
+  const [r1, r2, r3, r4] = await Promise.all([
     fetch(`${base}/${tribunal}/_search`, {
       method: "POST",
       headers,
@@ -123,9 +130,18 @@ export async function GET(request: Request) {
     })
       .then((r) => r.json())
       .catch((e) => ({ error: e.message })),
+    fetch(`${base}/${tribunal}/_search`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(q4),
+      signal: AbortSignal.timeout(10000),
+    })
+      .then((r) => r.json())
+      .catch((e) => ({ error: e.message })),
   ]);
 
-  const sample = r3?.hits?.hits?.[0]?._source ?? null;
+  const sample =
+    r3?.hits?.hits?.[0]?._source ?? r4?.hits?.hits?.[0]?._source ?? null;
   const advSample = sample?.partes?.[0]?.advogados?.[0] ?? null;
 
   return NextResponse.json({
@@ -133,6 +149,7 @@ export async function GET(request: Request) {
     oab_buscado: oab,
     estado_buscado: estado,
     dias,
+    total_docs_indice: r4?.hits?.total?.value ?? 0,
     q1_OABNumero_maiusculo: {
       total: r1?.hits?.total?.value ?? 0,
       hits: (r1?.hits?.hits ?? []).map(

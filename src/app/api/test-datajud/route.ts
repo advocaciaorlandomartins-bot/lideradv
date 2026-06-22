@@ -105,20 +105,16 @@ export async function GET(request: Request) {
     _source: true,
   };
 
-  // Query 5: busca por nome do advogado (alternativa à OAB)
+  // Query 5: full-text multi_match sem nested para encontrar qualquer campo com ORLANDO
   const q5 = {
     query: {
       bool: {
         must: [
           {
-            nested: {
-              path: "partes",
-              query: {
-                nested: {
-                  path: "partes.advogados",
-                  query: { match: { "partes.advogados.nome": "ORLANDO" } },
-                },
-              },
+            multi_match: {
+              query: "JOSE ORLANDO",
+              type: "best_fields",
+              lenient: true,
             },
           },
         ],
@@ -128,10 +124,24 @@ export async function GET(request: Request) {
       },
     },
     size: 2,
-    _source: ["numeroProcesso", "partes", "dataHoraUltimaAtualizacao"],
+    _source: true,
   };
 
-  const [r1, r2, r3, r4, r5] = await Promise.all([
+  // Query 6: busca processo específico do TRF5 sem filtro de advogado — ver estrutura de partes
+  const q6 = {
+    query: {
+      bool: {
+        filter: [
+          { range: { dataHoraUltimaAtualizacao: { gte: `now-${dias}d` } } },
+          { exists: { field: "partes" } },
+        ],
+      },
+    },
+    size: 1,
+    _source: true,
+  };
+
+  const [r1, r2, r3, r4, r5, r6] = await Promise.all([
     fetch(`${base}/${tribunal}/_search`, {
       method: "POST",
       headers,
@@ -172,13 +182,18 @@ export async function GET(request: Request) {
     })
       .then((r) => r.json())
       .catch((e) => ({ error: e.message })),
+    fetch(`${base}/${tribunal}/_search`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(q6),
+      signal: AbortSignal.timeout(10000),
+    })
+      .then((r) => r.json())
+      .catch((e) => ({ error: e.message })),
   ]);
 
-  const docComPartes = r4?.hits?.hits?.[0]?._source ?? null;
+  const docComPartes = r6?.hits?.hits?.[0]?._source ?? null;
   const advSample = docComPartes?.partes?.[0]?.advogados?.[0] ?? null;
-  const hitsPorNome = (r5?.hits?.hits ?? []).map(
-    (h: { _source: Record<string, unknown> }) => h._source
-  );
 
   return NextResponse.json({
     tribunal,
@@ -187,17 +202,18 @@ export async function GET(request: Request) {
     dias,
     q1_OABNumero_maiusculo: { total: r1?.hits?.total?.value ?? 0 },
     q2_oabNumero_minusculo: { total: r2?.hits?.total?.value ?? 0 },
-    campo_real_advogado_de_processo_com_partes: advSample,
+    multi_match_jose_orlando: {
+      total: r5?.hits?.total?.value ?? 0,
+      primeiro: r5?.hits?.hits?.[0]?._source ?? null,
+    },
+    partes_exists_query: { total: r6?.hits?.total?.value ?? 0 },
+    campo_real_advogado: advSample,
     doc_com_partes: docComPartes
       ? {
           numeroProcesso: docComPartes.numeroProcesso,
           partes: docComPartes.partes,
         }
       : null,
-    busca_por_nome_orlando: {
-      total: r5?.hits?.total?.value ?? 0,
-      hits: hitsPorNome,
-    },
     conexao: r3?.hits ? "ok" : "erro",
   });
 }

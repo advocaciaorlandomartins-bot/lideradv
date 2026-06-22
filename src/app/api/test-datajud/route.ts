@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 // Endpoint temporário de diagnóstico DataJud — remove após usar
 export async function GET(request: Request) {
-  const session = await getSession();
-  if (!session)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const apiKey = process.env.DATAJUD_API_KEY;
   if (!apiKey)
     return NextResponse.json(

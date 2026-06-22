@@ -59,7 +59,7 @@ interface DatajudParte {
 }
 
 interface DatajudProcesso {
-  numero: string;
+  numeroProcesso: string;
   tribunal?: string;
   orgaoJulgador?: { nome?: string };
   dataHoraUltimaAtualizacao?: string;
@@ -157,7 +157,7 @@ export async function buscarPublicacoesPorOab(
 
       for (const hit of hits) {
         const src = hit._source;
-        const processo = src.numero ?? "";
+        const processo = src.numeroProcesso ?? "";
         if (!processo) continue;
 
         const tribunalNome =

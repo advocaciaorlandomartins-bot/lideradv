@@ -141,6 +141,19 @@ export async function GET(request: Request) {
     _source: true,
   };
 
+  // Mapping do índice — mostra todos os campos disponíveis
+  const mapping = await fetch(`${base}/${tribunal}/_mapping`, {
+    headers,
+    signal: AbortSignal.timeout(10000),
+  })
+    .then((r) => r.json())
+    .catch((e) => ({ error: e.message }));
+  const camposDisponiveis = Object.keys(
+    mapping?.[tribunal]?.mappings?.properties ??
+      mapping?.mappings?.properties ??
+      {}
+  );
+
   const [r1, r2, r3, r4, r5, r6] = await Promise.all([
     fetch(`${base}/${tribunal}/_search`, {
       method: "POST",
@@ -200,6 +213,7 @@ export async function GET(request: Request) {
     oab_buscado: oab,
     estado_buscado: estado,
     dias,
+    campos_do_indice: camposDisponiveis,
     q1_OABNumero_maiusculo: { total: r1?.hits?.total?.value ?? 0 },
     q2_oabNumero_minusculo: { total: r2?.hits?.total?.value ?? 0 },
     multi_match_jose_orlando: {

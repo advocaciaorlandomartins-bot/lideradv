@@ -140,9 +140,8 @@ export async function GET(request: Request) {
       .catch((e) => ({ error: e.message })),
   ]);
 
-  const sample =
-    r3?.hits?.hits?.[0]?._source ?? r4?.hits?.hits?.[0]?._source ?? null;
-  const advSample = sample?.partes?.[0]?.advogados?.[0] ?? null;
+  const docBruto = r4?.hits?.hits?.[0]?._source ?? null;
+  const advSample = docBruto?.partes?.[0]?.advogados?.[0] ?? null;
 
   return NextResponse.json({
     tribunal,
@@ -150,30 +149,10 @@ export async function GET(request: Request) {
     estado_buscado: estado,
     dias,
     total_docs_indice: r4?.hits?.total?.value ?? 0,
-    q1_OABNumero_maiusculo: {
-      total: r1?.hits?.total?.value ?? 0,
-      hits: (r1?.hits?.hits ?? []).map(
-        (h: {
-          _source: { numero?: string; dataHoraUltimaAtualizacao?: string };
-        }) => ({
-          numero: h._source?.numero,
-          data: h._source?.dataHoraUltimaAtualizacao,
-        })
-      ),
-    },
-    q2_oabNumero_minusculo: {
-      total: r2?.hits?.total?.value ?? 0,
-      hits: (r2?.hits?.hits ?? []).map(
-        (h: {
-          _source: { numero?: string; dataHoraUltimaAtualizacao?: string };
-        }) => ({
-          numero: h._source?.numero,
-          data: h._source?.dataHoraUltimaAtualizacao,
-        })
-      ),
-    },
+    q1_OABNumero_maiusculo: { total: r1?.hits?.total?.value ?? 0 },
+    q2_oabNumero_minusculo: { total: r2?.hits?.total?.value ?? 0 },
     campo_real_advogado: advSample,
-    processo_amostra_numero: sample?.numero ?? null,
-    conexao: r3?.hits ? "ok" : "erro",
+    doc_bruto_amostra: docBruto,
+    conexao: r4?.hits ? "ok" : "erro",
   });
 }

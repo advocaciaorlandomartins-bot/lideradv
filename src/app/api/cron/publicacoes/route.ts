@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
-import { buscarPublicacoesPorOab } from "@/lib/datajud";
+import {
+  buscarPublicacoesPorOab,
+  buscarMovimentosPorProcesso,
+} from "@/lib/datajud";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -63,11 +66,40 @@ export async function GET(request: Request) {
     resultados.push({ oab: oab.numero, estado: oab.estado, inseridos });
   }
 
+  // Monitoramento por número de processo (funciona sem TramitaSign, para qualquer escritório)
+  const processos = await sql`
+    SELECT p.id::text, p.numero, c.nome AS cliente_nome
+    FROM processos p
+    LEFT JOIN clientes c ON c.id = p.client_id
+    WHERE p.numero IS NOT NULL AND p.numero != ''
+      AND LENGTH(REGEXP_REPLACE(p.numero, '[^0-9]', '', 'g')) = 20
+  `;
+
+  let processoInseridos = 0;
+  const processosResultados: { numero: string; inseridos: number }[] = [];
+
+  for (const proc of processos) {
+    const inseridos = await buscarMovimentosPorProcesso(
+      String(proc.id),
+      String(proc.numero),
+      proc.cliente_nome ? String(proc.cliente_nome) : null,
+      apiKey,
+      diasAtras
+    );
+    processoInseridos += inseridos;
+    if (inseridos > 0)
+      processosResultados.push({ numero: String(proc.numero), inseridos });
+  }
+
   return NextResponse.json({
     ok: true,
     oabs_verificadas: rows.length,
-    publicacoes_novas: totalInseridos,
-    detalhes: resultados,
+    publicacoes_novas: totalInseridos + processoInseridos,
+    detalhes: {
+      por_oab: resultados,
+      por_processo: processosResultados,
+      processos_monitorados: processos.length,
+    },
     timestamp: new Date().toISOString(),
   });
 }

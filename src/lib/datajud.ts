@@ -67,6 +67,173 @@ interface DatajudProcesso {
   partes?: DatajudParte[];
 }
 
+// Movimento codes que indicam publicação/intimação com prazo processual
+const CODIGOS_PUBLICACAO = new Set([
+  92, // Publicação
+  132, // Decisão
+  466, // Homologação
+  848, // Trânsito em julgado
+  851, // Intimação
+  1051, // Decurso de Prazo
+  1061, // Disponibilização no Diário da Justiça Eletrônico
+  11009, // Intimação via DJe
+]);
+
+// Mapeia número CNJ (20 dígitos) para índice DataJud
+function tribunalIndexDoCNJ(numero: string): string | null {
+  const d = numero.replace(/\D/g, "");
+  if (d.length !== 20) return null;
+  const j = parseInt(d[13]);
+  const tt = parseInt(d.slice(14, 16));
+
+  if (j === 4) return `api_publica_trf${tt}`;
+  if (j === 5) return `api_publica_trt${tt}`;
+  if (j === 9) return "api_publica_tjdft";
+  if (j === 8) {
+    const estados = [
+      "ac",
+      "al",
+      "ap",
+      "am",
+      "ba",
+      "ce",
+      "df",
+      "es",
+      "go",
+      "ma",
+      "mt",
+      "ms",
+      "mg",
+      "pa",
+      "pb",
+      "pr",
+      "pe",
+      "pi",
+      "rj",
+      "rn",
+      "rs",
+      "ro",
+      "rr",
+      "sc",
+      "se",
+      "sp",
+      "to",
+    ];
+    const estado = estados[tt - 1];
+    return estado ? `api_publica_tj${estado}` : null;
+  }
+  return null;
+}
+
+export async function buscarMovimentosPorProcesso(
+  processoDbId: string,
+  numeroProcesso: string,
+  clienteNome: string | null,
+  apiKey: string,
+  diasAtras = 3
+): Promise<number> {
+  const tribunalIndex = tribunalIndexDoCNJ(numeroProcesso);
+  if (!tribunalIndex) return 0;
+
+  const numDigits = numeroProcesso.replace(/\D/g, "");
+
+  try {
+    const res = await fetch(`${DATAJUD_BASE}/${tribunalIndex}/_search`, {
+      method: "POST",
+      headers: {
+        Authorization: `ApiKey ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: { term: { numeroProcesso: numDigits } },
+        size: 1,
+        _source: true,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) return 0;
+
+    const data = await res.json();
+    const src: DatajudProcesso = data?.hits?.hits?.[0]?._source;
+    if (!src) return 0;
+
+    const tribunalNome =
+      src.tribunal ??
+      tribunalIndex
+        .replace("api_publica_", "")
+        .toUpperCase()
+        .replace(/^TJ([A-Z]+)$/, "TJ-$1")
+        .replace(/^TRT(\d+)$/, "TRT $1ª Região");
+
+    const orgao = src.orgaoJulgador?.nome ?? "—";
+
+    const limite = new Date();
+    limite.setDate(limite.getDate() - diasAtras);
+
+    const movimentosRecentes = (src.movimentos ?? []).filter((m) => {
+      if (!CODIGOS_PUBLICACAO.has(m.codigo)) return false;
+      try {
+        return new Date(m.dataHora) >= limite;
+      } catch {
+        return false;
+      }
+    });
+
+    if (movimentosRecentes.length === 0) return 0;
+
+    let inseridos = 0;
+    for (const mov of movimentosRecentes.slice(0, 10)) {
+      const tipo = mov.nome || "Publicação";
+      const disponibilizacao = new Date(mov.dataHora)
+        .toISOString()
+        .slice(0, 10);
+
+      const partes = [
+        ...(mov.complementos ?? []),
+        ...(mov.complementosTabelados ?? []),
+      ];
+      const conteudo =
+        partes.length > 0
+          ? partes.map((c) => `${c.descricao}: ${c.valor}`).join("; ")
+          : null;
+
+      const existe = await sql`
+        SELECT 1 FROM publicacoes
+        WHERE processo = ${numeroProcesso}
+          AND tipo = ${tipo}
+          AND disponibilizacao = ${disponibilizacao}::date
+        LIMIT 1
+      `;
+      if (existe.length > 0) continue;
+
+      await sql`
+        INSERT INTO publicacoes
+          (processo, tipo, destinatario, advogados, orgao, tribunal,
+           disponibilizacao, status, origem, conteudo)
+        VALUES (
+          ${numeroProcesso},
+          ${tipo},
+          ${clienteNome},
+          ${[]},
+          ${orgao},
+          ${tribunalNome},
+          ${disponibilizacao}::date,
+          'nao_lida',
+          'automatica',
+          ${conteudo}
+        )
+      `;
+      inseridos++;
+    }
+
+    return inseridos;
+  } catch (err) {
+    console.error(`Erro DataJud processo ${numeroProcesso}:`, err);
+    return 0;
+  }
+}
+
 export interface OabInput {
   id: string;
   numero: string;

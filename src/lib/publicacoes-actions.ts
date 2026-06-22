@@ -209,7 +209,8 @@ export async function verificarPublicacoesAction(): Promise<{
         estado: String(row.estado),
         nome_advogado: row.nome_advogado ? String(row.nome_advogado) : null,
       },
-      apiKey
+      apiKey,
+      30 // busca manual: últimos 30 dias para capturar histórico
     );
   }
 

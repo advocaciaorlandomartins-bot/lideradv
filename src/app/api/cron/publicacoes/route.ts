@@ -12,6 +12,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Permite busca histórica via ?dias=N (padrão: 3 para o cron diário)
+  const url = new URL(request.url);
+  const diasParam = parseInt(url.searchParams.get("dias") ?? "3", 10);
+  const diasAtras =
+    Number.isFinite(diasParam) && diasParam > 0 && diasParam <= 180
+      ? diasParam
+      : 3;
+
   const apiKey = process.env.DATAJUD_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -50,7 +58,7 @@ export async function GET(request: Request) {
       estado: String(row.estado),
       nome_advogado: row.nome_advogado ? String(row.nome_advogado) : null,
     };
-    const inseridos = await buscarPublicacoesPorOab(oab, apiKey);
+    const inseridos = await buscarPublicacoesPorOab(oab, apiKey, diasAtras);
     totalInseridos += inseridos;
     resultados.push({ oab: oab.numero, estado: oab.estado, inseridos });
   }

@@ -98,14 +98,40 @@ export async function GET(request: Request) {
     _source: ["numero", "tribunal", "partes", "dataHoraUltimaAtualizacao"],
   };
 
-  // Query 4: match_all com campo @timestamp
+  // Query 4: busca processo que tenha partes com advogados para ver estrutura
   const q4 = {
-    query: { match_all: {} },
+    query: { exists: { field: "partes.advogados" } },
     size: 1,
     _source: true,
   };
 
-  const [r1, r2, r3, r4] = await Promise.all([
+  // Query 5: busca por nome do advogado (alternativa à OAB)
+  const q5 = {
+    query: {
+      bool: {
+        must: [
+          {
+            nested: {
+              path: "partes",
+              query: {
+                nested: {
+                  path: "partes.advogados",
+                  query: { match: { "partes.advogados.nome": "ORLANDO" } },
+                },
+              },
+            },
+          },
+        ],
+        filter: [
+          { range: { dataHoraUltimaAtualizacao: { gte: `now-${dias}d` } } },
+        ],
+      },
+    },
+    size: 2,
+    _source: ["numeroProcesso", "partes", "dataHoraUltimaAtualizacao"],
+  };
+
+  const [r1, r2, r3, r4, r5] = await Promise.all([
     fetch(`${base}/${tribunal}/_search`, {
       method: "POST",
       headers,
@@ -138,21 +164,40 @@ export async function GET(request: Request) {
     })
       .then((r) => r.json())
       .catch((e) => ({ error: e.message })),
+    fetch(`${base}/${tribunal}/_search`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(q5),
+      signal: AbortSignal.timeout(10000),
+    })
+      .then((r) => r.json())
+      .catch((e) => ({ error: e.message })),
   ]);
 
-  const docBruto = r4?.hits?.hits?.[0]?._source ?? null;
-  const advSample = docBruto?.partes?.[0]?.advogados?.[0] ?? null;
+  const docComPartes = r4?.hits?.hits?.[0]?._source ?? null;
+  const advSample = docComPartes?.partes?.[0]?.advogados?.[0] ?? null;
+  const hitsPorNome = (r5?.hits?.hits ?? []).map(
+    (h: { _source: Record<string, unknown> }) => h._source
+  );
 
   return NextResponse.json({
     tribunal,
     oab_buscado: oab,
     estado_buscado: estado,
     dias,
-    total_docs_indice: r4?.hits?.total?.value ?? 0,
     q1_OABNumero_maiusculo: { total: r1?.hits?.total?.value ?? 0 },
     q2_oabNumero_minusculo: { total: r2?.hits?.total?.value ?? 0 },
-    campo_real_advogado: advSample,
-    doc_bruto_amostra: docBruto,
-    conexao: r4?.hits ? "ok" : "erro",
+    campo_real_advogado_de_processo_com_partes: advSample,
+    doc_com_partes: docComPartes
+      ? {
+          numeroProcesso: docComPartes.numeroProcesso,
+          partes: docComPartes.partes,
+        }
+      : null,
+    busca_por_nome_orlando: {
+      total: r5?.hits?.total?.value ?? 0,
+      hits: hitsPorNome,
+    },
+    conexao: r3?.hits ? "ok" : "erro",
   });
 }

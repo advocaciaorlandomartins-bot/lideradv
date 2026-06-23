@@ -83,12 +83,12 @@ function parseHtmlResultados(html: string, baseUrl: string): DjeItem[] {
     if (!urlMatch) continue;
     const pageUrl = `${baseUrl}${urlMatch[1]}`;
 
-    // Texto do link: "Thu Aug 21 00:00:00 BRT 2025 - Caderno 2 - ... - Página 287"
+    // Texto do link: "07/05/2025 - Caderno 2 - ..." ou "Thu Aug 21 00:00:00 BRT 2025 - ..."
     const afterUrl = bloco.slice(
       bloco.indexOf(urlMatch[0]) + urlMatch[0].length
     );
     const dateMatch = afterUrl.match(
-      />\s*(\w+ \w{3} \d{1,2} \d{2}:\d{2}:\d{2} \w+ \d{4}[^<]*)</
+      />\s*((?:\d{2}\/\d{2}\/\d{4}|\w+ \w{3} \d{1,2} \d{2}:\d{2}:\d{2} \w+ \d{4})[^<]*)</
     );
     if (!dateMatch) continue;
 

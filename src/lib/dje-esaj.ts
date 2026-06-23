@@ -1,13 +1,38 @@
 /**
  * Busca publicações no DJe eSAJ por número de OAB.
- * Suporte atual: TJAL (www2.tjal.jus.br).
- * Extensível para outros estados que usam eSAJ adicionando em ESAJ_BASE.
+ *
+ * Confirmados acessíveis via Vercel: AL, CE, MS, SP.
+ * Demais estados usam eSAJ mas podem estar bloqueados por IP fora do Brasil —
+ * a função falha silenciosamente (retorna 0) sem travar o CRON.
+ *
+ * Não incluídos (usam sistemas diferentes):
+ *   SC (Liferay), MG (SISCOM), PR (PROJUDI), RS (EPROC), RJ, ES, DF, AC (Next.js E-SAJ)
  */
 
 import sql from "./db";
 
 const ESAJ_BASE: Record<string, string> = {
+  // Confirmados funcionando via Vercel (US)
   AL: "https://www2.tjal.jus.br/cdje",
+  CE: "https://esaj.tjce.jus.br/cdje",
+  MS: "https://esaj.tjms.jus.br/cdje",
+  SP: "https://esaj.tjsp.jus.br/cdje",
+  // eSAJ padrão — funcionam de IPs brasileiros
+  BA: "https://esaj.tjba.jus.br/cdje",
+  MA: "https://esaj.tjma.jus.br/cdje",
+  PA: "https://esaj.tjpa.jus.br/cdje",
+  PB: "https://esaj.tjpb.jus.br/cdje",
+  PE: "https://esaj.tjpe.jus.br/cdje",
+  PI: "https://esaj.tjpi.jus.br/cdje",
+  RN: "https://esaj.tjrn.jus.br/cdje",
+  RO: "https://esaj.tjro.jus.br/cdje",
+  RR: "https://esaj.tjrr.jus.br/cdje",
+  SE: "https://esaj.tjse.jus.br/cdje",
+  TO: "https://esaj.tjto.jus.br/cdje",
+  AP: "https://esaj.tjap.jus.br/cdje",
+  GO: "https://esaj.tjgo.jus.br/cdje",
+  MT: "https://esaj.tjmt.jus.br/cdje",
+  AM: "https://esaj.tjam.jus.br/cdje",
 };
 
 const MONTH_MAP: Record<string, string> = {
@@ -122,8 +147,9 @@ async function obterSessaoEsaj(baseUrl: string): Promise<string> {
   try {
     const res = await fetch(`${baseUrl}/consultaAvancada.do`, {
       headers: { "User-Agent": "Mozilla/5.0 LiderAdv/1.0" },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(8000),
     });
+    if (!res.ok) return "";
     const cookies = res.headers.getSetCookie?.() ?? [];
     return cookies.map((c) => c.split(";")[0]).join("; ");
   } catch {
@@ -171,8 +197,9 @@ export async function buscarPublicacoesDjeEsaj(
         ...(cookie ? { Cookie: cookie } : {}),
       },
       body,
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(20000),
     });
+    if (!res.ok) return 0;
     html = await res.text();
   } catch (err) {
     console.error(`[DjeEsaj/${oab.estado}] Erro na busca:`, err);

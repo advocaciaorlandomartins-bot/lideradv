@@ -4,6 +4,10 @@ import {
   buscarPublicacoesPorOab,
   buscarMovimentosPorProcesso,
 } from "@/lib/datajud";
+import {
+  sincronizarTramitaSign,
+  tramitaSyncAtivo,
+} from "@/lib/tramitasign-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -91,14 +95,30 @@ export async function GET(request: Request) {
       processosResultados.push({ numero: String(proc.numero), inseridos });
   }
 
+  // Sincronização TramitaSign (sessão web — funciona sem API REST)
+  let tramitaInseridos = 0;
+  let tramitaErro: string | undefined;
+
+  if (tramitaSyncAtivo()) {
+    const tramitaResult = await sincronizarTramitaSign();
+    tramitaInseridos = tramitaResult.inseridos;
+    tramitaErro = tramitaResult.erro;
+  }
+
   return NextResponse.json({
     ok: true,
     oabs_verificadas: rows.length,
-    publicacoes_novas: totalInseridos + processoInseridos,
+    publicacoes_novas: totalInseridos + processoInseridos + tramitaInseridos,
     detalhes: {
       por_oab: resultados,
       por_processo: processosResultados,
       processos_monitorados: processos.length,
+      tramitasign: tramitaSyncAtivo()
+        ? { inseridos: tramitaInseridos, erro: tramitaErro ?? null }
+        : {
+            desabilitado: true,
+            motivo: "TRAMITASIGN_LOGIN_EMAIL não configurado",
+          },
     },
     timestamp: new Date().toISOString(),
   });

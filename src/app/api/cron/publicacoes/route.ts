@@ -8,6 +8,7 @@ import {
   sincronizarTramitaSign,
   tramitaSyncAtivo,
 } from "@/lib/tramitasign-sync";
+import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -56,7 +57,12 @@ export async function GET(request: Request) {
   }
 
   let totalInseridos = 0;
-  const resultados: { oab: string; estado: string; inseridos: number }[] = [];
+  const resultados: {
+    oab: string;
+    estado: string;
+    inseridos_datajud: number;
+    inseridos_dje: number;
+  }[] = [];
 
   for (const row of rows) {
     const oab = {
@@ -65,9 +71,19 @@ export async function GET(request: Request) {
       estado: String(row.estado),
       nome_advogado: row.nome_advogado ? String(row.nome_advogado) : null,
     };
-    const inseridos = await buscarPublicacoesPorOab(oab, apiKey, diasAtras);
-    totalInseridos += inseridos;
-    resultados.push({ oab: oab.numero, estado: oab.estado, inseridos });
+    const inseridosDatajud = await buscarPublicacoesPorOab(
+      oab,
+      apiKey,
+      diasAtras
+    );
+    const inseridosDje = await buscarPublicacoesDjeEsaj(oab, diasAtras);
+    totalInseridos += inseridosDatajud + inseridosDje;
+    resultados.push({
+      oab: oab.numero,
+      estado: oab.estado,
+      inseridos_datajud: inseridosDatajud,
+      inseridos_dje: inseridosDje,
+    });
   }
 
   // Monitoramento por número de processo (funciona sem TramitaSign, para qualquer escritório)
@@ -119,6 +135,10 @@ export async function GET(request: Request) {
             desabilitado: true,
             motivo: "TRAMITASIGN_LOGIN_EMAIL não configurado",
           },
+      dje_esaj: {
+        estados_suportados: ["AL"],
+        nota: "Busca DJe por OAB incluída acima em por_oab.inseridos_dje",
+      },
     },
     timestamp: new Date().toISOString(),
   });

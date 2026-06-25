@@ -4,10 +4,6 @@ import {
   buscarPublicacoesPorOab,
   buscarMovimentosPorProcesso,
 } from "@/lib/datajud";
-import {
-  sincronizarTramitaSign,
-  tramitaSyncAtivo,
-} from "@/lib/tramitasign-sync";
 import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
 
 export const dynamic = "force-dynamic";
@@ -88,9 +84,9 @@ export async function GET(request: Request) {
 
   // Monitoramento por número de processo (funciona sem TramitaSign, para qualquer escritório)
   const processos = await sql`
-    SELECT p.id::text, p.numero, c.nome AS cliente_nome
+    SELECT p.id::text, p.numero, c.name AS cliente_nome
     FROM processos p
-    LEFT JOIN clientes c ON c.id = p.client_id
+    LEFT JOIN clients c ON c.id = p.client_id
     WHERE p.numero IS NOT NULL AND p.numero != ''
       AND LENGTH(REGEXP_REPLACE(p.numero, '[^0-9]', '', 'g')) = 20
   `;
@@ -111,32 +107,44 @@ export async function GET(request: Request) {
       processosResultados.push({ numero: String(proc.numero), inseridos });
   }
 
-  // Sincronização TramitaSign (sessão web — funciona sem API REST)
-  let tramitaInseridos = 0;
-  let tramitaErro: string | undefined;
-
-  if (tramitaSyncAtivo()) {
-    const tramitaResult = await sincronizarTramitaSign();
-    tramitaInseridos = tramitaResult.inseridos;
-    tramitaErro = tramitaResult.erro;
-  }
+  // TramitaSign: recebe via webhook em /api/webhooks/tramitasign/publicacoes
+  // (sessão web bloqueada por IP fora do Brasil — Vercel = EUA)
 
   return NextResponse.json({
     ok: true,
     oabs_verificadas: rows.length,
-    publicacoes_novas: totalInseridos + processoInseridos + tramitaInseridos,
+    publicacoes_novas: totalInseridos + processoInseridos,
     detalhes: {
       por_oab: resultados,
       por_processo: processosResultados,
       processos_monitorados: processos.length,
-      tramitasign: tramitaSyncAtivo()
-        ? { inseridos: tramitaInseridos, erro: tramitaErro ?? null }
-        : {
-            desabilitado: true,
-            motivo: "TRAMITASIGN_LOGIN_EMAIL não configurado",
-          },
+      tramitasign: {
+        modo: "webhook",
+        url: "https://lideradv.vercel.app/api/webhooks/tramitasign/publicacoes",
+        nota: "Configure este webhook no painel do TramitaSign para receber publicações do TRF5 e demais tribunais",
+      },
       dje_esaj: {
-        estados_suportados: ["AL"],
+        estados_suportados: [
+          "AL",
+          "CE",
+          "MS",
+          "SP",
+          "BA",
+          "MA",
+          "PA",
+          "PB",
+          "PE",
+          "PI",
+          "RN",
+          "RO",
+          "RR",
+          "SE",
+          "TO",
+          "AP",
+          "GO",
+          "MT",
+          "AM",
+        ],
         nota: "Busca DJe por OAB incluída acima em por_oab.inseridos_dje",
       },
     },

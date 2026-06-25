@@ -43,7 +43,7 @@ export async function getAllPublicacoes(): Promise<Publicacao[]> {
     SELECT
       id, processo, tipo, destinatario, advogados, orgao, tribunal,
       TO_CHAR(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
-      status, origem, conteudo, conteudo_completo, created_at::text
+      status, origem, conteudo, conteudo_completo, resumo_ia, created_at::text
     FROM publicacoes
     ORDER BY disponibilizacao DESC, id DESC
   `;
@@ -57,7 +57,7 @@ export async function getPublicacaoById(
     SELECT
       id, processo, tipo, destinatario, advogados, orgao, tribunal,
       TO_CHAR(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
-      status, origem, conteudo, conteudo_completo, created_at::text
+      status, origem, conteudo, conteudo_completo, resumo_ia, created_at::text
     FROM publicacoes
     WHERE id = ${id}
     LIMIT 1
@@ -71,7 +71,7 @@ export async function searchPublicacoes(q: string): Promise<Publicacao[]> {
     SELECT
       id, processo, tipo, destinatario, advogados, orgao, tribunal,
       TO_CHAR(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
-      status, origem, conteudo, conteudo_completo, created_at::text
+      status, origem, conteudo, conteudo_completo, resumo_ia, created_at::text
     FROM publicacoes
     WHERE
       processo ILIKE ${term}

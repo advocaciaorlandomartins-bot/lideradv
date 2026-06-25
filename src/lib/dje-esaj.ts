@@ -1,15 +1,16 @@
 /**
  * Busca publicações no DJe eSAJ por número de OAB.
  *
- * Confirmados acessíveis via Vercel: AL, CE, MS, SP.
- * Demais estados usam eSAJ mas podem estar bloqueados por IP fora do Brasil —
- * a função falha silenciosamente (retorna 0) sem travar o CRON.
+ * Quando SCRAPER_BR_URL está definida, delega a busca HTTP ao microserviço
+ * lideradv-scraper-br (Fly.io GRU, IP brasileiro) — resolve bloqueios por IP.
+ * Fallback: scraping local direto de Vercel (funciona para AL, CE, MS, SP).
  *
  * Não incluídos (usam sistemas diferentes):
- *   SC (Liferay), MG (SISCOM), PR (PROJUDI), RS (EPROC), RJ, ES, DF, AC (Next.js E-SAJ)
+ *   SC (Liferay), MG (SISCOM), PR (PROJUDI), RS (EPROC), DF
  */
 
 import sql from "./db";
+import Anthropic from "@anthropic-ai/sdk";
 
 const ESAJ_BASE: Record<string, string> = {
   // Confirmados funcionando via Vercel (US)
@@ -143,6 +144,41 @@ function parseHtmlResultados(html: string, baseUrl: string): DjeItem[] {
   return itens;
 }
 
+async function fetchTextoCompleto(
+  url: string,
+  cookie: string
+): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return "";
+    const html = await res.text();
+    // O texto da publicação fica dentro de <textarea> ou dentro de divs com classe específica
+    const textareaMatch = html.match(/<textarea[^>]*>([\s\S]*?)<\/textarea>/i);
+    if (textareaMatch) return textareaMatch[1].trim();
+    // Fallback: busca em div com id="tabelaConteudo" ou similar
+    const divMatch = html.match(
+      /id="tabelaConteudo"[^>]*>([\s\S]*?)<\/table>/i
+    );
+    if (divMatch) return limparSnippet(divMatch[1]);
+    // Último fallback: bloco de texto em <pre> ou parágrafo central
+    const preMatch = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+    if (preMatch)
+      return preMatch[1]
+        .replace(/&amp;/g, "&")
+        .replace(/&nbsp;/g, " ")
+        .trim();
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 async function obterSessaoEsaj(baseUrl: string): Promise<string> {
   try {
     const res = await fetch(`${baseUrl}/consultaAvancada.do`, {
@@ -154,6 +190,108 @@ async function obterSessaoEsaj(baseUrl: string): Promise<string> {
     return cookies.map((c) => c.split(";")[0]).join("; ");
   } catch {
     return "";
+  }
+}
+
+async function gerarResumoAutomatico(
+  id: number,
+  tipo: string,
+  orgao: string,
+  tribunal: string,
+  texto: string
+): Promise<void> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return;
+
+  const prompt = `Você é um assistente jurídico brasileiro. Analise esta publicação do Diário de Justiça e retorne SOMENTE um JSON válido no formato abaixo. Campos desconhecidos devem ser null.
+
+{
+  "texto": "Resumo em português claro em 2-3 frases explicando o que a publicação determina",
+  "prazo_dias": <número inteiro de dias úteis do prazo processual, ou null se não houver>,
+  "acao_necessaria": "<ação necessária: Recurso | Manifestação | Contestação | Pagamento | Audiência | Cumprimento de sentença | Petição | Nenhuma ação imediata | ou outra ação concisa>",
+  "audiencia": "<data da audiência no formato DD/MM/YYYY, ou null se não houver>"
+}
+
+Publicação:
+Tipo: ${tipo}
+Órgão: ${orgao} · ${tribunal}
+
+${texto.slice(0, 4000)}`;
+
+  try {
+    const anthropic = new Anthropic({ apiKey });
+    const res = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const block = res.content[0];
+    const raw = block?.type === "text" ? block.text : "";
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return;
+
+    const resumo = JSON.parse(match[0]);
+    await sql`
+      UPDATE publicacoes SET resumo_ia = ${JSON.stringify(resumo)}::jsonb, updated_at = now()
+      WHERE id = ${id}
+    `;
+  } catch (err) {
+    console.error(`[DjeEsaj] Erro ao gerar resumo IA para pub ${id}:`, err);
+  }
+}
+
+async function buscarItensViaBr(
+  oabNumero: string,
+  oabEstado: string,
+  diasAtras: number,
+  estado: string
+): Promise<DjeItem[] | null> {
+  const scraperUrl = process.env.SCRAPER_BR_URL;
+  const scraperSecret = process.env.SCRAPER_SECRET;
+  if (!scraperUrl) return null;
+
+  try {
+    const res = await fetch(
+      `${scraperUrl}/scraper/publicacoes/estado/${estado}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(scraperSecret ? { "x-scraper-secret": scraperSecret } : {}),
+        },
+        body: JSON.stringify({
+          oab_numero: oabNumero,
+          oab_estado: oabEstado,
+          dias: diasAtras,
+        }),
+        signal: AbortSignal.timeout(55000),
+      }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ok: boolean;
+      publicacoes: Array<{
+        data: string;
+        tipo: string;
+        orgao: string;
+        url: string;
+        snippet: string;
+        processo: string | null;
+      }>;
+    };
+    if (!data.ok) return null;
+    return data.publicacoes.map((p) => ({
+      data: p.data,
+      tipo: p.tipo,
+      orgao: p.orgao,
+      url: p.url,
+      snippet: p.snippet,
+      processo: p.processo,
+    }));
+  } catch (err) {
+    console.error(`[DjeEsaj/${estado}] Erro no scraper-br:`, err);
+    return null;
   }
 }
 
@@ -169,70 +307,101 @@ export async function buscarPublicacoesDjeEsaj(
   const baseUrl = ESAJ_BASE[oab.estado];
   if (!baseUrl) return 0;
 
-  const hoje = new Date();
-  const inicio = new Date(hoje);
-  inicio.setDate(inicio.getDate() - diasAtras);
+  // Tenta via scraper-br (IP brasileiro); fallback: scraping local
+  const itensBr = await buscarItensViaBr(
+    oab.numero,
+    oab.estado,
+    diasAtras,
+    oab.estado
+  );
 
-  const fmt = (d: Date) =>
-    `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  let itens: DjeItem[];
 
-  const cookie = await obterSessaoEsaj(baseUrl);
-
-  // Busca com aspas = frase exata → evita falsos positivos
-  const body = new URLSearchParams({
-    "dadosConsulta.pesquisaLivre": `"${oab.numero}/${oab.estado}"`,
-    "dadosConsulta.dtInicio": fmt(inicio),
-    "dadosConsulta.dtFim": fmt(hoje),
-    "dadosConsulta.cdCaderno": "-11",
-  }).toString();
-
-  let html = "";
-  try {
-    const res = await fetch(`${baseUrl}/consultaAvancada.do`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
-        Referer: `${baseUrl}/consultaAvancada.do`,
-        ...(cookie ? { Cookie: cookie } : {}),
-      },
-      body,
-      signal: AbortSignal.timeout(20000),
-    });
-    if (!res.ok) return 0;
-    html = await res.text();
-  } catch (err) {
-    console.error(`[DjeEsaj/${oab.estado}] Erro na busca:`, err);
-    return 0;
+  if (itensBr !== null) {
+    itens = itensBr;
+    console.log(`[DjeEsaj/${oab.estado}] ${itens.length} itens via scraper-br`);
+  } else {
+    // Fallback local (funciona para AL, CE, MS, SP via Vercel)
+    const hoje = new Date();
+    const inicio = new Date(hoje);
+    inicio.setDate(inicio.getDate() - diasAtras);
+    const fmt = (d: Date) =>
+      `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    const cookie = await obterSessaoEsaj(baseUrl);
+    const body = new URLSearchParams({
+      "dadosConsulta.pesquisaLivre": `"${oab.numero}/${oab.estado}"`,
+      "dadosConsulta.dtInicio": fmt(inicio),
+      "dadosConsulta.dtFim": fmt(hoje),
+      "dadosConsulta.cdCaderno": "-11",
+    }).toString();
+    try {
+      const res = await fetch(`${baseUrl}/consultaAvancada.do`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
+          Referer: `${baseUrl}/consultaAvancada.do`,
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+        body,
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!res.ok) return 0;
+      const html = await res.text();
+      itens = parseHtmlResultados(html, baseUrl);
+      console.log(
+        `[DjeEsaj/${oab.estado}] ${itens.length} itens via fallback local`
+      );
+    } catch (err) {
+      console.error(`[DjeEsaj/${oab.estado}] Erro na busca local:`, err);
+      return 0;
+    }
   }
 
-  const itens = parseHtmlResultados(html, baseUrl);
   let inseridos = 0;
+  const cookie = itensBr !== null ? "" : await obterSessaoEsaj(baseUrl);
 
   for (const item of itens) {
-    // URL da página é único por publicação — usamos como chave de dedup
     const existe = await sql`
       SELECT 1 FROM publicacoes WHERE conteudo = ${item.url} LIMIT 1
     `;
     if (existe.length > 0) continue;
 
-    await sql`
+    // Quando veio do scraper-br, o snippet já é o texto completo
+    const textoParaResumo =
+      item.snippet ||
+      (itensBr === null ? await fetchTextoCompleto(item.url, cookie) : "");
+
+    const inserted = await sql`
       INSERT INTO publicacoes (
         processo, tipo, destinatario, orgao, tribunal,
         disponibilizacao, status, origem, conteudo, conteudo_completo
       ) VALUES (
-        ${item.processo},
+        ${item.processo ?? ""},
         ${item.tipo},
-        ${oab.nome_advogado},
+        ${oab.nome_advogado ?? ""},
         ${item.orgao},
         ${"TJ" + oab.estado},
         ${item.data}::date,
         'nao_lida',
-        ${"dje_" + oab.estado.toLowerCase()},
+        'automatica',
         ${item.url},
-        ${item.snippet}
+        ${textoParaResumo || null}
       )
+      RETURNING id
     `;
+
+    const newId = inserted[0]?.id;
+    if (newId && textoParaResumo) {
+      await gerarResumoAutomatico(
+        newId,
+        item.tipo,
+        item.orgao,
+        "TJ" + oab.estado,
+        textoParaResumo
+      );
+    }
+
     inseridos++;
   }
 

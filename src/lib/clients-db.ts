@@ -242,7 +242,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         to_char(c.data_afastamento, 'YYYY-MM-DD') AS data_afastamento,
         c.atividade_anterior,
         c.num_contribuicoes,
-        (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id) AS process_count
+        (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
       WHERE c.id = ${id}::uuid
@@ -279,7 +279,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       to_char(c.data_afastamento, 'YYYY-MM-DD') AS data_afastamento,
       c.atividade_anterior,
       c.num_contribuicoes,
-      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id) AS process_count
+      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
     WHERE c.id = ${id}::uuid
   `;
@@ -390,7 +390,7 @@ export async function getClientById(id: string): Promise<Client | null> {
       c.state,
       c.status,
       c.created_at,
-      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id) AS process_count
+      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
     WHERE c.id = ${id}::uuid
   `;

@@ -143,7 +143,7 @@ export async function getClientesForControle(): Promise<ClienteOption[]> {
   const rows = await sql`
     SELECT id::text, name AS nome, COALESCE(doc, '') AS doc
     FROM clients
-    WHERE status = 'ativo'
+    WHERE status = 'ativo' AND deleted_at IS NULL
     ORDER BY name ASC
   `;
   return rows.map((r) => ({
@@ -157,7 +157,7 @@ export async function getProcessosForControle(): Promise<ProcessoOption[]> {
   const rows = await sql`
     SELECT id::text, COALESCE(numero, tipo_acao) AS numero, client_id::text AS cliente_id
     FROM processos
-    WHERE status = 'ativo'
+    WHERE status = 'ativo' AND deleted_at IS NULL
     ORDER BY numero ASC
   `;
   return rows.map((r) => ({

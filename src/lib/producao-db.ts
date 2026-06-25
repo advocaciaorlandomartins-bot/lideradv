@@ -49,6 +49,7 @@ export async function getAllProcessosProducao(): Promise<ProcessoProducao[]> {
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     LEFT JOIN tarefas_processo t ON t.processo_id = p.id AND t.status != 'Cancelada'
+    WHERE p.deleted_at IS NULL
     GROUP BY p.id, c.name
     ORDER BY p.data_estagio_at ASC
   `;

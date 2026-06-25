@@ -327,6 +327,8 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
       WHERE c.status IS NULL
         AND c.data_evento >= CURRENT_DATE
         AND c.data_evento <= CURRENT_DATE + INTERVAL '14 days'
+        AND (cl.deleted_at IS NULL OR cl.id IS NULL)
+        AND (p.deleted_at IS NULL OR p.id IS NULL)
       ORDER BY c.data_evento ASC
       LIMIT 20
     `,

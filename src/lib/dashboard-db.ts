@@ -119,6 +119,8 @@ async function _getDashboardData(login?: string) {
         WHERE c.status IS NULL
           AND c.data_evento >= CURRENT_DATE
           AND c.data_evento <= CURRENT_DATE + INTERVAL '14 days'
+          AND (cl.deleted_at IS NULL OR cl.id IS NULL)
+          AND (p.deleted_at IS NULL OR p.id IS NULL)
 
         UNION ALL
 
@@ -133,8 +135,8 @@ async function _getDashboardData(login?: string) {
           p.numero                                          AS processo_numero,
           (ec.data - CURRENT_DATE)::int                     AS dias_restantes
         FROM eventos_controles ec
-        JOIN processos p   ON p.id  = ec.processo_id
-        LEFT JOIN clients cl ON cl.id = p.client_id
+        JOIN processos p   ON p.id  = ec.processo_id AND p.deleted_at IS NULL
+        LEFT JOIN clients cl ON cl.id = p.client_id AND cl.deleted_at IS NULL
         WHERE ec.data >= CURRENT_DATE
           AND ec.data <= CURRENT_DATE + INTERVAL '14 days'
 

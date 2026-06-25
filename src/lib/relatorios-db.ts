@@ -434,29 +434,50 @@ export async function getRelatorioJuridico(): Promise<RelatorioJuridico> {
              OR resultado_judicial IN ('acordo','homologado')
         ) AS acordo
       FROM processos
+      WHERE deleted_at IS NULL
       GROUP BY area
       ORDER BY total DESC
     `,
     sql`
       SELECT
         COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE status = 'concluido' AND (prazo_interno IS NULL OR updated_at::date <= prazo_interno OR data_evento IS NULL OR updated_at::date <= data_evento)) AS concluidos_no_prazo,
-        COUNT(*) FILTER (WHERE status = 'concluido' AND (prazo_interno IS NOT NULL AND updated_at::date > prazo_interno)) AS concluidos_atrasados,
-        COUNT(*) FILTER (WHERE status NOT IN ('concluido','arquivado') AND (prazo_interno IS NULL OR prazo_interno >= CURRENT_DATE) AND (data_evento IS NULL OR data_evento >= CURRENT_DATE)) AS pendentes,
-        COUNT(*) FILTER (WHERE status NOT IN ('concluido','arquivado') AND (prazo_interno < CURRENT_DATE OR data_evento < CURRENT_DATE)) AS vencidos
+        COUNT(*) FILTER (
+          WHERE status = 'concluido'
+            AND (
+              (prazo_interno IS NOT NULL AND updated_at::date <= prazo_interno)
+              OR (prazo_interno IS NULL AND data_evento IS NOT NULL AND updated_at::date <= data_evento)
+              OR (prazo_interno IS NULL AND data_evento IS NULL)
+            )
+        ) AS concluidos_no_prazo,
+        COUNT(*) FILTER (
+          WHERE status = 'concluido'
+            AND (
+              (prazo_interno IS NOT NULL AND updated_at::date > prazo_interno)
+              OR (prazo_interno IS NULL AND data_evento IS NOT NULL AND updated_at::date > data_evento)
+            )
+        ) AS concluidos_atrasados,
+        COUNT(*) FILTER (
+          WHERE status NOT IN ('concluido','cancelado')
+            AND COALESCE(prazo_interno, data_evento) >= CURRENT_DATE
+        ) AS pendentes,
+        COUNT(*) FILTER (
+          WHERE status NOT IN ('concluido','cancelado')
+            AND COALESCE(prazo_interno, data_evento) < CURRENT_DATE
+        ) AS vencidos
       FROM controles
     `,
     sql`
       SELECT status, COUNT(*)::int AS total
       FROM processos
+      WHERE deleted_at IS NULL
       GROUP BY status
       ORDER BY total DESC
     `,
     sql`
       SELECT
-        (SELECT COUNT(*) FROM processos)::int AS total_processos,
-        (SELECT COUNT(*) FROM clients)::int AS total_clientes,
-        (SELECT COUNT(*) FROM clients WHERE created_at >= date_trunc('month', CURRENT_DATE))::int AS novos_clientes_mes
+        (SELECT COUNT(*) FROM processos WHERE deleted_at IS NULL)::int AS total_processos,
+        (SELECT COUNT(*) FROM clients WHERE deleted_at IS NULL)::int AS total_clientes,
+        (SELECT COUNT(*) FROM clients WHERE deleted_at IS NULL AND created_at >= date_trunc('month', CURRENT_DATE))::int AS novos_clientes_mes
     `,
   ]);
 

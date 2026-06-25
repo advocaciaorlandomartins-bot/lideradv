@@ -117,7 +117,7 @@ export async function getProcessoExtended(
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     LEFT JOIN colaboradores col ON col.id = p.responsavel_id
-    WHERE p.id = ${id}::uuid
+    WHERE p.id = ${id}::uuid AND p.deleted_at IS NULL
   `;
   if (rows.length === 0) return null;
   const r = rows[0];

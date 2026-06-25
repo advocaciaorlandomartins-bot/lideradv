@@ -163,7 +163,7 @@ export async function getProcessoById(id: string): Promise<Processo | null> {
       to_char(p.dcb, 'YYYY-MM-DD') AS dcb
     FROM processos p
     JOIN clients c ON c.id = p.client_id
-    WHERE p.id = ${id}::uuid
+    WHERE p.id = ${id}::uuid AND p.deleted_at IS NULL
   `;
   if (rows.length === 0) return null;
   return mapRow(rows[0]);
@@ -202,7 +202,7 @@ export async function getProcessoFull(
       to_char(p.dcb, 'YYYY-MM-DD') AS dcb
     FROM processos p
     JOIN clients c ON c.id = p.client_id
-    WHERE p.id = ${id}::uuid
+    WHERE p.id = ${id}::uuid AND p.deleted_at IS NULL
   `;
   if (rows.length === 0) return null;
   const r = rows[0];

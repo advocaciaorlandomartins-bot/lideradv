@@ -14,6 +14,9 @@ import {
   ArrowRightIcon,
   SpinnerIcon,
   ChevronRightIcon,
+  DocumentTextIcon,
+  PenSignIcon,
+  ArrowTopRightOnSquareIcon,
 } from "@/components/icons";
 import {
   ESTAGIOS,
@@ -224,6 +227,91 @@ function EstagioBar({ lead }: { lead: Lead }) {
       )}
 
       {isPending && <SpinnerIcon className="h-4 w-4 text-muted" />}
+    </div>
+  );
+}
+
+// ── Contrato Card ─────────────────────────────────────────────────────────────
+
+function ContratoCard({ lead }: { lead: Lead }) {
+  if (!lead.contrato_id && !lead.contrato_url && !lead.contrato_status)
+    return null;
+
+  const assinado = lead.contrato_status === "assinado";
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border bg-slate-50 px-5 py-3">
+        <DocumentTextIcon className="h-4 w-4 text-primary" />
+        <h3 className="font-heading text-sm font-semibold text-fg">
+          Contrato Digital
+        </h3>
+        <span
+          className={`ml-auto rounded-full px-2.5 py-0.5 font-body text-xs font-semibold ${
+            assinado
+              ? "bg-green-100 text-green-700"
+              : "bg-amber-100 text-amber-700"
+          }`}
+        >
+          {assinado ? "Assinado" : "Aguardando Assinatura"}
+        </span>
+      </div>
+      <div className="divide-y divide-border">
+        {lead.contrato_id && (
+          <div className="flex items-center gap-4 px-5 py-3">
+            <span className="w-36 shrink-0 font-body text-sm text-muted">
+              ID do Contrato
+            </span>
+            <span className="font-mono text-xs text-fg">
+              {lead.contrato_id}
+            </span>
+          </div>
+        )}
+        {lead.contrato_assinado_em && (
+          <div className="flex items-center gap-4 px-5 py-3">
+            <span className="w-36 shrink-0 font-body text-sm text-muted">
+              Assinado em
+            </span>
+            <span className="flex items-center gap-1.5 font-body text-sm text-green-700">
+              <CheckCircleIcon className="h-4 w-4" />
+              {lead.contrato_assinado_em}
+            </span>
+          </div>
+        )}
+        {lead.contrato_url && !assinado && (
+          <div className="flex items-center gap-4 px-5 py-3">
+            <span className="w-36 shrink-0 font-body text-sm text-muted">
+              Link de Assinatura
+            </span>
+            <a
+              href={lead.contrato_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 font-body text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+            >
+              <PenSignIcon className="h-4 w-4" />
+              Abrir para Assinar
+              <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        )}
+        {lead.contrato_url && assinado && (
+          <div className="flex items-center gap-4 px-5 py-3">
+            <span className="w-36 shrink-0 font-body text-sm text-muted">
+              Documento
+            </span>
+            <a
+              href={lead.contrato_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 font-body text-sm text-primary hover:underline"
+            >
+              <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+              Ver contrato assinado
+            </a>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -865,6 +953,9 @@ export default function LeadDetail({
           <EstagioBar lead={lead} />
         </div>
       </div>
+
+      {/* Contrato Digital — visível quando PrevBot envia contrato_url */}
+      <ContratoCard lead={lead} />
 
       {/* Detail tabs */}
       <div className="flex gap-1 border-b border-border">

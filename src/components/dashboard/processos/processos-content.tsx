@@ -247,6 +247,7 @@ function SortButton({
 interface ProcessosContentProps {
   processos: Processo[];
   clients: { id: string; name: string }[];
+  initialBusca?: string;
 }
 
 const QUICK_FILTERS_KEY = "advmartins:processos:quick-filters";
@@ -254,6 +255,7 @@ const QUICK_FILTERS_KEY = "advmartins:processos:quick-filters";
 export default function ProcessosContent({
   processos,
   clients: _clients,
+  initialBusca,
 }: ProcessosContentProps) {
   const router = useRouter();
   const novoRef = useRef<HTMLDivElement>(null);
@@ -288,7 +290,7 @@ export default function ProcessosContent({
   // Filter state
   const [indicador, setIndicador] = useState<IndicadorKey>("todos");
   const [statusFilter, setStatusFilter] = useState<StatusKey>("todos");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialBusca ?? "");
   const [filtrosAtivos, setFiltrosAtivos] = useState<FiltroAvancado | null>(
     null
   );
@@ -842,7 +844,7 @@ export default function ProcessosContent({
             </p>
             <p className="font-body text-xs text-slate-400">
               {search
-                ? "Tente ajustar os termos da busca"
+                ? "Este processo ainda não está cadastrado no LiderAdv"
                 : activeFiltrosCount > 0
                   ? "Ajuste ou limpe os filtros avançados"
                   : "Ajuste os filtros acima"}
@@ -862,6 +864,15 @@ export default function ProcessosContent({
               >
                 Ver todos
               </button>
+            )}
+            {search && (
+              <Link
+                href={`/dashboard/processos/novo?numero=${encodeURIComponent(search)}`}
+                className="mt-2 flex items-center gap-2 rounded-lg bg-cta px-4 py-2 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Cadastrar processo {search}
+              </Link>
             )}
             {indicador === "todos" &&
               statusFilter === "todos" &&

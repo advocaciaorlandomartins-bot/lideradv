@@ -357,13 +357,15 @@ export default function IntimacoesContent({
                       <ClockIcon className="h-3.5 w-3.5" />
                       Prazo: {dias <= 0 ? "Vencido" : `${dias}d`}
                     </div>
-                    <Link
-                      href={`/dashboard/processos?busca=${encodeURIComponent(pub.processo)}`}
-                      className="mt-1 flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1 font-body text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
-                    >
-                      <FolderOpenIcon className="h-3.5 w-3.5" />
-                      Ver processo
-                    </Link>
+                    {pub.processo ? (
+                      <Link
+                        href={`/dashboard/processos?busca=${encodeURIComponent(pub.processo)}`}
+                        className="mt-1 flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1 font-body text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+                      >
+                        <FolderOpenIcon className="h-3.5 w-3.5" />
+                        Ver processo
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               );

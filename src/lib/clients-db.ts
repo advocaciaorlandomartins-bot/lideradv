@@ -38,8 +38,9 @@ export async function getAllClients(): Promise<Client[]> {
       c.state,
       c.status,
       c.created_at,
-      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id) AS process_count
+      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
+    WHERE c.deleted_at IS NULL
     ORDER BY c.created_at DESC
   `;
 
@@ -311,6 +312,7 @@ export async function getAllClientsWithOrigin(): Promise<ClientOptionFull[]> {
         c.comissao_valor
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
+      WHERE c.deleted_at IS NULL
       ORDER BY c.name
     `;
     return rows.map((r) => ({
@@ -330,7 +332,7 @@ export async function getAllClientsWithOrigin(): Promise<ClientOptionFull[]> {
   }
   // Fallback: new origin columns not yet migrated
   const rows = await sql`
-    SELECT c.id::text, c.name, c.doc FROM clients c ORDER BY c.name
+    SELECT c.id::text, c.name, c.doc FROM clients c WHERE c.deleted_at IS NULL ORDER BY c.name
   `;
   return rows.map((r) => ({
     id: r.id,
@@ -359,7 +361,7 @@ export async function getClientsWithBirthdays(): Promise<BirthdayClient[]> {
     SELECT id::text, name, email, phone,
            TO_CHAR(birth_date, 'YYYY-MM-DD') AS birth_date
     FROM clients
-    WHERE birth_date IS NOT NULL AND type = 'PF'
+    WHERE birth_date IS NOT NULL AND type = 'PF' AND deleted_at IS NULL
     ORDER BY
       EXTRACT(MONTH FROM birth_date),
       EXTRACT(DAY FROM birth_date),

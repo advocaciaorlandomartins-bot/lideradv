@@ -22,6 +22,18 @@ function mapLead(r: any): Lead {
     updated_at: new Date(r.updated_at).toLocaleDateString("pt-BR"),
     atividades_count: Number(r.atividades_count ?? 0),
     tarefas_pendentes: Number(r.tarefas_pendentes ?? 0),
+    contrato_id: r.contrato_id ?? null,
+    contrato_status: r.contrato_status ?? null,
+    contrato_url: r.contrato_url ?? null,
+    contrato_assinado_em: r.contrato_assinado_em
+      ? new Date(r.contrato_assinado_em).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null,
   };
 }
 
@@ -36,6 +48,7 @@ export async function getAllLeads(): Promise<Lead[]> {
       l.client_id::text,
       l.processo_id::text,
       l.notas, l.created_at, l.updated_at,
+      l.contrato_id, l.contrato_status, l.contrato_url, l.contrato_assinado_em,
       (SELECT COUNT(*)::int FROM crm_atividades WHERE lead_id = l.id) AS atividades_count,
       (SELECT COUNT(*)::int FROM crm_tarefas    WHERE lead_id = l.id AND concluida = FALSE) AS tarefas_pendentes
     FROM crm_leads l
@@ -56,6 +69,7 @@ export async function getLeadById(id: string): Promise<Lead | null> {
       l.client_id::text,
       l.processo_id::text,
       l.notas, l.created_at, l.updated_at,
+      l.contrato_id, l.contrato_status, l.contrato_url, l.contrato_assinado_em,
       (SELECT COUNT(*)::int FROM crm_atividades WHERE lead_id = l.id) AS atividades_count,
       (SELECT COUNT(*)::int FROM crm_tarefas    WHERE lead_id = l.id AND concluida = FALSE) AS tarefas_pendentes
     FROM crm_leads l

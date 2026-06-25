@@ -93,6 +93,8 @@ export type TipoAtividade =
   | "visita"
   | "outro";
 
+export type ContratoStatus = "aguardando_assinatura" | "assinado";
+
 export interface Lead {
   id: string;
   nome: string;
@@ -112,6 +114,11 @@ export interface Lead {
   updated_at: string;
   atividades_count: number;
   tarefas_pendentes: number;
+  // Contrato digital (gerado pelo PrevBot / assinado via TramitaSign)
+  contrato_id: string | null;
+  contrato_status: ContratoStatus | null;
+  contrato_url: string | null;
+  contrato_assinado_em: string | null;
 }
 
 export interface Atividade {

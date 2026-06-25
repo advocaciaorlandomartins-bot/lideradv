@@ -343,7 +343,8 @@ export async function getFluxoMensal(meses = 12): Promise<FluxoMensal[]> {
 }
 
 export async function getClientesParaRelatorio(): Promise<ClienteOption[]> {
-  const rows = await sql`SELECT id::text, name FROM clients ORDER BY name ASC`;
+  const rows =
+    await sql`SELECT id::text, name FROM clients WHERE deleted_at IS NULL ORDER BY name ASC`;
   return rows.map((r) => ({ id: r.id, name: r.name }));
 }
 
@@ -361,6 +362,7 @@ export async function getClientesParaRecibo(): Promise<ClienteParaRecibo[]> {
   const rows = await sql`
     SELECT id::text, name, doc, phone, city, state, type
     FROM clients
+    WHERE deleted_at IS NULL
     ORDER BY name ASC
   `;
   return rows.map((r) => ({
@@ -380,4 +382,128 @@ export async function getColaboradoresParaRelatorio(): Promise<
   const rows =
     await sql`SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo' ORDER BY nome ASC`;
   return rows.map((r) => ({ id: r.id, nome: r.nome, cargo: r.cargo }));
+}
+
+// ── Relatório Jurídico ────────────────────────────────────────────────────────
+
+export interface RelatorioJuridicoArea {
+  area: string;
+  total: number;
+  ativos: number;
+  ganhos: number;
+  perdidos: number;
+  acordo: number;
+  taxa_exito: number;
+}
+
+export interface RelatorioJuridicoControle {
+  total: number;
+  concluidos_no_prazo: number;
+  concluidos_atrasados: number;
+  pendentes: number;
+  vencidos: number;
+  compliance_pct: number;
+}
+
+export interface RelatorioJuridico {
+  por_area: RelatorioJuridicoArea[];
+  controles: RelatorioJuridicoControle;
+  processos_por_status: { status: string; total: number }[];
+  total_processos: number;
+  total_clientes: number;
+  novos_clientes_mes: number;
+}
+
+export async function getRelatorioJuridico(): Promise<RelatorioJuridico> {
+  const [areaRows, controleRows, statusRows, totaisRows] = await Promise.all([
+    sql`
+      SELECT
+        COALESCE(area, 'Não definida') AS area,
+        COUNT(*)                        AS total,
+        COUNT(*) FILTER (WHERE status = 'ativo')  AS ativos,
+        COUNT(*) FILTER (
+          WHERE resultado IN ('ganho','procedente','procedente_parcial','favoravel')
+             OR resultado_judicial IN ('ganho','procedente','procedente_parcial','favoravel')
+        ) AS ganhos,
+        COUNT(*) FILTER (
+          WHERE resultado IN ('perda','improcedente','desfavoravel')
+             OR resultado_judicial IN ('perda','improcedente','desfavoravel')
+        ) AS perdidos,
+        COUNT(*) FILTER (
+          WHERE resultado IN ('acordo','homologado')
+             OR resultado_judicial IN ('acordo','homologado')
+        ) AS acordo
+      FROM processos
+      GROUP BY area
+      ORDER BY total DESC
+    `,
+    sql`
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE status = 'concluido' AND (prazo_interno IS NULL OR updated_at::date <= prazo_interno OR data_evento IS NULL OR updated_at::date <= data_evento)) AS concluidos_no_prazo,
+        COUNT(*) FILTER (WHERE status = 'concluido' AND (prazo_interno IS NOT NULL AND updated_at::date > prazo_interno)) AS concluidos_atrasados,
+        COUNT(*) FILTER (WHERE status NOT IN ('concluido','arquivado') AND (prazo_interno IS NULL OR prazo_interno >= CURRENT_DATE) AND (data_evento IS NULL OR data_evento >= CURRENT_DATE)) AS pendentes,
+        COUNT(*) FILTER (WHERE status NOT IN ('concluido','arquivado') AND (prazo_interno < CURRENT_DATE OR data_evento < CURRENT_DATE)) AS vencidos
+      FROM controles
+    `,
+    sql`
+      SELECT status, COUNT(*)::int AS total
+      FROM processos
+      GROUP BY status
+      ORDER BY total DESC
+    `,
+    sql`
+      SELECT
+        (SELECT COUNT(*) FROM processos)::int AS total_processos,
+        (SELECT COUNT(*) FROM clients)::int AS total_clientes,
+        (SELECT COUNT(*) FROM clients WHERE created_at >= date_trunc('month', CURRENT_DATE))::int AS novos_clientes_mes
+    `,
+  ]);
+
+  const por_area: RelatorioJuridicoArea[] = areaRows.map((r) => {
+    const total = Number(r.total);
+    const ganhos = Number(r.ganhos);
+    const perdidos = Number(r.perdidos);
+    const encerrados = ganhos + perdidos + Number(r.acordo);
+    return {
+      area: r.area as string,
+      total,
+      ativos: Number(r.ativos),
+      ganhos,
+      perdidos,
+      acordo: Number(r.acordo),
+      taxa_exito: encerrados > 0 ? Math.round((ganhos / encerrados) * 100) : 0,
+    };
+  });
+
+  const cr = controleRows[0] as Record<string, unknown>;
+  const totalControles = Number(cr.total);
+  const concluidos_no_prazo = Number(cr.concluidos_no_prazo);
+  const concluidos_atrasados = Number(cr.concluidos_atrasados);
+  const totalConcluidos = concluidos_no_prazo + concluidos_atrasados;
+  const controles: RelatorioJuridicoControle = {
+    total: totalControles,
+    concluidos_no_prazo,
+    concluidos_atrasados,
+    pendentes: Number(cr.pendentes),
+    vencidos: Number(cr.vencidos),
+    compliance_pct:
+      totalConcluidos > 0
+        ? Math.round((concluidos_no_prazo / totalConcluidos) * 100)
+        : 100,
+  };
+
+  const tr = totaisRows[0] as Record<string, unknown>;
+
+  return {
+    por_area,
+    controles,
+    processos_por_status: statusRows.map((r) => ({
+      status: r.status as string,
+      total: Number(r.total),
+    })),
+    total_processos: Number(tr.total_processos),
+    total_clientes: Number(tr.total_clientes),
+    novos_clientes_mes: Number(tr.novos_clientes_mes),
+  };
 }

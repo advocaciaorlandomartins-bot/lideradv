@@ -95,12 +95,14 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 interface Props {
   clients: { id: string; name: string }[];
   defaultClientId?: string;
+  defaultNumero?: string;
   redirectTo?: string;
 }
 
 export default function NewProcessoForm({
   clients,
   defaultClientId,
+  defaultNumero,
   redirectTo,
 }: Props) {
   const [state, formAction, isPending] = useActionState<
@@ -171,6 +173,7 @@ export default function NewProcessoForm({
                 name="numero"
                 type="text"
                 placeholder="0000000-00.0000.0.00.0000"
+                defaultValue={defaultNumero ?? ""}
                 onBlur={handleNumeroBlur}
                 onChange={() => setCnpjWarning("")}
                 disabled={isPending}

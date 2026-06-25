@@ -126,6 +126,7 @@ export async function getAllProcessos(): Promise<Processo[]> {
       to_char(p.dcb, 'YYYY-MM-DD') AS dcb
     FROM processos p
     JOIN clients c ON c.id = p.client_id
+    WHERE p.deleted_at IS NULL
     ORDER BY COALESCE(p.updated_at, p.created_at) DESC
   `;
   return rows.map(mapRow);
@@ -246,6 +247,7 @@ export async function getProcessosByClientId(
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.client_id = ${clientId}::uuid
+      AND p.deleted_at IS NULL
     ORDER BY COALESCE(p.updated_at, p.created_at) DESC
   `;
   return rows.map(mapRow);

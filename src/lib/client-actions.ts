@@ -544,7 +544,7 @@ export async function deleteClientAction(
   }
 
   try {
-    await sql`DELETE FROM clients WHERE id = ${id}::uuid`;
+    await sql`UPDATE clients SET deleted_at = NOW() WHERE id = ${id}::uuid AND deleted_at IS NULL`;
   } catch (err) {
     console.error("deleteClientAction DB error:", err);
     return {

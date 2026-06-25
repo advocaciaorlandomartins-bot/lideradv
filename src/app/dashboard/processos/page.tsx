@@ -12,9 +12,15 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function ProcessosPage() {
+export default async function ProcessosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ busca?: string }>;
+}) {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "ver")) notFound();
+
+  const { busca } = await searchParams;
 
   const [processos, clients] = await Promise.all([
     getAllProcessos(),
@@ -39,7 +45,11 @@ export default async function ProcessosPage() {
 
       <ProcessosSubNav />
 
-      <ProcessosContent processos={processos} clients={clientOptions} />
+      <ProcessosContent
+        processos={processos}
+        clients={clientOptions}
+        initialBusca={busca}
+      />
     </div>
   );
 }

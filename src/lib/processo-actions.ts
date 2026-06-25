@@ -241,7 +241,7 @@ export async function deleteProcessoAction(id: string): Promise<void> {
   if (!session || !hasPermission(session, "processos", "excluir")) return;
 
   try {
-    await sql`DELETE FROM processos WHERE id = ${id}::uuid`;
+    await sql`UPDATE processos SET deleted_at = NOW() WHERE id = ${id}::uuid AND deleted_at IS NULL`;
   } catch (err) {
     console.error("deleteProcessoAction DB error:", err);
     return;

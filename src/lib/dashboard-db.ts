@@ -152,6 +152,7 @@ async function _getDashboardData(login?: string) {
         FROM clients
         WHERE type = 'PF'
           AND birth_date IS NOT NULL
+          AND deleted_at IS NULL
         ORDER BY
           EXTRACT(MONTH FROM birth_date),
           EXTRACT(DAY FROM birth_date),
@@ -259,6 +260,7 @@ async function _getAlertasPrevidenciarios(): Promise<AlertaPrevidenciario[]> {
     WHERE p.dcb IS NOT NULL
       AND p.dcb BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE + INTERVAL '60 days'
       AND p.status = 'ativo'
+      AND p.deleted_at IS NULL
 
     UNION ALL
 
@@ -274,6 +276,7 @@ async function _getAlertasPrevidenciarios(): Promise<AlertaPrevidenciario[]> {
     JOIN clients c ON c.id = p.client_id
     WHERE p.resultado_admin = 'indeferido'
       AND p.status = 'ativo'
+      AND p.deleted_at IS NULL
       AND (p.fase IS NULL OR p.fase NOT IN ('Conhecimento','Instrução','Julgamento','Recurso','Execução','Cumprimento de Sentença'))
 
     ORDER BY dias ASC

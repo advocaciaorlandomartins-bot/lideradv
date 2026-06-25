@@ -334,8 +334,8 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
     // 5. Contagens gerais
     sql`
       SELECT
-        (SELECT COUNT(*)::int FROM clients)      AS total_clientes,
-        (SELECT COUNT(*)::int FROM processos)    AS total_processos,
+        (SELECT COUNT(*)::int FROM clients WHERE deleted_at IS NULL)      AS total_clientes,
+        (SELECT COUNT(*)::int FROM processos WHERE deleted_at IS NULL)    AS total_processos,
         (SELECT COUNT(*)::int FROM colaboradores) AS total_colaboradores,
         (SELECT COUNT(*)::int FROM controles
          WHERE status IS NULL
@@ -361,6 +361,7 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
     sql`
       SELECT tipo_acao AS label, COUNT(*)::int AS count
       FROM processos
+      WHERE deleted_at IS NULL
       GROUP BY tipo_acao
       ORDER BY count DESC
       LIMIT 8
@@ -393,7 +394,8 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
         to_char(date_trunc('month', created_at), 'YYYY-MM') AS mes,
         COUNT(*)::int AS count
       FROM clients
-      WHERE created_at >= date_trunc('month', CURRENT_DATE - INTERVAL '11 months')
+      WHERE deleted_at IS NULL
+        AND created_at >= date_trunc('month', CURRENT_DATE - INTERVAL '11 months')
       GROUP BY mes
       ORDER BY mes ASC
     `,
@@ -466,6 +468,7 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
           EXTRACT(EPOCH FROM (NOW() - data_estagio_at)) / 86400
         )::int, 0) AS max_dias
       FROM processos
+      WHERE deleted_at IS NULL
       GROUP BY estagio_producao
       ORDER BY CASE estagio_producao
         WHEN 'analise'        THEN 1
@@ -488,6 +491,7 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
       FROM processos p
       JOIN clients c ON c.id = p.client_id
       WHERE p.estagio_producao != 'arquivado'
+        AND p.deleted_at IS NULL
       ORDER BY p.data_estagio_at ASC
       LIMIT 8
     `,

@@ -9,6 +9,7 @@ import type {
   ClienteOption,
   ColaboradorOption,
   ClienteParaRecibo,
+  RelatorioJuridico,
 } from "@/lib/relatorios-db";
 import type { EscritorioConfig } from "@/lib/escritorio-db";
 import {
@@ -18,9 +19,17 @@ import {
   UsersIcon,
   UserPlusIcon,
   CalendarIcon as FluxoIcon,
+  ScalesIcon,
 } from "@/components/icons";
 
-type Tab = "painel" | "extrato" | "clientes" | "folha" | "fluxo" | "recibo";
+type Tab =
+  | "painel"
+  | "extrato"
+  | "clientes"
+  | "folha"
+  | "fluxo"
+  | "recibo"
+  | "juridico";
 
 function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -173,6 +182,7 @@ interface Props {
   colaboradores: ColaboradorOption[];
   escritorio: EscritorioConfig;
   clientesComDados: ClienteParaRecibo[];
+  juridico: RelatorioJuridico;
   permissoes: Record<string, string[]>;
 }
 
@@ -1958,6 +1968,263 @@ function ReciboTab({
   );
 }
 
+// ── JuridicoTab ───────────────────────────────────────────────────────────────
+
+const STATUS_PROCESSO_LABELS: Record<string, string> = {
+  ativo: "Ativo",
+  suspenso: "Suspenso",
+  arquivado: "Arquivado",
+  encerrado: "Encerrado",
+};
+const STATUS_PROCESSO_COLORS: Record<string, string> = {
+  ativo: "bg-emerald-50 text-emerald-700",
+  suspenso: "bg-amber-50 text-amber-700",
+  arquivado: "bg-slate-100 text-slate-500",
+  encerrado: "bg-blue-50 text-blue-700",
+};
+
+function JuridicoTab({ juridico }: { juridico: RelatorioJuridico }) {
+  const {
+    por_area,
+    controles,
+    processos_por_status,
+    total_processos,
+    total_clientes,
+    novos_clientes_mes,
+  } = juridico;
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs de topo */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+            Total Processos
+          </p>
+          <p className="mt-1 font-heading text-2xl font-bold text-fg">
+            {total_processos}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+            Total Clientes
+          </p>
+          <p className="mt-1 font-heading text-2xl font-bold text-fg">
+            {total_clientes}
+          </p>
+          <p className="mt-0.5 font-body text-xs text-emerald-600">
+            +{novos_clientes_mes} este mês
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+            Compliance Prazos
+          </p>
+          <p
+            className={`mt-1 font-heading text-2xl font-bold ${controles.compliance_pct >= 80 ? "text-emerald-600" : controles.compliance_pct >= 60 ? "text-amber-600" : "text-red-600"}`}
+          >
+            {controles.compliance_pct}%
+          </p>
+          <p className="mt-0.5 font-body text-xs text-muted">
+            {controles.concluidos_no_prazo} de{" "}
+            {controles.concluidos_no_prazo + controles.concluidos_atrasados}{" "}
+            concluídos
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+            Prazos Vencidos
+          </p>
+          <p
+            className={`mt-1 font-heading text-2xl font-bold ${controles.vencidos > 0 ? "text-red-600" : "text-emerald-600"}`}
+          >
+            {controles.vencidos}
+          </p>
+          <p className="mt-0.5 font-body text-xs text-muted">
+            {controles.pendentes} pendentes
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Processos por status */}
+        <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+          <h3 className="mb-4 font-heading text-sm font-bold text-fg">
+            Processos por Status
+          </h3>
+          <div className="space-y-2">
+            {processos_por_status.map(({ status, total }) => {
+              const pct =
+                total_processos > 0
+                  ? Math.round((total / total_processos) * 100)
+                  : 0;
+              return (
+                <div key={status}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 font-body text-xs font-semibold ${STATUS_PROCESSO_COLORS[status] ?? "bg-slate-100 text-slate-500"}`}
+                    >
+                      {STATUS_PROCESSO_LABELS[status] ?? status}
+                    </span>
+                    <span className="font-body text-xs text-muted">
+                      {total} ({pct}%)
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-100">
+                    <div
+                      className="h-1.5 rounded-full bg-primary transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Controle de prazos */}
+        <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+          <h3 className="mb-4 font-heading text-sm font-bold text-fg">
+            Controle de Prazos
+          </h3>
+          <div className="space-y-3">
+            {[
+              {
+                label: "Concluídos no prazo",
+                value: controles.concluidos_no_prazo,
+                color: "text-emerald-600",
+                bar: "bg-emerald-500",
+              },
+              {
+                label: "Concluídos com atraso",
+                value: controles.concluidos_atrasados,
+                color: "text-amber-600",
+                bar: "bg-amber-400",
+              },
+              {
+                label: "Pendentes",
+                value: controles.pendentes,
+                color: "text-blue-600",
+                bar: "bg-blue-500",
+              },
+              {
+                label: "Vencidos",
+                value: controles.vencidos,
+                color: "text-red-600",
+                bar: "bg-red-500",
+              },
+            ].map(({ label, value, color, bar }) => {
+              const pct =
+                controles.total > 0
+                  ? Math.round((value / controles.total) * 100)
+                  : 0;
+              return (
+                <div key={label}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="font-body text-xs text-slate-600">
+                      {label}
+                    </span>
+                    <span className={`font-body text-xs font-bold ${color}`}>
+                      {value} ({pct}%)
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-100">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${bar}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Taxa de êxito por área */}
+      {por_area.length > 0 && (
+        <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-border">
+            <h3 className="font-heading text-sm font-bold text-fg">
+              Taxa de Êxito por Área
+            </h3>
+            <p className="mt-0.5 font-body text-xs text-muted">
+              Baseado em processos com resultado registrado
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-4 py-2.5 text-left font-body text-xs font-semibold text-muted">
+                    Área
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-body text-xs font-semibold text-muted">
+                    Total
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-body text-xs font-semibold text-muted">
+                    Ativos
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-body text-xs font-semibold text-emerald-600">
+                    Ganhos
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-body text-xs font-semibold text-red-500">
+                    Perdas
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-body text-xs font-semibold text-amber-600">
+                    Acordos
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-body text-xs font-semibold text-muted">
+                    Taxa Êxito
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {por_area.map((a) => (
+                  <tr
+                    key={a.area}
+                    className="hover:bg-slate-50 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-body text-sm font-semibold text-fg">
+                      {a.area}
+                    </td>
+                    <td className="px-4 py-3 text-right font-body text-sm text-muted">
+                      {a.total}
+                    </td>
+                    <td className="px-4 py-3 text-right font-body text-sm text-muted">
+                      {a.ativos}
+                    </td>
+                    <td className="px-4 py-3 text-right font-body text-sm font-semibold text-emerald-600">
+                      {a.ganhos}
+                    </td>
+                    <td className="px-4 py-3 text-right font-body text-sm font-semibold text-red-500">
+                      {a.perdidos}
+                    </td>
+                    <td className="px-4 py-3 text-right font-body text-sm font-semibold text-amber-600">
+                      {a.acordo}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {a.ganhos + a.perdidos + a.acordo === 0 ? (
+                        <span className="font-body text-xs text-muted">—</span>
+                      ) : (
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 font-body text-xs font-bold ${a.taxa_exito >= 70 ? "bg-emerald-50 text-emerald-700" : a.taxa_exito >= 40 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-600"}`}
+                        >
+                          {a.taxa_exito}%
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 type TabMeta = {
@@ -2011,6 +2278,13 @@ const ALL_TABS: TabMeta[] = [
     icon: PrinterIcon,
     subKey: "relatorios_recibo",
   },
+  {
+    key: "juridico",
+    label: "Jurídico",
+    description: "Êxito e compliance",
+    icon: ScalesIcon,
+    subKey: null,
+  },
 ];
 
 function canSeeTab(
@@ -2032,6 +2306,7 @@ export default function RelatoriosContent({
   colaboradores,
   escritorio,
   clientesComDados,
+  juridico,
   permissoes,
 }: Props) {
   const visibleTabs = ALL_TABS.filter(({ subKey }) =>
@@ -2127,6 +2402,7 @@ export default function RelatoriosContent({
               escritorio={escritorio}
             />
           )}
+          {activeTab === "juridico" && <JuridicoTab juridico={juridico} />}
         </div>
       </div>
     </div>

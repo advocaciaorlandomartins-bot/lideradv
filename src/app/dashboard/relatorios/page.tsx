@@ -7,6 +7,7 @@ import {
   getClientesParaRelatorio,
   getColaboradoresParaRelatorio,
   getClientesParaRecibo,
+  getRelatorioJuridico,
 } from "@/lib/relatorios-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { getSession } from "@/lib/session";
@@ -29,6 +30,7 @@ export default async function RelatoriosPage() {
     colaboradores,
     escritorio,
     clientesComDados,
+    juridico,
   ] = await Promise.all([
     getRelatorioLancamentos({}),
     getRelatorioResumo({}),
@@ -38,6 +40,7 @@ export default async function RelatoriosPage() {
     getColaboradoresParaRelatorio(),
     getEscritorioConfig(),
     getClientesParaRecibo(),
+    getRelatorioJuridico(),
   ]);
 
   return (
@@ -59,6 +62,7 @@ export default async function RelatoriosPage() {
         colaboradores={colaboradores}
         escritorio={escritorio}
         clientesComDados={clientesComDados}
+        juridico={juridico}
         permissoes={session.permissoes ?? {}}
       />
     </div>

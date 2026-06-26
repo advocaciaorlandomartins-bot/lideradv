@@ -30,6 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# logs e erros de desenvolvimento
+*.log
+*.err
+
 # env files (can opt-in for committing if needed)
 .env*
 
@@ -40,11 +44,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# screenshots e logs de desenvolvimento
+# screenshots e artefatos de desenvolvimento
 *.png
 *.jpg
 *.zip
-dev-out.log
-dev-err.log
+*.pdf
+screenshots/
 
 .vercel

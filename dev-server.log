@@ -1,9 +1,0 @@
-▲ Next.js 16.2.6 (Turbopack)
-- Local:         http://localhost:3000
-- Network:       http://192.168.15.10:3000
-✓ Ready in 1234ms
-Creating turbopack project {
-  dir: 'C:\\Users\\Orlando\\Documents\\Teste\\next-app',
-  testMode: true
-}
-

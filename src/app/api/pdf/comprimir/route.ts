@@ -11,7 +11,7 @@ const inflateRaw = promisify(zlib.inflateRaw);
 const JPEG_QUALITY = 75;
 
 // Decode FlateDecode (zlib-compressed) stream data
-async function flateDecode(data: Buffer, predictor = 1): Promise<Buffer> {
+async function flateDecode(data: Buffer, _predictor = 1): Promise<Buffer> {
   try {
     return await inflate(data);
   } catch {
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     let imagesProcessed = 0;
     let bytesSaved = 0;
 
-    for (const [ref, obj] of context.enumerateIndirectObjects()) {
+    for (const [, obj] of context.enumerateIndirectObjects()) {
       if (!(obj instanceof PDFRawStream)) continue;
       const dict = obj.dict;
 
@@ -100,7 +100,6 @@ export async function POST(req: NextRequest) {
         // Already JPEG — re-encode at lower quality
         const compressed = recompressJpeg(originalData);
         if (compressed && compressed.length < originalData.length) {
-          bytesSaved += originalData.length - compressed.length;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (obj as any).contents = new Uint8Array(compressed);
           dict.set(PDFName.of("Length"), PDFNumber.of(compressed.length));

@@ -326,10 +326,8 @@ export async function getFluxoMensal(meses = 12): Promise<FluxoMensal[]> {
     GROUP BY mes_iso, mes_label
     ORDER BY mes_iso ASC
   `;
-  let acumulado = 0;
   return rows.map((r) => {
     const saldoMes = Number(r.receitas) - Number(r.despesas);
-    acumulado += saldoMes;
     return {
       mes_iso: r.mes_iso,
       mes_label: r.mes_label,

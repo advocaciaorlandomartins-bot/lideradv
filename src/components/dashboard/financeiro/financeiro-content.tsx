@@ -277,7 +277,7 @@ function PaginationBar({
 
 function RowActions({
   lancamento,
-  canEdit,
+  canEdit: _canEdit,
   singleDeleteOnly = false,
 }: {
   lancamento: Lancamento;
@@ -982,13 +982,6 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     a.click();
     URL.revokeObjectURL(url);
   }
-
-  const dateRangeLabel = (() => {
-    if (datePreset === "todos" || datePreset === "custom") return null;
-    const r = getPresetRange(datePreset);
-    if (!r.from || !r.to) return null;
-    return `${r.from.toLocaleDateString("pt-BR")} — ${r.to.toLocaleDateString("pt-BR")}`;
-  })();
 
   // ── Shared table column layout ──────────────────────────────────────────────
 

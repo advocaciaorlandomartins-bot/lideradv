@@ -500,7 +500,7 @@ function CasosProducaoTable({ casos }: { casos: ProducaoCasoUrgente[] }) {
 }
 
 function OperacionalTab({ data }: { data: GerenciadorData }) {
-  const { kpis, counts, proximosControles, vencidos, crm, producao } = data;
+  const { counts, proximosControles, vencidos, crm, producao } = data;
 
   const controlesHojeAmanha = proximosControles.filter(
     (c) => c.dias_restantes <= 1

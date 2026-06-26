@@ -364,9 +364,6 @@ export default function NewLancamentoForm({
   ]);
 
   // ── Opção de pagamento da comissão ────────────────────────
-  const canChooseComissaoMode =
-    !!commissionInfo && commissionInfo.comissao_calculada > 0;
-
   const comissaoValorCustomEffective =
     comissaoModoPag === "avista" && comissaoValorCustomInput
       ? parseMoney(comissaoValorCustomInput)

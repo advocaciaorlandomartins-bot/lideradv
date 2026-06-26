@@ -5,7 +5,6 @@ import {
   XMarkIcon,
   PlusIcon,
   SpinnerIcon,
-  BanknotesIcon,
   TrendUpIcon,
   TrendDownIcon,
   CalendarIcon,

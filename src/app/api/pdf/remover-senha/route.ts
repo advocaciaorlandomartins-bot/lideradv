@@ -5,7 +5,7 @@ export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;
-    const senha = (form.get("senha") as string) || "";
+    const _senha = (form.get("senha") as string) || "";
 
     if (!file)
       return NextResponse.json(

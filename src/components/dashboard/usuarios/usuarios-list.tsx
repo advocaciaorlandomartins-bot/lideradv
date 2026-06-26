@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   ShieldCheckIcon,
   PlusIcon,
-  ChevronRightIcon,
   MagnifyingGlassIcon,
 } from "@/components/icons";
 import DeleteUsuarioButton from "@/components/dashboard/usuarios/delete-usuario-button";

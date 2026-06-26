@@ -7,7 +7,6 @@ import {
   ChevronRightIcon,
   FolderOpenIcon,
   ArchiveBoxIcon,
-  ArrowRightIcon,
   MagnifyingGlassIcon,
 } from "@/components/icons";
 import {

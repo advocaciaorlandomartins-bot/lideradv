@@ -245,7 +245,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
-      WHERE c.id = ${id}::uuid
+      WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
     `;
     if (rows.length === 0) return null;
     return mapClientFull(rows[0], true);
@@ -281,7 +281,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       c.num_contribuicoes,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
-    WHERE c.id = ${id}::uuid
+    WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
   `;
   if (rows.length === 0) return null;
   return mapClientFull(rows[0], false);
@@ -392,7 +392,7 @@ export async function getClientById(id: string): Promise<Client | null> {
       c.created_at,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
-    WHERE c.id = ${id}::uuid
+    WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
   `;
 
   if (rows.length === 0) return null;

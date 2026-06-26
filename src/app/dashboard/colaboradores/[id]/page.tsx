@@ -7,12 +7,7 @@ export const metadata = { title: "Colaborador — LiderAdv" };
 
 import { getColaboradorFull } from "@/lib/colaboradores-db";
 import { getColaboradorContaPagar } from "@/lib/remuneracoes-db";
-import {
-  CARGO_LABELS,
-  CARGO_COLORS,
-  cargoColor,
-  cargoLabel,
-} from "@/lib/colaboradores-types";
+import { cargoColor, cargoLabel } from "@/lib/colaboradores-types";
 import DeleteColaboradorButton from "@/components/dashboard/colaboradores/delete-colaborador-button";
 import ColaboradorRemuneracoes from "@/components/dashboard/colaboradores/colaborador-remuneracoes";
 import {

@@ -9,7 +9,6 @@ import {
   type ControleFormState,
 } from "@/lib/controles-actions";
 import {
-  TIPOS_CONTROLE,
   TIPOS_DEMANDA,
   STATUS_CONTROLE,
   getTipoConfig,
@@ -61,7 +60,7 @@ export default function ControleForm({
     FormData
   >(action, null);
 
-  const [tipo, setTipo] = useState(controle?.tipo ?? tipoInicial);
+  const [tipo] = useState(controle?.tipo ?? tipoInicial);
 
   // ── Autocomplete de cliente ──
   const [clienteNome, setClienteNome] = useState(controle?.cliente_nome ?? "");

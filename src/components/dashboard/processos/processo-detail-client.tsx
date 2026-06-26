@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
@@ -25,7 +25,6 @@ import {
   darBaixaEventoControleAction,
   reabrirEventoControleAction,
   createTarefaProcessoAction,
-  updateTarefaStatusAction,
   deleteTarefaAction,
   darBaixaTarefaProcessoAction,
   reabrirTarefaProcessoAction,
@@ -43,7 +42,6 @@ import {
   voltarEstagioAction,
 } from "@/lib/producao-actions";
 import {
-  ESTAGIOS_PRODUCAO,
   ESTAGIO_PRODUCAO_META,
   RESULTADO_ADMIN_META,
   RESULTADO_JUDICIAL_META,
@@ -54,7 +52,6 @@ import {
   DocumentTextIcon,
   ChevronRightIcon,
   PlusIcon,
-  CalendarIcon,
   CheckIcon,
   ClockIcon,
   FolderOpenIcon,
@@ -2386,60 +2383,6 @@ function NovaPendenciaModal({
         </button>
       </div>
     </Modal>
-  );
-}
-
-// ── Novo Dropdown Button ────────────────────────────────────────
-
-function NovoDropdown({ processo }: { processo: ProcessoExtended }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex h-9 items-center gap-1.5 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover cursor-pointer"
-      >
-        <PlusIcon className="h-3.5 w-3.5" />
-        Novo(a)
-        <svg
-          className="h-3.5 w-3.5 ml-0.5"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fillRule="evenodd"
-            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-40 mt-1.5 w-52 rounded-xl border border-border bg-white py-1 shadow-lg">
-            {[
-              { label: "Cliente", href: "/dashboard/clientes/novo" },
-              { label: "Processo/Demanda", href: "/dashboard/processos/novo" },
-              {
-                label: "Receita/Despesa",
-                href: "/dashboard/financeiro/novo",
-              },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 font-body text-sm text-fg transition-colors hover:bg-slate-50 hover:text-primary"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
   );
 }
 

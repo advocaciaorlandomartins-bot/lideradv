@@ -19,7 +19,6 @@ import {
   ArrowTopRightOnSquareIcon,
 } from "@/components/icons";
 import {
-  ESTAGIOS,
   ESTAGIO_META,
   TIPOS_ATIVIDADE,
   ORIGENS,

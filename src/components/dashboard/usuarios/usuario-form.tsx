@@ -16,9 +16,7 @@ import {
 import {
   MODULOS,
   ACOES,
-  DEFAULTS_POR_CATEGORIA,
   resolvePermissoes,
-  isSubModulo,
   type Permissoes,
 } from "@/lib/permissoes";
 

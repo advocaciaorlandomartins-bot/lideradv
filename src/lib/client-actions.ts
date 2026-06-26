@@ -147,7 +147,7 @@ export async function createClientAction(
 
   if (email) {
     const dup =
-      await sql`SELECT id FROM clients WHERE email = ${email} LIMIT 1`;
+      await sql`SELECT id FROM clients WHERE email = ${email} AND deleted_at IS NULL LIMIT 1`;
     if (dup.length > 0)
       return { error: "Este e-mail já está cadastrado em outro cliente." };
   }
@@ -394,7 +394,7 @@ export async function updateClientAction(
 
   if (email) {
     const dup =
-      await sql`SELECT id FROM clients WHERE email = ${email} AND id != ${id}::uuid LIMIT 1`;
+      await sql`SELECT id FROM clients WHERE email = ${email} AND id != ${id}::uuid AND deleted_at IS NULL LIMIT 1`;
     if (dup.length > 0)
       return { error: "Este e-mail já está cadastrado em outro cliente." };
   }

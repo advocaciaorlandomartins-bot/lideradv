@@ -165,7 +165,6 @@ export default function PdfToolPage({
   buildFormData,
 }: PdfToolPageProps) {
   const [files, setFiles] = useState<File[]>([]);
-  const [extras, setExtras] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const [resultado, setResultado] = useState<{

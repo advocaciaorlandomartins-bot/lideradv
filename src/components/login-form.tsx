@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { loginAction, type LoginState } from "@/lib/auth-actions";
 import { EyeIcon, EyeOffIcon, SpinnerIcon } from "@/components/icons";
 import Image from "next/image";
@@ -11,6 +13,8 @@ export default function LoginForm() {
     null
   );
   const [showSenha, setShowSenha] = useState(false);
+  const searchParams = useSearchParams();
+  const redefinido = searchParams.get("redefinido") === "1";
 
   return (
     <div className="w-full max-w-md">
@@ -37,6 +41,19 @@ export default function LoginForm() {
       </div>
 
       <form action={formAction} className="space-y-5" noValidate>
+        {redefinido && (
+          <div
+            role="status"
+            className="rounded-xl border px-4 py-3 font-body text-sm"
+            style={{
+              borderColor: "rgba(34,197,94,0.4)",
+              background: "rgba(34,197,94,0.08)",
+              color: "#16a34a",
+            }}
+          >
+            ✅ Senha redefinida com sucesso. Faça login com a nova senha.
+          </div>
+        )}
         {state?.error && (
           <div
             role="alert"
@@ -121,6 +138,17 @@ export default function LoginForm() {
               )}
             </button>
           </div>
+        </div>
+
+        {/* Esqueci minha senha */}
+        <div className="flex justify-end -mt-2">
+          <Link
+            href="/reset-senha"
+            className="font-body text-xs font-semibold transition-colors duration-150"
+            style={{ color: "#005DFF" }}
+          >
+            Esqueci minha senha
+          </Link>
         </div>
 
         {/* Submit */}

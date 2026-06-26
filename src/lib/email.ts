@@ -5,6 +5,79 @@ function getResend(): Resend | null {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
+export async function enviarEmailResetSenha({
+  para,
+  resetUrl,
+}: {
+  para: string;
+  resetUrl: string;
+}) {
+  const resend = getResend();
+  if (!resend) {
+    // Sem Resend configurado: loga o link para uso manual em dev
+    console.warn("[reset-senha] RESEND_API_KEY não configurada.");
+    console.warn("[reset-senha] Link de redefinição:", resetUrl);
+    return;
+  }
+
+  await resend.emails.send({
+    from: "LiderAdv <onboarding@resend.dev>",
+    to: para,
+    subject: "[LiderAdv] Redefinição de senha",
+    html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <tr>
+          <td style="background:linear-gradient(135deg,#000D25,#001848,#003080);padding:28px 32px;border-radius:14px 14px 0 0;">
+            <p style="margin:0;color:#8FBEFF;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">Sistema Jurídico</p>
+            <h1 style="margin:6px 0 0 0;color:#ffffff;font-size:22px;font-weight:700;">🔐 Redefinição de senha</h1>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;">
+            <p style="margin:0 0 16px 0;color:#334155;font-size:15px;line-height:1.6;">
+              Recebemos uma solicitação para redefinir a senha da sua conta <strong>${para}</strong>.
+            </p>
+            <p style="margin:0 0 24px 0;color:#334155;font-size:14px;line-height:1.6;">
+              Clique no botão abaixo para criar uma nova senha. O link é válido por <strong>1 hora</strong>.
+            </p>
+
+            <div style="text-align:center;margin:28px 0;">
+              <a href="${resetUrl}"
+                 style="display:inline-block;background:#005DFF;color:#ffffff;padding:14px 32px;border-radius:50px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.02em;">
+                Redefinir minha senha →
+              </a>
+            </div>
+
+            <p style="margin:24px 0 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">
+              Se você não solicitou a redefinição, ignore este e-mail. Sua senha permanece a mesma.<br>
+              O link expira automaticamente em 1 hora.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#f8fafc;padding:14px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;text-align:center;">
+            <p style="margin:0;color:#94a3b8;font-size:11px;">LiderAdv — Sistema Jurídico &nbsp;|&nbsp; Notificação automática</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    text: `[LiderAdv] Redefinição de senha\n\nClique no link abaixo para redefinir sua senha (válido por 1 hora):\n${resetUrl}\n\nSe não solicitou, ignore este e-mail.`,
+  });
+}
+
 export async function notificarEmailRecebido({
   para,
   cliente,

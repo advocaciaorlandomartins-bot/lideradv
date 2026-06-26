@@ -6,6 +6,7 @@ import sql from "./db";
 import { createSession, destroySession, getSession } from "./session";
 import { resolvePermissoes } from "./permissoes";
 import { logAction } from "./audit";
+import { enviarEmailResetSenha } from "./email";
 
 export type LoginState = { error: string } | null;
 
@@ -186,4 +187,102 @@ export async function registerAction(
   }
 
   redirect("/dashboard");
+}
+
+export type ResetRequestState = { error: string } | { success: true } | null;
+
+export async function requestPasswordResetAction(
+  _prevState: ResetRequestState,
+  formData: FormData
+): Promise<ResetRequestState> {
+  const email = ((formData.get("email") as string | null) ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!email) return { error: "Informe o e-mail cadastrado." };
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token      TEXT PRIMARY KEY,
+      usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used       BOOLEAN NOT NULL DEFAULT FALSE
+    )
+  `;
+
+  const rows = await sql`
+    SELECT id::text, login, ativo FROM usuarios WHERE login = ${email} LIMIT 1
+  `;
+
+  // Não revela se o e-mail existe (segurança)
+  if (!rows[0] || !rows[0].ativo) return { success: true };
+
+  const userId = String(rows[0].id);
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+  await sql`DELETE FROM password_reset_tokens WHERE usuario_id = ${userId}::uuid`;
+  await sql`
+    INSERT INTO password_reset_tokens (token, usuario_id, expires_at)
+    VALUES (${token}, ${userId}::uuid, ${expiresAt.toISOString()})
+  `;
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ?? "https://lideradv.vercel.app";
+  const resetUrl = `${baseUrl}/reset-senha?token=${token}`;
+
+  await enviarEmailResetSenha({ para: email, resetUrl });
+
+  return { success: true };
+}
+
+export type ResetPasswordState = { error: string } | { success: true } | null;
+
+export async function resetPasswordAction(
+  _prevState: ResetPasswordState,
+  formData: FormData
+): Promise<ResetPasswordState> {
+  const token = ((formData.get("token") as string | null) ?? "").trim();
+  const senha = (formData.get("senha") as string | null) ?? "";
+  const confirmar = (formData.get("confirmar") as string | null) ?? "";
+
+  if (!token) return { error: "Token inválido." };
+  if (senha.length < 8)
+    return { error: "A senha deve ter pelo menos 8 caracteres." };
+  if (senha !== confirmar) return { error: "As senhas não coincidem." };
+
+  const rows = await sql`
+    SELECT t.usuario_id::text, t.expires_at, t.used
+    FROM password_reset_tokens t
+    WHERE t.token = ${token}
+    LIMIT 1
+  `;
+
+  const tokenRow = rows[0];
+  if (!tokenRow) return { error: "Link inválido ou já utilizado." };
+  if (tokenRow.used)
+    return { error: "Este link já foi utilizado. Solicite um novo." };
+  if (new Date(String(tokenRow.expires_at)) < new Date())
+    return { error: "Link expirado. Solicite um novo." };
+
+  const userId = String(tokenRow.usuario_id);
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto
+    .createHash("sha256")
+    .update(senha + salt)
+    .digest("hex");
+  const senhaHash = `sha256:${salt}:${hash}`;
+
+  await sql`UPDATE usuarios SET senha_hash = ${senhaHash} WHERE id = ${userId}::uuid`;
+  await sql`UPDATE password_reset_tokens SET used = TRUE WHERE token = ${token}`;
+
+  await logAction({
+    acao: "editar",
+    entidade: "usuario",
+    descricao: `Senha redefinida via link de recuperação`,
+    _login: userId,
+    _cat: "sistema",
+  });
+
+  redirect("/login?redefinido=1");
 }

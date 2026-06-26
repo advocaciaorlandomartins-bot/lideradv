@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import LoginForm from "@/components/login-form";
 import { CheckIcon } from "@/components/icons";
 import Image from "next/image";
@@ -83,7 +84,9 @@ export default function LoginPage() {
 
       {/* ── Right Form Panel ── */}
       <main className="login-form-panel flex flex-1 items-center justify-center p-8 lg:w-1/2 overflow-auto">
-        <LoginForm />
+        <Suspense>
+          <LoginForm />
+        </Suspense>
       </main>
     </div>
   );

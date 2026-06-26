@@ -14,9 +14,14 @@ export async function enviarEmailResetSenha({
 }) {
   const resend = getResend();
   if (!resend) {
-    // Sem Resend configurado: loga o link para uso manual em dev
-    console.warn("[reset-senha] RESEND_API_KEY não configurada.");
-    console.warn("[reset-senha] Link de redefinição:", resetUrl);
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[reset-senha] RESEND_API_KEY não configurada.");
+      console.warn("[reset-senha] Link de redefinição:", resetUrl);
+    } else {
+      console.warn(
+        "[reset-senha] RESEND_API_KEY não configurada — e-mail não enviado."
+      );
+    }
     return;
   }
 

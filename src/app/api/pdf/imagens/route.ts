@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
+import { getSession } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session)
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
   try {
     const form = await req.formData();
     const files = form.getAll("files") as File[];

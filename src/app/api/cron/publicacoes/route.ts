@@ -12,7 +12,8 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   // Autenticação do cron (Vercel define CRON_SECRET automaticamente)
   const auth = request.headers.get("authorization");
-  if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || auth !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

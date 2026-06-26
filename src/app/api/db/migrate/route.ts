@@ -80,6 +80,18 @@ export async function GET() {
       sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`
   );
 
+  await run(
+    "password_reset_tokens",
+    () => sql`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        token      TEXT PRIMARY KEY,
+        usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used       BOOLEAN NOT NULL DEFAULT FALSE
+      )
+    `
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

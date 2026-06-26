@@ -29,15 +29,26 @@ function mapRow(r: any): Usuario {
 
 export async function getAllUsuarios(): Promise<Usuario[]> {
   const rows = await sql`
+    WITH tarefas_count AS (
+      SELECT responsavel, COUNT(*)::int AS n
+      FROM tarefas_processo
+      WHERE status IN ('Pendente', 'Em andamento')
+      GROUP BY responsavel
+    ),
+    controles_count AS (
+      SELECT responsavel_id, COUNT(*)::int AS n
+      FROM controles
+      WHERE (status IS NULL OR status = 'em_andamento')
+      GROUP BY responsavel_id
+    )
     SELECT
       u.id::text, u.login, u.nome, u.categoria, u.colaborador_id::text,
       u.validade::text, u.ultimo_acesso::text, u.ativo, u.permissoes, u.created_at::text,
-      COUNT(t.id) FILTER (WHERE t.status IN ('Pendente', 'Em andamento'))::int AS tarefas_pendentes,
-      COUNT(c.id) FILTER (WHERE c.status IS NULL OR c.status = 'em_andamento')::int AS controles_pendentes
+      COALESCE(tc.n, 0) AS tarefas_pendentes,
+      COALESCE(cc.n, 0) AS controles_pendentes
     FROM usuarios u
-    LEFT JOIN tarefas_processo t ON t.responsavel = u.login AND t.status != 'Cancelada'
-    LEFT JOIN controles c ON c.responsavel_id = u.id AND (c.status IS NULL OR c.status = 'em_andamento')
-    GROUP BY u.id
+    LEFT JOIN tarefas_count  tc ON tc.responsavel    = u.login
+    LEFT JOIN controles_count cc ON cc.responsavel_id = u.id
     ORDER BY u.nome ASC
   `;
   return rows.map(mapRow);

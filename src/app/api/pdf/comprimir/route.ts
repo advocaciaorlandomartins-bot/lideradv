@@ -3,6 +3,7 @@ import { PDFDocument, PDFRawStream, PDFName, PDFNumber } from "pdf-lib";
 import * as jpegjs from "jpeg-js";
 import zlib from "node:zlib";
 import { promisify } from "node:util";
+import { getSession } from "@/lib/session";
 
 const inflate = promisify(zlib.inflate);
 const inflateRaw = promisify(zlib.inflateRaw);
@@ -63,6 +64,10 @@ async function flatToJpeg(
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session)
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;

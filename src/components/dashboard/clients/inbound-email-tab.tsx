@@ -122,9 +122,17 @@ function EmailCard({
           )}
           <div>
             {email.body_html ? (
-              <div
-                className="prose prose-sm max-w-none font-body text-sm text-fg"
-                dangerouslySetInnerHTML={{ __html: email.body_html }}
+              <iframe
+                srcDoc={email.body_html}
+                sandbox="allow-same-origin"
+                className="w-full rounded border-0"
+                style={{ minHeight: 300, height: "auto" }}
+                onLoad={(e) => {
+                  const f = e.currentTarget;
+                  const body = f.contentDocument?.body;
+                  if (body) f.style.height = body.scrollHeight + 32 + "px";
+                }}
+                title="Corpo do e-mail"
               />
             ) : (
               <pre className="whitespace-pre-wrap font-body text-sm text-fg">

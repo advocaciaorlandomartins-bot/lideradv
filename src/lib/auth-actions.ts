@@ -201,15 +201,6 @@ export async function requestPasswordResetAction(
 
   if (!email) return { error: "Informe o e-mail cadastrado." };
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS password_reset_tokens (
-      token      TEXT PRIMARY KEY,
-      usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-      expires_at TIMESTAMPTZ NOT NULL,
-      used       BOOLEAN NOT NULL DEFAULT FALSE
-    )
-  `;
-
   const rows = await sql`
     SELECT id::text, login, ativo FROM usuarios WHERE login = ${email} LIMIT 1
   `;

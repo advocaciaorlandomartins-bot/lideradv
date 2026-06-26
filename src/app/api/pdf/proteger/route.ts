@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { encryptPdf } from "@/lib/pdf-encrypt";
+import { getSession } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session)
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;

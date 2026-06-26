@@ -5,6 +5,7 @@ import { getClientFull } from "@/lib/clients-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
 import { applyFundoTimbrado } from "@/lib/pdf-fundo";
+import { getSession } from "@/lib/session";
 import {
   ProcuracaoDoc,
   ContratoHonorariosDoc,
@@ -39,6 +40,10 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getSession();
+  if (!session)
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const template = searchParams.get("template") as TemplateKey | null;

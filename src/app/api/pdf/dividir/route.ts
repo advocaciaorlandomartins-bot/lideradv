@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
+import { getSession } from "@/lib/session";
 
 // Parseia intervalos como "1-3,5,7-9" → [0,1,2,4,6,7,8] (0-indexed)
 function parseIntervals(input: string, total: number): number[] {
@@ -23,6 +24,10 @@ function parseIntervals(input: string, total: number): number[] {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session)
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;

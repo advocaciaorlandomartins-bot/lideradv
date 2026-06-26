@@ -102,6 +102,7 @@ export async function getAllLancamentos(): Promise<Lancamento[]> {
     LEFT JOIN clients   c ON c.id = l.client_id
     LEFT JOIN processos p ON p.id = l.processo_id
     ORDER BY l.data_vencimento ASC, l.created_at DESC
+    LIMIT 1000
   `;
   return rows.map(mapRow);
 }

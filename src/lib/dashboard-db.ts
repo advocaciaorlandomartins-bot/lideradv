@@ -59,11 +59,11 @@ const TIPO_LABELS: Record<string, string> = {
 
 async function _getDashboardData(login?: string) {
   const [
-    clientesDevedoresRows,
-    lancamentosVencidosRows,
-    proximosControlesRows,
-    aniversariantesRows,
-  ] = await Promise.all([
+    clientesDevedoresResult,
+    lancamentosVencidosResult,
+    proximosControlesResult,
+    aniversariantesResult,
+  ] = await Promise.allSettled([
     // Clientes com lançamentos de entrada vencidos (agrupados)
     sql`
         SELECT
@@ -161,6 +161,41 @@ async function _getDashboardData(login?: string) {
           name
       `,
   ]);
+
+  const clientesDevedoresRows =
+    clientesDevedoresResult.status === "fulfilled"
+      ? clientesDevedoresResult.value
+      : [];
+  const lancamentosVencidosRows =
+    lancamentosVencidosResult.status === "fulfilled"
+      ? lancamentosVencidosResult.value
+      : [];
+  const proximosControlesRows =
+    proximosControlesResult.status === "fulfilled"
+      ? proximosControlesResult.value
+      : [];
+  const aniversariantesRows =
+    aniversariantesResult.status === "fulfilled"
+      ? aniversariantesResult.value
+      : [];
+
+  if (clientesDevedoresResult.status === "rejected")
+    console.error(
+      "[dashboard] clientesDevedores:",
+      clientesDevedoresResult.reason
+    );
+  if (lancamentosVencidosResult.status === "rejected")
+    console.error(
+      "[dashboard] lancamentosVencidos:",
+      lancamentosVencidosResult.reason
+    );
+  if (proximosControlesResult.status === "rejected")
+    console.error(
+      "[dashboard] proximosControles:",
+      proximosControlesResult.reason
+    );
+  if (aniversariantesResult.status === "rejected")
+    console.error("[dashboard] aniversariantes:", aniversariantesResult.reason);
 
   const clientesDevedores: ClienteDevedor[] = clientesDevedoresRows.map(
     (r) => ({

@@ -6,6 +6,7 @@ import sql from "./db";
 import { logAction } from "./audit";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { notificarPrevBot } from "./prevbot-outbound";
 
 export type LancamentoFormState = { error: string } | null;
 
@@ -445,6 +446,14 @@ export async function updateLancamentoAction(
           data_pagamento = ${hoje}::date, observacoes = ${observacoes}
         WHERE id = ${id}::uuid
       `;
+      if (tipo === "entrada") {
+        await notificarPrevBot({
+          evento: "honorario_pago",
+          processoId: processoId || null,
+          clientId: clientId || null,
+          dados: { valor_honorario: valor },
+        });
+      }
     } else if (status !== "pago") {
       await sql`
         UPDATE lancamentos SET
@@ -527,15 +536,31 @@ export async function markAsPagoAction(id: string): Promise<void> {
       UPDATE lancamentos
       SET status = 'pago', data_pagamento = ${todayBR()}::date
       WHERE id = ${id}::uuid
-      RETURNING remuneracao_id
+      RETURNING remuneracao_id, client_id::text, processo_id::text, tipo, valor
     `;
-    const remuneracaoId = rows[0]?.remuneracao_id as string | null;
-    if (remuneracaoId) {
+    const lan = rows[0] as
+      | {
+          remuneracao_id: string | null;
+          client_id: string | null;
+          processo_id: string | null;
+          tipo: string;
+          valor: number;
+        }
+      | undefined;
+    if (lan?.remuneracao_id) {
       await sql`
         UPDATE remuneracoes
         SET status = 'pago', data_pagamento = ${todayBR()}::date, updated_at = NOW()
-        WHERE id = ${remuneracaoId}::uuid
+        WHERE id = ${lan.remuneracao_id}::uuid
       `;
+    }
+    if (lan?.tipo === "entrada") {
+      await notificarPrevBot({
+        evento: "honorario_pago",
+        processoId: lan.processo_id,
+        clientId: lan.client_id,
+        dados: { valor_honorario: lan.valor },
+      });
     }
   } catch (err) {
     console.error("markAsPagoAction DB error:", err);

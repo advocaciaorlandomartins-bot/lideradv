@@ -36,6 +36,8 @@ export async function POST(request: Request) {
 
   const email = ((body.email as string | undefined) ?? "").trim() || null;
   const telefone = ((body.telefone as string | undefined) ?? "").trim() || null;
+  const prevbotLeadId =
+    ((body.prevbot_lead_id as string | undefined) ?? "").trim() || null;
   const tipo =
     ((body.tipo as string | undefined) ?? "PF") === "PJ" ? "PJ" : "PF";
   const areaInteresse =
@@ -66,12 +68,18 @@ export async function POST(request: Request) {
         const leadId = (existing[0] as { id: string }).id;
 
         // Atualiza dados de contrato se vieram no payload
-        if (contratoId || contratoUrl || contratoStatusValido) {
+        if (
+          contratoId ||
+          contratoUrl ||
+          contratoStatusValido ||
+          prevbotLeadId
+        ) {
           await sql`
             UPDATE crm_leads SET
               contrato_id          = COALESCE(${contratoId}, contrato_id),
               contrato_status      = COALESCE(${contratoStatusValido}, contrato_status),
               contrato_url         = COALESCE(${contratoUrl}, contrato_url),
+              prevbot_lead_id      = COALESCE(${prevbotLeadId}, prevbot_lead_id),
               contrato_assinado_em = CASE
                 WHEN ${contratoStatusValido === "assinado"} AND contrato_assinado_em IS NULL THEN now()
                 ELSE contrato_assinado_em
@@ -112,11 +120,11 @@ export async function POST(request: Request) {
     const rows = await sql`
       INSERT INTO crm_leads
         (nome, email, telefone, tipo, area_interesse, estagio, origem, notas,
-         contrato_id, contrato_status, contrato_url)
+         prevbot_lead_id, contrato_id, contrato_status, contrato_url)
       VALUES
         (${nome}, ${email}, ${telefone}, ${tipo}, ${areaInteresse},
          'novo_contato', 'prevbot', ${notas},
-         ${contratoId}, ${contratoStatusValido}, ${contratoUrl})
+         ${prevbotLeadId}, ${contratoId}, ${contratoStatusValido}, ${contratoUrl})
       RETURNING id::text
     `;
 

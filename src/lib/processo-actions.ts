@@ -5,6 +5,7 @@ import sql from "./db";
 import { logAction } from "./audit";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { notificarPrevBot } from "./prevbot-outbound";
 
 export type ProcessoFormState = { error: string } | null;
 
@@ -188,6 +189,15 @@ export async function updateProcessoAction(
   if (!tipoAcao) return { error: "Informe o tipo de ação." };
   if (!area) return { error: "Selecione a área jurídica." };
 
+  // Lê estado anterior para detectar mudanças relevantes
+  const prev = await sql`
+    SELECT resultado_admin, status FROM processos
+    WHERE id = ${id}::uuid AND deleted_at IS NULL LIMIT 1
+  `;
+  const prevResultadoAdmin =
+    prev.length > 0 ? (prev[0].resultado_admin as string | null) : null;
+  const prevStatus = prev.length > 0 ? (prev[0].status as string | null) : null;
+
   try {
     await sql`
       UPDATE processos SET
@@ -223,6 +233,32 @@ export async function updateProcessoAction(
   } catch (err) {
     console.error("updateProcessoAction DB error:", err);
     return { error: "Erro ao atualizar processo. Tente novamente." };
+  }
+
+  // Notifica PrevBot quando resultado muda para deferido/indeferido,
+  // ou quando processo é encerrado por outros motivos (extinto)
+  if (resultadoAdmin !== prevResultadoAdmin) {
+    if (resultadoAdmin === "deferido") {
+      await notificarPrevBot({
+        evento: "processo_deferido",
+        processoId: id,
+        dados: { observacoes: motivoIndeferimento ?? undefined },
+      });
+    } else if (resultadoAdmin === "indeferido") {
+      await notificarPrevBot({
+        evento: "processo_indeferido",
+        processoId: id,
+        dados: { observacoes: motivoIndeferimento ?? undefined },
+      });
+    }
+  }
+  if (
+    status === "encerrado" &&
+    prevStatus !== "encerrado" &&
+    resultadoAdmin !== "deferido" &&
+    resultadoAdmin !== "indeferido"
+  ) {
+    await notificarPrevBot({ evento: "processo_extinto", processoId: id });
   }
 
   await logAction({

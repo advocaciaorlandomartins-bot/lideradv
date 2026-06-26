@@ -92,6 +92,32 @@ export async function GET() {
     `
   );
 
+  await run(
+    "crm_leads.prevbot_lead_id",
+    () =>
+      sql`ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS prevbot_lead_id TEXT`
+  );
+
+  await run(
+    "prevbot_webhook_log",
+    () => sql`
+      CREATE TABLE IF NOT EXISTS prevbot_webhook_log (
+        id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        evento          TEXT NOT NULL,
+        crm_lead_id     UUID NOT NULL REFERENCES crm_leads(id) ON DELETE CASCADE,
+        prevbot_lead_id TEXT,
+        telefone        TEXT,
+        payload         JSONB,
+        status          TEXT NOT NULL DEFAULT 'pendente',
+        tentativas      INT  NOT NULL DEFAULT 0,
+        ultimo_erro     TEXT,
+        enviado_em      TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(evento, crm_lead_id)
+      )
+    `
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

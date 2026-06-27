@@ -5,6 +5,7 @@ import sql from "./db";
 import { logAction } from "./audit";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { notificarPrevBot } from "./prevbot-outbound";
 
 export type ClientFormState = { error: string } | null;
 
@@ -414,6 +415,13 @@ export async function updateClientAction(
     }
   }
 
+  const prevClient =
+    await sql`SELECT status FROM clients WHERE id = ${id}::uuid LIMIT 1`.catch(
+      () => []
+    );
+  const prevStatus =
+    prevClient.length > 0 ? (prevClient[0] as { status: string }).status : null;
+
   try {
     await sql`
       UPDATE clients SET
@@ -531,6 +539,12 @@ export async function updateClientAction(
     entidadeId: id,
     descricao: `Editou cliente: ${name}`,
   });
+
+  if (status === "inativo" && prevStatus === "ativo") {
+    await notificarPrevBot({ evento: "cliente_inativo", clientId: id }).catch(
+      () => null
+    );
+  }
 
   redirect(`/dashboard/clientes/${id}`);
 }

@@ -1,6 +1,7 @@
 import sql from "./db";
 
 const PREVBOT_WEBHOOK_URL =
+  process.env.PREVBOT_WEBHOOK_URL ??
   "https://prevbot-production.up.railway.app/webhook/lideradv";
 
 export type PrevBotEvento =
@@ -100,7 +101,8 @@ export async function notificarPrevBot(opts: {
   clientId?: string | null;
   dados?: Record<string, unknown>;
 }): Promise<void> {
-  const webhookKey = process.env.PREVBOT_API_KEY;
+  const webhookKey =
+    process.env.PREVBOT_WEBHOOK_KEY ?? process.env.PREVBOT_API_KEY;
   if (!webhookKey) return;
 
   try {

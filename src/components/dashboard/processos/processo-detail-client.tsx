@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import IaJuridicaSection from "@/components/dashboard/ia/ia-juridica-section";
+import IaPeticoesProcesso from "@/components/dashboard/ia/ia-peticoes-processo";
 import type {
   ProcessoExtended,
   HistoricoRegistro,
@@ -2502,6 +2503,13 @@ export default function ProcessoDetailClient({
       <IaJuridicaSection
         clienteId={processo.client_id}
         processoId={processo.id}
+        areaProcesso={processo.area}
+      />
+
+      {/* Petições salvas do processo */}
+      <IaPeticoesProcesso
+        processoId={processo.id}
+        clienteId={processo.client_id}
         areaProcesso={processo.area}
       />
 

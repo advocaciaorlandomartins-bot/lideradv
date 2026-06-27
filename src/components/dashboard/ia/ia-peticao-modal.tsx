@@ -262,6 +262,8 @@ export default function IaPeticaoModal({
           area: skill,
           tipoPeticao: tipoEfetivo,
           texto: conteudo,
+          processoId: processoId ?? null,
+          clienteId: clienteId ?? null,
         }),
       });
       const data = await res.json();

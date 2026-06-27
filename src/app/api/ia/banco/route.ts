@@ -4,31 +4,44 @@ import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// GET — buscar petições aprovadas por area/tipo
+// GET — buscar petições por processo, cliente ou área
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session)
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
+  const processoId = searchParams.get("processoId");
+  const clienteId = searchParams.get("clienteId");
   const area = searchParams.get("area");
-  const tipo = searchParams.get("tipo");
-  const limit = Math.min(Number(searchParams.get("limit") ?? "5"), 10);
+  const apenasAprovadas = searchParams.get("aprovadas") === "1";
+  const limit = Math.min(Number(searchParams.get("limit") ?? "20"), 50);
 
   const rows = await sql`
-    SELECT id::text, area, tipo_peticao, titulo, resumo, vezes_usada, created_at
+    SELECT
+      id::text,
+      area,
+      tipo_peticao,
+      titulo,
+      resumo,
+      aprovada,
+      vezes_usada,
+      processo_id::text,
+      cliente_id::text,
+      created_at
     FROM ia_peticoes
-    WHERE aprovada = TRUE
+    WHERE (${processoId}::text IS NULL OR processo_id = ${processoId}::uuid)
+      AND (${clienteId}::text IS NULL OR cliente_id = ${clienteId}::uuid)
       AND (${area}::text IS NULL OR area = ${area})
-      AND (${tipo}::text IS NULL OR tipo_peticao ILIKE ${"%" + (tipo ?? "") + "%"})
-    ORDER BY vezes_usada DESC, created_at DESC
+      AND (NOT ${apenasAprovadas} OR aprovada = TRUE)
+    ORDER BY created_at DESC
     LIMIT ${limit}
   `;
 
   return NextResponse.json(rows);
 }
 
-// POST — salvar petição no banco
+// POST — salvar petição vinculada ao processo/cliente
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session)
@@ -41,7 +54,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
 
-  // Gera resumo automático (primeiros 300 chars)
   const resumo = body.texto
     .replace(/\n+/g, " ")
     .trim()
@@ -53,15 +65,25 @@ export async function POST(request: Request) {
     `${body.tipoPeticao} — ${new Date().toLocaleDateString("pt-BR")}`;
 
   const [row] = await sql`
-    INSERT INTO ia_peticoes (area, tipo_peticao, titulo, texto, resumo, aprovada)
-    VALUES (${body.area}, ${body.tipoPeticao}, ${titulo}, ${body.texto}, ${resumo}, FALSE)
-    RETURNING id::text, titulo
+    INSERT INTO ia_peticoes
+      (area, tipo_peticao, titulo, texto, resumo, aprovada, processo_id, cliente_id)
+    VALUES (
+      ${body.area},
+      ${body.tipoPeticao},
+      ${titulo},
+      ${body.texto},
+      ${resumo},
+      FALSE,
+      ${body.processoId ?? null}::uuid,
+      ${body.clienteId ?? null}::uuid
+    )
+    RETURNING id::text, titulo, created_at
   `;
 
   return NextResponse.json({ id: row.id, titulo: row.titulo });
 }
 
-// PATCH — aprovar petição (torna-a referência)
+// PATCH — aprovar petição (torna-a referência para o banco global)
 export async function PATCH(request: Request) {
   const session = await getSession();
   if (!session)
@@ -75,5 +97,20 @@ export async function PATCH(request: Request) {
     UPDATE ia_peticoes SET aprovada = TRUE WHERE id = ${body.id}::uuid
   `;
 
+  return NextResponse.json({ ok: true });
+}
+
+// DELETE — remover petição
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!session)
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id)
+    return NextResponse.json({ error: "id é obrigatório." }, { status: 400 });
+
+  await sql`DELETE FROM ia_peticoes WHERE id = ${id}::uuid`;
   return NextResponse.json({ ok: true });
 }

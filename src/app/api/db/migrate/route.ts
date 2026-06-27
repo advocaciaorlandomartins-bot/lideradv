@@ -158,6 +158,24 @@ export async function GET() {
     `
   );
 
+  await run(
+    "ia_peticoes.processo_id",
+    () =>
+      sql`ALTER TABLE ia_peticoes ADD COLUMN IF NOT EXISTS processo_id UUID REFERENCES processos(id) ON DELETE SET NULL`
+  );
+
+  await run(
+    "ia_peticoes.cliente_id",
+    () =>
+      sql`ALTER TABLE ia_peticoes ADD COLUMN IF NOT EXISTS cliente_id UUID REFERENCES clients(id) ON DELETE SET NULL`
+  );
+
+  await run(
+    "ia_peticoes.idx_processo",
+    () =>
+      sql`CREATE INDEX IF NOT EXISTS ia_peticoes_processo_idx ON ia_peticoes (processo_id) WHERE processo_id IS NOT NULL`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

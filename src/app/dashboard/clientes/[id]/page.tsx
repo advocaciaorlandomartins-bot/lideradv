@@ -15,6 +15,7 @@ import {
 } from "@/lib/inbound-emails-db";
 import DeleteClientButton from "@/components/dashboard/clients/delete-client-button";
 import ClienteDetailTabs from "@/components/dashboard/clients/cliente-detail-tabs";
+import LgpdActions from "@/components/dashboard/clients/lgpd-actions";
 import { ChevronRightIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -163,6 +164,11 @@ export default async function ClienteDetailPage({
         inboundEmails={inboundEmails}
         initialTab={initialTab}
       />
+
+      {/* LGPD — only for Administrador */}
+      {session.categoria === "Administrador(a)" && (
+        <LgpdActions clienteId={client.id} />
+      )}
 
       {/* Danger zone */}
       <div className="rounded-xl border border-red-200 bg-red-50 p-5">

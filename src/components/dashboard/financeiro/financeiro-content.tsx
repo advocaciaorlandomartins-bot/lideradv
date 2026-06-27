@@ -317,7 +317,6 @@ function RowActions({
 
   function handleDesfazer() {
     setMenuOpen(false);
-    if (!confirm("Reverter este lançamento para pendente?")) return;
     setAction("desfazer");
     startTransition(async () => {
       await revertParaPendenteAction(lancamento.id);

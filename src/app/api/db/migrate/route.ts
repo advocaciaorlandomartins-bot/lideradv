@@ -118,6 +118,21 @@ export async function GET() {
     `
   );
 
+  await run(
+    "lgpd_solicitacoes",
+    () => sql`
+      CREATE TABLE IF NOT EXISTS lgpd_solicitacoes (
+        id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        tipo         TEXT        NOT NULL,
+        entidade     TEXT        NOT NULL,
+        entidade_id  TEXT,
+        motivo       TEXT,
+        executado_por TEXT       NOT NULL DEFAULT 'sistema',
+        executado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

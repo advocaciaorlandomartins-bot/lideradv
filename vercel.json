@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/prevbot-retries",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/limpeza",
+      "schedule": "0 2 * * *"
     }
   ]
 }

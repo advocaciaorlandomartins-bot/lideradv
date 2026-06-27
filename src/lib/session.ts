@@ -31,6 +31,7 @@ export async function createSession(user: SessionUser): Promise<void> {
   const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: MAX_AGE,

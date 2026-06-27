@@ -86,8 +86,7 @@ export async function GET(req: Request) {
         tipo_incapacidade     = NULL,
         data_diagnostico      = NULL,
         data_afastamento      = NULL,
-        notes                 = NULL,
-        updated_at            = NOW()
+        notes                 = NULL
       WHERE deleted_at IS NOT NULL
         AND deleted_at < NOW() - INTERVAL '90 days'
         AND name != '[ANONIMIZADO]'

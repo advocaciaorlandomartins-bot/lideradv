@@ -133,6 +133,31 @@ export async function GET() {
     `
   );
 
+  await run(
+    "ia_peticoes",
+    () => sql`
+      CREATE TABLE IF NOT EXISTS ia_peticoes (
+        id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        area         TEXT        NOT NULL,
+        tipo_peticao TEXT        NOT NULL,
+        titulo       TEXT        NOT NULL,
+        texto        TEXT        NOT NULL,
+        resumo       TEXT,
+        tags         TEXT[]      NOT NULL DEFAULT '{}',
+        aprovada     BOOLEAN     NOT NULL DEFAULT FALSE,
+        vezes_usada  INTEGER     NOT NULL DEFAULT 0,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+  );
+
+  await run(
+    "ia_peticoes.idx_area",
+    () => sql`
+      CREATE INDEX IF NOT EXISTS ia_peticoes_area_idx ON ia_peticoes (area, aprovada)
+    `
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

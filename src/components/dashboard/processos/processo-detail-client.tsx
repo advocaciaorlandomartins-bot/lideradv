@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import IaAcoesButtons from "@/components/dashboard/ia/ia-acoes-buttons";
-import IaEstrategiaPanel from "@/components/dashboard/ia/ia-estrategia-panel";
+import IaJuridicaSection from "@/components/dashboard/ia/ia-juridica-section";
 import type {
   ProcessoExtended,
   HistoricoRegistro,
@@ -2473,11 +2472,6 @@ export default function ProcessoDetailClient({
             </div>
           </div>
           <div className="flex flex-wrap gap-2 items-start">
-            <IaAcoesButtons
-              clienteId={processo.client_id}
-              processoId={processo.id}
-              areaProcesso={processo.area}
-            />
             <Link
               href={`/dashboard/processos/${processo.id}/editar`}
               className={btnOutline}
@@ -2504,8 +2498,8 @@ export default function ProcessoDetailClient({
       {/* Linha de Produção */}
       <ProducaoBar processo={processo} />
 
-      {/* IA — Diagnóstico Estratégico */}
-      <IaEstrategiaPanel
+      {/* IA Jurídica — Gerar Petição | Analisar Documento | Diagnóstico Estratégico */}
+      <IaJuridicaSection
         clienteId={processo.client_id}
         processoId={processo.id}
         areaProcesso={processo.area}

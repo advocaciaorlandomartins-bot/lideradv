@@ -313,6 +313,56 @@ Seja objetivo e cirúrgico — o advogado precisa saber exatamente o que melhora
     : "Não foi possível revisar a petição.";
 }
 
+// ─── Correção de petição ────────────────────────────────────────────────────────
+
+export interface CorrigirPeticaoParams {
+  textoPeticao: string;
+  revisao: string;
+  tipoPeticao: string;
+  skill: SkillId;
+  contexto?: ContextoJuridico;
+}
+
+export async function corrigirPeticao(
+  params: CorrigirPeticaoParams
+): Promise<string> {
+  const client = getClient();
+  const ctxTexto = params.contexto ? buildContextoTexto(params.contexto) : "";
+
+  const res = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 4096,
+    system: SKILLS[params.skill].systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: `${ctxTexto ? ctxTexto + "\n\n" : ""}=== PETIÇÃO ORIGINAL ===
+${params.textoPeticao}
+
+=== REVISÃO REALIZADA ===
+${params.revisao}
+
+=== TAREFA: APLICAR CORREÇÕES ===
+Com base na revisão acima, reescreva a petição aplicando TODAS as correções indicadas.
+
+REGRAS ABSOLUTAS:
+1. NUNCA invente dados — use apenas informações presentes na petição original ou no contexto do caso
+2. Mantenha TODOS os dados específicos do caso (nomes, CPF, datas, CID, valores, números de processo)
+3. Corrija os pontos apontados na revisão, mas preserve o que estava correto
+4. Acrescente a jurisprudência ausente indicada na revisão APENAS se ela for real e verificável
+5. Melhore a fundamentação jurídica conforme sugerido, sempre dentro da lei vigente
+6. O texto corrigido deve ser COMPLETO — não resuma, não omita seções
+7. Mantenha a estrutura formal da petição (cabeçalho, fatos, direito, pedido)
+
+Responda APENAS com a petição corrigida completa, sem comentários ou explicações.`,
+      },
+    ],
+  });
+
+  const block = res.content[0];
+  return block?.type === "text" ? block.text : params.textoPeticao;
+}
+
 // ─── Estratégia processual ──────────────────────────────────────────────────────
 
 export interface EstrategiaProcessualParams {

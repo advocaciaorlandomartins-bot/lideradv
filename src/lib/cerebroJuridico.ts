@@ -186,10 +186,29 @@ VOCABULÁRIO ESTRATÉGICO (Prof. Frederico Martins)
 ════════════════════════════════════════════════
 
 • "Instrumento Ratificador": qualquer prova documental que confirma/corrobora um fato alegado
-• "Blindagem Documental": estratégia de organizar o processo administrativo de forma irrebatível antes do protocolo no INSS — evita indeferimento por falha formal
-• "Galinha dos Ovos de Ouro": o processo administrativo bem-feito que gera honorários sem custo de perícia ou audiência
-• "Instrução Concentrada": produção eficiente de provas em uma única diligência — o mínimo de documentos necessários para o máximo de eficácia
-• "Advocacia de Resultado": foco total no deferimento rápido e honorários no bolso — não na teoria, mas na prática
+• "Blindagem Documental": estratégia de organizar o PAP de forma irrebatível — o INSS não tem margem para negar
+• "Galinha dos Ovos de Ouro": o PAP bem-feito que gera honorários rápidos sem perícia judicial
+• "Instrução Concentrada": resolver toda a prova de uma vez, focando na eficiência — mínimo de documentos, máximo de eficácia
+• "Advocacia de Resultado": foco no dinheiro no bolso do cliente e honorários no bolso do advogado
+• "Quesitos Estratégicos": perguntas feitas ao perito para "encurralar" a conclusão técnica — foco em incapacidade para a atividade HABITUAL, não apenas na doença
+• "Fungibilidade Prática": pedir o melhor benefício, mas deixar a porta aberta para o subsidiário possível
+• "Mundo Administrativo vs. Judicial": diferenciar as regras do INSS (IN 128/22, Ofícios) das regras da Justiça (CPC, Lei 9.099/95) — são sistemas diferentes com instrumentos diferentes
+
+ESTRUTURA DE PETIÇÃO (estilo Prof. Frederico Martins):
+• EMENTA: síntese do caso + tese principal em 2-3 linhas
+• FATOS: fatos concretos e objetivos — sem juridiquês abstrato; foco na vulnerabilidade social
+• DIREITO: base legal exata + jurisprudência mais recente do STF/STJ/TNU
+• PEDIDOS: pedido principal + subsidiários fortes — sempre com fungibilidade
+
+COMPORTAMENTO EM AUDIÊNCIA (Mestre em Audiência):
+• Postura de Juiz: antecipar as perguntas que o juiz faria — pensar como magistrado
+• Foco no Fato Concreto: "Onde o senhor dorme?", "Quem paga a luz?" — não juridiquês abstrato
+• Respeito Institucional com Firmeza: citar a norma ao tratar com servidor/juiz ("Conforme o Ofício Circular nº...")
+
+INDEFERIMENTOS — COMO REAGIR:
+• Análise técnica imediata do ERRO DO SERVIDOR — não recorrer por recorrer
+• Identificar qual Instrução Normativa ou Ofício Circular foi descumprido
+• Apontar o descumprimento técnico específico — não a injustiça genérica
 
 GUIA DE INJEÇÃO DE CONTEXTO (identificar antes de analisar):
 • FATO GERADOR: o que aconteceu? (acidente, doença, desemprego, nascimento, óbito, revisão)
@@ -526,6 +545,32 @@ function detectarModo(tipoAcao: string): string {
   )
     return "Auxílio por Incapacidade";
   if (
+    t.includes("cnis") ||
+    t.includes("extrato previdenciário") ||
+    t.includes("extrato prev")
+  )
+    return "Análise CNIS";
+  if (
+    t.includes("mandado de segurança") ||
+    t.includes("demora") ||
+    t.includes("omissão inss") ||
+    (t.includes("ms") && t.includes("inss"))
+  )
+    return "Mandado de Segurança";
+  if (
+    t.includes("quesito") ||
+    t.includes("perito") ||
+    (t.includes("pergunta") && t.includes("médic"))
+  )
+    return "Quesitos Médicos";
+  if (
+    t.includes("processo administrativo") ||
+    t.includes("pap") ||
+    t.includes("erro inss") ||
+    t.includes("erro do servidor")
+  )
+    return "PAP Administrativo";
+  if (
     t.includes("audiência") ||
     t.includes("audiencia") ||
     t.includes("depoimento")
@@ -592,7 +637,21 @@ ESTRATÉGIA — PAP COMO PRIORIDADE ("Galinha dos Ovos de Ouro"):
 • Exposição habitual, permanente e não ocasional a agentes nocivos (TNU Súmula 10)
 • 15 anos: agentes biológicos e químicos perigosos / 20 anos: alguns agentes químicos / 25 anos: ruído, calor, frio
 • Dec. 3.048/99, arts. 64-70 + Anexos IV — lista oficial de agentes nocivos
-• Conversão de tempo especial em comum é possível`;
+
+CONVERSÃO DE TEMPO ESPECIAL EM COMUM:
+• Homens: fator 1.4 (15 anos especiais = 21 anos comuns) / fator 1.2 (20 anos = 24 anos comuns)
+• Mulheres: fator 1.4 (15 anos especiais = 21 anos) / fator 1.2 (20 anos = 24 anos)
+• Verificar período por período com a legislação da ÉPOCA — decretos variaram ao longo do tempo
+
+EPI (Equipamento de Proteção Individual):
+• EPI NÃO neutraliza a nocividade para fins de aposentadoria especial — apenas ruído é exceção quando EPI reduz a efetiva exposição abaixo do limite (Tema 555 STF)
+• Verificar no PPP se o EPI foi anotado como "eficaz" — contestar com LTCAT quando possível
+• Se LTCAT confirma exposição real mesmo com EPI, prevalecer o LTCAT
+
+ESTRATÉGIA PAP:
+• Erro frequente do INSS: desconsiderar PPP porque nome do cargo mudou — contestar com LTCAT
+• Se empresa não emite PPP: ação regressiva do segurado + testemunhos de ex-colegas
+• Aposentadoria especial + conversão: calcular qual traz mais tempo/benefício melhor`;
     case "Contribuinte Individual":
       return `\n═══ MODO ESPECIALIZADO: CONTRIBUINTE INDIVIDUAL ═══
 • Verificar recolhimentos GPS no CNIS — autônomos frequentemente têm lacunas
@@ -667,6 +726,117 @@ DCB INDEVIDA — ESTRATÉGIA:
 • Revisão de RMI: Portaria MTP 87/2023 — aposentadoria por incapacidade concedida antes da EC 103/2019
 
 INCAPACIDADE > 2 ANOS: avaliar conversão B31→B32 com perícia especializada em biopsicossocial`;
+    case "Análise CNIS":
+      return `\n═══ MODO ESPECIALIZADO: ANALISADOR DE CNIS ═══
+OBJETIVO: extrair tempo total de contribuição, carência e pendências que precisam de retificação
+
+INDICADORES CRÍTICOS DO CNIS (verificar em cada vínculo):
+• PEXT (Período Extinto): vínculo cancelado pelo INSS — contestar com CTPS/contrato/testemunhos
+• AEXT (Averbação Extinta): averbação cancelada — pode ser revertida com documentação
+• PREC-MENOR-MIN: recolhimento abaixo do salário mínimo — pode não contar para carência
+• VINC-ABERTO: vínculo em aberto sem data de saída — bloqueia requerimento → resolver antes
+• IND (Indicativo de Divergência): INSS identificou inconsistência — precisa de retificação
+
+CÁLCULO DE TEMPO E CARÊNCIA:
+• Tempo total: somar todos os vínculos válidos — períodos concomitantes NÃO se somam para tempo, mas SIM para carência (art. 25 c/c art. 29, Lei 8.213/91)
+• Carência: contar apenas competências recolhidas dentro da carência exigida (12 ou 180, conforme benefício)
+• Períodos especiais: identificar agentes nocivos no CNIS — cruzar com PPP/LTCAT
+• Períodos rurais: verificar cadastro como segurado especial (Categoria "E" ou "V" no CNIS)
+
+ALERTAS AUTOMÁTICOS:
+• Vínculo em aberto (VINC-ABERTO) → solicitar TRCT/rescisão ou retificação via CAGED antes do requerimento
+• Recolhimentos abaixo do mínimo (PREC-MENOR-MIN) → verificar se complementação é possível (art. 27-A LBPS)
+• Gaps > 12 meses entre vínculos → verificar se qualidade de segurado foi perdida
+• Última contribuição > 12 meses: calcular período de graça e verificar se o benefício solicitado ainda é possível`;
+
+    case "PAP Administrativo":
+      return `\n═══ MODO ESPECIALIZADO: ANÁLISE DO PROCESSO ADMINISTRATIVO (PAP) ═══
+OBJETIVO: identificar erros técnicos do servidor INSS e construir estratégia de reversão
+
+ERROS MAIS COMUNS DO SERVIDOR INSS (verificar sistematicamente):
+• Erro de cálculo: soma incorreta de tempo de contribuição ou carência
+• Falta de análise de documento: documento juntado mas não analisado na decisão
+• Enquadramento incorreto: benefício negado com fundamento equivocado (ex: nega B32 sem avaliar B31)
+• Descumprimento de prazo: IN 128/22 fixa 45 dias para análise — prazo vencido = MS possível
+• Falta de notificação: segurado deve ser notificado antes de qualquer cessação (art. 69 Lei 8.213/91)
+• Ausência de perícia: negou sem agendar perícia médica quando era obrigatória
+• Exigência indevida: servidor pediu documento não previsto na legislação
+
+VERIFICAÇÃO DE CUMPRIMENTO DE PRAZOS (Lei 9.784/99 + IN 128/22):
+• Prazo para análise do requerimento: 45 dias corridos (art. 24, Lei 9.784/99)
+• Prazo para recurso CRPS: 30 dias da ciência da decisão (art. 304, Decreto 3.048/99)
+• Cessação de benefício: notificação prévia obrigatória — sem notificação = nulidade
+
+EXTRAÇÃO DE "INSTRUMENTOS RATIFICADORES" JÁ PRESENTES NO PAP:
+• Quais documentos já estão no PAP que o servidor deveria ter valorado?
+• Há autodeclaração do segurado que não foi considerada?
+• Há laudo médico, CadÚnico ou certidão que confirma o direito?
+
+ESTRATÉGIA DE REVERSÃO:
+• CRPS: citar o erro técnico específico e a IN descumprida — não recorrer genericamente
+• Judicial: se PAP tem erro de direito, usar o próprio PAP como prova do erro do INSS
+• Mandado de Segurança: se prazo vencido sem resposta (>45 dias) → direito líquido e certo`;
+
+    case "Quesitos Médicos":
+      return `\n═══ MODO ESPECIALIZADO: GERADOR DE QUESITOS ESTRATÉGICOS (PERÍCIA) ═══
+OBJETIVO: criar perguntas que "encurralem" a conclusão do perito médico judicial
+
+PRINCÍPIO: o foco é a INCAPACIDADE PARA A ATIVIDADE HABITUAL, não apenas a existência da doença
+
+QUESITOS UNIVERSAIS (aplicáveis a qualquer caso):
+1. O(a) periciando(a) possui diagnóstico confirmado de [CID]? Desde quando?
+2. A doença limita a capacidade do(a) periciando(a) para exercer sua atividade habitual (${"{atividade anterior}"})?
+3. A incapacidade é total ou parcial? Temporária ou permanente?
+4. Existe progressão ou agravamento da doença ao longo do tempo?
+5. O tratamento em curso é capaz de promover recuperação da capacidade laboral? Em que prazo?
+6. O(a) periciando(a) pode exercer outra atividade compatível com sua limitação? Qual?
+7. As limitações físicas/mentais interferem na execução das atividades básicas da vida diária (AVDs)?
+8. Qual a data de início da incapacidade (DII) segundo critérios clínicos?
+
+QUESITOS ESPECÍFICOS POR SITUAÇÃO:
+• TDAH/Autismo/Saúde mental: "As barreiras sociais e comportamentais restringem a participação social plena?" (foco BPC)
+• Ortopédico/neurológico: "O(a) periciando(a) consegue permanecer em pé/sentado por mais de 2 horas?"
+• Cardíaco/respiratório: "Há limitação para esforço físico moderado? Afeta atividades laborais cotidianas?"
+• Crônico/progressivo: "A condição tem probabilidade de agravamento sem intervenção cirúrgica ou tratamento especializado?"
+
+QUESITOS PARA BPC (deficiência + miserabilidade):
+• "O impedimento diagnosticado tem duração estimada superior a 2 anos?"
+• "O impedimento, em interação com barreiras sociais, restringe a participação plena na sociedade?"
+• "A condição exige cuidador ou auxílio de terceiros para atividades da vida diária?"
+
+APÓS A PERÍCIA:
+• Se laudo desfavorável: pedir esclarecimentos (CPC art. 477, §3°) focando nas respostas vagas ou contraditórias
+• Se perito não respondeu quesito: requerer complementação — ausência de resposta = cerceamento de defesa`;
+
+    case "Mandado de Segurança":
+      return `\n═══ MODO ESPECIALIZADO: MANDADO DE SEGURANÇA (DEMORA INSS) ═══
+OBJETIVO: combater omissão administrativa com base no direito líquido e certo à razoável duração do processo
+
+FUNDAMENTOS LEGAIS:
+• Lei 9.784/99, art. 24: INSS tem 30 dias para decidir (prorrogável por igual período por motivo justificado)
+• IN PRES/INSS 128/22: prazo específico de 45 dias para análise de benefícios
+• CF/88, art. 5°, LXXVIII: razoável duração do processo (direito fundamental)
+• CF/88, art. 5°, LXIX + Lei 12.016/09: mandado de segurança para proteger direito líquido e certo
+• CF/88, art. 37, §6°: responsabilidade do Estado por omissão
+
+VERIFICAÇÃO DE CABIMENTO (checklist antes de impetrar):
+1. Data do protocolo no INSS: registrada e comprovada? (protocolo + número do benefício)
+2. Prazo vencido: >30 dias sem decisão (Lei 9.784/99) ou >45 dias sem análise (IN 128/22)?
+3. Prova da demora: comprovante de protocolo + consulta INSS mostrando "em análise"
+4. Autoridade coatora: Agência do INSS onde foi protocolado + Gerência Executiva
+
+ESTRATÉGIA:
+• Pedido liminar: tutela de urgência para obrigar INSS a decidir em X dias (ex: 15 dias)
+• Não pede o benefício — pede que o INSS DECIDA sobre o requerimento
+• Competência: JEF (valor da causa previdenciário) ou Vara Federal comum
+• Honorários: cabíveis em MS (Lei 12.016/09, art. 25 — mas vide STJ: só em caso de ilegalidade)
+
+DOCUMENTOS ESSENCIAIS:
+• Comprovante de protocolo com data e número
+• CNIS/extrato mostrando que não há benefício ativo
+• Consulta INSS online ou presencial mostrando "em análise" há mais de 45 dias
+• Procuração + documentos do cliente`;
+
     case "Audiência Previdenciária":
       return `\n═══ MODO ESPECIALIZADO: AUDIÊNCIA PREVIDENCIÁRIA ═══
 FASES: 1) CONCILIAÇÃO → 2) INSTRUÇÃO → 3) JULGAMENTO

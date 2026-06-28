@@ -181,6 +181,67 @@ ALGORITMO DE RACIOCÍNIO (5 PASSOS — Prof. Frederico Martins)
 4. CONSTRUIR A PROVA: quais documentos provam a tese? O que ainda falta obter?
 5. CALCULAR VIABILIDADE: probabilidade de êxito × honorários × esforço = decisão de aceitar o caso
 
+════════════════════════════════════════════════
+VOCABULÁRIO ESTRATÉGICO (Prof. Frederico Martins)
+════════════════════════════════════════════════
+
+• "Instrumento Ratificador": qualquer prova documental que confirma/corrobora um fato alegado
+• "Blindagem Documental": estratégia de organizar o processo administrativo de forma irrebatível antes do protocolo no INSS — evita indeferimento por falha formal
+• "Galinha dos Ovos de Ouro": o processo administrativo bem-feito que gera honorários sem custo de perícia ou audiência
+• "Instrução Concentrada": produção eficiente de provas em uma única diligência — o mínimo de documentos necessários para o máximo de eficácia
+• "Advocacia de Resultado": foco total no deferimento rápido e honorários no bolso — não na teoria, mas na prática
+
+GUIA DE INJEÇÃO DE CONTEXTO (identificar antes de analisar):
+• FATO GERADOR: o que aconteceu? (acidente, doença, desemprego, nascimento, óbito, revisão)
+• STATUS QUO: em que fase está? (pré-protocolo / aguardando INSS / CRPS / JEF / TRF5)
+• PROVA RAINHA: qual o documento mais forte que já existe?
+• OBJETIVO MESTRE: qual o resultado esperado? (deferimento, revisão de valor, restabelecimento, retroatividade)
+
+════════════════════════════════════════════════
+BPC/LOAS — REGRAS ADICIONAIS (2021-2025)
+════════════════════════════════════════════════
+
+Lei 14.126/2021: visão monocular classificada como DEFICIÊNCIA SENSORIAL (tipo visual) para todos os efeitos legais, inclusive BPC
+STF Tema 27: repetitório geral sobre BPC — renda per capita ¼ SM pode ser relativizada
+STF Tema 312: exclusão de benefícios de renda mínima e transferência de renda do cálculo da renda familiar BPC
+Art. 20, §11-A, Lei 8.742/93: autoriza considerar gastos com saúde, medicamentos e cuidador para fins de aferição de miserabilidade
+Art. 20-B, Lei 8.742/93: critérios adicionais de flexibilização da renda familiar per capita
+Art. 4°, §1°, Decreto 6.214/07: menor de 16 anos com deficiência pode receber BPC — impedimento de longo prazo é suficiente
+Instituição de longa permanência: internação em abrigo/ILPI NÃO impede BPC — requisitos avaliados individualmente (Portaria Conjunta MDS 03/2018)
+Deficiente mental/intelectual: NÃO precisa de interdição judicial para requerer BPC
+CadÚnico: OBRIGATÓRIO para BPC — se desatualizado, atualizar na CRAS antes do requerimento; inscrição pode ser feita no mesmo dia
+
+════════════════════════════════════════════════
+AUDIÊNCIAS PREVIDENCIÁRIAS — FRAMEWORK
+════════════════════════════════════════════════
+
+Bases normativas: CPC arts. 358-368, Lei 9.099/95 arts. 27-29, Lei 10.259/01
+Fases: 1) CONCILIAÇÃO (proposta INSS → proposta advogado → acordo ou sem acordo) | 2) INSTRUÇÃO (depoimento pessoal, oitiva testemunhas, perito) | 3) JULGAMENTO (oral/posterior)
+
+Tipos mais comuns de audiência previdenciária:
+• Segurado especial rural: Súmula 9 TNU — prova oral + material (documentos + testemunhos)
+• Pensão por morte: prova de união estável ou dependência econômica
+• Período de graça por desemprego involuntário: 24 meses (Tema 348 TNU + art. 15, §2°)
+• Vínculos de emprego: CTPS + CNIS + testemunhos de ex-colegas
+• Aposentadoria híbrida/tempo rural: prova de período remoto rural
+• Benefícios por incapacidade: esclarecimentos do perito médico judicial
+• BPC/LOAS: prova de renda familiar e deficiência
+
+Testemunhas (CPC art. 455 + Lei 9.099/95 art. 34):
+• Advogado DEVE levar as testemunhas — não depende de intimação (salvo pedido formal com 5 dias de antecedência)
+• Máx. 3 testemunhas por parte (JEF)
+• Impedidas: cônjuge/companheiro, ascendentes, descendentes, parentes até 3º grau (exceto interesse público ou quando for única prova)
+• Suspeitas: inimigos ou amigos íntimos da parte, interesse no resultado
+• Incapazes: interditados por saúde mental, menores de 16 anos, deficientes visuais/auditivos quando o fato depender do sentido que lhes falta
+• Flexibilização (§4° e §5° CPC art. 447): juiz pode aceitar testemunho impedido/suspeito "sem compromisso"
+
+Juntada de documentos na audiência: POSSÍVEL (aplicação subsidiária Lei 9.099/95 arts. 28-29)
+Gravação da audiência pelo advogado: PERMITIDA (precedentes TRF1 e TRF6)
+Alegações finais orais: o advogado DEVE falar em audiência — não é necessário aguardar prazo escrito
+Sentença: imediata possível no JEF (art. 62 Lei 9.099/95) ou em até 30 dias (CPC art. 366)
+Audiência telepresencial: a pedido da parte (Resolução CNJ 354/2020 + 481/2022); PID disponível para distantes (Resolução CNJ 508/2023, distância ≥40km, município ≤50mil hab.)
+Pedido indeferido de audiência: CERCEAMENTO DE DEFESA → JEF: recurso inominado; VARA: agravo de instrumento (CPC art. 1.015)
+
 CÁLCULOS:
 • Teto INSS 2025: R$ 7.786,02
 • Salário mínimo 2025: R$ 1.622,00
@@ -464,6 +525,17 @@ function detectarModo(tipoAcao: string): string {
     t.includes("incapacidade temporária")
   )
     return "Auxílio por Incapacidade";
+  if (
+    t.includes("audiência") ||
+    t.includes("audiencia") ||
+    t.includes("depoimento")
+  )
+    return "Audiência Previdenciária";
+  if (
+    (t.includes("pente") && t.includes("fino")) ||
+    (t.includes("revisão") && (t.includes("bpc") || t.includes("loas")))
+  )
+    return "Pente-Fino BPC";
   if (t.includes("tempo") && t.includes("contribuição"))
     return "Aposentadoria por Tempo de Contribuição";
   if (t.includes("idade")) return "Aposentadoria por Idade";
@@ -478,21 +550,32 @@ function promptModoEspecializado(modo: string): string {
 • Deficiência: modelo biopsicossocial ICF (Lei 13.146/2015 — EPCD) — impedimento de longo prazo (≥2 anos) físico, mental, intelectual ou sensorial que restrinja participação social
 
 CRITÉRIO DE RENDA — ANÁLISE BPC 360 (holística):
-• Critério legal ¼ SM per capita NÃO é absoluto: Tema 995 STF + Súmula 54 TNU + ADPF 182
+• Critério legal ¼ SM per capita NÃO é absoluto: Tema 995 STF + Súmula 54 TNU + ADPF 182 + Temas 27 e 312 STF
 • Lei 13.982/2020 — rendas EXCLUÍDAS: BPC do cônjuge, 1 SM de pensão por morte, benefícios assistenciais eventuais, bolsa família, rendimentos da própria PcD
-• Considerar GASTOS com medicamentos, cuidador, aluguel, transporte para tratamento, dívidas
+• Art. 20, §11-A, Lei 8.742/93: GASTOS com medicamentos, cuidador, aluguel, transporte, dívidas REDUZEM renda efetiva
+• Art. 20-B, Lei 8.742/93: critérios adicionais de flexibilização — aplicar sempre
 • Tema 185 TNU: se INSS já reconheceu hipossuficiência, dispensa nova perícia de renda
+• Tema 312 STF: benefícios de renda mínima (Bolsa Família, auxílio emergencial etc.) excluídos do cálculo
+
+DEFICIÊNCIA — AMPLITUDE DO CONCEITO (Blindagem Documental):
+• Modelo biopsicossocial ICF — impedimento de longo prazo (≥2 anos) + barreiras que restringem participação social
+• Lei 14.126/2021: VISÃO MONOCULAR = deficiência sensorial visual — QUALIFICA para BPC
+• HIV, autismo, TDAH, neoplasia, esquizofrenia, epilepsia, paralisia cerebral: documentar impacto funcional
+• Menor de 16 anos: BPC possível (Decreto 6.214/07, art. 4°, §1°) — deficiência suficiente
+• Interditado: NÃO precisa de interdição judicial para requerer BPC
+• Internado em ILPI/abrigo: NÃO impede BPC — requisitos avaliados individualmente (Portaria MDS 03/2018)
 
 IMPEDIMENTO DE LONGO PRAZO:
 • Tema 173 TNU: pode ser reconhecido PROSPECTIVAMENTE (laudo atual demonstra cronificação)
-• HIV, autismo, TDAH, neoplasia, esquizofrenia: documentar impacto funcional na participação social
+• Não precisa estar incapacitado para o trabalho — basta restrição à participação social plena
 
-ESTRATÉGIA:
+ESTRATÉGIA — PAP COMO PRIORIDADE ("Galinha dos Ovos de Ouro"):
+• CadÚnico: OBRIGATÓRIO — se desatualizado, atualizar na CRAS antes do requerimento
 • Verificar CNIS: vínculos em aberto = causa frequente de indeferimento indevido — solucionar antes
-• PAP PRIMEIRO: administrativo resolve em ~30 dias + economiza honorários do cliente
-• Se indeferido: CRPS em 30 dias; se mantido: ação judicial com perícia biopsicossocial (ICF)
+• PAP PRIMEIRO (IN 128/22): administrativo resolve em ~30 dias + economiza honorários
+• Se indeferido: CRPS em 30 dias; se mantido: ação judicial com perícia biopsicossocial (CIF)
 • Estratégia subsidiária: BPC deficiente + pedido subsidiário BPC idoso (se próximo dos 65 anos)
-• Documentos críticos: laudo ICF, CNIS completo, CadÚnico, composição familiar declarada, comprovantes de renda e gastos`;
+• Documentos críticos ("Instrução Concentrada"): laudo ICF/CIF, CNIS, CadÚnico, composição familiar, comprovantes de renda e GASTOS com saúde`;
     case "Trabalhador Rural":
       return `\n═══ MODO ESPECIALIZADO: TRABALHADOR RURAL / SEGURADO ESPECIAL ═══
 • Prova material OBRIGATÓRIA + testemunhos (Súmula 9 TNU) — sem prova material o pedido não prospera
@@ -584,6 +667,76 @@ DCB INDEVIDA — ESTRATÉGIA:
 • Revisão de RMI: Portaria MTP 87/2023 — aposentadoria por incapacidade concedida antes da EC 103/2019
 
 INCAPACIDADE > 2 ANOS: avaliar conversão B31→B32 com perícia especializada em biopsicossocial`;
+    case "Audiência Previdenciária":
+      return `\n═══ MODO ESPECIALIZADO: AUDIÊNCIA PREVIDENCIÁRIA ═══
+FASES: 1) CONCILIAÇÃO → 2) INSTRUÇÃO → 3) JULGAMENTO
+
+PRÉ-AUDIÊNCIA — 3 pontos obrigatórios:
+• Revisar todos os fatos e documentos do processo — não confiar na memória
+• Preparar perguntas diretas para testemunhas (formulá-las antes, não improvisar)
+• Identificar o "ponto controverso" central: é renda? é vínculo? é incapacidade? é tempo rural?
+
+CONCILIAÇÃO:
+• Proposta do INSS via preposto (pode ser por videoconferência — Resolução CNJ 354/2020 + 481/2022)
+• Avaliar proposta: DIB + risco de perda na instrução + tempo restante até sentença
+• Acordo homologado tem força de sentença — avaliar reparcelamento vs. pagamento à vista
+
+INSTRUÇÃO:
+• Depoimento pessoal DO CLIENTE: advogado PODE requerer (CPC art. 385)
+• Testemunhas: advogado DEVE levar (CPC art. 455 + Lei 9.099/95 art. 34) — máx. 3 por parte
+• Formalidade essencial: tratar o juiz de "Excelência" — urbanidade obrigatória (CPC art. 358)
+• Juntada de documentos NA audiência: POSSÍVEL (Lei 9.099/95 arts. 28-29)
+• Gravação pelo advogado: PERMITIDA (precedentes TRF1 e TRF6)
+
+TESTEMUNHAS — REGRAS:
+• Advogado leva sem intimação ou requer intimação ≥5 dias antes (Lei 9.099/95 art. 34)
+• IMPEDIDAS: cônjuge/companheiro, ascendentes, descendentes, parentes até 3° grau (consanguinidade ou afinidade)
+• EXCETO quando for a ÚNICA forma de provar o fato (ex: rural, união estável)
+• Testemunha impedida pode depor "sem compromisso" — juiz avalia credibilidade
+
+CASOS MAIS COMUNS QUE EXIGEM AUDIÊNCIA:
+• Rural/segurado especial: Súmula 9 TNU — prova oral + material (documentos + testemunhos)
+• Pensão por morte: provar união estável ou dependência econômica
+• Desemprego involuntário: provar para estender período de graça (Tema 348 TNU — 24 meses)
+• Vínculos de emprego: CTPS + CNIS + testemunhas de colegas/supervisores
+• Aposentadoria híbrida/tempo rural: comprovação de período rural remoto
+• BPC: prova de renda familiar e deficiência por biopsicossocial
+
+CLIENTE DISTANTE (>40km): solicitar PID (Ponto de Inclusão Digital) via JF — Resolução CNJ 508/2023
+SENTENÇA: imediata no JEF (art. 62 Lei 9.099/95) ou em até 30 dias (CPC art. 366)
+RECURSO se negar audiência injustamente: JEF → recurso inominado; VARA → agravo de instrumento (CPC art. 1.015)
+ALEGAÇÕES FINAIS: falar oralmente em audiência — não aguardar prazo escrito`;
+
+    case "Pente-Fino BPC":
+      return `\n═══ MODO ESPECIALIZADO: PENTE-FINO / REVISÃO BPC ═══
+CONTEXTO: O INSS iniciou revisão periódica do BPC (art. 21, Lei 8.742/93). O objetivo é MANTER o benefício, não perder.
+
+ESTRATÉGIA DE DEFESA — "BLINDAGEM DOCUMENTAL":
+• DEFESA PREVENTIVA: não esperar notificação — regularizar documentação proativamente
+• FOCO NO ERRO FORMAL DO INSS: verificar se a notificação obedece aos requisitos legais (prazo, forma, fundamentação)
+• Erro formal do INSS no procedimento de revisão → nulidade → manutenção do benefício
+
+CHECKLIST DE REVISÃO (antes de qualquer manifestação):
+1. CNIS atualizado: verificar se há vínculos empregatícios em aberto (causa nº 1 de cessação)
+2. CadÚnico: verificar se está atualizado e consistente com declaração original
+3. Renda familiar: recalcular com EXCLUSÕES da Lei 13.982/2020 + art. 20, §11-A (gastos de saúde)
+4. Composição familiar: confirmar se houve mudança (morte, separação, nascimento) — atualizar CadÚnico
+5. Deficiência: reavaliação médica agendada? Obter novo laudo com CIF/biopsicossocial ANTES da perícia do INSS
+6. Resultado INSS: o médico-perito do INSS pode reconhecer deficiência diferente — pedir vista do laudo
+
+FUNDAMENTOS PARA MANTER O BENEFÍCIO:
+• Tema 185 TNU: se INSS já reconheceu hipossuficiência anteriormente, nova perícia de renda é dispensável
+• Art. 20, §11-A, Lei 8.742/93: gastos com saúde REDUZEM renda efetiva — calcular sempre
+• Temas 27 e 312 STF: critério renda ¼ SM não é absoluto — prova de miserabilidade por outros meios
+• Lei 14.126/2021: visão monocular = deficiência visual → qualifica para BPC (novo argumento)
+• Tema 173 TNU: impedimento de longo prazo reconhecido prospectivamente — laudo atual suficiente
+
+SE CESSAR INDEVIDAMENTE:
+• 1ª via: CRPS em 30 dias — gratuito e mais ágil
+• 2ª via: ação judicial na JF com pedido liminar de restabelecimento
+• Retroatividade: parcelas cessadas indevidamente = parcelas atrasadas com correção
+• Documentar a cessação indevida como prova de dano material para fins de indenização`;
+
     default:
       return "";
   }

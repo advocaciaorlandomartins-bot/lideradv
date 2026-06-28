@@ -10,6 +10,7 @@ import { estrategiaProcessual, SKILLS, type SkillId } from "@/lib/ai-juridico";
 import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
+import { obterContextoCerebro } from "@/lib/cerebroJuridico";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -53,12 +54,20 @@ export async function POST(req: Request) {
     processoId ? getProcessoById(processoId).catch(() => null) : null,
   ]);
 
+  const cerebroCtx = processo
+    ? await obterContextoCerebro(
+        processo.tipo_acao || "",
+        processo.area || "Previdenciário"
+      ).catch(() => "")
+    : "";
+
   const resultado = await estrategiaProcessual({
     skill: skill as SkillId,
     contexto: {
       escritorio,
       cliente: cliente ?? undefined,
       processo: processo ?? undefined,
+      instrucaoExtra: cerebroCtx || undefined,
     },
   });
 

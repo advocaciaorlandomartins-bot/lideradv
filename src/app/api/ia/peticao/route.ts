@@ -11,6 +11,7 @@ import { buildContextoTexto } from "@/lib/ai-juridico";
 import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
+import { gerarContextoPeticao } from "@/lib/cerebroJuridico";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -54,11 +55,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Skill inválida." }, { status: 400 });
   }
 
-  const [escritorio, cliente, processo] = await Promise.all([
+  const [escritorio, cliente, processo, cerebroCtx] = await Promise.all([
     getEscritorioConfig(),
     clienteId ? getClientFull(clienteId).catch(() => null) : null,
     processoId ? getProcessoById(processoId).catch(() => null) : null,
+    processoId
+      ? gerarContextoPeticao(processoId, tipoPeticao).catch(() => "")
+      : Promise.resolve(""),
   ]);
+
+  const instrucaoFinal = [cerebroCtx, instrucaoExtra]
+    .filter(Boolean)
+    .join("\n\n");
 
   const stream = await gerarPeticaoStream({
     skill: skill as SkillId,
@@ -67,7 +75,7 @@ export async function POST(req: Request) {
       escritorio,
       cliente: cliente ?? undefined,
       processo: processo ?? undefined,
-      instrucaoExtra,
+      instrucaoExtra: instrucaoFinal || undefined,
     },
   });
 

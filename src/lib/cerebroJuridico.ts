@@ -91,10 +91,22 @@ TNU (Turma Nacional de Uniformização):
 • Súmula 63: salário-maternidade — empregada demitida durante gestação mantém direito
 • Súmula 72: período de graça — contagem para qualidade de segurado
 • Súmula 77: SUPERADA pela ADI 2.110 (STF 2024) — carência de 10 contribuições para individual não se aplica mais
+• Tema 173 TNU: BPC — impedimento de longo prazo pode ser reconhecido de forma prospectiva (após a DER)
+• Tema 185 TNU: BPC — análise de miserabilidade dispensa nova perícia quando o INSS já reconheceu hipossuficiência
+• Tema 192 TNU: recolhimento de GPS em atraso dentro do período de graça é válido para cômputo de carência
+• Tema 220 TNU: gravidez de alto risco equipara-se a acidente de trabalho — dispensa de carência para B31
+• Tema 285 TNU: segurado facultativo de baixa renda — requisitos para recolhimento a 5% (alíquota reduzida)
+• Tema 300 TNU: mantém qualidade de segurado quando empregador se recusa a aceitar trabalhador após alta do INSS
+• Tema 301 TNU: vínculos urbanos intercalados não descaracterizam a condição de segurado especial rural
+• Tema 315 TNU: auxílio-acidente independe de pedido específico quando há sequela após cessação do B31
+• Tema 327 TNU: documentos em nome do cônjuge servem como início de prova material para segurado rural
+• Tema 348 TNU: desemprego involuntário amplia período de graça de 12 para 24 meses (art. 15, §2°, Lei 8.213/91)
 
 STJ:
 • Tema 352: carência — cômputo de contribuições
 • Súmula 548: correção de benefícios anteriores a 1988
+• Tema 862 STJ: DIB do auxílio-acidente é o dia seguinte à cessação do auxílio-doença (B31)
+• Tema 416 STJ: qualquer redução funcional permanente é suficiente para auxílio-acidente — irrelevante a extensão da sequela
 
 STF:
 • ADIs 2.110/2.111 (21/03/2024): carência para salário-maternidade inconstitucional
@@ -108,6 +120,66 @@ TRF5 / TJAL / TRT19 (Alagoas — sede do escritório):
 • Jurisprudência local do TRF5 para benefícios por incapacidade
 • TJAL para questões cíveis e de família
 • TRT19 para demandas trabalhistas
+
+════════════════════════════════════════════════
+BPC/LOAS — FRAMEWORK BPC 360 (2025)
+════════════════════════════════════════════════
+
+Lei 13.982/2020 — Rendas EXCLUÍDAS do cálculo familiar BPC:
+• BPC ou pensão por morte recebido pelo cônjuge/companheiro até 1 SM
+• Rendimentos da própria pessoa com deficiência (quando membro da família)
+• Bolsa Família e outros benefícios assistenciais eventuais
+• Parcelas de programas federais de transferência de renda
+
+Critério de miserabilidade holística (Tema 185 TNU + Súmula 54 TNU + ADPF 182):
+• O critério ¼ SM per capita NÃO é absoluto — juiz deve considerar gastos com saúde, cuidador, medicamentos, habitação, dívidas
+• Se o INSS já reconheceu hipossuficiência, nova perícia de renda é dispensável (Tema 185 TNU)
+• CadÚnico atualizado reforça prova de hipossuficiência, mas a ausência não impede concessão
+
+Impedimento de longo prazo (Tema 173 TNU):
+• Pode ser reconhecido prospectivamente — laudo atual demonstrando cronificação ou progressão da doença
+• Aplicável mesmo quando a data do laudo é posterior à DER
+
+Estratégia PAP (Processo Administrativo Previdenciário):
+• Priorizar resolução no INSS (Ofício Circular 46/19, IN 128/22) — mais rápido e economiza honorários
+• Vínculo em aberto no CNIS é causa recorrente de indeferimento — verificar e resolver antes do protocolo
+• Se indeferido: CRPS (recurso) em 30 dias; se mantido: ação judicial com perícia biopsicossocial
+
+════════════════════════════════════════════════
+BENEFÍCIOS POR INCAPACIDADE — FUNGIBILIDADE
+════════════════════════════════════════════════
+
+Regra de ouro (Súmula 47 TNU + prática do Prof. Frederico Martins):
+• SEMPRE peticionar B31 com pedido SUBSIDIÁRIO de B32 — e vice-versa
+• Se B32 negado mas há incapacidade parcial → pedir B31 como subsidiário
+• Incluir B94 (auxílio-acidente) quando há sequela permanente pós-acidente/pós-B31
+
+Auxílio-acidente (B94) — pontos críticos:
+• Tema 862 STJ: DIB é o dia SEGUINTE à cessação do B31, automático
+• Tema 315 TNU: dispensa pedido específico de B94 quando há sequela após B31
+• Tema 416 STJ: qualquer redução funcional permanente basta — sem percentual mínimo
+
+Incapacidade e qualidade de segurado:
+• Tema 348 TNU: desemprego involuntário → período de graça de 12 → 24 meses
+• Tema 192 TNU: GPS recolhida em atraso no período de graça conta para carência (art. 27-A LBPS)
+• Tema 300 TNU: empregador que recusa retorno do reabilitado → qualidade de segurado mantida
+• Gravidez de alto risco: Tema 220 TNU — carência dispensada (equiparada a acidente de trabalho)
+• Neoplasia maligna: carência sempre dispensada (art. 26, II, Lei 8.213/91) — citar no diagnóstico
+
+Revisão de RMI:
+• Portaria MTP 87/2023: revisão de renda mensal inicial de aposentadoria por incapacidade concedida pré-EC 103/2019
+
+Lei 15.156/2025: pensão por morte para genitores de vítimas da síndrome congênita do Zika vírus (B21)
+
+════════════════════════════════════════════════
+ALGORITMO DE RACIOCÍNIO (5 PASSOS — Prof. Frederico Martins)
+════════════════════════════════════════════════
+
+1. IDENTIFICAR VULNERABILIDADE: qual direito está sendo negado? Por qual razão o INSS indeferiu?
+2. FILTRO DE ADMISSIBILIDADE: o cliente tem qualidade de segurado? Carência atingida? Prazo vigente?
+3. SELECIONAR TESE: qual a tese mais forte — legal, jurisprudencial ou fática?
+4. CONSTRUIR A PROVA: quais documentos provam a tese? O que ainda falta obter?
+5. CALCULAR VIABILIDADE: probabilidade de êxito × honorários × esforço = decisão de aceitar o caso
 
 CÁLCULOS:
 • Teto INSS 2025: R$ 7.786,02
@@ -401,20 +473,36 @@ function detectarModo(tipoAcao: string): string {
 function promptModoEspecializado(modo: string): string {
   switch (modo) {
     case "BPC/LOAS":
-      return `\n═══ MODO ESPECIALIZADO: BPC/LOAS ═══
-• Critério renda: STF ampliou para miserabilidade real (Tema 995 STF, ADPF 182)
-• Deficiência: modelo biopsicossocial (Lei 13.146/2015 — EPCD); perícia ICF
-• Sem carência contributiva — qualquer pessoa com deficiência ou idoso (65+) pode ter direito
-• Idoso: 65 anos (Lei 8.742/93, art. 20, §2°)
-• Documentos críticos: laudo médico ICF, composição familiar, declaração de renda
-• TNU Súmula 54: miserabilidade vai além do critério renda per capita`;
+      return `\n═══ MODO ESPECIALIZADO: BPC/LOAS 360° ═══
+• Sem carência contributiva — pessoa com deficiência (qualquer idade) ou idoso (65+, art. 20 LOAS)
+• Deficiência: modelo biopsicossocial ICF (Lei 13.146/2015 — EPCD) — impedimento de longo prazo (≥2 anos) físico, mental, intelectual ou sensorial que restrinja participação social
+
+CRITÉRIO DE RENDA — ANÁLISE BPC 360 (holística):
+• Critério legal ¼ SM per capita NÃO é absoluto: Tema 995 STF + Súmula 54 TNU + ADPF 182
+• Lei 13.982/2020 — rendas EXCLUÍDAS: BPC do cônjuge, 1 SM de pensão por morte, benefícios assistenciais eventuais, bolsa família, rendimentos da própria PcD
+• Considerar GASTOS com medicamentos, cuidador, aluguel, transporte para tratamento, dívidas
+• Tema 185 TNU: se INSS já reconheceu hipossuficiência, dispensa nova perícia de renda
+
+IMPEDIMENTO DE LONGO PRAZO:
+• Tema 173 TNU: pode ser reconhecido PROSPECTIVAMENTE (laudo atual demonstra cronificação)
+• HIV, autismo, TDAH, neoplasia, esquizofrenia: documentar impacto funcional na participação social
+
+ESTRATÉGIA:
+• Verificar CNIS: vínculos em aberto = causa frequente de indeferimento indevido — solucionar antes
+• PAP PRIMEIRO: administrativo resolve em ~30 dias + economiza honorários do cliente
+• Se indeferido: CRPS em 30 dias; se mantido: ação judicial com perícia biopsicossocial (ICF)
+• Estratégia subsidiária: BPC deficiente + pedido subsidiário BPC idoso (se próximo dos 65 anos)
+• Documentos críticos: laudo ICF, CNIS completo, CadÚnico, composição familiar declarada, comprovantes de renda e gastos`;
     case "Trabalhador Rural":
-      return `\n═══ MODO ESPECIALIZADO: TRABALHADOR RURAL ═══
-• Prova material + testemunhos (TNU Súmulas 9 e 47) — sem prova material não há direito
-• Carência reduzida (art. 26, II da Lei 8.213/91) — período de graça art. 15
-• Documentos: ITR, bloco produtor, declaração sindicato rural, contrato arrendamento, fotos
-• Comprovação deve ser habitual e contemporânea ao período reivindicado
-• Segurado especial: art. 11, VII da Lei 8.213/91`;
+      return `\n═══ MODO ESPECIALIZADO: TRABALHADOR RURAL / SEGURADO ESPECIAL ═══
+• Prova material OBRIGATÓRIA + testemunhos (Súmula 9 TNU) — sem prova material o pedido não prospera
+• Documentos aceitos: ITR, bloco produtor rural, declaração do sindicato rural, contrato de arrendamento/parceria, nota fiscal de venda de produção, certidão de nascimento dos filhos (com profissão rural), fotos, ficha de associado rural, cadastro Pronaf
+• Tema 327 TNU: documentos em nome do cônjuge VALEM como início de prova material (ex: ITR do marido serve para a esposa comprovar atividade rural)
+• Tema 301 TNU: vínculos urbanos intercalados NÃO descaracterizam o segurado especial — verificar se a atividade rural principal era mantida concomitantemente
+• Verificar CNIS: vínculos em aberto ou vínculos urbanos no período reivindicado = indeferimento provável — identificar e fundamentar antes do protocolo
+• Comprovação: habitual e contemporânea ao período reivindicado (não basta documento isolado antigo)
+• Segurado especial (art. 11, VII, Lei 8.213/91): SEM carência contributiva — comprovar período de atividade rural equivalente à carência do benefício solicitado
+• Carência: para benefícios rurais com carência, usar período de atividade rural como substituição (art. 26, II, Lei 8.213/91)`;
     case "Aposentadoria Especial":
       return `\n═══ MODO ESPECIALIZADO: APOSENTADORIA ESPECIAL ═══
 • PPP + LTCAT obrigatórios (TNU Súmula 33) — sem ambos não prospera
@@ -467,12 +555,35 @@ ATIVIDADES CONCOMITANTES (2 salários):
 POTENCIAL FINANCEIRO: Honorários médios R$ 2.000,00 por contrato — 10 clientes = R$ 20.000,00
 DIB: data do parto, adoção ou guarda judicial para adoção`;
     case "Auxílio por Incapacidade":
-      return `\n═══ MODO ESPECIALIZADO: AUXÍLIO POR INCAPACIDADE TEMPORÁRIA (B31) ═══
-• Carência: 12 contribuições (art. 25, I Lei 8.213/91) — exceções art. 26, II (doenças graves)
-• Qualidade de segurado: verificar período de graça (art. 15)
-• Carência dispensada: acidente de trabalho, lista doenças graves (art. 26, II)
-• Incapacidade > 2 anos: conversão em B32 (Aposentadoria por Incapacidade) — avaliação pericial
-• DCB indevida: recurso no CRPS ou mandado de segurança`;
+      return `\n═══ MODO ESPECIALIZADO: BENEFÍCIOS POR INCAPACIDADE (B31/B32/B94) ═══
+FUNGIBILIDADE — REGRA DE OURO: SEMPRE peticionar B31 com pedido SUBSIDIÁRIO de B32 (e vice-versa)
+• B31 (Auxílio-Doença): incapacidade temporária > 15 dias
+• B32 (Aposentadoria por Incapacidade): incapacidade permanente e insusceptível de reabilitação
+• B94 (Auxílio-Acidente): sequela permanente redutora da capacidade — SEMPRE incluir quando há pós-acidente/pós-B31
+
+CARÊNCIA:
+• 12 contribuições (art. 25, I, Lei 8.213/91)
+• DISPENSADA: acidente de trabalho, doenças graves (art. 26, II) — neoplasia maligna SEMPRE dispensa
+• Gravidez de alto risco: Tema 220 TNU — equiparada a acidente, dispensa carência imediata
+
+QUALIDADE DE SEGURADO — VERIFICAR:
+• Período de graça padrão: 12 meses (art. 15, Lei 8.213/91)
+• Desemprego involuntário: amplia para 24 meses (Tema 348 TNU — art. 15, §2°)
+• GPS paga em atraso dentro do período de graça: válida para carência (Tema 192 TNU + art. 27-A LBPS)
+• Empregador que recusa retorno do reabilitado: qualidade de segurado MANTIDA (Tema 300 TNU)
+
+AUXÍLIO-ACIDENTE (B94) — PONTOS CRÍTICOS:
+• Tema 862 STJ: DIB é o dia SEGUINTE à cessação do B31 — automático, sem pedido de nova data
+• Tema 315 TNU: dispensa pedido específico de B94 quando há sequela comprovada após B31
+• Tema 416 STJ: QUALQUER redução funcional permanente é suficiente — sem percentual mínimo de sequela
+• Súmula 44 TNU: basta redução parcial permanente da capacidade para o trabalho habitual
+
+DCB INDEVIDA — ESTRATÉGIA:
+• 1ª via: recurso no CRPS (30 dias da cessação) — mais ágil e gratuito
+• 2ª via: mandado de segurança na JF (célere, liminar possível)
+• Revisão de RMI: Portaria MTP 87/2023 — aposentadoria por incapacidade concedida antes da EC 103/2019
+
+INCAPACIDADE > 2 ANOS: avaliar conversão B31→B32 com perícia especializada em biopsicossocial`;
     default:
       return "";
   }

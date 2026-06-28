@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import IaJuridicaSection from "@/components/dashboard/ia/ia-juridica-section";
 import IaPeticoesProcesso from "@/components/dashboard/ia/ia-peticoes-processo";
+import CerebroPanel from "@/components/dashboard/ia/cerebro-panel";
 import type {
   ProcessoExtended,
   HistoricoRegistro,
@@ -2498,6 +2499,9 @@ export default function ProcessoDetailClient({
 
       {/* Linha de Produção */}
       <ProducaoBar processo={processo} />
+
+      {/* Cérebro Jurídico — análise automática e aprendizado */}
+      <CerebroPanel processoId={processo.id} processoStatus={processo.status} />
 
       {/* IA Jurídica — Gerar Petição | Analisar Documento | Diagnóstico Estratégico */}
       <IaJuridicaSection

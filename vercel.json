@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/limpeza",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cerebro/scheduler",
+      "schedule": "0 3 * * *"
     }
   ]
 }

@@ -47,7 +47,33 @@ EC 103/2019 — Reforma Previdenciária:
 • Regra de pontos progressiva: 96/86 pts (2024), 100/90 pts (2028)
 • Aposentadoria por incapacidade: mantém regras anteriores
 
-IN PRES/INSS 128/2022: instrução normativa vigente para concessão administrativa
+IN PRES/INSS 128/2022 (alterada pela IN 188/2025):
+• Art. 200, §4°: isenção de carência ao salário-maternidade aplicada a requerimentos a partir de 05/04/2024 e aos pendentes de análise, independentemente da data do fato gerador
+
+════════════════════════════════════════════════
+SALÁRIO-MATERNIDADE SEM CARÊNCIA (2024-2025)
+════════════════════════════════════════════════
+
+• ADIs 2.110 e 2.111 (STF, 21/03/2024): INCONSTITUCIONAL a exigência de carência (art. 25, III, Lei 8.213/91) — viola isonomia
+• ÚNICO REQUISITO: ter qualidade de segurado na data do parto/adoção
+• Partos anteriores a 05/04/2024: regra retroativa, desde que dentro do prazo de 5 anos (prescrição quinquenal)
+• Indeferimentos anteriores: podem ser reabertos; coisa julgada anterior NÃO é empecilho (RE 586.068, Tema 100 STF)
+• DEFERIMENTO AUTOMÁTICO no INSS desde 05/04/2024 para qualquer segurada com qualidade de segurado
+
+Enunciado 19 CRPS (Resolução 13, 27/08/2025 — DOU 08/09/2025):
+• Contribuinte individual: provar exercício de atividade remunerada + ao menos 1 contribuição (GPS 1163 mensal / 1180 trimestral, 11%)
+  - Se não comprovar atividade → enquadrar como SEGURADO FACULTATIVO (sem precisar provar atividade)
+• Segurado facultativo: apenas comprovar pagamento da contribuição (GPS 1473 mensal / 1490 trimestral, 11%)
+• Segurada especial (rural): NÃO precisa de carência nem contribuição — apenas 1 documento rural anterior ao fato gerador (Ofício Circular 63/2025)
+• NÃO USAR alíquota de 5% (baixa renda) — risco de não validação pelo INSS; sempre 11%
+• Recolhimento trimestral: JAN-MAR (vence 15/abr), ABR-JUN (vence 15/jul), JUL-SET (vence 15/out), OUT-DEZ (vence 15/jan)
+• Atividades concomitantes (2 salários-maternidade): empregada+autônoma, empregada+MEI — NÃO: empregada+facultativa
+
+Ofício Circular 63/2025/DIRBEN-INSS (17/07/2025):
+• Segurada especial: basta 1 instrumento ratificador anterior ao fato gerador (nascimento/adoção/guarda)
+• Revogou Ofício 46/2019 — antes exigia documento anterior à data presumida da gravidez
+
+TNU Tema 11: Flexibilização da exigência de prova material contemporânea para segurada especial (salário-maternidade)
 
 ════════════════════════════════════════════════
 JURISPRUDÊNCIA CONSOLIDADA
@@ -64,16 +90,19 @@ TNU (Turma Nacional de Uniformização):
 • Súmula 57: laudo pericial é relativo — juiz pode valorar outros elementos
 • Súmula 63: salário-maternidade — empregada demitida durante gestação mantém direito
 • Súmula 72: período de graça — contagem para qualidade de segurado
-• Súmula 77: salário-maternidade — contribuinte individual: 1 contribuição + carência 10
+• Súmula 77: SUPERADA pela ADI 2.110 (STF 2024) — carência de 10 contribuições para individual não se aplica mais
 
 STJ:
 • Tema 352: carência — cômputo de contribuições
 • Súmula 548: correção de benefícios anteriores a 1988
 
 STF:
+• ADIs 2.110/2.111 (21/03/2024): carência para salário-maternidade inconstitucional
+• RE 586.068 (Tema 100): coisa julgada de juizado especial revisável quando fundada em lei inconstitucional
 • Tema 995: BPC — critério de renda não é absoluto (miserabilidade)
 • RE 636.941: incapacidade — perícia biopsicossocial (ICF)
 • ADPF 182: BPC — família de acolhimento
+• ARE 930.647 AgR: precedente STF vinculante aplicável imediatamente, independente de publicação do paradigma
 
 TRF5 / TJAL / TRT19 (Alagoas — sede do escritório):
 • Jurisprudência local do TRF5 para benefícios por incapacidade
@@ -82,8 +111,10 @@ TRF5 / TJAL / TRT19 (Alagoas — sede do escritório):
 
 CÁLCULOS:
 • Teto INSS 2025: R$ 7.786,02
+• Salário mínimo 2025: R$ 1.622,00
+• GPS Salário-Maternidade (mensal, 11%): Facultativa=1473 (R$178,42), Individual=1163 (R$178,42), Especial Rural=1503 (20%, R$324,40)
+• GPS Salário-Maternidade (trimestral, 11%): Facultativa=1490 (R$535,26), Individual=1180 (R$535,26), Especial Rural=1554 (20%, R$973,20)
 • Fator previdenciário: aplicado a aposentadorias por tempo (EC 103/2019)
-• Salário mínimo: consultar campo salario_minimo no perfil do escritório
 `;
 
 // ─── Tipos estruturados ──────────────────────────────────────────────────────
@@ -336,6 +367,9 @@ function detectarModo(tipoAcao: string): string {
   if (
     t.includes("maternidade") ||
     t.includes("gestante") ||
+    t.includes("parto") ||
+    t.includes("gestação") ||
+    t.includes("adoção") ||
     t.includes("b-80") ||
     t.includes("b80")
   )
@@ -403,12 +437,35 @@ function promptModoEspecializado(modo: string): string {
 • DIB: data do óbito (se requerida em até 90 dias) ou data do requerimento
 • EC 103/2019: novas regras para % de rateio (cotas percentuais por número de dependentes)`;
     case "Salário-Maternidade":
-      return `\n═══ MODO ESPECIALIZADO: SALÁRIO-MATERNIDADE ═══
-• Empregada CLT: até o teto do INSS — pago pelo INSS e compensado pelo empregador
-• Contribuinte individual/avulsa: 1 contribuição em dia + carência 10 (TNU Súmula 77)
-• Desempregada: mantém direito dentro do período de graça (TNU Súmula 63)
-• Carência: 10 contribuições para individual (art. 25, III Lei 8.213/91)
-• DIB: data do parto, adoção ou guarda judicial`;
+      return `\n═══ MODO ESPECIALIZADO: SALÁRIO-MATERNIDADE SEM CARÊNCIA ═══
+ATENÇÃO — MUDANÇA HISTÓRICA: A ADI 2.110 (STF, 21/03/2024) declarou INCONSTITUCIONAL a exigência de carência (art. 25, III, Lei 8.213/91). A TNU Súmula 77 está SUPERADA. O único requisito é ter QUALIDADE DE SEGURADO na data do parto/adoção.
+
+FLUXO DE DECISÃO POR TIPO DE SEGURADA:
+• Empregada CLT: qualidade de segurado automática — deferimento certo; valor até o teto do INSS
+• Desempregada/ex-empregada: mantém direito dentro do período de graça (TNU Súmula 63) — verificar se ainda está no prazo
+• Contribuinte individual: 1 contribuição + comprovação de atividade remunerada (Enunciado 19 CRPS)
+  - Se não comprovar atividade → ENQUADRAR COMO FACULTATIVA (inversão de ônus — não perde o direito)
+• Segurada facultativa: apenas 1 contribuição paga (GPS 1473 ou 1490 trimestral, 11%) — sem precisar provar atividade
+• Segurada especial (rural): SEM carência, SEM contribuição — basta 1 documento rural anterior ao parto (Ofício Circular 63/2025)
+
+RETROATIVIDADE — PARTOS ANTERIORES A 05/04/2024:
+• Aplica-se a partos dentro dos últimos 5 anos (prescrição quinquenal)
+• Se foi indeferido antes: PODE REQUERER NOVAMENTE — coisa julgada anterior NÃO impede (RE 586.068, Tema 100 STF)
+• Valor: 1 salário mínimo (R$ 1.622,00) — DIB: data do parto
+
+ESTRATÉGIA DE RECOLHIMENTO (se cliente ainda não tem contribuição):
+• ANTES do parto: GPS até o dia do parto; DEPOIS do parto: GPS até o dia 15 do mês seguinte
+• Sempre alíquota 11% — NUNCA 5% (risco de não validação pelo INSS)
+• Facultativa mensal: código 1473 | Facultativa trimestral: código 1490
+• Individual mensal: código 1163 | Individual trimestral: código 1180
+
+ATIVIDADES CONCOMITANTES (2 salários):
+• Empregada + autônoma (contribuinte individual): SIM
+• Empregada + MEI: SIM
+• Empregada + segurada facultativa: NÃO é possível
+
+POTENCIAL FINANCEIRO: Honorários médios R$ 2.000,00 por contrato — 10 clientes = R$ 20.000,00
+DIB: data do parto, adoção ou guarda judicial para adoção`;
     case "Auxílio por Incapacidade":
       return `\n═══ MODO ESPECIALIZADO: AUXÍLIO POR INCAPACIDADE TEMPORÁRIA (B31) ═══
 • Carência: 12 contribuições (art. 25, I Lei 8.213/91) — exceções art. 26, II (doenças graves)

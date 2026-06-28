@@ -456,9 +456,37 @@ function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
       );
       alertas.push({
         tipo: "prescricao",
-        nivel: "atencao",
-        mensagem: `PRESCRIÇÃO QUINQUENAL: Parcelas anteriores a ${dataCorte.toLocaleDateString("pt-BR")} estão prescritas. Parcelas de ${Math.floor(anos - 5)} ano(s) perdidas. Ajuizar o quanto antes.`,
+        nivel: "critico",
+        mensagem: `PRESCRIÇÃO QUINQUENAL EM CURSO: Parcelas anteriores a ${dataCorte.toLocaleDateString("pt-BR")} já estão prescritas. ${Math.floor(anos - 5)} ano(s) de parcelas perdidos. Ajuizar URGENTE para estancar a perda.`,
         base_legal: "Art. 103, §1° da Lei 8.213/91 — prescrição quinquenal",
+      });
+    } else if (anos >= 4) {
+      const mesesAtePrescrever = Math.ceil((5 - anos) * 12);
+      alertas.push({
+        tipo: "prescricao",
+        nivel: "atencao",
+        mensagem: `ALERTA PRESCRIÇÃO: Em ~${mesesAtePrescrever} meses as primeiras parcelas começarão a prescrever (DER: ${new Date(processo.der as string).toLocaleDateString("pt-BR")}). Ajuizar antes que parcelas sejam perdidas.`,
+        base_legal: "Art. 103, §1° da Lei 8.213/91 — prescrição quinquenal",
+      });
+    }
+  }
+
+  // Prazo de recurso CRPS — 30 dias do indeferimento (Art. 304, Dec. 3.048/99)
+  if (processo.resultado_admin === "indeferido" && processo.der) {
+    const der = new Date(processo.der as string);
+    const diasDesdeDeR = Math.floor(
+      (hoje.getTime() - der.getTime()) / (24 * 3600 * 1000)
+    );
+    if (diasDesdeDeR >= 1 && diasDesdeDeR <= 35) {
+      const diasRestantes = 30 - diasDesdeDeR;
+      alertas.push({
+        tipo: "prazo_recurso",
+        nivel: diasRestantes <= 5 ? "critico" : "atencao",
+        mensagem:
+          diasRestantes > 0
+            ? `PRAZO RECURSO CRPS: ${diasRestantes} dia(s) restantes para interpor recurso administrativo (indeferido em ${der.toLocaleDateString("pt-BR")}).`
+            : `PRAZO RECURSO CRPS POSSIVELMENTE VENCIDO: Verificar data exata da ciência do indeferimento — prazo de 30 dias para CRPS.`,
+        base_legal: "Art. 304, Decreto 3.048/99 — recurso ao CRPS em 30 dias",
       });
     }
   }
@@ -487,13 +515,7 @@ function detectarModo(tipoAcao: string): string {
   const t = (tipoAcao || "").toLowerCase();
   if (t.includes("bpc") || t.includes("loas") || t.includes("assistencial"))
     return "BPC/LOAS";
-  if (
-    t.includes("especial") ||
-    t.includes("insalubr") ||
-    t.includes("periculosidade") ||
-    t.includes("agente nocivo")
-  )
-    return "Aposentadoria Especial";
+  // Rural ANTES de Especial — "segurado especial" é rural, não atividade especial
   if (
     t.includes("rural") ||
     t.includes("segurado especial") ||
@@ -502,6 +524,13 @@ function detectarModo(tipoAcao: string): string {
     t.includes("garimpeiro")
   )
     return "Trabalhador Rural";
+  if (
+    (t.includes("especial") && !t.includes("rural")) ||
+    t.includes("insalubr") ||
+    t.includes("periculosidade") ||
+    t.includes("agente nocivo")
+  )
+    return "Aposentadoria Especial";
   if (
     t.includes("individual") ||
     t.includes("autônom") ||
@@ -552,22 +581,17 @@ function detectarModo(tipoAcao: string): string {
     return "Análise CNIS";
   if (
     t.includes("mandado de segurança") ||
-    t.includes("demora") ||
     t.includes("omissão inss") ||
-    (t.includes("ms") && t.includes("inss"))
+    t.includes("demora administrativa")
   )
     return "Mandado de Segurança";
-  if (
-    t.includes("quesito") ||
-    t.includes("perito") ||
-    (t.includes("pergunta") && t.includes("médic"))
-  )
+  if (t.includes("quesito") || (t.includes("perito") && t.includes("médic")))
     return "Quesitos Médicos";
   if (
     t.includes("processo administrativo") ||
-    t.includes("pap") ||
     t.includes("erro inss") ||
-    t.includes("erro do servidor")
+    t.includes("erro do servidor") ||
+    t.includes("revisão administrativa")
   )
     return "PAP Administrativo";
   if (
@@ -906,6 +930,60 @@ SE CESSAR INDEVIDAMENTE:
 • 2ª via: ação judicial na JF com pedido liminar de restabelecimento
 • Retroatividade: parcelas cessadas indevidamente = parcelas atrasadas com correção
 • Documentar a cessação indevida como prova de dano material para fins de indenização`;
+
+    case "Aposentadoria por Tempo de Contribuição":
+      return `\n═══ MODO ESPECIALIZADO: APOSENTADORIA POR TEMPO DE CONTRIBUIÇÃO ═══
+ATENÇÃO: EC 103/2019 EXTINGUIU a aposentadoria por tempo para novos segurados após 13/11/2019.
+Verificar se cliente tem direito adquirido (tempo completo antes da EC) ou aplica-se regra de transição.
+
+REGRAS DE TRANSIÇÃO (EC 103/2019) — verificar qual é mais vantajosa:
+• PEDÁGIO 50% (art. 17): para quem estava a ≤2 anos de completar o tempo — homens 35 anos, mulheres 30 anos
+• PEDÁGIO 100% (art. 20): para quem estava a >2 anos — contribuir 100% do tempo restante + idade mínima
+• PONTOS PROGRESSIVOS (art. 19): 97/87 pts (2025), 98/88 (2026), 99/89 (2027), 100/90 (2028+) + tempo mínimo
+
+DIREITO ADQUIRIDO (antes de 13/11/2019):
+• Homem com 35 anos de contribuição OU mulher com 30 anos → direito adquirido preservado
+• Professor(a): 30 anos (homem) / 25 anos (mulher) de magistério exclusivo
+• Verificar CNIS: todo o tempo conta — público + privado + rural (sem contribuição, mas com carência)
+
+CÁLCULO DO BENEFÍCIO (pós-EC 103):
+• RMB = média de 100% de todos os salários de contribuição (não mais 80% maiores)
+• Alíquota progressiva: começa em 60% + 2% por ano além do mínimo (35/30 anos)
+• Fator previdenciário: pode ser aplicado — calcular com e sem para verificar o mais vantajoso
+• Teto INSS 2025: R$ 7.786,02
+
+PERÍODOS ESPECIAIS — computar para converter:
+• Tempo especial converte com fator 1.4 (15 anos) ou 1.2 (20 anos) em tempo comum
+• Tempo rural sem contribuição: conta como tempo e carência (segurado especial)
+• Tempo de serviço público: RPPS é separado — verificar se há contagem recíproca (art. 201, §9°, CF)`;
+
+    case "Aposentadoria por Idade":
+      return `\n═══ MODO ESPECIALIZADO: APOSENTADORIA POR IDADE ═══
+REQUISITOS (art. 201, §7°, CF/88 + EC 103/2019):
+• Homem: 65 anos de idade + 20 anos de contribuição (carência)
+• Mulher urbana: 62 anos de idade + 15 anos de contribuição
+• Segurado especial (rural): homem 60 anos / mulher 55 anos + carência de atividade rural
+
+REGRAS DE TRANSIÇÃO (EC 103/2019):
+• Mulher que já tinha 60 anos em 13/11/2019: mantém direito com 15 anos de carência
+• Progressão da idade mínima feminina: 60 anos (2019) → 61 (2020) → 62 (2023+)
+• Para contribuições iniciadas antes de 13/11/2019: carência pode ser diferente — verificar
+
+CÁLCULO DO BENEFÍCIO:
+• RMB = 60% + 2% por ano de contribuição acima de 20 anos (homem) ou 15 anos (mulher)
+• Para atingir 100%: precisaria de 40 anos de contribuição (homem) ou 30 anos (mulher)
+• Salário de benefício: média de todos os salários desde julho/1994
+
+RURAL / SEGURADO ESPECIAL:
+• Regra especial mantida pela EC 103/2019: 60 anos (homem) / 55 anos (mulher)
+• Carência: 180 meses de atividade rural (não precisa ser contributiva)
+• Documentação: prova material + testemunhos (Súmula 9 TNU) — OBRIGATÓRIA
+• Documentos em nome do cônjuge valem (Tema 327 TNU)
+
+ESTRATÉGIA:
+• Se não tem carência completa: verificar se há tempo rural complementar
+• Se está próximo da idade: orientar sobre contribuições voluntárias para completar carência
+• MEI com contribuições em dia: conta para carência da aposentadoria por idade`;
 
     default:
       return "";

@@ -43,42 +43,6 @@ export default async function DiscPage() {
         </Link>
       </div>
 
-      {/* Card de explicação */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          {
-            letra: "A",
-            nome: "Executor",
-            cor: "bg-red-50 border-red-200 text-red-700",
-            vaga: "SDR / Vendas / Audiências",
-          },
-          {
-            letra: "B",
-            nome: "Comunicador",
-            cor: "bg-yellow-50 border-yellow-200 text-yellow-700",
-            vaga: "Atendimento / Captação",
-          },
-          {
-            letra: "C",
-            nome: "Planejador",
-            cor: "bg-green-50 border-green-200 text-green-700",
-            vaga: "Backoffice / Operacional",
-          },
-          {
-            letra: "D",
-            nome: "Analista",
-            cor: "bg-blue-50 border-blue-200 text-blue-700",
-            vaga: "Cálculos / Peticionamento",
-          },
-        ].map((p) => (
-          <div key={p.letra} className={`rounded-xl border p-4 ${p.cor}`}>
-            <span className="text-2xl font-black opacity-20">{p.letra}</span>
-            <p className="font-bold text-sm mt-1">{p.nome}</p>
-            <p className="text-xs opacity-70 mt-0.5">{p.vaga}</p>
-          </div>
-        ))}
-      </div>
-
       <DiscList testes={testes as Parameters<typeof DiscList>[0]["testes"]} />
     </div>
   );

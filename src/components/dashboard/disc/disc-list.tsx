@@ -4,6 +4,43 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+type FiltroPerfil = "todos" | "A" | "B" | "C" | "D";
+
+const PERFIS = [
+  {
+    letra: "A" as const,
+    nome: "Executor",
+    vaga: "SDR / Vendas / Audiências",
+    cor: "#ef4444",
+    bg: "#fef2f2",
+    border: "#fecaca",
+  },
+  {
+    letra: "B" as const,
+    nome: "Comunicador",
+    vaga: "Atendimento / Captação",
+    cor: "#ca8a04",
+    bg: "#fefce8",
+    border: "#fde68a",
+  },
+  {
+    letra: "C" as const,
+    nome: "Planejador",
+    vaga: "Backoffice / Operacional",
+    cor: "#16a34a",
+    bg: "#f0fdf4",
+    border: "#bbf7d0",
+  },
+  {
+    letra: "D" as const,
+    nome: "Analista",
+    vaga: "Cálculos / Peticionamento",
+    cor: "#2563eb",
+    bg: "#eff6ff",
+    border: "#bfdbfe",
+  },
+];
+
 interface Teste {
   id: string;
   nome_candidato: string;
@@ -83,13 +120,18 @@ interface Props {
 export default function DiscList({ testes }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [filtroPerfil, setFiltroPerfil] = useState<FiltroPerfil>("todos");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const filtered = testes.filter((t) =>
-    `${t.nome_candidato} ${t.cargo_vaga ?? ""} ${t.perfil_dominante}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+  const filtered = testes.filter((t) => {
+    const matchSearch =
+      `${t.nome_candidato} ${t.cargo_vaga ?? ""} ${t.perfil_dominante}`
+        .toLowerCase()
+        .includes(search.toLowerCase());
+    const matchPerfil =
+      filtroPerfil === "todos" || t.perfil_dominante.startsWith(filtroPerfil);
+    return matchSearch && matchPerfil;
+  });
 
   async function handleDelete(id: string, nome: string) {
     if (!confirm(`Excluir teste de ${nome}?`)) return;
@@ -102,8 +144,51 @@ export default function DiscList({ testes }: Props) {
     }
   }
 
+  const totalPorPerfil = (letra: string) =>
+    testes.filter((t) => t.perfil_dominante.startsWith(letra)).length;
+
   return (
     <div className="space-y-4">
+      {/* Cards de perfil — clicáveis como filtro */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {PERFIS.map((p) => {
+          const ativo = filtroPerfil === p.letra;
+          const count = totalPorPerfil(p.letra);
+          return (
+            <button
+              key={p.letra}
+              type="button"
+              onClick={() => setFiltroPerfil(ativo ? "todos" : p.letra)}
+              style={{
+                backgroundColor: ativo ? p.cor : p.bg,
+                borderColor: ativo ? p.cor : p.border,
+                color: ativo ? "#fff" : p.cor,
+              }}
+              className="rounded-xl border p-4 text-left transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <span
+                className="text-2xl font-black"
+                style={{ opacity: ativo ? 0.4 : 0.2 }}
+              >
+                {p.letra}
+              </span>
+              <p className="font-bold text-sm mt-1">{p.nome}</p>
+              <p className="text-xs mt-0.5" style={{ opacity: 0.75 }}>
+                {p.vaga}
+              </p>
+              {count > 0 && (
+                <p
+                  className="text-xs font-semibold mt-2"
+                  style={{ opacity: 0.9 }}
+                >
+                  {count} candidato{count > 1 ? "s" : ""}
+                </p>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <input

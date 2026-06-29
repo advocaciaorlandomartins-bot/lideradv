@@ -15,6 +15,9 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
+  if (session.categoria !== "Administrador(a)") {
+    return NextResponse.json({ error: "Acesso restrito a administradores." }, { status: 403 });
+  }
 
   const migrations: { name: string; ok: boolean; error?: string }[] = [];
 

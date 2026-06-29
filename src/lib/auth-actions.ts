@@ -10,15 +10,28 @@ import { enviarEmailResetSenha } from "./email";
 
 export type LoginState = { error: string } | null;
 
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+}
+
 function verifyPassword(input: string, stored: string): boolean {
   const parts = stored.split(":");
-  if (parts.length !== 3 || parts[0] !== "sha256") return false;
-  const [, salt, hash] = parts;
-  const check = crypto
-    .createHash("sha256")
-    .update(input + salt)
-    .digest("hex");
-  return check === hash;
+  if (parts[0] === "scrypt" && parts.length === 3) {
+    const [, salt, hash] = parts;
+    try {
+      const check = crypto.scryptSync(input, salt, 64).toString("hex");
+      return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(check, "hex"));
+    } catch { return false; }
+  }
+  // Legacy sha256 — aceito mas migrado automaticamente no login
+  if (parts[0] === "sha256" && parts.length === 3) {
+    const [, salt, hash] = parts;
+    const check = crypto.createHash("sha256").update(input + salt).digest("hex");
+    return check === hash;
+  }
+  return false;
 }
 
 export async function loginAction(
@@ -59,9 +72,16 @@ export async function loginAction(
     return { error: "Login ou senha incorretos." };
   }
 
-  await sql`
-    UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ${String(user.id)}::uuid
-  `;
+  // Migração transparente sha256 → scrypt no próximo login
+  const updates: Promise<unknown>[] = [
+    sql`UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ${String(user.id)}::uuid`,
+  ];
+  if (String(user.senha_hash).startsWith("sha256:")) {
+    updates.push(
+      sql`UPDATE usuarios SET senha_hash = ${hashPassword(senha)} WHERE id = ${String(user.id)}::uuid`
+    );
+  }
+  await Promise.all(updates);
 
   const permissoes = resolvePermissoes(
     String(user.categoria),

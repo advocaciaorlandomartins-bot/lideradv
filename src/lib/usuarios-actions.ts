@@ -13,11 +13,8 @@ export type UsuarioFormState = { error?: string; success?: boolean } | null;
 
 function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto
-    .createHash("sha256")
-    .update(password + salt)
-    .digest("hex");
-  return `sha256:${salt}:${hash}`;
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
 }
 
 function parsePermissoes(formData: FormData): Permissoes {

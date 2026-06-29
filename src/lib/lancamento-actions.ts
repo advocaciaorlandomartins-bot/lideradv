@@ -374,9 +374,8 @@ export async function createLancamentoAction(
     return { error: "Erro ao salvar lançamento. Tente novamente." };
   }
 
-  const redirectTo =
-    ((formData.get("redirect_to") as string | null) ?? "").trim() ||
-    "/dashboard/financeiro";
+  const rawRedirect = ((formData.get("redirect_to") as string | null) ?? "").trim();
+  const redirectTo = rawRedirect.startsWith("/") ? rawRedirect : "/dashboard/financeiro";
 
   const valorFmt = valor.toLocaleString("pt-BR", {
     minimumFractionDigits: 2,

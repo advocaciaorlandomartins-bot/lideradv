@@ -48,16 +48,20 @@ function verificarAssinatura(
 
 export async function POST(request: Request) {
   const secret = process.env.TRAMITASIGN_WEBHOOK_SECRET;
-  const rawBody = await request.text();
+  if (!secret) {
+    return NextResponse.json(
+      { error: "Webhook não configurado no servidor." },
+      { status: 503 }
+    );
+  }
 
-  if (secret) {
-    const sig = request.headers.get("x-webhook-signature") ?? "";
-    if (!verificarAssinatura(rawBody, sig, secret)) {
-      return NextResponse.json(
-        { error: "Assinatura inválida" },
-        { status: 401 }
-      );
-    }
+  const rawBody = await request.text();
+  const sig = request.headers.get("x-webhook-signature") ?? "";
+  if (!verificarAssinatura(rawBody, sig, secret)) {
+    return NextResponse.json(
+      { error: "Assinatura inválida" },
+      { status: 401 }
+    );
   }
 
   let payload: {

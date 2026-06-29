@@ -25,6 +25,21 @@ const ALLOWED_TYPES = new Set([
   "image/webp",
 ]);
 
+function isUrlPermitida(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname;
+    const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+      : null;
+    const allowed = [supabaseHost, "supabase.co", "supabase.in"].filter(Boolean) as string[];
+    return allowed.some((h) => host === h || host.endsWith("." + h));
+  } catch {
+    return false;
+  }
+}
+
 const MAX_MB = 20;
 
 export async function POST(req: Request) {
@@ -63,6 +78,10 @@ export async function POST(req: Request) {
         { error: "Tipo de arquivo não suportado." },
         { status: 400 }
       );
+    }
+
+    if (!isUrlPermitida(body.documentoUrl)) {
+      return NextResponse.json({ error: "URL de documento não permitida." }, { status: 400 });
     }
 
     // Faz fetch do arquivo via URL pública

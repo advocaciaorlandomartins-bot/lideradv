@@ -10,20 +10,21 @@ import sql from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  }
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    }
 
-  if (session.categoria !== "Administrador(a)") {
-    return NextResponse.json(
-      { error: "Apenas administradores podem executar esta operação." },
-      { status: 403 }
-    );
-  }
+    if (session.categoria !== "Administrador(a)") {
+      return NextResponse.json(
+        { error: "Apenas administradores podem executar esta operação." },
+        { status: 403 }
+      );
+    }
 
-  const [clientes, leads, disc] = await Promise.all([
-    sql`
+    const [clientes, leads, disc] = await Promise.all([
+      sql`
       SELECT id, name, doc, email, created_at,
         (SELECT COUNT(*)::int FROM processos
          WHERE client_id = clients.id AND deleted_at IS NULL) AS processos_ativos
@@ -46,7 +47,7 @@ export async function GET() {
         )
       ORDER BY created_at DESC
     `,
-    sql`
+      sql`
       SELECT id, nome_completo, email, telefone, status, created_at
       FROM crm_leads
       WHERE
@@ -65,7 +66,7 @@ export async function GET() {
         OR nome_completo ILIKE '%example%'
       ORDER BY created_at DESC
     `,
-    sql`
+      sql`
       SELECT id, nome_candidato, cargo_vaga, perfil_dominante, created_at
       FROM testes_comportamentais
       WHERE
@@ -79,17 +80,24 @@ export async function GET() {
         OR nome_candidato ILIKE '%exemplo%'
       ORDER BY created_at DESC
     `,
-  ]);
+    ]);
 
-  return NextResponse.json({
-    preview: true,
-    aviso:
-      "Estes são os registros identificados como teste. Para apagar, envie DELETE /api/admin/cleanup.",
-    clientes: { total: clientes.length, itens: clientes },
-    leads: { total: leads.length, itens: leads },
-    testes_disc: { total: disc.length, itens: disc },
-    total_geral: clientes.length + leads.length + disc.length,
-  });
+    return NextResponse.json({
+      preview: true,
+      aviso:
+        "Estes são os registros identificados como teste. Para apagar, envie DELETE /api/admin/cleanup.",
+      clientes: { total: clientes.length, itens: clientes },
+      leads: { total: leads.length, itens: leads },
+      testes_disc: { total: disc.length, itens: disc },
+      total_geral: clientes.length + leads.length + disc.length,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: "Erro interno", detalhe: msg },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE() {

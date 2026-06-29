@@ -23,7 +23,16 @@ export async function GET() {
       await query();
       migrations.push({ name, ok: true });
     } catch (err) {
-      migrations.push({ name, ok: false, error: String(err) });
+      const msg = err instanceof Error ? err.message : String(err);
+      // Mask internal details in production
+      const safeMsg =
+        process.env.NODE_ENV === "production"
+          ? msg.replace(
+              /\b(?:password|secret|key|token)\b[^\s]*/gi,
+              "[redacted]"
+            )
+          : msg;
+      migrations.push({ name, ok: false, error: safeMsg });
     }
   }
 

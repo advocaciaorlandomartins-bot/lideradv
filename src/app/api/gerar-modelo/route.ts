@@ -27,6 +27,15 @@ export async function GET(request: Request) {
     );
   }
 
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(modeloId) || !UUID_RE.test(clienteId)) {
+    return NextResponse.json(
+      { error: "Parâmetros inválidos." },
+      { status: 400 }
+    );
+  }
+
   const [modelo, client, escritorioConfig] = await Promise.all([
     getModeloById(modeloId),
     getClientFull(clienteId),

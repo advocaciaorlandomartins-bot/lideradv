@@ -18,6 +18,7 @@ export default async function DiscPage() {
     SELECT id, nome_candidato, cargo_vaga, perfil_dominante, funcao_sugerida,
            recomendacao, pontuacao_a, pontuacao_b, pontuacao_c, pontuacao_d, created_at
     FROM testes_comportamentais
+    WHERE created_by = ${session.id}
     ORDER BY created_at DESC
     LIMIT 100
   `;

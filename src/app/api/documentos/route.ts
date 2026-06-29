@@ -23,6 +23,20 @@ export async function GET(request: Request) {
       { status: 400 }
     );
 
+  const VALID_TYPES = ["processo", "cliente", "pericia"];
+  if (!VALID_TYPES.includes(entityType)) {
+    return NextResponse.json(
+      { error: "entityType inválido." },
+      { status: 400 }
+    );
+  }
+
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(entityId)) {
+    return NextResponse.json({ error: "entityId inválido." }, { status: 400 });
+  }
+
   const docs = await getDocumentosByEntityId(entityType, entityId);
   return NextResponse.json(docs);
 }

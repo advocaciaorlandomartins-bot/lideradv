@@ -111,7 +111,12 @@ export async function POST(request: Request) {
     try {
       await fetch(prevbotCallbackUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(process.env.CONTRATO_WEBHOOK_SECRET && {
+            Authorization: `Bearer ${process.env.CONTRATO_WEBHOOK_SECRET}`,
+          }),
+        },
         body: JSON.stringify({
           contrato_id: contratoId,
           document_id: contratoId,

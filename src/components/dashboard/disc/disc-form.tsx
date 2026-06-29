@@ -231,22 +231,33 @@ export default function DiscForm() {
                   C: "Planejador (C)",
                   D: "Analista (D)",
                 };
-                const letraColor: Record<Letra, string> = {
-                  A: "text-red-700 bg-red-50 border-red-200",
-                  B: "text-yellow-700 bg-yellow-50 border-yellow-200",
-                  C: "text-green-700 bg-green-50 border-green-200",
-                  D: "text-blue-700 bg-blue-50 border-blue-200",
+                const letraStyles: Record<
+                  Letra,
+                  { card: string; cor: string }
+                > = {
+                  A: {
+                    card: "text-red-700 bg-red-50 border-red-200",
+                    cor: "#ef4444",
+                  },
+                  B: {
+                    card: "text-yellow-700 bg-yellow-50 border-yellow-200",
+                    cor: "#ca8a04",
+                  },
+                  C: {
+                    card: "text-green-700 bg-green-50 border-green-200",
+                    cor: "#16a34a",
+                  },
+                  D: {
+                    card: "text-blue-700 bg-blue-50 border-blue-200",
+                    cor: "#2563eb",
+                  },
                 };
-                const letraBtnSelected: Record<Letra, string> = {
-                  A: "bg-red-500 text-white",
-                  B: "bg-yellow-500 text-white",
-                  C: "bg-green-500 text-white",
-                  D: "bg-blue-500 text-white",
-                };
+                const selecionado = respostas[bloco.n][letra];
+                const cor = letraStyles[letra].cor;
                 return (
                   <div
                     key={letra}
-                    className={`rounded-lg border p-3 ${letraColor[letra]}`}
+                    className={`rounded-lg border p-3 ${letraStyles[letra].card}`}
                   >
                     <p className="text-xs font-semibold mb-2">
                       {letraLabel[letra]}
@@ -262,11 +273,20 @@ export default function DiscForm() {
                           key={nota}
                           type="button"
                           onClick={() => setNota(bloco.n, letra, nota)}
-                          className={`flex-1 rounded text-xs font-bold py-1.5 transition-colors border ${
-                            respostas[bloco.n][letra] === nota
-                              ? `${letraBtnSelected[letra]} border-transparent shadow-sm`
-                              : "bg-white border-current/30 opacity-60 hover:opacity-100 hover:bg-white"
-                          }`}
+                          style={
+                            selecionado === nota
+                              ? {
+                                  backgroundColor: cor,
+                                  color: "#fff",
+                                  borderColor: cor,
+                                }
+                              : {
+                                  backgroundColor: "#fff",
+                                  color: cor,
+                                  borderColor: cor + "66",
+                                }
+                          }
+                          className="flex-1 rounded text-xs font-bold py-2 transition-all border cursor-pointer hover:scale-105 active:scale-95"
                         >
                           {nota}
                         </button>

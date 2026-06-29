@@ -30,6 +30,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CheckCircleIcon,
+  IdentificationIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -147,6 +148,12 @@ const GROUPS: {
         icon: UserPlusIcon,
         label: "Colaboradores",
         modulo: "colaboradores",
+      },
+      {
+        href: "/dashboard/disc",
+        icon: IdentificationIcon,
+        label: "Teste DISC",
+        modulo: null,
       },
     ],
   },

@@ -176,6 +176,36 @@ export async function GET() {
       sql`CREATE INDEX IF NOT EXISTS ia_peticoes_processo_idx ON ia_peticoes (processo_id) WHERE processo_id IS NOT NULL`
   );
 
+  await run(
+    "testes_comportamentais",
+    () => sql`
+      CREATE TABLE IF NOT EXISTS testes_comportamentais (
+        id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        nome_candidato  TEXT        NOT NULL,
+        cargo_vaga      TEXT,
+        pontuacao_a     INT         NOT NULL DEFAULT 0,
+        pontuacao_b     INT         NOT NULL DEFAULT 0,
+        pontuacao_c     INT         NOT NULL DEFAULT 0,
+        pontuacao_d     INT         NOT NULL DEFAULT 0,
+        perfil_dominante TEXT       NOT NULL DEFAULT '',
+        funcao_sugerida TEXT        NOT NULL DEFAULT '',
+        pontos_fortes   TEXT,
+        pontos_atencao  TEXT,
+        recomendacao    TEXT        NOT NULL DEFAULT '',
+        pergunta_entrevista TEXT,
+        respostas       JSONB       NOT NULL DEFAULT '[]',
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_by      UUID        REFERENCES usuarios(id) ON DELETE SET NULL
+      )
+    `
+  );
+
+  await run(
+    "testes_comportamentais.idx_created_at",
+    () =>
+      sql`CREATE INDEX IF NOT EXISTS testes_comportamentais_created_at_idx ON testes_comportamentais (created_at DESC)`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

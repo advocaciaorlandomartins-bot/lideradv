@@ -278,7 +278,12 @@ export interface DadoFaltante {
 }
 
 export interface AlertaJuridico {
-  tipo: "prescricao" | "decadencia" | "dcb_vencida" | "prazo_recurso";
+  tipo:
+    | "prescricao"
+    | "decadencia"
+    | "dcb_vencida"
+    | "prazo_recurso"
+    | "processo_parado";
   nivel: "critico" | "atencao";
   mensagem: string;
   base_legal: string;
@@ -491,6 +496,36 @@ function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
     }
   }
 
+  // Processo parado no INSS — Avanço Tático (45/90 dias sem resposta)
+  // Fase Aceleração: 45 dias → Reabertura de Tarefa / Ouvidoria; 90 dias → MS
+  if (
+    processo.der &&
+    (!processo.resultado_admin || processo.resultado_admin === "pendente") &&
+    !processo.dcb
+  ) {
+    const der = new Date(processo.der as string);
+    const dias = Math.floor(
+      (hoje.getTime() - der.getTime()) / (24 * 3600 * 1000)
+    );
+    if (dias >= 90) {
+      alertas.push({
+        tipo: "processo_parado",
+        nivel: "critico",
+        mensagem: `PROCESSO PARADO HÁ ${dias} DIAS — MANDADO DE SEGURANÇA CABÍVEL: INSS descumpriu prazo legal (Lei 9.784/99, art. 24 — 90 dias). Preparar MS imediatamente para garantir análise em 30 dias. Blindagem: protocolo INSS + print da tela de acompanhamento.`,
+        base_legal:
+          "Art. 24 Lei 9.784/99 — prazo máximo 90 dias. MS: Art. 5°, LXIX, CF/88",
+      });
+    } else if (dias >= 45) {
+      alertas.push({
+        tipo: "processo_parado",
+        nivel: "atencao",
+        mensagem: `AVANÇO TÁTICO: Processo sem resposta há ${dias} dias. Acionar Reabertura de Tarefa no portal Meu INSS + Ouvidoria (0800-722-8477). Em ${90 - dias} dias caberá Mandado de Segurança se não houver resposta.`,
+        base_legal:
+          "Art. 24 Lei 9.784/99 — prazo máximo 90 dias para decisão administrativa",
+      });
+    }
+  }
+
   // DCB vencida — benefício cessado
   if (processo.dcb) {
     const dcb = new Date(processo.dcb as string);
@@ -608,6 +643,18 @@ function detectarModo(tipoAcao: string): string {
   if (t.includes("tempo") && t.includes("contribuição"))
     return "Aposentadoria por Tempo de Contribuição";
   if (t.includes("idade")) return "Aposentadoria por Idade";
+  if (
+    t.includes("sdr") ||
+    t.includes("lead") ||
+    t.includes("captação") ||
+    t.includes("captacao") ||
+    t.includes("qualificação") ||
+    t.includes("qualificacao") ||
+    t.includes("novo cliente") ||
+    t.includes("prospecção") ||
+    t.includes("prospeccao")
+  )
+    return "SDR/Qualificação";
   return "Geral Previdenciário";
 }
 
@@ -984,6 +1031,45 @@ ESTRATÉGIA:
 • Se não tem carência completa: verificar se há tempo rural complementar
 • Se está próximo da idade: orientar sobre contribuições voluntárias para completar carência
 • MEI com contribuições em dia: conta para carência da aposentadoria por idade`;
+
+    case "SDR/Qualificação":
+      return `\n═══ MODO ESPECIALIZADO: SDR / QUALIFICAÇÃO DE LEAD ═══
+OBJETIVO: Qualificar se o potencial cliente tem viabilidade jurídica e calcular ROI do contrato.
+
+ALGORITMO DE QUALIFICAÇÃO (Score 0–10):
+1. DOR URGENTE (0–2 pts): Qual a situação que motivou a consulta?
+   • Benefício negado/cortado recentemente (+2) | Doença incapacitante ativa (+2) | Dúvida sem urgência (+0)
+
+2. QUALIDADE DE SEGURADO (0–2 pts):
+   • Contribuindo ou em período de graça (+2) | Perdeu qualidade — verificar recuperação (+1) | Nunca contribuiu (BPC path) (+1)
+
+3. PROVA RAINHA disponível (0–2 pts):
+   • Possui CNIS, CTPS, laudos, PPP ou documentos rurais (+2) | Tem parcial — orientar complemento (+1) | Sem documentos (+0)
+
+4. VIABILIDADE DA TESE (0–2 pts):
+   • Tese clara e jurisprudência favorável (+2) | Tese possível mas com risco (+1) | Caso improvável (+0)
+
+5. URGÊNCIA / TIMING (0–2 pts):
+   • Prescrição próxima ou DCB vencida (+2) | Dentro do prazo confortável (+1) | Sem urgência (+0)
+
+VEREDITO PELO SCORE:
+• 8–10: FECHAR CONTRATO — caso forte, honorários garantidos. Script: "Encontrei sua tese. Posso reverter isso no administrativo rapidamente. Vou precisar de [X documento]. Meu honorário é [Y]. Quando podemos assinar?"
+• 5–7: FECHAR COM CAUTELA — caso possível, apresentar risco. Script: "Há uma tese, mas precisa de [documento X]. Se trouxer até [data], podemos entrar com o pedido e aumentar muito as chances."
+• 0–4: NÃO FECHAR AGORA — orientar sem assumir caso inviável. Script: "No momento, a documentação não está suficiente para garantir resultado. Recomendo você regularizar [X] e voltar quando tiver [Y]."
+
+IDENTIFICAÇÃO DA "DOR URGENTE":
+• Benefício cortado → DCB alert + ação restabelecimento
+• Demora no INSS > 45 dias → Avanço Tático (Reabertura de Tarefa / Ouvidoria)
+• Demora > 90 dias → Mandado de Segurança (MS)
+• Indeferimento recente → Recurso CRPS (30 dias) ou Ação Judicial
+
+FUNGIBILIDADE PRÁTICA — sempre apresentar o caminho alternativo:
+• "Principal: Aposentadoria por Incapacidade. Subsidiário: Auxílio-Incapacidade."
+• "Principal: BPC/LOAS. Subsidiário: Salário-Maternidade (se segurada)."
+
+ANÁLISE ROI (Honorários):
+• Calcular: valor do benefício × 12 meses × % honorário contratado
+• Apresentar ao cliente em termos de "recuperação acumulada" para justificar contrato`;
 
     default:
       return "";

@@ -48,22 +48,22 @@ export async function GET() {
       ORDER BY created_at DESC
     `,
       sql`
-      SELECT id, nome_completo, email, telefone, status, created_at
+      SELECT id, nome, email, telefone, status, created_at
       FROM crm_leads
       WHERE
-        nome_completo ILIKE '%teste%'
-        OR nome_completo ILIKE '%ficticio%'
-        OR nome_completo ILIKE '%fictício%'
-        OR nome_completo ILIKE '%joao silva%'
-        OR nome_completo ILIKE '%joão silva%'
-        OR nome_completo ILIKE '%maria silva%'
-        OR nome_completo ILIKE '%jose silva%'
-        OR nome_completo ILIKE '%josé silva%'
-        OR nome_completo ILIKE '%fulano%'
-        OR nome_completo ILIKE '%beltrano%'
-        OR nome_completo ILIKE '%sicrano%'
-        OR nome_completo ILIKE '%exemplo%'
-        OR nome_completo ILIKE '%example%'
+        nome ILIKE '%teste%'
+        OR nome ILIKE '%ficticio%'
+        OR nome ILIKE '%fictício%'
+        OR nome ILIKE '%joao silva%'
+        OR nome ILIKE '%joão silva%'
+        OR nome ILIKE '%maria silva%'
+        OR nome ILIKE '%jose silva%'
+        OR nome ILIKE '%josé silva%'
+        OR nome ILIKE '%fulano%'
+        OR nome ILIKE '%beltrano%'
+        OR nome ILIKE '%sicrano%'
+        OR nome ILIKE '%exemplo%'
+        OR nome ILIKE '%example%'
       ORDER BY created_at DESC
     `,
       sql`
@@ -135,19 +135,19 @@ export async function DELETE() {
   const leadsDel = await sql`
     DELETE FROM crm_leads
     WHERE
-      nome_completo ILIKE '%teste%'
-      OR nome_completo ILIKE '%ficticio%'
-      OR nome_completo ILIKE '%fictício%'
-      OR nome_completo ILIKE '%joao silva%'
-      OR nome_completo ILIKE '%joão silva%'
-      OR nome_completo ILIKE '%maria silva%'
-      OR nome_completo ILIKE '%jose silva%'
-      OR nome_completo ILIKE '%josé silva%'
-      OR nome_completo ILIKE '%fulano%'
-      OR nome_completo ILIKE '%beltrano%'
-      OR nome_completo ILIKE '%sicrano%'
-      OR nome_completo ILIKE '%exemplo%'
-      OR nome_completo ILIKE '%example%'
+      nome ILIKE '%teste%'
+      OR nome ILIKE '%ficticio%'
+      OR nome ILIKE '%fictício%'
+      OR nome ILIKE '%joao silva%'
+      OR nome ILIKE '%joão silva%'
+      OR nome ILIKE '%maria silva%'
+      OR nome ILIKE '%jose silva%'
+      OR nome ILIKE '%josé silva%'
+      OR nome ILIKE '%fulano%'
+      OR nome ILIKE '%beltrano%'
+      OR nome ILIKE '%sicrano%'
+      OR nome ILIKE '%exemplo%'
+      OR nome ILIKE '%example%'
     RETURNING id
   `;
   resultados.push({ operacao: "crm_leads", removidos: leadsDel.length });

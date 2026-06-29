@@ -232,10 +232,16 @@ export default function DiscForm() {
                   D: "Analista (D)",
                 };
                 const letraColor: Record<Letra, string> = {
-                  A: "text-red-600 bg-red-50 border-red-200",
-                  B: "text-yellow-600 bg-yellow-50 border-yellow-200",
-                  C: "text-green-600 bg-green-50 border-green-200",
-                  D: "text-blue-600 bg-blue-50 border-blue-200",
+                  A: "text-red-700 bg-red-50 border-red-200",
+                  B: "text-yellow-700 bg-yellow-50 border-yellow-200",
+                  C: "text-green-700 bg-green-50 border-green-200",
+                  D: "text-blue-700 bg-blue-50 border-blue-200",
+                };
+                const letraBtnSelected: Record<Letra, string> = {
+                  A: "bg-red-500 text-white",
+                  B: "bg-yellow-500 text-white",
+                  C: "bg-green-500 text-white",
+                  D: "bg-blue-500 text-white",
                 };
                 return (
                   <div
@@ -256,10 +262,10 @@ export default function DiscForm() {
                           key={nota}
                           type="button"
                           onClick={() => setNota(bloco.n, letra, nota)}
-                          className={`flex-1 rounded text-xs font-bold py-1 transition-colors ${
+                          className={`flex-1 rounded text-xs font-bold py-1.5 transition-colors border ${
                             respostas[bloco.n][letra] === nota
-                              ? "bg-current text-white opacity-100"
-                              : "bg-white/60 opacity-60 hover:opacity-100"
+                              ? `${letraBtnSelected[letra]} border-transparent shadow-sm`
+                              : "bg-white border-current/30 opacity-60 hover:opacity-100 hover:bg-white"
                           }`}
                         >
                           {nota}

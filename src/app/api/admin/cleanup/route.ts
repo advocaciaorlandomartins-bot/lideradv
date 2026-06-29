@@ -1,10 +1,6 @@
 /**
  * GET    /api/admin/cleanup  — preview: mostra registros de teste que seriam apagados
  * DELETE /api/admin/cleanup  — executa a limpeza (requer Administrador(a))
- *
- * Identifica "dados de teste" pelo padrão de nome (regex case-insensitive):
- * teste, test, demo, ficticio, joão/joao silva, maria silva, jose silva,
- * fake, exemplo, example, fulano, beltrano, sicrano
  */
 
 import { NextResponse } from "next/server";
@@ -12,10 +8,6 @@ import { getSession } from "@/lib/session";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
-
-// Regex PostgreSQL — case-insensitive via ~*
-const PATTERN =
-  "\\mteste\\M|\\mtest\\M|\\mdemo\\M|ficticio|fictício|joão silva|joao silva|maria silva|jose silva|josé silva|\\mfake\\M|exemplo|example|\\mfulano\\M|beltrano|sicrano";
 
 export async function GET() {
   const session = await getSession();
@@ -37,19 +29,54 @@ export async function GET() {
          WHERE client_id = clients.id AND deleted_at IS NULL) AS processos_ativos
       FROM clients
       WHERE deleted_at IS NULL
-        AND name ~* ${PATTERN}
+        AND (
+          name ILIKE '%teste%'
+          OR name ILIKE '%ficticio%'
+          OR name ILIKE '%fictício%'
+          OR name ILIKE '%joao silva%'
+          OR name ILIKE '%joão silva%'
+          OR name ILIKE '%maria silva%'
+          OR name ILIKE '%jose silva%'
+          OR name ILIKE '%josé silva%'
+          OR name ILIKE '%fulano%'
+          OR name ILIKE '%beltrano%'
+          OR name ILIKE '%sicrano%'
+          OR name ILIKE '%exemplo%'
+          OR name ILIKE '%example%'
+        )
       ORDER BY created_at DESC
     `,
     sql`
       SELECT id, nome_completo, email, telefone, status, created_at
       FROM crm_leads
-      WHERE nome_completo ~* ${PATTERN}
+      WHERE
+        nome_completo ILIKE '%teste%'
+        OR nome_completo ILIKE '%ficticio%'
+        OR nome_completo ILIKE '%fictício%'
+        OR nome_completo ILIKE '%joao silva%'
+        OR nome_completo ILIKE '%joão silva%'
+        OR nome_completo ILIKE '%maria silva%'
+        OR nome_completo ILIKE '%jose silva%'
+        OR nome_completo ILIKE '%josé silva%'
+        OR nome_completo ILIKE '%fulano%'
+        OR nome_completo ILIKE '%beltrano%'
+        OR nome_completo ILIKE '%sicrano%'
+        OR nome_completo ILIKE '%exemplo%'
+        OR nome_completo ILIKE '%example%'
       ORDER BY created_at DESC
     `,
     sql`
       SELECT id, nome_candidato, cargo_vaga, perfil_dominante, created_at
       FROM testes_comportamentais
-      WHERE nome_candidato ~* ${PATTERN}
+      WHERE
+        nome_candidato ILIKE '%teste%'
+        OR nome_candidato ILIKE '%ficticio%'
+        OR nome_candidato ILIKE '%joao silva%'
+        OR nome_candidato ILIKE '%joão silva%'
+        OR nome_candidato ILIKE '%maria silva%'
+        OR nome_candidato ILIKE '%fulano%'
+        OR nome_candidato ILIKE '%beltrano%'
+        OR nome_candidato ILIKE '%exemplo%'
       ORDER BY created_at DESC
     `,
   ]);
@@ -80,10 +107,18 @@ export async function DELETE() {
 
   const resultados: { operacao: string; removidos: number }[] = [];
 
-  // 1. Testes DISC fictícios — hard delete (sem vínculos)
+  // 1. Testes DISC fictícios — hard delete
   const discDel = await sql`
     DELETE FROM testes_comportamentais
-    WHERE nome_candidato ~* ${PATTERN}
+    WHERE
+      nome_candidato ILIKE '%teste%'
+      OR nome_candidato ILIKE '%ficticio%'
+      OR nome_candidato ILIKE '%joao silva%'
+      OR nome_candidato ILIKE '%joão silva%'
+      OR nome_candidato ILIKE '%maria silva%'
+      OR nome_candidato ILIKE '%fulano%'
+      OR nome_candidato ILIKE '%beltrano%'
+      OR nome_candidato ILIKE '%exemplo%'
     RETURNING id
   `;
   resultados.push({ operacao: "testes_disc", removidos: discDel.length });
@@ -91,7 +126,20 @@ export async function DELETE() {
   // 2. CRM leads fictícios — hard delete
   const leadsDel = await sql`
     DELETE FROM crm_leads
-    WHERE nome_completo ~* ${PATTERN}
+    WHERE
+      nome_completo ILIKE '%teste%'
+      OR nome_completo ILIKE '%ficticio%'
+      OR nome_completo ILIKE '%fictício%'
+      OR nome_completo ILIKE '%joao silva%'
+      OR nome_completo ILIKE '%joão silva%'
+      OR nome_completo ILIKE '%maria silva%'
+      OR nome_completo ILIKE '%jose silva%'
+      OR nome_completo ILIKE '%josé silva%'
+      OR nome_completo ILIKE '%fulano%'
+      OR nome_completo ILIKE '%beltrano%'
+      OR nome_completo ILIKE '%sicrano%'
+      OR nome_completo ILIKE '%exemplo%'
+      OR nome_completo ILIKE '%example%'
     RETURNING id
   `;
   resultados.push({ operacao: "crm_leads", removidos: leadsDel.length });
@@ -101,7 +149,21 @@ export async function DELETE() {
     UPDATE clients
     SET deleted_at = NOW()
     WHERE deleted_at IS NULL
-      AND name ~* ${PATTERN}
+      AND (
+        name ILIKE '%teste%'
+        OR name ILIKE '%ficticio%'
+        OR name ILIKE '%fictício%'
+        OR name ILIKE '%joao silva%'
+        OR name ILIKE '%joão silva%'
+        OR name ILIKE '%maria silva%'
+        OR name ILIKE '%jose silva%'
+        OR name ILIKE '%josé silva%'
+        OR name ILIKE '%fulano%'
+        OR name ILIKE '%beltrano%'
+        OR name ILIKE '%sicrano%'
+        OR name ILIKE '%exemplo%'
+        OR name ILIKE '%example%'
+      )
     RETURNING id
   `;
   resultados.push({ operacao: "clientes", removidos: clientesDel.length });

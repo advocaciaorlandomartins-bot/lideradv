@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import sql from "@/lib/db";
-import Link from "next/link";
+import BuscarAtualizacoesButton from "@/components/dashboard/atualizacoes-legais/buscar-button";
 
 export const metadata = {
   title: "Atualizações Legais — LiderAdv",
@@ -97,12 +97,7 @@ export default async function AtualizacoesLegaisPage() {
               ⚠ {altoImpacto} de alto impacto
             </span>
           )}
-          <Link
-            href="/api/cron/atualizacoes-legais"
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-muted hover:bg-slate-50 transition-colors"
-          >
-            ↻ Buscar agora
-          </Link>
+          <BuscarAtualizacoesButton />
         </div>
       </div>
 

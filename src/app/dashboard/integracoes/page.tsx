@@ -10,6 +10,11 @@ export default async function IntegracoesPage() {
   const user = await getSession();
   if (!user || !hasPermission(user, "gerenciador", "ver")) notFound();
 
+  const tramitaSyncAtivo = !!(
+    process.env.TRAMITASIGN_LOGIN_EMAIL &&
+    process.env.TRAMITASIGN_LOGIN_PASSWORD
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -21,7 +26,7 @@ export default async function IntegracoesPage() {
           calendário e assinaturas.
         </p>
       </div>
-      <IntegracoesContent />
+      <IntegracoesContent tramitaSyncAtivo={tramitaSyncAtivo} />
     </div>
   );
 }

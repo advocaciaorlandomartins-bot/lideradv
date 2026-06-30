@@ -722,7 +722,11 @@ interface GoogleStatus {
   email: string | null;
 }
 
-export default function IntegracoesContent() {
+export default function IntegracoesContent({
+  tramitaSyncAtivo = false,
+}: {
+  tramitaSyncAtivo?: boolean;
+}) {
   const [asaasConfig, setAsaasConfig] = useState<AsaasConfig | null>(null);
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
   const [emailStatus, setEmailStatus] = useState<EmailInboundStatus | null>(
@@ -900,23 +904,47 @@ export default function IntegracoesContent() {
         <IntegrationCard
           logo={<LogoTramitaSign />}
           name="TramitaSign"
-          status={
-            typeof window === "undefined"
-              ? "em_breve"
-              : process.env.NEXT_PUBLIC_TRAMITASIGN_ATIVO === "true"
-                ? "conectado"
-                : "em_breve"
-          }
-          description="Assinaturas digitais com validade jurídica via tramitacaointeligente.com.br. Clientes assinam pelo WhatsApp ou e-mail."
+          status={tramitaSyncAtivo ? "conectado" : "nao_configurado"}
+          description="Monitoramento automático de publicações (TRF5, TJAL, TRT19) e assinaturas digitais via tramitacaointeligente.com.br."
         >
-          <a
-            href="https://planilha.tramitacaointeligente.com.br/assinaturas"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 font-body text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
-          >
-            Acessar painel
-          </a>
+          {tramitaSyncAtivo ? (
+            <div className="space-y-2">
+              <p className="text-xs text-emerald-700 font-medium">
+                ✓ Sincronização automática ativa — publicações importadas
+                diariamente às 8h.
+              </p>
+              <a
+                href="https://planilha.tramitacaointeligente.com.br"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 font-body text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+              >
+                Acessar painel
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-amber-700">
+                Configure{" "}
+                <code className="bg-amber-100 px-1 rounded">
+                  TRAMITASIGN_LOGIN_EMAIL
+                </code>{" "}
+                e{" "}
+                <code className="bg-amber-100 px-1 rounded">
+                  TRAMITASIGN_LOGIN_PASSWORD
+                </code>{" "}
+                no Vercel para ativar a sincronização automática de publicações.
+              </p>
+              <a
+                href="https://planilha.tramitacaointeligente.com.br"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 font-body text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+              >
+                Acessar painel
+              </a>
+            </div>
+          )}
         </IntegrationCard>
       </div>
 

@@ -100,17 +100,30 @@ function parseRssItems(xml: string, fonte: string): RssItem[] {
   return items;
 }
 
-async function buscarRSS(url: string, fonte: string): Promise<RssItem[]> {
+async function buscarRSS(
+  url: string,
+  fonte: string
+): Promise<{ items: RssItem[]; status: number; erro?: string }> {
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": "LiderAdv/1.0" },
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; LiderAdv/1.0; +https://lideradv.vercel.app)",
+        Accept: "application/rss+xml, application/xml, text/xml, */*",
+      },
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok)
+      return { items: [], status: res.status, erro: `HTTP ${res.status}` };
     const xml = await res.text();
-    return parseRssItems(xml, fonte);
-  } catch {
-    return [];
+    const items = parseRssItems(xml, fonte);
+    return { items, status: res.status };
+  } catch (e) {
+    return {
+      items: [],
+      status: 0,
+      erro: e instanceof Error ? e.message : String(e),
+    };
   }
 }
 
@@ -214,6 +227,13 @@ export async function GET(req: Request) {
     novos: 0,
     erros: 0,
     fontes: [] as string[],
+    debug: [] as {
+      fonte: string;
+      url: string;
+      status: number;
+      itens: number;
+      erro?: string;
+    }[],
   };
   const vistos = new Set<string>();
 
@@ -294,42 +314,68 @@ export async function GET(req: Request) {
     }
   }
 
-  // 2. INSS Notícias RSS (sempre ativo, sem chave)
-  resultados.fontes.push("INSS/gov.br");
-  const inssItems = await buscarRSS(
-    "https://www.gov.br/inss/pt-br/noticias/RSS",
-    "inss_noticias"
-  );
-  for (const item of inssItems.slice(0, 20)) {
-    await processarItem(
-      item.link || item.titulo,
-      item.titulo,
-      item.descricao.replace(/<[^>]+>/g, "").slice(0, 800),
-      item.link || null,
-      "INSS",
-      null,
-      "diario_oficial",
-      "inss_noticias"
-    );
-  }
+  // RSS feeds gov.br — tentamos múltiplas URLs por fonte
+  const RSS_SOURCES = [
+    {
+      label: "INSS/gov.br",
+      orgao: "INSS",
+      fonte: "inss_noticias",
+      urls: [
+        "https://www.gov.br/inss/pt-br/@@search?portal_type=News+Item&sort_on=Date&sort_order=reverse&RSS=1",
+        "https://www.gov.br/inss/pt-br/noticias/RSS",
+        "https://www.gov.br/inss/pt-br/noticias?b_start:int=0&RSS=1",
+      ],
+    },
+    {
+      label: "Previdência/gov.br",
+      orgao: "Previdência Social",
+      fonte: "previdencia_noticias",
+      urls: [
+        "https://www.gov.br/previdencia/pt-br/@@search?portal_type=News+Item&sort_on=Date&sort_order=reverse&RSS=1",
+        "https://www.gov.br/previdencia/pt-br/noticias-e-conteudos/previdencia-social/noticias/RSS",
+        "https://www.gov.br/previdencia/pt-br/assuntos/noticias?RSS=1",
+      ],
+    },
+    {
+      label: "Trabalho/gov.br",
+      orgao: "Ministério do Trabalho e Previdência",
+      fonte: "trabalho_noticias",
+      urls: [
+        "https://www.gov.br/trabalho-e-emprego/pt-br/@@search?portal_type=News+Item&sort_on=Date&sort_order=reverse&RSS=1",
+      ],
+    },
+  ];
 
-  // 3. Previdência Social RSS (sempre ativo, sem chave)
-  resultados.fontes.push("Previdência/gov.br");
-  const prevItems = await buscarRSS(
-    "https://www.gov.br/previdencia/pt-br/noticias-e-conteudos/previdencia-social/noticias/RSS",
-    "previdencia_noticias"
-  );
-  for (const item of prevItems.slice(0, 15)) {
-    await processarItem(
-      item.link || item.titulo,
-      item.titulo,
-      item.descricao.replace(/<[^>]+>/g, "").slice(0, 800),
-      item.link || null,
-      "Previdência Social",
-      null,
-      "diario_oficial",
-      "previdencia_noticias"
-    );
+  for (const src of RSS_SOURCES) {
+    resultados.fontes.push(src.label);
+    let found = false;
+    for (const url of src.urls) {
+      const { items, status, erro } = await buscarRSS(url, src.fonte);
+      resultados.debug.push({
+        fonte: src.label,
+        url,
+        status,
+        itens: items.length,
+        erro,
+      });
+      if (items.length > 0) {
+        found = true;
+        for (const item of items.slice(0, 20)) {
+          await processarItem(
+            item.link || item.titulo,
+            item.titulo,
+            item.descricao.replace(/<[^>]+>/g, "").slice(0, 800),
+            item.link || null,
+            src.orgao,
+            null,
+            "diario_oficial",
+            src.fonte
+          );
+        }
+        break; // URL funcionou — não precisa tentar as outras
+      }
+      if (found) break;
+    }
   }
 
   return NextResponse.json({ ok: true, data: dataStr, ...resultados });

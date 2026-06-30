@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { getControles } from "@/lib/controles-db";
 import { getTipoConfig } from "@/lib/controles-types";
 import ControlesContent from "@/components/dashboard/controles/controles-content";
+import ControlesSectionNav from "@/components/dashboard/controles/section-nav";
 
 export const metadata = { title: "Controles — LiderAdv" };
 export const dynamic = "force-dynamic";
@@ -79,6 +80,8 @@ export default async function ControlesPage({
           + {tipoConfig.label_novo}
         </Link>
       </div>
+
+      <ControlesSectionNav />
 
       <ControlesContent
         controles={controles}

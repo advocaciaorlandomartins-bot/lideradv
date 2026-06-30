@@ -92,12 +92,6 @@ const GROUPS: {
         label: "Controles",
         modulo: "controles",
       },
-      {
-        href: "/dashboard/pericias",
-        icon: ScalesIcon,
-        label: "Perícias",
-        modulo: "controles",
-      },
     ],
   },
   {
@@ -279,9 +273,13 @@ export default function Sidebar({
   })).filter((group) => group.visibleItems.length > 0);
 
   function isActive(href: string) {
-    return href === "/dashboard"
-      ? pathname === "/dashboard"
-      : pathname.startsWith(href);
+    if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/dashboard/controles")
+      return (
+        pathname.startsWith("/dashboard/controles") ||
+        pathname.startsWith("/dashboard/pericias")
+      );
+    return pathname.startsWith(href);
   }
 
   const initials = user.login.slice(0, 2).toUpperCase();

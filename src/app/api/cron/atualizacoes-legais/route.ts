@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
+import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -192,10 +193,14 @@ impacto baixo = informativo sem efeito prático imediato`,
 // ─── Handler principal ────────────────────────────────────────────────────────
 
 export async function GET(req: Request) {
+  // Aceita: CRON_SECRET via header (Vercel) OU sessão de administrador (manual)
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
+  const auth = req.headers.get("authorization");
+  const isVercel = secret && auth === `Bearer ${secret}`;
+
+  if (!isVercel) {
+    const session = await getSession();
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
     }
   }

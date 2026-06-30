@@ -5,9 +5,13 @@ import {
   buscarMovimentosPorProcesso,
 } from "@/lib/datajud";
 import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
+import {
+  sincronizarTramitaSign,
+  tramitaSyncAtivo,
+} from "@/lib/tramitasign-sync";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET(request: Request) {
   // Autenticação do cron (Vercel define CRON_SECRET automaticamente)
@@ -108,22 +112,36 @@ export async function GET(request: Request) {
       processosResultados.push({ numero: String(proc.numero), inseridos });
   }
 
-  // TramitaSign: recebe via webhook em /api/webhooks/tramitasign/publicacoes
-  // (sessão web bloqueada por IP fora do Brasil — Vercel = EUA)
+  // TramitaSign: sincronização via login (se credenciais configuradas)
+  let tramitaResult: { inseridos: number; pulados: number; erro?: string } = {
+    inseridos: 0,
+    pulados: 0,
+  };
+  if (tramitaSyncAtivo()) {
+    tramitaResult = await sincronizarTramitaSign();
+  }
 
   return NextResponse.json({
     ok: true,
     oabs_verificadas: rows.length,
-    publicacoes_novas: totalInseridos + processoInseridos,
+    publicacoes_novas:
+      totalInseridos + processoInseridos + tramitaResult.inseridos,
     detalhes: {
       por_oab: resultados,
       por_processo: processosResultados,
       processos_monitorados: processos.length,
-      tramitasign: {
-        modo: "webhook",
-        url: "https://lideradv.vercel.app/api/webhooks/tramitasign/publicacoes",
-        nota: "Configure este webhook no painel do TramitaSign para receber publicações do TRF5 e demais tribunais",
-      },
+      tramitasign: tramitaSyncAtivo()
+        ? {
+            modo: "login_sync",
+            inseridos: tramitaResult.inseridos,
+            pulados: tramitaResult.pulados,
+            erro: tramitaResult.erro,
+          }
+        : {
+            modo: "webhook",
+            url: "https://lideradv.vercel.app/api/webhooks/tramitasign/publicacoes",
+            nota: "Configure TRAMITASIGN_LOGIN_EMAIL e TRAMITASIGN_LOGIN_PASSWORD no Vercel para sincronização automática",
+          },
       dje_esaj: {
         estados_suportados: [
           "AL",

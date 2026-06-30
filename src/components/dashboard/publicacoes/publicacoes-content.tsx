@@ -329,17 +329,20 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
 
+  const isAutomatica = (origem: string) =>
+    origem === "automatica" || origem === "tramitasign";
+
   const naoLidas = useMemo(
     () =>
       publicacoes.filter(
-        (p) => p.status === "nao_lida" && p.origem === "automatica"
+        (p) => p.status === "nao_lida" && isAutomatica(p.origem)
       ),
     [publicacoes]
   );
   const tratadas = useMemo(
     () =>
       publicacoes.filter(
-        (p) => p.status === "tratada" && p.origem === "automatica"
+        (p) => p.status === "tratada" && isAutomatica(p.origem)
       ),
     [publicacoes]
   );

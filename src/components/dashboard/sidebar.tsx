@@ -81,16 +81,16 @@ const GROUPS: {
         modulo: "publicacoes",
       },
       {
-        href: "/dashboard/atualizacoes-legais",
-        icon: BellAlertIcon,
-        label: "Leis & DOU",
-        modulo: null,
-      },
-      {
         href: "/dashboard/controles",
         icon: ClipboardListIcon,
         label: "Controles",
         modulo: "controles",
+      },
+      {
+        href: "/dashboard/atualizacoes-legais",
+        icon: BellAlertIcon,
+        label: "Leis & DOU",
+        modulo: null,
       },
     ],
   },

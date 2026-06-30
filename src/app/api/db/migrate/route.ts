@@ -16,7 +16,10 @@ export async function GET() {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
   if (session.categoria !== "Administrador(a)") {
-    return NextResponse.json({ error: "Acesso restrito a administradores." }, { status: 403 });
+    return NextResponse.json(
+      { error: "Acesso restrito a administradores." },
+      { status: 403 }
+    );
   }
 
   const migrations: { name: string; ok: boolean; error?: string }[] = [];
@@ -216,6 +219,42 @@ export async function GET() {
     "testes_comportamentais.idx_created_at",
     () =>
       sql`CREATE INDEX IF NOT EXISTS testes_comportamentais_created_at_idx ON testes_comportamentais (created_at DESC)`
+  );
+
+  await run(
+    "atualizacoes_legais",
+    () => sql`
+      CREATE TABLE IF NOT EXISTS atualizacoes_legais (
+        id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        titulo                TEXT        NOT NULL,
+        resumo                TEXT,
+        url                   TEXT,
+        data_publicacao       DATE        NOT NULL,
+        secao_dou             TEXT,
+        orgao                 TEXT,
+        tipo                  TEXT        NOT NULL DEFAULT 'diario_oficial',
+        impacto               TEXT        NOT NULL DEFAULT 'baixo',
+        analise_ia            TEXT,
+        o_que_muda            TEXT,
+        acao_recomendada      TEXT,
+        tipos_afetados        TEXT[]      NOT NULL DEFAULT '{}',
+        lida                  BOOLEAN     NOT NULL DEFAULT FALSE,
+        fonte                 TEXT        NOT NULL DEFAULT 'dou',
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `
+  );
+
+  await run(
+    "atualizacoes_legais.idx_data",
+    () =>
+      sql`CREATE INDEX IF NOT EXISTS atualizacoes_legais_data_idx ON atualizacoes_legais (data_publicacao DESC, impacto)`
+  );
+
+  await run(
+    "atualizacoes_legais.idx_lida",
+    () =>
+      sql`CREATE INDEX IF NOT EXISTS atualizacoes_legais_lida_idx ON atualizacoes_legais (lida) WHERE lida = FALSE`
   );
 
   const allOk = migrations.every((m) => m.ok);

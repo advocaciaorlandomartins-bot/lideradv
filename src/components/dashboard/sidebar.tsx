@@ -31,6 +31,7 @@ import {
   ChevronRightIcon,
   CheckCircleIcon,
   IdentificationIcon,
+  BellAlertIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -78,6 +79,12 @@ const GROUPS: {
         icon: InboxArrowDownIcon,
         label: "Publicações",
         modulo: "publicacoes",
+      },
+      {
+        href: "/dashboard/atualizacoes-legais",
+        icon: BellAlertIcon,
+        label: "Leis & DOU",
+        modulo: null,
       },
       {
         href: "/dashboard/controles",

@@ -18,15 +18,19 @@ export default function BuscarAtualizacoesButton() {
         credentials: "include",
       });
       const data = await res.json();
+      console.log("[Leis & DOU] debug:", JSON.stringify(data.debug, null, 2));
       if (data.ok) {
         const novos = data.novos ?? 0;
+        const buscados = data.buscados ?? 0;
         setMsg(
           novos > 0
             ? `${novos} nova${novos > 1 ? "s" : ""} publicação${novos > 1 ? "ões" : ""} encontrada${novos > 1 ? "s" : ""}!`
-            : "Nenhuma publicação nova hoje."
+            : buscados === 0
+              ? "Fontes sem resposta. Verifique console (F12)."
+              : "Nenhuma publicação nova hoje."
         );
-        setEstado("ok");
-        router.refresh();
+        setEstado(buscados === 0 ? "erro" : "ok");
+        if (buscados > 0) router.refresh();
       } else {
         setMsg(data.error ?? data.msg ?? "Erro desconhecido.");
         setEstado("erro");

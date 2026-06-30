@@ -314,16 +314,33 @@ export async function GET(req: Request) {
     }
   }
 
-  // RSS feeds gov.br — tentamos múltiplas URLs por fonte
+  // RSS feeds — Google News (acessível de datacenter) + gov.br como fallback
   const RSS_SOURCES = [
+    {
+      label: "Google News INSS",
+      orgao: "INSS",
+      fonte: "google_news_inss",
+      urls: [
+        "https://news.google.com/rss/search?q=INSS+instru%C3%A7%C3%A3o+normativa+portaria&hl=pt-BR&gl=BR&ceid=BR%3Apt-419",
+        "https://news.google.com/rss/search?q=INSS+previd%C3%AAncia+social+lei&hl=pt-BR&gl=BR&ceid=BR%3Apt-419",
+      ],
+    },
+    {
+      label: "Google News Previdência",
+      orgao: "Previdência Social",
+      fonte: "google_news_previdencia",
+      urls: [
+        "https://news.google.com/rss/search?q=previd%C3%AAncia+social+reforma+benef%C3%ADcio&hl=pt-BR&gl=BR&ceid=BR%3Apt-419",
+        "https://news.google.com/rss/search?q=aposentadoria+aux%C3%ADlio-doen%C3%A7a+BPC+LOAS+lei&hl=pt-BR&gl=BR&ceid=BR%3Apt-419",
+      ],
+    },
     {
       label: "INSS/gov.br",
       orgao: "INSS",
       fonte: "inss_noticias",
       urls: [
-        "https://www.gov.br/inss/pt-br/@@search?portal_type=News+Item&sort_on=Date&sort_order=reverse&RSS=1",
         "https://www.gov.br/inss/pt-br/noticias/RSS",
-        "https://www.gov.br/inss/pt-br/noticias?b_start:int=0&RSS=1",
+        "https://www.gov.br/inss/pt-br/@@search?portal_type=News+Item&sort_on=Date&sort_order=reverse&RSS=1",
       ],
     },
     {
@@ -331,17 +348,8 @@ export async function GET(req: Request) {
       orgao: "Previdência Social",
       fonte: "previdencia_noticias",
       urls: [
-        "https://www.gov.br/previdencia/pt-br/@@search?portal_type=News+Item&sort_on=Date&sort_order=reverse&RSS=1",
         "https://www.gov.br/previdencia/pt-br/noticias-e-conteudos/previdencia-social/noticias/RSS",
-        "https://www.gov.br/previdencia/pt-br/assuntos/noticias?RSS=1",
-      ],
-    },
-    {
-      label: "Trabalho/gov.br",
-      orgao: "Ministério do Trabalho e Previdência",
-      fonte: "trabalho_noticias",
-      urls: [
-        "https://www.gov.br/trabalho-e-emprego/pt-br/@@search?portal_type=News+Item&sort_on=Date&sort_order=reverse&RSS=1",
+        "https://www.gov.br/previdencia/pt-br/@@search?portal_type=News+Item&sort_on=Date&sort_order=reverse&RSS=1",
       ],
     },
   ];

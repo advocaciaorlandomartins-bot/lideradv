@@ -170,83 +170,86 @@ export async function adicionarOabTramitaSign(
   const cookie = await loginTramitaSign(email, password);
   if (!cookie) return { ok: false, erro: "Falha no login do TramitaSign" };
 
-  // Busca a página de OABs para obter o CSRF token
-  const pageCandidates = ["/advogados", "/oabs", "/monitoramentos"];
+  const CONFIG_PAGE = "/publicacoes/configuracoes";
+
+  // Busca página de configuração para obter CSRF token
   let csrf = "";
   let pageCookie = cookie;
-
-  for (const path of pageCandidates) {
-    try {
-      const res = await fetch(`${TRAMITA_BASE}${path}`, {
-        headers: { Cookie: cookie, "User-Agent": "Mozilla/5.0 LiderAdv/1.0" },
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!res.ok) continue;
+  try {
+    const res = await fetch(`${TRAMITA_BASE}${CONFIG_PAGE}`, {
+      headers: { Cookie: cookie, "User-Agent": "Mozilla/5.0 LiderAdv/1.0" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.ok) {
       const html = await res.text();
-      const token = html.match(/csrf-token" content="([^"]+)"/)?.[1];
-      if (token) {
-        csrf = token;
-        const newCookies = res.headers.getSetCookie?.() ?? [];
-        if (newCookies.length > 0)
-          pageCookie = newCookies
-            .map((c: string) => c.split(";")[0])
-            .join("; ");
-        break;
+      csrf = html.match(/csrf-token" content="([^"]+)"/)?.[1] ?? "";
+      // Inertia pode emitir o token no JSON da página também
+      if (!csrf) {
+        const inertia = extrairJsonInertia(html) as {
+          props?: { csrf_token?: string };
+        } | null;
+        csrf = inertia?.props?.csrf_token ?? "";
       }
-    } catch {
-      continue;
+      const newCookies = res.headers.getSetCookie?.() ?? [];
+      if (newCookies.length > 0)
+        pageCookie = newCookies.map((c: string) => c.split(";")[0]).join("; ");
     }
+  } catch (e) {
+    console.error(
+      "[TramitaSync] adicionarOab: erro ao buscar página de config:",
+      e
+    );
   }
 
   if (!csrf) {
     console.error(
-      "[TramitaSync] adicionarOab: CSRF não encontrado — verifique a URL de OABs do TramitaSign"
+      "[TramitaSync] adicionarOab: CSRF não encontrado em /publicacoes/configuracoes"
     );
-    return { ok: false, erro: "Página de OABs não encontrada no TramitaSign" };
+    return {
+      ok: false,
+      erro: "CSRF não encontrado na página de configurações",
+    };
   }
 
-  // Tenta submeter o formulário de cadastro de OAB
-  const oabNumeroLimpo = numero.replace(/\D/g, "");
-  const postCandidates = ["/advogados", "/oabs", "/monitoramentos"];
-  for (const path of postCandidates) {
-    try {
-      const res = await fetch(`${TRAMITA_BASE}${path}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Cookie: pageCookie,
-          "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
-          "X-CSRF-Token": csrf,
-        },
-        redirect: "manual",
-        body: new URLSearchParams({
-          authenticity_token: csrf,
-          "advogado[numero_oab]": oabNumeroLimpo,
-          "advogado[uf_oab]": estado.toUpperCase(),
-          "advogado[nome]": nomeAdvogado,
-          "oab[numero]": oabNumeroLimpo,
-          "oab[estado]": estado.toUpperCase(),
-          "monitoramento[numero_oab]": oabNumeroLimpo,
-          "monitoramento[uf_oab]": estado.toUpperCase(),
-        }).toString(),
-        signal: AbortSignal.timeout(15000),
-      });
-      // 201 Created, 200 OK ou 302 redirect = sucesso
-      if (res.status === 201 || res.status === 200 || res.status === 302) {
-        console.log(
-          `[TramitaSync] OAB ${numero}/${estado} cadastrada no TramitaSign via ${path}`
-        );
-        return { ok: true };
-      }
-    } catch {
-      continue;
+  // Submete o formulário "Cadastrar nova OAB"
+  // Número formatado como o TramitaSign exibe: "14.381" (com ponto)
+  const numeroFormatado = numero
+    .replace(/\D/g, "")
+    .replace(/(\d+)(\d{3})$/, "$1.$2");
+  try {
+    const res = await fetch(`${TRAMITA_BASE}${CONFIG_PAGE}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: pageCookie,
+        "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
+        "X-CSRF-Token": csrf,
+        Referer: `${TRAMITA_BASE}${CONFIG_PAGE}`,
+      },
+      redirect: "manual",
+      body: new URLSearchParams({
+        authenticity_token: csrf,
+        "oab[numero]": numeroFormatado,
+        "oab[uf]": estado.toUpperCase(),
+        "oab[nome]": nomeAdvogado,
+      }).toString(),
+      signal: AbortSignal.timeout(15000),
+    });
+    // 201, 200 ou 302 (redirect após POST) = sucesso
+    if (res.status === 200 || res.status === 201 || res.status === 302) {
+      console.log(
+        `[TramitaSync] OAB ${numero}/${estado} cadastrada no TramitaSign`
+      );
+      return { ok: true };
     }
+    console.error(
+      `[TramitaSync] adicionarOab: HTTP ${res.status} ao cadastrar OAB`
+    );
+    return { ok: false, erro: `HTTP ${res.status}` };
+  } catch (e) {
+    console.error("[TramitaSync] adicionarOab: erro no POST:", e);
+    return { ok: false, erro: e instanceof Error ? e.message : String(e) };
   }
-
-  console.error(
-    `[TramitaSync] adicionarOab: nenhum endpoint respondeu para OAB ${numero}/${estado}`
-  );
-  return { ok: false, erro: "Endpoint de cadastro de OAB não respondeu" };
 }
 
 export async function sincronizarTramitaSign(): Promise<{

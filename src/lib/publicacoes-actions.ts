@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import Anthropic from "@anthropic-ai/sdk";
+import { adicionarOabTramitaSign, tramitaSyncAtivo } from "./tramitasign-sync";
 
 // ── Publicações ───────────────────────────────────────────────────────────────
 
@@ -53,6 +54,21 @@ export async function adicionarOabAction(data: {
       SET ativa = true,
           nome_advogado = EXCLUDED.nome_advogado
   `;
+
+  // Registra automaticamente no TramitaSign se credenciais configuradas
+  if (tramitaSyncAtivo()) {
+    adicionarOabTramitaSign(
+      numero.trim().toUpperCase(),
+      estado.trim().toUpperCase(),
+      nome_advogado.trim()
+    ).then((r) => {
+      if (!r.ok)
+        console.warn(
+          `[TramitaSync] OAB ${numero}/${estado} não registrada automaticamente: ${r.erro}`
+        );
+    });
+  }
+
   revalidatePath("/dashboard/publicacoes");
 }
 

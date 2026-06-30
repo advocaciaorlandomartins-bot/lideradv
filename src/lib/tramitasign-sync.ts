@@ -170,20 +170,17 @@ export async function adicionarOabTramitaSign(
   const cookie = await loginTramitaSign(email, password);
   if (!cookie) return { ok: false, erro: "Falha no login do TramitaSign" };
 
-  const CONFIG_PAGE = "/publicacoes/configuracoes";
-
-  // Busca página de configuração para obter CSRF token
+  // Busca a página principal para obter CSRF token (Inertia/Vite app)
   let csrf = "";
   let pageCookie = cookie;
   try {
-    const res = await fetch(`${TRAMITA_BASE}${CONFIG_PAGE}`, {
+    const res = await fetch(`${TRAMITA_BASE}/publicacoes/configuracoes`, {
       headers: { Cookie: cookie, "User-Agent": "Mozilla/5.0 LiderAdv/1.0" },
       signal: AbortSignal.timeout(15000),
     });
     if (res.ok) {
       const html = await res.text();
       csrf = html.match(/csrf-token" content="([^"]+)"/)?.[1] ?? "";
-      // Inertia pode emitir o token no JSON da página também
       if (!csrf) {
         const inertia = extrairJsonInertia(html) as {
           props?: { csrf_token?: string };
@@ -195,59 +192,48 @@ export async function adicionarOabTramitaSign(
         pageCookie = newCookies.map((c: string) => c.split(";")[0]).join("; ");
     }
   } catch (e) {
-    console.error(
-      "[TramitaSync] adicionarOab: erro ao buscar página de config:",
-      e
-    );
+    console.error("[TramitaSync] adicionarOab: erro ao buscar CSRF:", e);
   }
 
-  if (!csrf) {
-    console.error(
-      "[TramitaSync] adicionarOab: CSRF não encontrado em /publicacoes/configuracoes"
-    );
-    return {
-      ok: false,
-      erro: "CSRF não encontrado na página de configurações",
-    };
-  }
-
-  // Submete o formulário "Cadastrar nova OAB"
-  // Número formatado como o TramitaSign exibe: "14.381" (com ponto)
-  const numeroFormatado = numero
-    .replace(/\D/g, "")
-    .replace(/(\d+)(\d{3})$/, "$1.$2");
+  // Endpoint real confirmado via Network tab: POST /oabs (XHR/JSON)
+  const numeroLimpo = numero.replace(/\D/g, "");
   try {
-    const res = await fetch(`${TRAMITA_BASE}${CONFIG_PAGE}`, {
+    const body: Record<string, string> = {
+      uf: estado.toUpperCase(),
+      numero: numeroLimpo,
+    };
+    if (nomeAdvogado) body.nome = nomeAdvogado;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Cookie: pageCookie,
+      "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
+      Accept: "application/json, text/plain, */*",
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: `${TRAMITA_BASE}/publicacoes/configuracoes`,
+    };
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+
+    const res = await fetch(`${TRAMITA_BASE}/oabs`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: pageCookie,
-        "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
-        "X-CSRF-Token": csrf,
-        Referer: `${TRAMITA_BASE}${CONFIG_PAGE}`,
-      },
-      redirect: "manual",
-      body: new URLSearchParams({
-        authenticity_token: csrf,
-        "oab[numero]": numeroFormatado,
-        "oab[uf]": estado.toUpperCase(),
-        "oab[nome]": nomeAdvogado,
-      }).toString(),
+      headers,
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
     });
-    // 201, 200 ou 302 (redirect após POST) = sucesso
-    if (res.status === 200 || res.status === 201 || res.status === 302) {
+
+    if (res.ok || res.status === 201 || res.status === 302) {
       console.log(
         `[TramitaSync] OAB ${numero}/${estado} cadastrada no TramitaSign`
       );
       return { ok: true };
     }
+    const txt = await res.text().catch(() => "");
     console.error(
-      `[TramitaSync] adicionarOab: HTTP ${res.status} ao cadastrar OAB`
+      `[TramitaSync] adicionarOab: HTTP ${res.status} — ${txt.slice(0, 200)}`
     );
     return { ok: false, erro: `HTTP ${res.status}` };
   } catch (e) {
-    console.error("[TramitaSync] adicionarOab: erro no POST:", e);
+    console.error("[TramitaSync] adicionarOab: erro no POST /oabs:", e);
     return { ok: false, erro: e instanceof Error ? e.message : String(e) };
   }
 }

@@ -101,6 +101,34 @@ export async function createLancamentoAction(
   if (mensalidade && (isNaN(valorMensalidade) || valorMensalidade <= 0))
     return { error: "Informe o valor da mensalidade." };
 
+  // ── Caminho especial: aguardando resultado ────────────────────────────────
+  // Ignora modo de pagamento e cria sempre uma entrada única com data sentinela.
+  if (status === "aguardando_resultado") {
+    try {
+      await sql`
+        INSERT INTO lancamentos
+          (tipo, categoria, descricao, valor, client_id, processo_id,
+           status, data_vencimento, observacoes)
+        VALUES
+          (${tipo}, ${categoria}, ${descricao}, ${valor},
+           ${clientId ? clientId : null}::uuid,
+           ${processoId ? processoId : null}::uuid,
+           'aguardando_resultado', '9999-12-31'::date, ${observacoes})
+      `;
+    } catch (err) {
+      console.error("createLancamentoAction aguardando error:", err);
+      return { error: "Erro ao salvar lançamento. Tente novamente." };
+    }
+    const rawRedirect = (
+      (formData.get("redirect_to") as string | null) ?? ""
+    ).trim();
+    const redirectTo = rawRedirect.startsWith("/")
+      ? rawRedirect
+      : "/dashboard/financeiro";
+    revalidatePath("/dashboard/financeiro");
+    redirect(redirectTo);
+  }
+
   // Calculate commission if applicable
   const shouldCreateComissao =
     tipo === "entrada" &&

@@ -732,27 +732,6 @@ export default function NewLancamentoForm({
             </Field>
           )}
         </div>
-
-        {tipo === "entrada" && !jaRecebida && (
-          <label className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 transition-colors hover:bg-amber-100">
-            <input
-              type="checkbox"
-              checked={aguardandoResultado}
-              onChange={(e) => setAguardandoResultado(e.target.checked)}
-              disabled={isPending}
-              className="h-4 w-4 flex-shrink-0 cursor-pointer accent-amber-600"
-            />
-            <div>
-              <p className="font-body text-sm font-semibold text-amber-900">
-                Aguardando resultado — sem data de pagamento
-              </p>
-              <p className="font-body text-xs text-amber-700">
-                Use quando o valor foi combinado mas a data depende do resultado
-                (judicial ou administrativo)
-              </p>
-            </div>
-          </label>
-        )}
       </div>
 
       {/* ── Valores e pagamento ── */}
@@ -1643,6 +1622,28 @@ export default function NewLancamentoForm({
               </>
             )}
           </div>
+
+          {/* Aguardando resultado */}
+          {tipo === "entrada" && !jaRecebida && (
+            <label className="flex w-full cursor-pointer items-center gap-3 rounded-xl border-2 border-amber-200 bg-amber-50 px-4 py-3.5 transition-colors hover:bg-amber-100">
+              <input
+                type="checkbox"
+                checked={aguardandoResultado}
+                onChange={(e) => setAguardandoResultado(e.target.checked)}
+                disabled={isPending}
+                className="h-4 w-4 flex-shrink-0 cursor-pointer accent-amber-600"
+              />
+              <div>
+                <p className="font-body text-sm font-semibold text-amber-900">
+                  Aguardando resultado — sem data de pagamento
+                </p>
+                <p className="font-body text-xs text-amber-700">
+                  Use quando o valor foi combinado mas a data depende do
+                  resultado (judicial ou administrativo)
+                </p>
+              </div>
+            </label>
+          )}
 
           {/* Já recebida / paga */}
           <label

@@ -736,7 +736,20 @@ function AguardandoSection({
   canEdit: boolean;
   fmt: (v: number) => string;
 }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleDelete(id: string) {
+    if (!confirm("Excluir este lançamento aguardando resultado?")) return;
+    setDeletingId(id);
+    startTransition(async () => {
+      await deleteLancamentoAction(id);
+      router.refresh();
+      setDeletingId(null);
+    });
+  }
   const visible = expanded ? lista : lista.slice(0, AGUARDANDO_LIMIT);
   const hidden = lista.length - AGUARDANDO_LIMIT;
 
@@ -791,6 +804,14 @@ function AguardandoSection({
                     >
                       Editar
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(l.id)}
+                      disabled={isPending && deletingId === l.id}
+                      className="rounded border border-red-200 bg-white px-2.5 py-1 font-body text-[11px] text-red-500 hover:bg-red-50 disabled:opacity-40 cursor-pointer"
+                    >
+                      {isPending && deletingId === l.id ? "…" : "Excluir"}
+                    </button>
                   </div>
                 )}
               </td>

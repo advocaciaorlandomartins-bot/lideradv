@@ -11,7 +11,7 @@ export interface Lancamento {
   processo_id: string | null;
   processo_tipo: string | null;
   remuneracao_id: string | null;
-  status: "pendente" | "pago" | "cancelado";
+  status: "pendente" | "pago" | "cancelado" | "aguardando_resultado";
   data_vencimento: string;
   data_pagamento: string | null;
   parcela_atual: number | null;
@@ -34,7 +34,11 @@ function mapRow(r: any): Lancamento {
     processo_id: r.processo_id ?? null,
     processo_tipo: r.processo_tipo ?? null,
     remuneracao_id: r.remuneracao_id ?? null,
-    status: r.status as "pendente" | "pago" | "cancelado",
+    status: r.status as
+      | "pendente"
+      | "pago"
+      | "cancelado"
+      | "aguardando_resultado",
     data_vencimento: r.data_vencimento,
     data_pagamento: r.data_pagamento ?? null,
     parcela_atual: r.parcela_atual ?? null,

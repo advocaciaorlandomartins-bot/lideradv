@@ -490,6 +490,9 @@ export default function EditLancamentoForm({
               <option value="pendente">Pendente</option>
               <option value="pago">Pago</option>
               <option value="cancelado">Cancelado</option>
+              <option value="aguardando_resultado">
+                Aguardando resultado judicial
+              </option>
             </select>
           </Field>
         </div>
@@ -522,7 +525,12 @@ export default function EditLancamentoForm({
               name="data_vencimento"
               type="date"
               required
-              defaultValue={ddmmyyyyToISO(lancamento.data_vencimento)}
+              defaultValue={
+                lancamento.status === "aguardando_resultado"
+                  ? ""
+                  : ddmmyyyyToISO(lancamento.data_vencimento)
+              }
+              placeholder="A definir quando sair o resultado"
               disabled={isPending}
               className={inputClass}
             />

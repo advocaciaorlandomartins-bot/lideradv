@@ -202,7 +202,11 @@ export async function createLancamentoAction(
         parcelaLancamentoIds.push(rows[0].id as string);
       }
     } else if (!parcelado) {
-      const dataVenc = dataVencimento || todayBR();
+      // aguardando_resultado: usa data sentinela 9999-12-31 (data real será definida quando sair o resultado)
+      const dataVenc =
+        status === "aguardando_resultado"
+          ? "9999-12-31"
+          : dataVencimento || todayBR();
       const rows = await sql`
         INSERT INTO lancamentos
           (tipo, categoria, descricao, valor, client_id, processo_id,
@@ -374,8 +378,12 @@ export async function createLancamentoAction(
     return { error: "Erro ao salvar lançamento. Tente novamente." };
   }
 
-  const rawRedirect = ((formData.get("redirect_to") as string | null) ?? "").trim();
-  const redirectTo = rawRedirect.startsWith("/") ? rawRedirect : "/dashboard/financeiro";
+  const rawRedirect = (
+    (formData.get("redirect_to") as string | null) ?? ""
+  ).trim();
+  const redirectTo = rawRedirect.startsWith("/")
+    ? rawRedirect
+    : "/dashboard/financeiro";
 
   const valorFmt = valor.toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
@@ -434,6 +442,11 @@ export async function updateLancamentoAction(
     const remuneracaoId = current[0].remuneracao_id as string | null;
 
     const hoje = todayBR();
+    // Quando aguardando resultado, mantém a data sentinela 9999-12-31
+    const dataVencFinal =
+      status === "aguardando_resultado"
+        ? "9999-12-31"
+        : dataVencimento || todayBR();
     if (status === "pago" && oldStatus !== "pago") {
       await sql`
         UPDATE lancamentos SET
@@ -441,7 +454,7 @@ export async function updateLancamentoAction(
           valor = ${valor},
           client_id = ${clientId ? clientId : null}::uuid,
           processo_id = ${processoId ? processoId : null}::uuid,
-          status = ${status}, data_vencimento = ${dataVencimento}::date,
+          status = ${status}, data_vencimento = ${dataVencFinal}::date,
           data_pagamento = ${hoje}::date, observacoes = ${observacoes}
         WHERE id = ${id}::uuid
       `;
@@ -460,7 +473,7 @@ export async function updateLancamentoAction(
           valor = ${valor},
           client_id = ${clientId ? clientId : null}::uuid,
           processo_id = ${processoId ? processoId : null}::uuid,
-          status = ${status}, data_vencimento = ${dataVencimento}::date,
+          status = ${status}, data_vencimento = ${dataVencFinal}::date,
           data_pagamento = NULL, observacoes = ${observacoes}
         WHERE id = ${id}::uuid
       `;
@@ -471,7 +484,7 @@ export async function updateLancamentoAction(
           valor = ${valor},
           client_id = ${clientId ? clientId : null}::uuid,
           processo_id = ${processoId ? processoId : null}::uuid,
-          status = ${status}, data_vencimento = ${dataVencimento}::date,
+          status = ${status}, data_vencimento = ${dataVencFinal}::date,
           observacoes = ${observacoes}
         WHERE id = ${id}::uuid
       `;
@@ -633,6 +646,36 @@ export async function revertParaPendenteAction(id: string): Promise<void> {
     _cat: session?.categoria ? String(session.categoria) : undefined,
   });
   revalidatePath("/dashboard/financeiro");
+}
+
+export async function ativarLancamentoAction(
+  id: string,
+  dataVencimento: string
+): Promise<{ ok: boolean; erro?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { ok: false, erro: "Sem permissão." };
+  if (!dataVencimento)
+    return { ok: false, erro: "Informe a data de vencimento." };
+  try {
+    await sql`
+      UPDATE lancamentos
+      SET status = 'pendente', data_vencimento = ${dataVencimento}::date
+      WHERE id = ${id}::uuid AND status = 'aguardando_resultado'
+    `;
+  } catch (err) {
+    console.error("ativarLancamentoAction DB error:", err);
+    return { ok: false, erro: "Erro ao ativar lançamento." };
+  }
+  await logAction({
+    acao: "editar",
+    entidade: "lancamento",
+    entidadeId: id,
+    descricao: "Definiu data de vencimento — resultado confirmado",
+    detalhes: { dataVencimento },
+  });
+  revalidatePath("/dashboard/financeiro");
+  return { ok: true };
 }
 
 export async function deleteGrupoAction(grupoParcelas: string): Promise<void> {

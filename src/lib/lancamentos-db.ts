@@ -174,6 +174,7 @@ export async function getClientDebito(clientId: string): Promise<ClientDebito> {
     FROM lancamentos l
     WHERE l.client_id = ${clientId}::uuid
       AND l.status != 'cancelado'
+      AND l.status != 'aguardando_resultado'
     ORDER BY l.data_vencimento ASC NULLS LAST, l.created_at DESC
   `;
 
@@ -274,6 +275,7 @@ export async function getContasAReceber(): Promise<ContaCliente[]> {
     JOIN clients c ON c.id = l.client_id
     WHERE l.client_id IS NOT NULL
       AND l.status != 'cancelado'
+      AND l.status != 'aguardando_resultado'
     ORDER BY c.name, l.data_vencimento ASC NULLS LAST, l.created_at DESC
   `;
 

@@ -170,9 +170,12 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={(e) => e.target === e.currentTarget && handleClose()}
         >
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-white shadow-xl">
+          <div
+            className="flex w-full max-w-lg flex-col rounded-2xl border border-border bg-white shadow-xl"
+            style={{ maxHeight: "calc(100vh - 2rem)" }}
+          >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-6 py-4">
               <div className="flex items-center gap-2">
                 <DocumentTextIcon className="h-5 w-5 text-primary" />
                 <h2 className="font-heading text-lg font-semibold text-fg">
@@ -189,7 +192,7 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
             </div>
 
             {/* Body */}
-            <div className="px-6 py-5">
+            <div className="overflow-y-auto px-6 py-5">
               <p className="mb-4 font-body text-sm text-muted">
                 Selecione os modelos. Os dados de{" "}
                 <span className="font-semibold text-fg">{clientName}</span>{" "}
@@ -282,7 +285,7 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+            <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-4">
               <button
                 onClick={handleClose}
                 disabled={loading}

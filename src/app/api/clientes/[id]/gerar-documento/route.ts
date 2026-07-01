@@ -6,11 +6,13 @@ import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
 import { applyFundoTimbrado } from "@/lib/pdf-fundo";
 import { getSession } from "@/lib/session";
+import { getClientPendingEntradas } from "@/lib/lancamentos-db";
 import {
   ProcuracaoDoc,
   ContratoHonorariosDoc,
   DeclaracaoHipossuficienciaDoc,
   NotificacaoExtrajudicialDoc,
+  ComunicadoHonorariosDoc,
 } from "@/lib/pdf-templates";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +36,7 @@ const TEMPLATES = {
   },
 } as const;
 
-type TemplateKey = keyof typeof TEMPLATES;
+type TemplateKey = keyof typeof TEMPLATES | "comunicado_honorarios";
 
 export async function GET(
   request: Request,
@@ -48,7 +50,8 @@ export async function GET(
   const { searchParams } = new URL(request.url);
   const template = searchParams.get("template") as TemplateKey | null;
 
-  if (!template || !(template in TEMPLATES)) {
+  const validTemplates = [...Object.keys(TEMPLATES), "comunicado_honorarios"];
+  if (!template || !validTemplates.includes(template)) {
     return NextResponse.json({ error: "Template inválido." }, { status: 400 });
   }
 
@@ -74,13 +77,35 @@ export async function GET(
     year: "numeric",
   });
 
-  const { component, label } = TEMPLATES[template];
-  const doc = createElement(component, {
-    client,
-    date,
-    config: escritorioConfig,
-    logoData,
-  }) as ReactElement<DocumentProps>;
+  let doc: ReactElement<DocumentProps>;
+  let filename: string;
+
+  const safeName = client.name
+    .replace(/[^a-zA-Z0-9\s]/g, "")
+    .trim()
+    .replace(/\s+/g, "_");
+
+  if (template === "comunicado_honorarios") {
+    const lancamentos = await getClientPendingEntradas(id);
+    doc = createElement(ComunicadoHonorariosDoc, {
+      client,
+      lancamentos,
+      date,
+      config: escritorioConfig,
+      logoData,
+    }) as ReactElement<DocumentProps>;
+    filename = `Comunicado_de_Honorarios_${safeName}.pdf`;
+  } else {
+    const { component, label } = TEMPLATES[template as keyof typeof TEMPLATES];
+    doc = createElement(component, {
+      client,
+      date,
+      config: escritorioConfig,
+      logoData,
+    }) as ReactElement<DocumentProps>;
+    filename = `${label}_${safeName}.pdf`;
+  }
+
   let buffer = await renderToBuffer(doc);
   if (escritorioConfig.fundo_timbrado) {
     const withBg = await applyFundoTimbrado(
@@ -89,12 +114,6 @@ export async function GET(
     );
     buffer = Buffer.from(withBg);
   }
-
-  const safeName = client.name
-    .replace(/[^a-zA-Z0-9\s]/g, "")
-    .trim()
-    .replace(/\s+/g, "_");
-  const filename = `${label}_${safeName}.pdf`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {

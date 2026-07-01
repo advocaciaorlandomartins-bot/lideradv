@@ -12,7 +12,8 @@ type TemplateKey =
   | "procuracao"
   | "contrato_honorarios"
   | "declaracao_hipossuficiencia"
-  | "notificacao_extrajudicial";
+  | "notificacao_extrajudicial"
+  | "comunicado_honorarios";
 
 interface Template {
   key: TemplateKey;
@@ -47,6 +48,13 @@ const TEMPLATES: Template[] = [
     label: "Notificação Extrajudicial",
     description: "Notificação formal para cumprimento de obrigação ou direito",
     color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  {
+    key: "comunicado_honorarios",
+    label: "Comunicado de Honorários",
+    description:
+      "Detalha o plano de pagamento dos honorários pendentes do cliente",
+    color: "bg-amber-50 text-amber-700 border-amber-200",
   },
 ];
 

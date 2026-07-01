@@ -69,6 +69,8 @@ export async function createLancamentoAction(
   const numRecorrencias = parseInt(numRecorrenciasStr) || 12;
   const observacoes =
     ((formData.get("observacoes") as string | null) ?? "").trim() || null;
+  const cancelAguardando =
+    ((formData.get("cancel_aguardando") as string | null) ?? "").trim() || null;
   const valorMensalidadeStr = (
     (formData.get("valor_mensalidade") as string | null) ?? ""
   ).trim();
@@ -269,6 +271,14 @@ export async function createLancamentoAction(
         if (!firstLancamentoId) firstLancamentoId = rows[0].id as string;
         parcelaLancamentoIds.push(rows[0].id as string);
       }
+    }
+
+    // Cancela o lançamento "aguardando resultado" que deu origem a este
+    if (cancelAguardando) {
+      await sql`
+        DELETE FROM lancamentos
+        WHERE id = ${cancelAguardando}::uuid AND status = 'aguardando_resultado'
+      `;
     }
 
     // Auto-create commission remuneração(ões) when applicable

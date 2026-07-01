@@ -410,6 +410,257 @@ export function DeclaracaoHipossuficienciaDoc({
   );
 }
 
+// ── Comunicado de Honorários ─────────────────────────────────
+
+export interface LancamentoComunicado {
+  id: string;
+  descricao: string;
+  valor: number;
+  data_vencimento: string | null;
+  parcela_atual: number | null;
+  total_parcelas: number | null;
+}
+
+export function ComunicadoHonorariosDoc({
+  client,
+  lancamentos,
+  date,
+  config,
+  logoData,
+}: {
+  client: ClientFull;
+  lancamentos: LancamentoComunicado[];
+  date: string;
+} & SharedProps) {
+  const pdfCfg = getPdfConfig(config, !!config);
+  const s = buildStyles(pdfCfg);
+  const total = lancamentos.reduce((sum, l) => sum + l.valor, 0);
+  const fmt = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  return (
+    <Document
+      title={`Comunicado de Honorários — ${client.name}`}
+      author={config?.nome ?? "Advocacia Orlando Martins"}
+    >
+      <Page size="A4" style={s.page}>
+        <PageHeader config={config} logoData={logoData} s={s} />
+
+        <Text style={s.docTitle}>COMUNICADO DE HONORÁRIOS ADVOCATÍCIOS</Text>
+
+        {/* Destinatário */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={s.sectionTitle}>Destinatário</Text>
+          {(
+            [
+              ["Nome:", client.name.toUpperCase()],
+              [client.type === "PF" ? "CPF:" : "CNPJ:", client.doc],
+              ["E-mail:", client.email],
+              ["Telefone:", client.phone],
+            ] as [string, string][]
+          ).map(([label, value], i) => (
+            <View key={i} style={{ flexDirection: "row", marginBottom: 4 }}>
+              <Text style={s.dataLabel}>{label}</Text>
+              <Text style={s.dataValue}>{value}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: "#1E3A8A",
+            marginBottom: 16,
+          }}
+        />
+
+        {/* Intro */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={s.indent}>
+            Prezado(a) cliente, comunicamos que os honorários advocatícios
+            referentes aos serviços prestados encontram-se disponíveis para
+            pagamento, conforme o plano detalhado abaixo.
+          </Text>
+        </View>
+
+        {/* Tabela de parcelas */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={s.sectionTitle}>Plano de Pagamento</Text>
+
+          {/* Cabeçalho */}
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: "#EEF2FF",
+              paddingHorizontal: 8,
+              paddingVertical: 6,
+              borderRadius: 4,
+              marginBottom: 2,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: pdfCfg.fontBold,
+                fontSize: Math.max(pdfCfg.fontSize - 2, 8),
+                flex: 3,
+                color: "#1E3A8A",
+              }}
+            >
+              Descrição
+            </Text>
+            <Text
+              style={{
+                fontFamily: pdfCfg.fontBold,
+                fontSize: Math.max(pdfCfg.fontSize - 2, 8),
+                flex: 1.5,
+                textAlign: "center",
+                color: "#1E3A8A",
+              }}
+            >
+              Vencimento
+            </Text>
+            <Text
+              style={{
+                fontFamily: pdfCfg.fontBold,
+                fontSize: Math.max(pdfCfg.fontSize - 2, 8),
+                flex: 1.5,
+                textAlign: "right",
+                color: "#1E3A8A",
+              }}
+            >
+              Valor
+            </Text>
+          </View>
+
+          {lancamentos.length === 0 ? (
+            <Text
+              style={{
+                fontFamily: pdfCfg.fontRegular,
+                fontSize: pdfCfg.fontSize,
+                color: "#888",
+                textAlign: "center",
+                padding: 12,
+              }}
+            >
+              Nenhum lançamento pendente encontrado.
+            </Text>
+          ) : (
+            lancamentos.map((l, i) => (
+              <View
+                key={l.id}
+                style={{
+                  flexDirection: "row",
+                  paddingHorizontal: 8,
+                  paddingVertical: 5,
+                  backgroundColor: i % 2 === 0 ? "#F8FAFC" : "#FFFFFF",
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: "#E2E8F0",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: pdfCfg.fontRegular,
+                    fontSize: Math.max(pdfCfg.fontSize - 1, 8),
+                    flex: 3,
+                    color: "#1a1a1a",
+                  }}
+                >
+                  {l.parcela_atual && l.total_parcelas
+                    ? `${l.descricao} (${l.parcela_atual}/${l.total_parcelas})`
+                    : l.descricao}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: pdfCfg.fontRegular,
+                    fontSize: Math.max(pdfCfg.fontSize - 1, 8),
+                    flex: 1.5,
+                    textAlign: "center",
+                    color: "#555",
+                  }}
+                >
+                  {l.data_vencimento ?? "—"}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: pdfCfg.fontRegular,
+                    fontSize: Math.max(pdfCfg.fontSize - 1, 8),
+                    flex: 1.5,
+                    textAlign: "right",
+                    color: "#1a1a1a",
+                  }}
+                >
+                  {fmt(l.valor)}
+                </Text>
+              </View>
+            ))
+          )}
+
+          {/* Total */}
+          <View
+            style={{
+              flexDirection: "row",
+              paddingHorizontal: 8,
+              paddingVertical: 6,
+              backgroundColor: "#1E3A8A",
+              borderRadius: 4,
+              marginTop: 4,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: pdfCfg.fontBold,
+                fontSize: Math.max(pdfCfg.fontSize - 1, 8),
+                flex: 4.5,
+                color: "#FFFFFF",
+              }}
+            >
+              Total
+            </Text>
+            <Text
+              style={{
+                fontFamily: pdfCfg.fontBold,
+                fontSize: Math.max(pdfCfg.fontSize - 1, 8),
+                flex: 1.5,
+                textAlign: "right",
+                color: "#FFFFFF",
+              }}
+            >
+              {fmt(total)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Observação */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={s.indent}>
+            Em caso de dúvidas sobre o plano de pagamento ou para solicitar
+            outras formas de quitação, entre em contato com nosso escritório.
+          </Text>
+        </View>
+
+        <Text style={[s.body, { marginTop: 8 }]}>
+          {client.city}, {date}.
+        </Text>
+
+        <View
+          style={{
+            marginTop: 60,
+            flexDirection: "row",
+            justifyContent: "center",
+          }}
+        >
+          <SignatureBlock
+            cfg={pdfCfg}
+            lines={[lawyerName(config), `Advogado(a) — ${lawyerOab(config)}`]}
+          />
+        </View>
+
+        <PageFooter config={config} logoData={logoData} date={date} s={s} />
+      </Page>
+    </Document>
+  );
+}
+
 // ── Notificação Extrajudicial ─────────────────────────────────
 
 export function NotificacaoExtrajudicialDoc({

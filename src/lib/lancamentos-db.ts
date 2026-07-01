@@ -198,6 +198,42 @@ export async function getClientDebito(clientId: string): Promise<ClientDebito> {
   return { totalPendente, totalPago, items };
 }
 
+export interface LancamentoEntradaPendente {
+  id: string;
+  descricao: string;
+  valor: number;
+  data_vencimento: string | null;
+  parcela_atual: number | null;
+  total_parcelas: number | null;
+}
+
+export async function getClientPendingEntradas(
+  clientId: string
+): Promise<LancamentoEntradaPendente[]> {
+  const rows = await sql`
+    SELECT
+      l.id::text,
+      l.descricao,
+      l.valor,
+      to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
+      l.parcela_atual,
+      l.total_parcelas
+    FROM lancamentos l
+    WHERE l.client_id = ${clientId}::uuid
+      AND l.tipo = 'entrada'
+      AND l.status = 'pendente'
+    ORDER BY l.data_vencimento ASC NULLS LAST, l.parcela_atual ASC NULLS LAST
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    descricao: r.descricao,
+    valor: Number(r.valor),
+    data_vencimento: r.data_vencimento ?? null,
+    parcela_atual: r.parcela_atual ?? null,
+    total_parcelas: r.total_parcelas ?? null,
+  }));
+}
+
 export interface ContaClienteItem {
   id: string;
   tipo: "entrada" | "saida";

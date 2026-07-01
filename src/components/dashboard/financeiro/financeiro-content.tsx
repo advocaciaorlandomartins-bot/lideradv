@@ -20,7 +20,6 @@ import {
   deleteGrupoAction,
   reagendarLancamentoAction,
   revertParaPendenteAction,
-  ativarLancamentoAction,
 } from "@/lib/lancamento-actions";
 import {
   PlusIcon,
@@ -742,9 +741,6 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [pageConcluidas, setPageConcluidas] = useState(1);
   const [pageSizeConcluidas, setPageSizeConcluidas] = useState(10);
   const [categoryFilter, setCategoryFilter] = useState<string>("todas");
-  const [definindoId, setDefinindoId] = useState<string | null>(null);
-  const [definindoData, setDefinindoData] = useState("");
-  const [definindoPending, startDefinindo] = useTransition();
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
@@ -1122,62 +1118,18 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
                   <td className="px-3 py-2.5">
                     {canEdit && (
                       <div className="flex items-center gap-1.5">
-                        {definindoId === l.id ? (
-                          <>
-                            <input
-                              type="date"
-                              value={definindoData}
-                              onChange={(e) => setDefinindoData(e.target.value)}
-                              disabled={definindoPending}
-                              className="h-7 rounded border border-border bg-white px-2 font-body text-xs text-fg outline-none focus:border-primary focus:ring-1 focus:ring-blue-100"
-                            />
-                            <button
-                              onClick={() => {
-                                if (!definindoData) return;
-                                startDefinindo(async () => {
-                                  await ativarLancamentoAction(
-                                    l.id,
-                                    definindoData
-                                  );
-                                  setDefinindoId(null);
-                                  setDefinindoData("");
-                                });
-                              }}
-                              disabled={!definindoData || definindoPending}
-                              className="h-7 rounded bg-emerald-600 px-2.5 font-body text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                            >
-                              {definindoPending ? "…" : "Confirmar"}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDefinindoId(null);
-                                setDefinindoData("");
-                              }}
-                              disabled={definindoPending}
-                              className="h-7 rounded border border-border bg-white px-2 font-body text-[11px] text-muted hover:text-fg"
-                            >
-                              ✕
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => {
-                                setDefinindoId(l.id);
-                                setDefinindoData("");
-                              }}
-                              className="rounded border border-amber-300 bg-white px-2.5 py-1 font-body text-[11px] font-semibold text-amber-800 hover:bg-amber-50"
-                            >
-                              Definir data
-                            </button>
-                            <Link
-                              href={`/dashboard/financeiro/${l.id}/editar`}
-                              className="rounded border border-border bg-white px-2.5 py-1 font-body text-[11px] text-muted hover:text-fg"
-                            >
-                              Editar
-                            </Link>
-                          </>
-                        )}
+                        <Link
+                          href={`/dashboard/financeiro/novo?tipo=entrada${l.client_id ? `&client_id=${l.client_id}` : ""}${l.processo_id ? `&processo_id=${l.processo_id}` : ""}&cancel_aguardando=${l.id}&valor_inicial=${l.valor}&back=/dashboard/financeiro`}
+                          className="rounded border border-emerald-500 bg-emerald-50 px-2.5 py-1 font-body text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100"
+                        >
+                          Registrar resultado
+                        </Link>
+                        <Link
+                          href={`/dashboard/financeiro/${l.id}/editar`}
+                          className="rounded border border-border bg-white px-2.5 py-1 font-body text-[11px] text-muted hover:text-fg"
+                        >
+                          Editar
+                        </Link>
                       </div>
                     )}
                   </td>

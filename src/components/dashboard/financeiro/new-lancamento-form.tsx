@@ -123,6 +123,8 @@ interface Props {
   defaultClientId?: string;
   defaultProcessoId?: string;
   redirectTo?: string;
+  cancelAguardando?: string;
+  valorInicial?: string;
 }
 
 export default function NewLancamentoForm({
@@ -133,6 +135,8 @@ export default function NewLancamentoForm({
   defaultClientId,
   defaultProcessoId,
   redirectTo,
+  cancelAguardando,
+  valorInicial,
 }: Props) {
   const [state, formAction, isPending] = useActionState<
     LancamentoFormState,
@@ -211,7 +215,12 @@ export default function NewLancamentoForm({
 
   // ── Valores ────────────────────────────────────────────────
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("retroativo");
-  const [valor, setValor] = useState("");
+  const [valor, setValor] = useState(() => {
+    if (!valorInicial) return "";
+    const n = parseFloat(valorInicial);
+    if (isNaN(n)) return "";
+    return n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+  });
   const [valorEntrada, setValorEntrada] = useState("");
   const [totalParcelas, setTotalParcelas] = useState("1");
   const [valorEntradaMensalidade, setValorEntradaMensalidade] = useState("");
@@ -406,6 +415,13 @@ export default function NewLancamentoForm({
   return (
     <form action={formAction} className="space-y-8" noValidate>
       {/* Hidden fields */}
+      {cancelAguardando && (
+        <input
+          type="hidden"
+          name="cancel_aguardando"
+          value={cancelAguardando}
+        />
+      )}
       <input type="hidden" name="payment_mode" value={paymentModeSubmit} />
       <input
         type="hidden"
@@ -476,6 +492,19 @@ export default function NewLancamentoForm({
       />
       {redirectTo && (
         <input type="hidden" name="redirect_to" value={redirectTo} />
+      )}
+
+      {cancelAguardando && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="font-body text-sm font-semibold text-emerald-800">
+            Registrando resultado do processo
+          </p>
+          <p className="mt-0.5 font-body text-xs text-emerald-700">
+            Defina o valor final aprovado, a forma de pagamento e as datas. O
+            lançamento &quot;Aguardando resultado&quot; será cancelado
+            automaticamente ao salvar.
+          </p>
+        </div>
       )}
 
       {state?.error && (

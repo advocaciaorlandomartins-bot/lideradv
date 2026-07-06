@@ -9,6 +9,7 @@ import {
   sincronizarTramitaSign,
   tramitaSyncAtivo,
 } from "@/lib/tramitasign-sync";
+import { enviarEmailNovaPublicacao } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -121,11 +122,60 @@ export async function GET(request: Request) {
     tramitaResult = await sincronizarTramitaSign();
   }
 
+  const totalNovas =
+    totalInseridos + processoInseridos + tramitaResult.inseridos;
+
+  // Envia email de resumo se o cron encontrou publicações novas
+  if (totalNovas > 0) {
+    try {
+      const configRows = await sql`SELECT email FROM escritorio_config LIMIT 1`;
+      const emailDestino = (
+        (configRows[0] as { email?: string } | undefined)?.email ?? ""
+      ).trim();
+      if (emailDestino) {
+        // Busca as publicações recém-inseridas (última hora)
+        const recentes = await sql`
+          SELECT tipo, processo, tribunal, orgao,
+                 to_char(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
+                 resumo_ia
+          FROM publicacoes
+          WHERE created_at >= NOW() - INTERVAL '1 hour'
+            AND status = 'nao_lida'
+          ORDER BY created_at DESC
+          LIMIT 50
+        `;
+        if (recentes.length > 0) {
+          await enviarEmailNovaPublicacao({
+            para: emailDestino,
+            publicacoes: recentes.map((r) => {
+              const ri = r.resumo_ia as {
+                texto?: string;
+                prazo_dias?: number;
+                acao_necessaria?: string;
+              } | null;
+              return {
+                tipo: String(r.tipo),
+                processo: String(r.processo),
+                tribunal: String(r.tribunal ?? ""),
+                orgao: String(r.orgao ?? "—"),
+                disponibilizacao: String(r.disponibilizacao),
+                resumo: ri?.texto ?? null,
+                prazo_dias: ri?.prazo_dias ?? null,
+                acao_necessaria: ri?.acao_necessaria ?? null,
+              };
+            }),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[cron/publicacoes] erro ao enviar email:", err);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     oabs_verificadas: rows.length,
-    publicacoes_novas:
-      totalInseridos + processoInseridos + tramitaResult.inseridos,
+    publicacoes_novas: totalNovas,
     detalhes: {
       por_oab: resultados,
       por_processo: processosResultados,

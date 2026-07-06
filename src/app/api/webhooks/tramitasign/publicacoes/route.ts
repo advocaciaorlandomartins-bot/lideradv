@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import sql from "@/lib/db";
+import { enviarEmailNovaPublicacao } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -58,10 +59,7 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const sig = request.headers.get("x-webhook-signature") ?? "";
   if (!verificarAssinatura(rawBody, sig, secret)) {
-    return NextResponse.json(
-      { error: "Assinatura inválida" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Assinatura inválida" }, { status: 401 });
   }
 
   let payload: {
@@ -87,6 +85,16 @@ export async function POST(request: Request) {
     (payload.data?.publication ? [payload.data.publication] : []);
 
   let inseridos = 0;
+  const novas: {
+    tipo: string;
+    processo: string;
+    tribunal: string;
+    orgao: string;
+    disponibilizacao: string;
+    resumo: string | null;
+    prazo_dias: number | null;
+    acao_necessaria: string | null;
+  }[] = [];
 
   for (const pub of pubs) {
     const processo = pub.data?.numeroprocessocommascara ?? "";
@@ -147,6 +155,34 @@ export async function POST(request: Request) {
     }
 
     inseridos++;
+    novas.push({
+      tipo,
+      processo,
+      tribunal,
+      orgao,
+      disponibilizacao: new Date(disponibilizacao).toLocaleDateString("pt-BR"),
+      resumo: pub.summary?.resumo ?? null,
+      prazo_dias: pub.summary?.prazo ?? null,
+      acao_necessaria: pub.summary?.necessidade_acao ?? null,
+    });
+  }
+
+  // Envia email de notificação se houver publicações novas
+  if (novas.length > 0) {
+    try {
+      const configRows = await sql`SELECT email FROM escritorio_config LIMIT 1`;
+      const emailDestino = (
+        (configRows[0] as { email?: string } | undefined)?.email ?? ""
+      ).trim();
+      if (emailDestino) {
+        await enviarEmailNovaPublicacao({
+          para: emailDestino,
+          publicacoes: novas,
+        });
+      }
+    } catch (err) {
+      console.error("[webhook/tramitasign] erro ao enviar email:", err);
+    }
   }
 
   return NextResponse.json({ ok: true, inseridos });

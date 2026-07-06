@@ -199,3 +199,127 @@ export async function notificarEmailRecebido({
     text: `[LiderAdv] Novo e-mail de ${cliente}\n\nDe: ${deNome ? `${deNome} <${de}>` : de}\nAssunto: ${assuntoEmail}\n${resumoIA ? `\nResumo (IA):\n${resumoIA}\n` : ""}${textoCorpo ? `\nMensagem:\n${textoCorpo}` : ""}\n\nVer no sistema: https://lideradv.vercel.app/dashboard/clientes/${clienteId}`,
   });
 }
+
+export async function enviarEmailNovaPublicacao({
+  para,
+  publicacoes,
+}: {
+  para: string;
+  publicacoes: {
+    tipo: string;
+    processo: string;
+    tribunal: string;
+    orgao: string;
+    disponibilizacao: string;
+    resumo: string | null;
+    prazo_dias: number | null;
+    acao_necessaria: string | null;
+  }[];
+}) {
+  const resend = getResend();
+  if (!resend) {
+    console.warn(
+      "[email] RESEND_API_KEY não configurada — notificação de publicação ignorada."
+    );
+    return;
+  }
+
+  const total = publicacoes.length;
+  const titulo =
+    total === 1
+      ? `Nova ${publicacoes[0].tipo} — ${publicacoes[0].processo}`
+      : `${total} novas publicações recebidas`;
+
+  const linhas = publicacoes
+    .map((p) => {
+      const prazoTag =
+        p.prazo_dias != null && p.prazo_dias > 0
+          ? `<span style="display:inline-block;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px;">⏱ ${p.prazo_dias} dias</span>`
+          : "";
+      const acaoTag = p.acao_necessaria
+        ? `<span style="display:inline-block;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:4px;">${p.acao_necessaria}</span>`
+        : "";
+      return `
+      <tr><td style="padding:4px 32px;">
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #005DFF;border-radius:8px;margin-bottom:8px;">
+          <tr><td style="padding:12px 14px;">
+            <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#0f172a;">
+              📄 ${p.tipo}${prazoTag}${acaoTag}
+            </p>
+            <p style="margin:0 0 2px;font-size:12px;color:#334155;">
+              <strong>Processo:</strong> ${p.processo}
+            </p>
+            <p style="margin:0 0 2px;font-size:12px;color:#334155;">
+              <strong>Órgão:</strong> ${p.orgao} — ${p.tribunal}
+            </p>
+            <p style="margin:0;font-size:11px;color:#94a3b8;">Disponibilizado em ${p.disponibilizacao}</p>
+            ${
+              p.resumo
+                ? `
+            <div style="margin-top:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;">
+              <p style="margin:0 0 4px;font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.08em;">✨ Resumo IA</p>
+              <p style="margin:0;font-size:12px;color:#1e3a5f;line-height:1.6;">${p.resumo}</p>
+            </div>`
+                : ""
+            }
+          </td></tr>
+        </table>
+      </td></tr>`;
+    })
+    .join("");
+
+  await resend.emails.send({
+    from: "LiderAdv <onboarding@resend.dev>",
+    to: para,
+    subject: `[LiderAdv] 📋 ${titulo}`,
+    html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr>
+          <td style="background:linear-gradient(135deg,#000D25,#001848,#003080);padding:28px 32px;border-radius:14px 14px 0 0;">
+            <p style="margin:0;color:#8FBEFF;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">Sistema Jurídico</p>
+            <h1 style="margin:6px 0 0;color:#ffffff;font-size:22px;font-weight:700;">📋 Nova${total !== 1 ? "s" : ""} Intimaç${total !== 1 ? "ões" : "ão"} / Publicaç${total !== 1 ? "ões" : "ão"}</h1>
+            <p style="margin:6px 0 0;color:#8FBEFF;font-size:13px;">${total} nova${total !== 1 ? "s" : ""} publicaç${total !== 1 ? "ões recebidas" : "ão recebida"} agora</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;padding:16px 0;border:1px solid #e2e8f0;border-top:none;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              ${linhas}
+              <tr><td style="padding:16px 32px 20px;">
+                <div style="text-align:center;">
+                  <a href="https://lideradv.vercel.app/dashboard/publicacoes"
+                     style="display:inline-block;background:#005DFF;color:#ffffff;padding:13px 28px;border-radius:50px;text-decoration:none;font-weight:700;font-size:14px;">
+                    Ver publicações →
+                  </a>
+                </div>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8fafc;padding:14px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;text-align:center;">
+            <p style="margin:0;color:#94a3b8;font-size:11px;">LiderAdv — Sistema Jurídico &nbsp;|&nbsp; Notificação automática</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    text:
+      publicacoes
+        .map(
+          (p) =>
+            `${p.tipo} — ${p.processo}\n${p.orgao} (${p.tribunal})\nDisponibilizado: ${p.disponibilizacao}${p.resumo ? `\nResumo: ${p.resumo}` : ""}`
+        )
+        .join("\n\n---\n\n") +
+      "\n\nVer: https://lideradv.vercel.app/dashboard/publicacoes",
+  });
+}

@@ -199,7 +199,27 @@ export default function AiDocumentImport({
   const [city, setCity] = useState("");
   const [stateUf, setStateUf] = useState("");
   const [notes, setNotes] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
   const [, startTransition] = useTransition();
+
+  async function fetchCep(digits: string) {
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setStreet((prev) => prev || (data.logradouro ?? ""));
+        setNeighborhood((prev) => prev || (data.bairro ?? ""));
+        setCity((prev) => prev || (data.localidade ?? ""));
+        setStateUf((prev) => prev || (data.uf ?? ""));
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setCepLoading(false);
+    }
+  }
 
   function validateFile(file: File): string[] {
     const errs: string[] = [];
@@ -249,7 +269,8 @@ export default function AiDocumentImport({
     setRgOrgao(data.rg_orgao ?? "");
     setBirthDate(data.birth_date ?? "");
     setGenero(data.genero ?? "");
-    setCep(data.zipcode ? maskCEP(data.zipcode) : "");
+    const cepDigits = (data.zipcode ?? "").replace(/\D/g, "");
+    setCep(cepDigits ? maskCEP(cepDigits) : "");
     setStreet(data.street ?? "");
     setAddrNumber(data.addr_number ?? "");
     setNeighborhood(data.neighborhood ?? "");
@@ -265,6 +286,10 @@ export default function AiDocumentImport({
       .filter(Boolean)
       .join(" | ");
     if (extras) setNotes(extras);
+    // Auto-busca CEP quando IA trouxe CEP mas não o endereço completo
+    if (cepDigits.length === 8 && !data.street) {
+      fetchCep(cepDigits);
+    }
   }
 
   async function handleExtract() {
@@ -332,8 +357,15 @@ export default function AiDocumentImport({
   }
 
   async function handleCreateClient() {
-    if (!name.trim() || !cpf.trim()) {
-      setErrors(["Nome e CPF são obrigatórios para criar o cliente."]);
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("nome");
+    if (!cpf.trim()) missing.push("CPF");
+    if (!phone.trim())
+      missing.push(
+        "telefone (não encontrado no documento — preencha manualmente)"
+      );
+    if (missing.length > 0) {
+      setErrors([`Informe os campos obrigatórios: ${missing.join(", ")}.`]);
       return;
     }
     setErrors([]);
@@ -679,14 +711,20 @@ export default function AiDocumentImport({
                   placeholder="email@exemplo.com"
                 />
               </Field>
-              <Field label="Telefone">
+              <Field label="Telefone *">
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className={inputCls}
+                  className={`${inputCls} ${!phone.trim() ? "border-amber-300 focus:border-amber-400 focus:ring-amber-100" : ""}`}
                   placeholder="(82) 9 0000-0000"
                 />
+                {!phone.trim() && (
+                  <p className="mt-1 font-body text-xs text-amber-600">
+                    Documentos geralmente não contêm telefone — preencha
+                    manualmente
+                  </p>
+                )}
               </Field>
             </div>
           </div>
@@ -703,13 +741,21 @@ export default function AiDocumentImport({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
               <div className="sm:col-span-2">
                 <Field label="CEP">
-                  <input
-                    value={cep}
-                    onChange={(e) => setCep(maskCEP(e.target.value))}
-                    className={inputCls}
-                    placeholder="00000-000"
-                    inputMode="numeric"
-                  />
+                  <div className="relative">
+                    <input
+                      value={cep}
+                      onChange={(e) => setCep(maskCEP(e.target.value))}
+                      onBlur={(e) =>
+                        fetchCep(e.target.value.replace(/\D/g, ""))
+                      }
+                      className={`${inputCls} pr-10`}
+                      placeholder="00000-000"
+                      inputMode="numeric"
+                    />
+                    {cepLoading && (
+                      <SpinnerIcon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted" />
+                    )}
+                  </div>
                 </Field>
               </div>
               <div className="sm:col-span-4">
@@ -796,7 +842,9 @@ export default function AiDocumentImport({
             </button>
             <button
               onClick={handleCreateClient}
-              disabled={isProcessing || !name.trim() || !cpf.trim()}
+              disabled={
+                isProcessing || !name.trim() || !cpf.trim() || !phone.trim()
+              }
               className="flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-cta px-6 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               <UserPlusIcon className="h-4 w-4" />

@@ -233,7 +233,7 @@ export default function DocumentsSection({
                 {/* Actions */}
                 <div className="flex flex-shrink-0 items-center gap-3">
                   <a
-                    href={doc.url}
+                    href={`/api/documentos/download?id=${doc.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-body text-xs font-semibold text-primary transition-colors duration-150 hover:text-primary-dark"

@@ -53,16 +53,14 @@ export async function POST(request: Request) {
   let blobUrl: string;
   try {
     const blob = await put(blobPath, file, {
-      access: "public",
+      access: "private",
       contentType: file.type || "application/octet-stream",
     });
     blobUrl = blob.url;
   } catch (err) {
-    console.error("[documentos/upload] Vercel Blob error:", err);
-    return NextResponse.json(
-      { error: "Erro ao enviar arquivo para o armazenamento." },
-      { status: 500 }
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[documentos/upload] Vercel Blob error:", msg);
+    return NextResponse.json({ error: `Blob: ${msg}` }, { status: 500 });
   }
 
   try {

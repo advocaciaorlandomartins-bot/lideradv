@@ -1191,15 +1191,23 @@ export async function analisarProcesso(processoId: string) {
       FROM historico_registros
       WHERE processo_id = ${processoId}::uuid
       ORDER BY data_referencia DESC, created_at DESC LIMIT 15
-    `,
+    `.catch(
+      () =>
+        [] as {
+          texto: unknown;
+          tipo: unknown;
+          data_referencia: unknown;
+          situacao: unknown;
+        }[]
+    ),
     sql`
       SELECT nome, tipo FROM documentos
       WHERE entity_type = 'processo' AND entity_id = ${processoId}::uuid
-    `,
+    `.catch(() => [] as { nome: unknown; tipo: unknown }[]),
     obterContextoCerebro(
       processo.tipo_acao || "",
       processo.area || "Previdenciário"
-    ),
+    ).catch(() => ""),
   ]);
 
   // ── Cálculos server-side (sem IA, instantâneos) ──────────────────────────
@@ -1405,17 +1413,22 @@ Justifique com base nos dados disponíveis.
     estrategia_recomendada: estrategiaRecomendada,
   };
 
-  await sql`
-    INSERT INTO cerebro_analises
-      (processo_id, tipo, titulo, analise, risco, probabilidade_sucesso,
-       proxima_acao, base_legal, metadata)
-    VALUES (
-      ${processoId}::uuid, 'inicial',
-      ${"Análise — " + modo},
-      ${analise}, ${risco}, ${prob}, ${proximaAcao}, ${baseLegal},
-      ${JSON.stringify(metadata)}
-    )
-  `;
+  try {
+    await sql`
+      INSERT INTO cerebro_analises
+        (processo_id, tipo, titulo, analise, risco, probabilidade_sucesso,
+         proxima_acao, base_legal, metadata)
+      VALUES (
+        ${processoId}::uuid, 'inicial',
+        ${"Análise — " + modo},
+        ${analise}, ${risco}, ${prob}, ${proximaAcao}, ${baseLegal},
+        ${JSON.stringify(metadata)}
+      )
+    `;
+  } catch (insertErr) {
+    console.error("[cerebro] Falha ao salvar análise no banco:", insertErr);
+    // Retorna a análise mesmo sem salvar no banco
+  }
 
   return {
     analise,

@@ -75,7 +75,8 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
       });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
-        setErro((d as { error?: string }).error || "Erro ao analisar.");
+        const msg = (d as { error?: string }).error;
+        setErro(msg || `Erro ao analisar (HTTP ${r.status}). Tente novamente.`);
       } else {
         await carregar();
         setExpandido(true);

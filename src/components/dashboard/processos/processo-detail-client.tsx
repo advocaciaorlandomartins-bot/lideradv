@@ -2500,15 +2500,15 @@ export default function ProcessoDetailClient({
       {/* Linha de Produção */}
       <ProducaoBar processo={processo} />
 
-      {/* Cérebro Jurídico — análise automática e aprendizado */}
-      <CerebroPanel processoId={processo.id} processoStatus={processo.status} />
-
-      {/* IA Jurídica — Gerar Petição | Analisar Documento | Diagnóstico Estratégico */}
+      {/* IA Jurídica — Analisar Documento | Diagnóstico Estratégico | Gerar Petição */}
       <IaJuridicaSection
         clienteId={processo.client_id}
         processoId={processo.id}
         areaProcesso={processo.area}
       />
+
+      {/* Cérebro Jurídico — roda depois dos documentos analisados */}
+      <CerebroPanel processoId={processo.id} processoStatus={processo.status} />
 
       {/* Petições salvas do processo */}
       <IaPeticoesProcesso

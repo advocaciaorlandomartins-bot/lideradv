@@ -119,34 +119,34 @@ export default function IaJuridicaSection({
         {/* Guia de fluxo recomendado */}
         <WorkflowGuide step={workflowStep} temCliente={!!clienteId} />
 
-        {/* Header com 3 botões em linha */}
+        {/* Header com 3 botões em linha — ordem do fluxo */}
         <div className="grid grid-cols-1 sm:grid-cols-3 border-b border-border">
-          <ActionButton
-            icon="✍️"
-            label="Gerar Petição"
-            sublabel="Dr. Lex · Especialista"
-            active={secao === "peticao"}
-            onClick={() => setSecao(secao === "peticao" ? null : "peticao")}
-            color="primary"
-          />
           <ActionButton
             icon="🔍"
             label="Analisar Documento"
-            sublabel="PDF ou imagem"
+            sublabel="Passo 1 · Dr. Lex"
             active={secao === "analisar"}
             onClick={() => setSecao(secao === "analisar" ? null : "analisar")}
             color="blue"
-            border
           />
           <ActionButton
             icon="🧠"
             label="Diagnóstico Estratégico"
-            sublabel="Probabilidade de êxito"
+            sublabel="Passo 2 · Probabilidade de êxito"
             active={secao === "estrategia"}
             onClick={() =>
               setSecao(secao === "estrategia" ? null : "estrategia")
             }
             color="violet"
+            border
+          />
+          <ActionButton
+            icon="✍️"
+            label="Gerar Petição"
+            sublabel="Passo 3 · Dr. Lex"
+            active={secao === "peticao"}
+            onClick={() => setSecao(secao === "peticao" ? null : "peticao")}
+            color="primary"
             border
           />
         </div>

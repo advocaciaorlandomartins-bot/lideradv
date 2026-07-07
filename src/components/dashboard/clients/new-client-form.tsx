@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useRef } from "react";
 import { createClientAction, type ClientFormState } from "@/lib/client-actions";
 import { SpinnerIcon } from "@/components/icons";
 import type { Colaborador } from "@/lib/colaboradores-db";
@@ -258,6 +258,7 @@ export default function NewClientForm({
   const [uf, setUf] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
+  const lastFetchedCep = useRef("");
 
   function handleTypeChange(t: "PF" | "PJ") {
     setType(t);
@@ -309,12 +310,11 @@ export default function NewClientForm({
     }
   }
 
-  async function handleCepBlur(e: React.FocusEvent<HTMLInputElement>) {
-    const cep = e.target.value.replace(/\D/g, "");
-    if (cep.length !== 8) return;
+  async function fetchCepByDigits(digits: string) {
+    if (digits.length !== 8) return;
     setCepLoading(true);
     try {
-      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const data = await res.json();
       if (!data.erro) {
         setStreet(data.logradouro ?? "");
@@ -1173,8 +1173,18 @@ export default function NewClientForm({
                   placeholder="00000-000"
                   maxLength={9}
                   value={cepValue}
-                  onChange={(e) => setCepValue(maskCEP(e.target.value))}
-                  onBlur={handleCepBlur}
+                  onChange={(e) => {
+                    const masked = maskCEP(e.target.value);
+                    setCepValue(masked);
+                    const digits = masked.replace(/\D/g, "");
+                    if (
+                      digits.length === 8 &&
+                      digits !== lastFetchedCep.current
+                    ) {
+                      lastFetchedCep.current = digits;
+                      fetchCepByDigits(digits);
+                    }
+                  }}
                   disabled={disabled}
                   className={`${inputClass} pr-10`}
                 />

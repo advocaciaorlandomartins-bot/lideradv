@@ -175,6 +175,7 @@ export default function AiDocumentImport({
 }: Props) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastFetchedCep = useRef("");
 
   const [step, setStep] = useState<Step>("upload");
   const [dragOver, setDragOver] = useState(false);
@@ -753,10 +754,18 @@ export default function AiDocumentImport({
                   <div className="relative">
                     <input
                       value={cep}
-                      onChange={(e) => setCep(maskCEP(e.target.value))}
-                      onBlur={(e) =>
-                        fetchCep(e.target.value.replace(/\D/g, ""), true)
-                      }
+                      onChange={(e) => {
+                        const masked = maskCEP(e.target.value);
+                        setCep(masked);
+                        const digits = masked.replace(/\D/g, "");
+                        if (
+                          digits.length === 8 &&
+                          digits !== lastFetchedCep.current
+                        ) {
+                          lastFetchedCep.current = digits;
+                          fetchCep(digits, true);
+                        }
+                      }}
                       className={`${inputCls} pr-10`}
                       placeholder="00000-000"
                       inputMode="numeric"

@@ -202,17 +202,26 @@ export default function AiDocumentImport({
   const [cepLoading, setCepLoading] = useState(false);
   const [, startTransition] = useTransition();
 
-  async function fetchCep(digits: string) {
+  // force=true: sempre sobrescreve (usuário digitou CEP manualmente)
+  // force=false: só preenche campos vazios (IA preencheu CEP sem endereço)
+  async function fetchCep(digits: string, force = false) {
     if (digits.length !== 8) return;
     setCepLoading(true);
     try {
       const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const data = await res.json();
       if (!data.erro) {
-        setStreet((prev) => prev || (data.logradouro ?? ""));
-        setNeighborhood((prev) => prev || (data.bairro ?? ""));
-        setCity((prev) => prev || (data.localidade ?? ""));
-        setStateUf((prev) => prev || (data.uf ?? ""));
+        if (force) {
+          setStreet(data.logradouro ?? "");
+          setNeighborhood(data.bairro ?? "");
+          setCity(data.localidade ?? "");
+          setStateUf(data.uf ?? "");
+        } else {
+          setStreet((prev) => prev || (data.logradouro ?? ""));
+          setNeighborhood((prev) => prev || (data.bairro ?? ""));
+          setCity((prev) => prev || (data.localidade ?? ""));
+          setStateUf((prev) => prev || (data.uf ?? ""));
+        }
       }
     } catch {
       // silently fail
@@ -746,7 +755,7 @@ export default function AiDocumentImport({
                       value={cep}
                       onChange={(e) => setCep(maskCEP(e.target.value))}
                       onBlur={(e) =>
-                        fetchCep(e.target.value.replace(/\D/g, ""))
+                        fetchCep(e.target.value.replace(/\D/g, ""), true)
                       }
                       className={`${inputCls} pr-10`}
                       placeholder="00000-000"

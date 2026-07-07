@@ -38,6 +38,8 @@ interface Props {
   clienteId?: string;
   processoId?: string;
   onClose: () => void;
+  onDocsAnalisados?: () => void;
+  onCadastroComplementado?: () => void;
 }
 
 const TIPOS: { value: string; label: string; desc: string; icon: string }[] = [
@@ -127,6 +129,8 @@ export default function IaAnalisarModal({
   clienteId,
   processoId,
   onClose,
+  onDocsAnalisados,
+  onCadastroComplementado,
 }: Props) {
   const [modo, setModo] = useState<"existente" | "novo">("existente");
   const [docsExistentes, setDocsExistentes] = useState<DocExistente[]>([]);
@@ -292,6 +296,7 @@ export default function IaAnalisarModal({
     setErros(novosErros);
     setCarregando(false);
     setProgresso(null);
+    if (novosResultados.length > 0) onDocsAnalisados?.();
   };
 
   // Agrega dadosExtraidos de todos os resultados (campos não-nulos)
@@ -323,11 +328,13 @@ export default function IaAnalisarModal({
         setSalvoMsg(`Erro: ${result.error}`);
       } else if (result.camposAtualizados.length === 0) {
         setSalvoMsg("Todos os campos já estavam preenchidos no cadastro.");
+        onCadastroComplementado?.();
       } else {
         const labels = result.camposAtualizados
           .map((c) => LABELS[c as keyof DadosPrevidenciarios] ?? c)
           .join(", ");
         setSalvoMsg(`Salvo com sucesso: ${labels}`);
+        onCadastroComplementado?.();
       }
     } catch {
       setSalvoMsg("Erro ao salvar dados.");

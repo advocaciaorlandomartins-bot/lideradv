@@ -43,6 +43,9 @@ const LABEL_RISCO: Record<string, string> = {
 
 type Secao = "peticao" | "analisar" | "estrategia" | null;
 
+// Passo 1: docs analisados / Passo 2: cadastro complementado / Passo 3: Cérebro rodou
+type WorkflowStep = 0 | 1 | 2 | 3;
+
 export default function IaJuridicaSection({
   clienteId,
   processoId,
@@ -57,6 +60,7 @@ export default function IaJuridicaSection({
   const [resultado, setResultado] = useState<EstrategiaResult | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const [workflowStep, setWorkflowStep] = useState<WorkflowStep>(0);
 
   const analisar = async () => {
     setCarregando(true);
@@ -70,7 +74,10 @@ export default function IaJuridicaSection({
       });
       const data = await res.json();
       if (!res.ok) setErro(data.error ?? "Erro ao analisar.");
-      else setResultado(data);
+      else {
+        setResultado(data);
+        setWorkflowStep(3);
+      }
     } catch {
       setErro("Erro de conexão.");
     } finally {
@@ -98,11 +105,20 @@ export default function IaJuridicaSection({
           clienteId={clienteId}
           processoId={processoId}
           onClose={() => setSecao(null)}
+          onDocsAnalisados={() =>
+            setWorkflowStep((s) => (s < 1 ? 1 : s) as WorkflowStep)
+          }
+          onCadastroComplementado={() =>
+            setWorkflowStep((s) => (s < 2 ? 2 : s) as WorkflowStep)
+          }
         />
       )}
 
       {/* ── Painel principal ── */}
       <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
+        {/* Guia de fluxo recomendado */}
+        <WorkflowGuide step={workflowStep} temCliente={!!clienteId} />
+
         {/* Header com 3 botões em linha */}
         <div className="grid grid-cols-1 sm:grid-cols-3 border-b border-border">
           <ActionButton
@@ -318,6 +334,95 @@ export default function IaJuridicaSection({
         )}
       </div>
     </>
+  );
+}
+
+function WorkflowGuide({
+  step,
+  temCliente,
+}: {
+  step: WorkflowStep;
+  temCliente: boolean;
+}) {
+  const steps = [
+    {
+      n: 1,
+      label: "Analisar documentos",
+      sub: "Dr. Lex lê PDFs e imagens",
+      done: step >= 1,
+      active: step === 0,
+    },
+    ...(temCliente
+      ? [
+          {
+            n: 2,
+            label: "Complementar cadastro",
+            sub: "Salvar dados extraídos",
+            done: step >= 2,
+            active: step === 1,
+          },
+        ]
+      : []),
+    {
+      n: temCliente ? 3 : 2,
+      label: "Cérebro Jurídico",
+      sub: "Análise completa do caso",
+      done: step >= 3,
+      active: step === (temCliente ? 2 : 1),
+    },
+  ];
+
+  if (step === 3) {
+    return (
+      <div className="flex items-center gap-2 border-b border-border bg-emerald-50 px-4 py-2.5">
+        <span className="text-emerald-600 font-bold">✓</span>
+        <p className="font-body text-xs font-semibold text-emerald-700">
+          Fluxo completo — caso analisado com base nos documentos e dados do
+          cliente.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-b border-border bg-slate-50 px-4 py-2.5">
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="font-body text-xs font-semibold text-muted mr-1">
+          Ordem recomendada:
+        </span>
+        {steps.map((s, i) => (
+          <div key={s.n} className="flex items-center gap-1">
+            {i > 0 && <span className="text-slate-300 text-xs">→</span>}
+            <div
+              className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-xs font-semibold transition-colors ${
+                s.done
+                  ? "bg-emerald-100 text-emerald-700"
+                  : s.active
+                    ? "bg-primary/10 text-primary ring-1 ring-primary/30"
+                    : "bg-slate-100 text-slate-400"
+              }`}
+            >
+              {s.done ? (
+                <span className="font-bold">✓</span>
+              ) : (
+                <span
+                  className={`font-bold ${s.active ? "text-primary" : "text-slate-400"}`}
+                >
+                  {s.n}
+                </span>
+              )}
+              <span>{s.label}</span>
+            </div>
+          </div>
+        ))}
+        {step < (temCliente ? 3 : 2) && (
+          <span className="ml-1 font-body text-xs text-muted">
+            — comece pelo passo{" "}
+            <strong className="text-primary">{step + 1}</strong>
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

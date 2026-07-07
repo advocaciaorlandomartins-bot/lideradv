@@ -2,11 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { supabase, BUCKET } from "@/lib/supabase";
-import {
-  createDocumentoAction,
-  deleteDocumentoAction,
-} from "@/lib/document-actions";
+import { deleteDocumentoAction } from "@/lib/document-actions";
 import type { Documento } from "@/lib/documents-db";
 import { PlusIcon, SpinnerIcon } from "@/components/icons";
 
@@ -75,37 +71,28 @@ export default function DocumentsSection({
     setUploadError(null);
 
     for (const file of Array.from(files)) {
-      const ext = file.name.split(".").pop() ?? "bin";
-      const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const path = `${entityType}s/${entityId}/${uniqueName}`;
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("entityType", entityType);
+      fd.append("entityId", entityId);
 
-      const { error: storageError } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, file, { contentType: file.type, upsert: false });
-
-      if (storageError) {
+      try {
+        const res = await fetch("/api/documentos/upload", {
+          method: "POST",
+          body: fd,
+        });
+        const data: { id?: string; url?: string; error?: string } = await res
+          .json()
+          .catch(() => ({}));
+        if (!res.ok || data.error) {
+          setUploadError(
+            `Erro ao enviar "${file.name}": ${data.error ?? `HTTP ${res.status}`}`
+          );
+        }
+      } catch {
         setUploadError(
-          `Erro ao enviar "${file.name}": ${storageError.message}`
+          `Erro ao enviar "${file.name}": sem conexão com o servidor.`
         );
-        continue;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(path);
-
-      const result = await createDocumentoAction({
-        entityType,
-        entityId,
-        nome: file.name,
-        tipo: file.type || null,
-        tamanho: file.size,
-        caminho: path,
-        url: urlData.publicUrl,
-      });
-
-      if ("error" in result) {
-        setUploadError(result.error);
       }
     }
 
@@ -119,10 +106,8 @@ export default function DocumentsSection({
       return;
     setDeletingId(doc.id);
 
-    await supabase.storage.from(BUCKET).remove([doc.caminho]);
-
     startTransition(async () => {
-      await deleteDocumentoAction(doc.id);
+      await deleteDocumentoAction(doc.id, doc.url);
       setDeletingId(null);
       router.refresh();
     });

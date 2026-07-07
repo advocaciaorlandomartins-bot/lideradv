@@ -1,5 +1,6 @@
 "use server";
 
+import { del } from "@vercel/blob";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
@@ -42,7 +43,10 @@ export async function createDocumentoAction(
   }
 }
 
-export async function deleteDocumentoAction(id: string): Promise<void> {
+export async function deleteDocumentoAction(
+  id: string,
+  url?: string
+): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "excluir")) return;
 
@@ -50,5 +54,13 @@ export async function deleteDocumentoAction(id: string): Promise<void> {
     await sql`DELETE FROM documentos WHERE id = ${id}::uuid`;
   } catch (err) {
     console.error("deleteDocumentoAction DB error:", err);
+  }
+
+  if (url) {
+    try {
+      await del(url);
+    } catch (err) {
+      console.error("deleteDocumentoAction Blob error:", err);
+    }
   }
 }

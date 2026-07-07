@@ -264,6 +264,161 @@ Responda em português, com formatação markdown clara.`,
     : "Não foi possível analisar o documento.";
 }
 
+// ─── Análise com extração de dados previdenciários ──────────────────────────────
+
+export interface DadosPrevidenciarios {
+  cid_principal?: string | null;
+  tipo_incapacidade?: string | null;
+  data_diagnostico?: string | null;
+  data_afastamento?: string | null;
+  atividade_anterior?: string | null;
+  nis?: string | null;
+  num_beneficio?: string | null;
+  status_beneficio?: string | null;
+  tipo_beneficio?: string | null;
+  data_inicio_beneficio?: string | null;
+  valor_beneficio?: number | null;
+  filiacao_mae?: string | null;
+  filiacao_pai?: string | null;
+}
+
+export interface AnalisarDocumentoExtendidoParams extends AnalisarDocumentoParams {
+  extrairDados?: boolean;
+}
+
+export async function analisarDocumentoExtendido(
+  params: AnalisarDocumentoExtendidoParams
+): Promise<{ resultado: string; dadosExtraidos: DadosPrevidenciarios | null }> {
+  const client = getClient();
+
+  const promptAnalise = {
+    completa: `Faça uma análise jurídica completa deste documento. Inclua:
+1. **RESUMO EXECUTIVO** (3-5 linhas)
+2. **LINHA DO TEMPO** (datas relevantes em ordem cronológica)
+3. **PONTOS DE ATENÇÃO** (prazos, obrigações, riscos)
+4. **FUNDAMENTO LEGAL** (leis e artigos aplicáveis ao documento)
+5. **PRÓXIMAS AÇÕES RECOMENDADAS** (o que o advogado deve fazer)`,
+    resumo: `Faça um resumo jurídico objetivo deste documento em no máximo 5 parágrafos, destacando o essencial para o advogado.`,
+    riscos: `Analise este documento identificando:
+1. **RISCOS JURÍDICOS** (cláusulas abusivas, irregularidades, prazos vencidos)
+2. **CLÁUSULAS PROBLEMÁTICAS** (cada uma com o motivo e artigo violado)
+3. **RECOMENDAÇÕES** (o que negociar, questionar ou contestar)`,
+  };
+
+  const extrairInstrucao = params.extrairDados
+    ? `
+
+---
+EXTRAÇÃO DE DADOS (ao final da análise, adicione exatamente este bloco JSON — não invente dados ausentes):
+
+\`\`\`json_dados_previd
+{
+  "cid_principal": "CXX.X ou null",
+  "tipo_incapacidade": "total permanente | total temporária | parcial | null",
+  "data_diagnostico": "YYYY-MM-DD ou null",
+  "data_afastamento": "YYYY-MM-DD ou null",
+  "atividade_anterior": "última ocupação ou null",
+  "nis": "11 dígitos ou null",
+  "num_beneficio": "número ou null",
+  "status_beneficio": "ativo | cessado | indeferido | null",
+  "tipo_beneficio": "B31 | B32 | B41 | B42 | B93 | B94 | B96 | outro | null",
+  "data_inicio_beneficio": "YYYY-MM-DD ou null",
+  "valor_beneficio": número_decimal_ou_null,
+  "filiacao_mae": "nome ou null",
+  "filiacao_pai": "nome ou null"
+}
+\`\`\``
+    : "";
+
+  const isImage = params.mimeType.startsWith("image/");
+  const isPdf = params.mimeType === "application/pdf";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let contentBlock: any;
+  if (isImage) {
+    contentBlock = {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: params.mimeType,
+        data: params.conteudoBase64,
+      },
+    };
+  } else if (isPdf) {
+    contentBlock = {
+      type: "document",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: params.conteudoBase64,
+      },
+    };
+  } else {
+    throw new Error("Tipo de arquivo não suportado para análise.");
+  }
+
+  const ctxTexto = buildContextoTexto(params.contexto);
+
+  const res = await client.messages.create(
+    {
+      model: "claude-sonnet-4-6",
+      max_tokens: 2500,
+      system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
+      messages: [
+        {
+          role: "user",
+          content: [
+            contentBlock,
+            {
+              type: "text",
+              text: `Arquivo: ${params.nomeArquivo}
+
+CONTEXTO DO CASO:
+${ctxTexto}
+
+${promptAnalise[params.tipoAnalise ?? "completa"]}
+
+Responda em português, com formatação markdown clara.${extrairInstrucao}`,
+            },
+          ],
+        },
+      ],
+    },
+    isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
+  );
+
+  const fullText =
+    res.content[0]?.type === "text"
+      ? res.content[0].text
+      : "Não foi possível analisar o documento.";
+
+  // Extrai o bloco JSON de dados previdenciários
+  let dadosExtraidos: DadosPrevidenciarios | null = null;
+  const jsonMatch = fullText.match(/```json_dados_previd\s*([\s\S]*?)```/);
+  const resultado = fullText
+    .replace(/\n?---\s*\nEXTRAÇÃO DE DADOS[\s\S]*$/, "")
+    .replace(/```json_dados_previd[\s\S]*?```/g, "")
+    .trim();
+
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1].trim()) as DadosPrevidenciarios;
+      // Filtra só campos com valor real (não null/undefined/"null")
+      const filtrado: DadosPrevidenciarios = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        if (v !== null && v !== undefined && v !== "null" && v !== "") {
+          (filtrado as Record<string, unknown>)[k] = v;
+        }
+      }
+      if (Object.keys(filtrado).length > 0) dadosExtraidos = filtrado;
+    } catch {
+      // JSON malformado — ignora silenciosamente
+    }
+  }
+
+  return { resultado, dadosExtraidos };
+}
+
 // ─── Revisão de petição ─────────────────────────────────────────────────────────
 
 export interface RevisarPeticaoParams {

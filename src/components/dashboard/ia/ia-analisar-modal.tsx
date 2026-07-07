@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { complementarClienteAction } from "@/lib/client-actions";
 
 interface DocExistente {
   id: string;
@@ -9,6 +10,28 @@ interface DocExistente {
   tamanho: number | null;
   url: string;
   created_at_formatted: string;
+}
+
+interface DadosPrevidenciarios {
+  cid_principal?: string | null;
+  tipo_incapacidade?: string | null;
+  data_diagnostico?: string | null;
+  data_afastamento?: string | null;
+  atividade_anterior?: string | null;
+  nis?: string | null;
+  num_beneficio?: string | null;
+  status_beneficio?: string | null;
+  tipo_beneficio?: string | null;
+  data_inicio_beneficio?: string | null;
+  valor_beneficio?: number | null;
+  filiacao_mae?: string | null;
+  filiacao_pai?: string | null;
+}
+
+interface ResultadoAnalise {
+  nome: string;
+  resultado: string;
+  dadosExtraidos: DadosPrevidenciarios | null;
 }
 
 interface Props {
@@ -38,6 +61,22 @@ const TIPOS: { value: string; label: string; desc: string; icon: string }[] = [
   },
 ];
 
+const LABELS: Record<keyof DadosPrevidenciarios, string> = {
+  cid_principal: "CID Principal",
+  tipo_incapacidade: "Tipo de Incapacidade",
+  data_diagnostico: "Data do Diagnóstico",
+  data_afastamento: "Data de Afastamento",
+  atividade_anterior: "Atividade Anterior",
+  nis: "NIS/PIS",
+  num_beneficio: "Número do Benefício",
+  status_beneficio: "Status do Benefício",
+  tipo_beneficio: "Tipo de Benefício",
+  data_inicio_beneficio: "Início do Benefício",
+  valor_beneficio: "Valor do Benefício",
+  filiacao_mae: "Filiação (Mãe)",
+  filiacao_pai: "Filiação (Pai)",
+};
+
 const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp";
 const MIME_SUPORTADOS = new Set([
   "application/pdf",
@@ -62,6 +101,28 @@ function docIcon(tipo: string | null) {
   return "📄";
 }
 
+function formatFieldValue(
+  key: keyof DadosPrevidenciarios,
+  value: unknown
+): string {
+  if (value === null || value === undefined) return "";
+  if (key === "valor_beneficio") {
+    const n = Number(value);
+    return isNaN(n) ? String(value) : `R$ ${n.toFixed(2).replace(".", ",")}`;
+  }
+  if (
+    key === "data_diagnostico" ||
+    key === "data_afastamento" ||
+    key === "data_inicio_beneficio"
+  ) {
+    if (typeof value === "string" && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+      const [y, m, d] = value.split("-");
+      return `${d}/${m}/${y}`;
+    }
+  }
+  return String(value);
+}
+
 export default function IaAnalisarModal({
   clienteId,
   processoId,
@@ -75,14 +136,13 @@ export default function IaAnalisarModal({
   );
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [tipoAnalise, setTipoAnalise] = useState("completa");
-  const [resultados, setResultados] = useState<
-    { nome: string; resultado: string }[]
-  >([]);
+  const [resultados, setResultados] = useState<ResultadoAnalise[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erros, setErros] = useState<string[]>([]);
+  const [salvando, setSalvando] = useState(false);
+  const [salvoMsg, setSalvoMsg] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Busca documentos já existentes
   useEffect(() => {
     async function carregarDocs() {
       if (!processoId && !clienteId) return;
@@ -101,7 +161,6 @@ export default function IaAnalisarModal({
           );
           if (r.ok) {
             const clienteDocs: DocExistente[] = await r.json();
-            // Evitar duplicatas
             const ids = new Set(docs.map((d) => d.id));
             docs.push(...clienteDocs.filter((d) => !ids.has(d.id)));
           }
@@ -159,8 +218,9 @@ export default function IaAnalisarModal({
     setCarregando(true);
     setErros([]);
     setResultados([]);
+    setSalvoMsg(null);
 
-    const novosResultados: { nome: string; resultado: string }[] = [];
+    const novosResultados: ResultadoAnalise[] = [];
     const novosErros: string[] = [];
 
     for (const target of targets) {
@@ -194,7 +254,8 @@ export default function IaAnalisarModal({
         } else {
           novosResultados.push({
             nome: target.nome,
-            resultado: data.resultado,
+            resultado: data.resultado ?? data.resultado,
+            dadosExtraidos: data.dadosExtraidos ?? null,
           });
         }
       } catch {
@@ -205,6 +266,48 @@ export default function IaAnalisarModal({
     setResultados(novosResultados);
     setErros(novosErros);
     setCarregando(false);
+  };
+
+  // Agrega dadosExtraidos de todos os resultados (campos não-nulos)
+  const dadosCombinados: DadosPrevidenciarios | null = (() => {
+    if (!clienteId) return null;
+    const combined: DadosPrevidenciarios = {};
+    for (const r of resultados) {
+      if (!r.dadosExtraidos) continue;
+      for (const [k, v] of Object.entries(r.dadosExtraidos)) {
+        const key = k as keyof DadosPrevidenciarios;
+        if (v !== null && v !== undefined && !(key in combined)) {
+          (combined as Record<string, unknown>)[key] = v;
+        }
+      }
+    }
+    return Object.keys(combined).length > 0 ? combined : null;
+  })();
+
+  const salvarDados = async () => {
+    if (!clienteId || !dadosCombinados) return;
+    setSalvando(true);
+    setSalvoMsg(null);
+    try {
+      const result = await complementarClienteAction(
+        clienteId,
+        dadosCombinados
+      );
+      if (result.error) {
+        setSalvoMsg(`Erro: ${result.error}`);
+      } else if (result.camposAtualizados.length === 0) {
+        setSalvoMsg("Todos os campos já estavam preenchidos no cadastro.");
+      } else {
+        const labels = result.camposAtualizados
+          .map((c) => LABELS[c as keyof DadosPrevidenciarios] ?? c)
+          .join(", ");
+        setSalvoMsg(`Salvo com sucesso: ${labels}`);
+      }
+    } catch {
+      setSalvoMsg("Erro ao salvar dados.");
+    } finally {
+      setSalvando(false);
+    }
   };
 
   const renderMarkdown = (text: string) =>
@@ -447,6 +550,77 @@ export default function IaAnalisarModal({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Complementar cadastro — só aparece se há clienteId e dados extraídos */}
+          {dadosCombinados && clienteId && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🧬</span>
+                <div>
+                  <p className="font-body text-sm font-semibold text-indigo-900">
+                    Dados identificados no documento
+                  </p>
+                  <p className="font-body text-xs text-indigo-600">
+                    O Dr. Lex encontrou informações previdenciárias. Deseja
+                    complementar o cadastro do cliente?
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {(
+                  Object.entries(dadosCombinados) as [
+                    keyof DadosPrevidenciarios,
+                    unknown,
+                  ][]
+                )
+                  .filter(([, v]) => v !== null && v !== undefined)
+                  .map(([k, v]) => (
+                    <div
+                      key={k}
+                      className="rounded-lg bg-white border border-indigo-100 px-3 py-2"
+                    >
+                      <p className="font-body text-xs text-indigo-500 font-semibold uppercase tracking-wide">
+                        {LABELS[k]}
+                      </p>
+                      <p className="font-body text-sm text-fg font-semibold mt-0.5">
+                        {formatFieldValue(k, v)}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+
+              {salvoMsg && (
+                <p
+                  className={`font-body text-xs font-semibold ${
+                    salvoMsg.startsWith("Erro")
+                      ? "text-red-600"
+                      : "text-green-700"
+                  }`}
+                >
+                  {salvoMsg.startsWith("Erro") ? "⚠️ " : "✅ "}
+                  {salvoMsg}
+                </p>
+              )}
+
+              {!salvoMsg && (
+                <button
+                  onClick={salvarDados}
+                  disabled={salvando}
+                  className="flex h-9 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 font-body text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {salvando ? (
+                    <>
+                      <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "💾 Complementar cadastro"
+                  )}
+                </button>
+              )}
             </div>
           )}
 

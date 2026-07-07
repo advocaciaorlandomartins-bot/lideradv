@@ -549,6 +549,138 @@ export async function updateClientAction(
   redirect(`/dashboard/clientes/${id}`);
 }
 
+export interface DadosPrevidenciariosComplemento {
+  cid_principal?: string | null;
+  tipo_incapacidade?: string | null;
+  data_diagnostico?: string | null;
+  data_afastamento?: string | null;
+  atividade_anterior?: string | null;
+  nis?: string | null;
+  num_beneficio?: string | null;
+  status_beneficio?: string | null;
+  tipo_beneficio?: string | null;
+  data_inicio_beneficio?: string | null;
+  valor_beneficio?: number | null;
+  filiacao_mae?: string | null;
+  filiacao_pai?: string | null;
+}
+
+export async function complementarClienteAction(
+  clienteId: string,
+  dados: DadosPrevidenciariosComplemento
+): Promise<{ error?: string; camposAtualizados: string[] }> {
+  "use server";
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "editar")) {
+    return { error: "Sem permissão.", camposAtualizados: [] };
+  }
+
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(clienteId)) {
+    return { error: "ID inválido.", camposAtualizados: [] };
+  }
+
+  // Busca valores atuais para só atualizar campos que estão nulos
+  let atual: Record<string, unknown>;
+  try {
+    const rows = await sql`
+      SELECT cid_principal, tipo_incapacidade, data_diagnostico, data_afastamento,
+             atividade_anterior, nis, num_beneficio, status_beneficio, tipo_beneficio,
+             data_inicio_beneficio, valor_beneficio, filiacao_mae, filiacao_pai
+      FROM clients WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
+    `;
+    if (!rows[0])
+      return { error: "Cliente não encontrado.", camposAtualizados: [] };
+    atual = rows[0] as Record<string, unknown>;
+  } catch (err) {
+    console.error("complementarClienteAction SELECT error:", err);
+    return { error: "Erro ao buscar dados do cliente.", camposAtualizados: [] };
+  }
+
+  // Monta lista de campos a atualizar (só onde o valor atual é nulo E o novo tem valor)
+  const campos: string[] = [];
+  const updates: Record<string, unknown> = {};
+
+  const candidatos: (keyof DadosPrevidenciariosComplemento)[] = [
+    "cid_principal",
+    "tipo_incapacidade",
+    "data_diagnostico",
+    "data_afastamento",
+    "atividade_anterior",
+    "nis",
+    "num_beneficio",
+    "status_beneficio",
+    "tipo_beneficio",
+    "data_inicio_beneficio",
+    "valor_beneficio",
+    "filiacao_mae",
+    "filiacao_pai",
+  ];
+
+  for (const campo of candidatos) {
+    const novoValor = dados[campo];
+    if (novoValor !== null && novoValor !== undefined && novoValor !== "") {
+      if (
+        atual[campo] === null ||
+        atual[campo] === undefined ||
+        atual[campo] === ""
+      ) {
+        updates[campo] = novoValor;
+        campos.push(campo);
+      }
+    }
+  }
+
+  if (campos.length === 0) {
+    return { camposAtualizados: [] };
+  }
+
+  const toDate = (v: unknown) => (v && typeof v === "string" ? v : null);
+  const toNum = (v: unknown) =>
+    v !== null && v !== undefined ? Number(v) : null;
+
+  try {
+    // COALESCE keeps existing value if not null; sets new value only if column is null
+    await sql`
+      UPDATE clients SET
+        cid_principal         = COALESCE(cid_principal,         ${(updates["cid_principal"] as string | null) ?? null}),
+        tipo_incapacidade     = COALESCE(tipo_incapacidade,     ${(updates["tipo_incapacidade"] as string | null) ?? null}),
+        data_diagnostico      = COALESCE(data_diagnostico,      ${toDate(updates["data_diagnostico"])}::date),
+        data_afastamento      = COALESCE(data_afastamento,      ${toDate(updates["data_afastamento"])}::date),
+        atividade_anterior    = COALESCE(atividade_anterior,    ${(updates["atividade_anterior"] as string | null) ?? null}),
+        nis                   = COALESCE(nis,                   ${(updates["nis"] as string | null) ?? null}),
+        num_beneficio         = COALESCE(num_beneficio,         ${(updates["num_beneficio"] as string | null) ?? null}),
+        status_beneficio      = COALESCE(status_beneficio,      ${(updates["status_beneficio"] as string | null) ?? null}),
+        tipo_beneficio        = COALESCE(tipo_beneficio,        ${(updates["tipo_beneficio"] as string | null) ?? null}),
+        data_inicio_beneficio = COALESCE(data_inicio_beneficio, ${toDate(updates["data_inicio_beneficio"])}::date),
+        valor_beneficio       = COALESCE(valor_beneficio,       ${toNum(updates["valor_beneficio"])}),
+        filiacao_mae          = COALESCE(filiacao_mae,          ${(updates["filiacao_mae"] as string | null) ?? null}),
+        filiacao_pai          = COALESCE(filiacao_pai,          ${(updates["filiacao_pai"] as string | null) ?? null})
+      WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
+    `;
+  } catch (err) {
+    console.error("complementarClienteAction UPDATE error:", err);
+    return {
+      error: "Erro ao atualizar dados do cliente.",
+      camposAtualizados: [],
+    };
+  }
+
+  try {
+    await logAction({
+      acao: "editar",
+      entidade: "cliente",
+      entidadeId: clienteId,
+      descricao: `Complementou dados previdenciários via Cérebro IA: ${campos.join(", ")}`,
+    });
+  } catch {
+    /* non-critical */
+  }
+
+  return { camposAtualizados: campos };
+}
+
 export async function deleteClientAction(
   id: string
 ): Promise<{ error?: string }> {

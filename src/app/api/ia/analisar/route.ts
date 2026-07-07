@@ -8,8 +8,9 @@
  *      (para documentos já salvos no Supabase Storage)
  */
 import { NextResponse } from "next/server";
+import { getDownloadUrl } from "@vercel/blob";
 import { getSession } from "@/lib/session";
-import { analisarDocumento } from "@/lib/ai-juridico";
+import { analisarDocumentoExtendido } from "@/lib/ai-juridico";
 import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
@@ -30,14 +31,18 @@ function isUrlPermitida(url: string): boolean {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") return false;
     const host = parsed.hostname;
-    const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
-      ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
-      : null;
-    const allowed = [supabaseHost, "supabase.co", "supabase.in"].filter(Boolean) as string[];
+    const allowed = ["blob.vercel-storage.com", "supabase.co", "supabase.in"];
     return allowed.some((h) => host === h || host.endsWith("." + h));
   } catch {
     return false;
   }
+}
+
+async function resolveUrl(url: string): Promise<string> {
+  if (url.includes(".private.blob.vercel-storage.com")) {
+    return getDownloadUrl(url);
+  }
+  return url;
 }
 
 const MAX_MB = 20;
@@ -81,11 +86,14 @@ export async function POST(req: Request) {
     }
 
     if (!isUrlPermitida(body.documentoUrl)) {
-      return NextResponse.json({ error: "URL de documento não permitida." }, { status: 400 });
+      return NextResponse.json(
+        { error: "URL de documento não permitida." },
+        { status: 400 }
+      );
     }
 
-    // Faz fetch do arquivo via URL pública
-    const fileRes = await fetch(body.documentoUrl).catch(() => null);
+    const fetchUrl = await resolveUrl(body.documentoUrl);
+    const fileRes = await fetch(fetchUrl).catch(() => null);
     if (!fileRes || !fileRes.ok) {
       return NextResponse.json(
         {
@@ -160,7 +168,7 @@ export async function POST(req: Request) {
   ]);
 
   try {
-    const resultado = await analisarDocumento({
+    const { resultado, dadosExtraidos } = await analisarDocumentoExtendido({
       nomeArquivo,
       conteudoBase64: base64,
       mimeType,
@@ -170,8 +178,12 @@ export async function POST(req: Request) {
         cliente: cliente ?? undefined,
         processo: processo ?? undefined,
       },
+      extrairDados: !!clienteId,
     });
-    return NextResponse.json({ resultado });
+    return NextResponse.json({
+      resultado,
+      dadosExtraidos: dadosExtraidos ?? null,
+    });
   } catch (err) {
     console.error("[/api/ia/analisar]", err);
     return NextResponse.json(

@@ -106,6 +106,18 @@ function maskCEP(v: string) {
   return d.replace(/(\d{5})(\d{1,3})$/, "$1-$2");
 }
 
+function maskPhone(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 10) {
+    return d
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d{1,4})$/, "$1-$2");
+  }
+  return d
+    .replace(/(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d{1,4})$/, "$1-$2");
+}
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ value }: { value: number }) {
@@ -772,9 +784,10 @@ export default function AiDocumentImport({
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(maskPhone(e.target.value))}
                   className={inputCls}
                   placeholder="(82) 9 0000-0000"
+                  inputMode="numeric"
                 />
               </Field>
             </div>
@@ -934,10 +947,11 @@ export default function AiDocumentImport({
               <Field label="Telefone do responsável">
                 <input
                   value={respTelefone}
-                  onChange={(e) => setRespTelefone(e.target.value)}
+                  onChange={(e) => setRespTelefone(maskPhone(e.target.value))}
                   className={inputCls}
                   placeholder="(82) 9 0000-0000"
                   type="tel"
+                  inputMode="numeric"
                 />
               </Field>
             </div>

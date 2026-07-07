@@ -131,13 +131,18 @@ export default function IaAnalisarModal({
   const [modo, setModo] = useState<"existente" | "novo">("existente");
   const [docsExistentes, setDocsExistentes] = useState<DocExistente[]>([]);
   const [carregandoDocs, setCarregandoDocs] = useState(false);
-  const [docSelecionado, setDocSelecionado] = useState<DocExistente | null>(
-    null
+  const [docsSelecionados, setDocsSelecionados] = useState<Set<string>>(
+    new Set()
   );
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [tipoAnalise, setTipoAnalise] = useState("completa");
   const [resultados, setResultados] = useState<ResultadoAnalise[]>([]);
   const [carregando, setCarregando] = useState(false);
+  const [progresso, setProgresso] = useState<{
+    atual: number;
+    total: number;
+    nome: string;
+  } | null>(null);
   const [erros, setErros] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [salvoMsg, setSalvoMsg] = useState<string | null>(null);
@@ -194,6 +199,23 @@ export default function IaAnalisarModal({
     setArquivos((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const toggleDoc = (id: string) => {
+    setDocsSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selecionarTodos = () => {
+    if (docsSelecionados.size === docsExistentes.length) {
+      setDocsSelecionados(new Set());
+    } else {
+      setDocsSelecionados(new Set(docsExistentes.map((d) => d.id)));
+    }
+  };
+
   const analisar = async () => {
     const targets: {
       nome: string;
@@ -201,12 +223,12 @@ export default function IaAnalisarModal({
       data: DocExistente | File;
     }[] = [];
 
-    if (modo === "existente" && docSelecionado) {
-      targets.push({
-        nome: docSelecionado.nome,
-        tipo: "existente",
-        data: docSelecionado,
-      });
+    if (modo === "existente" && docsSelecionados.size > 0) {
+      docsExistentes
+        .filter((d) => docsSelecionados.has(d.id))
+        .forEach((d) =>
+          targets.push({ nome: d.nome, tipo: "existente", data: d })
+        );
     } else if (modo === "novo" && arquivos.length > 0) {
       arquivos.forEach((f) =>
         targets.push({ nome: f.name, tipo: "arquivo", data: f })
@@ -216,6 +238,7 @@ export default function IaAnalisarModal({
     if (targets.length === 0) return;
 
     setCarregando(true);
+    setProgresso(null);
     setErros([]);
     setResultados([]);
     setSalvoMsg(null);
@@ -223,7 +246,9 @@ export default function IaAnalisarModal({
     const novosResultados: ResultadoAnalise[] = [];
     const novosErros: string[] = [];
 
-    for (const target of targets) {
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      setProgresso({ atual: i + 1, total: targets.length, nome: target.nome });
       try {
         let res: Response;
         if (target.tipo === "existente") {
@@ -254,18 +279,19 @@ export default function IaAnalisarModal({
         } else {
           novosResultados.push({
             nome: target.nome,
-            resultado: data.resultado ?? data.resultado,
+            resultado: data.resultado,
             dadosExtraidos: data.dadosExtraidos ?? null,
           });
+          setResultados([...novosResultados]);
         }
       } catch {
         novosErros.push(`${target.nome}: Erro de conexão.`);
       }
     }
 
-    setResultados(novosResultados);
     setErros(novosErros);
     setCarregando(false);
+    setProgresso(null);
   };
 
   // Agrega dadosExtraidos de todos os resultados (campos não-nulos)
@@ -370,7 +396,7 @@ export default function IaAnalisarModal({
 
           {/* Docs existentes */}
           {modo === "existente" && (
-            <div>
+            <div className="space-y-2">
               {carregandoDocs ? (
                 <div className="flex items-center justify-center h-24 text-muted font-body text-sm">
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" />
@@ -381,41 +407,75 @@ export default function IaAnalisarModal({
                   Nenhum documento suportado encontrado no processo.
                 </p>
               ) : (
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {docsExistentes.map((doc) => (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="font-body text-xs text-muted">
+                      {docsSelecionados.size > 0
+                        ? `${docsSelecionados.size} de ${docsExistentes.length} selecionado(s)`
+                        : "Selecione um ou mais documentos"}
+                    </p>
                     <button
-                      key={doc.id}
-                      onClick={() =>
-                        setDocSelecionado(
-                          docSelecionado?.id === doc.id ? null : doc
-                        )
-                      }
-                      className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
-                        docSelecionado?.id === doc.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-slate-300 hover:bg-slate-50"
-                      }`}
+                      onClick={selecionarTodos}
+                      className="font-body text-xs font-semibold text-primary hover:underline"
                     >
-                      <span className="text-2xl flex-shrink-0">
-                        {docIcon(doc.tipo)}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-body text-sm font-semibold text-fg truncate">
-                          {doc.nome}
-                        </p>
-                        <p className="font-body text-xs text-muted">
-                          {doc.tamanho ? formatBytes(doc.tamanho) : ""} ·{" "}
-                          {doc.created_at_formatted}
-                        </p>
-                      </div>
-                      {docSelecionado?.id === doc.id && (
-                        <span className="text-primary font-bold text-lg flex-shrink-0">
-                          ✓
-                        </span>
-                      )}
+                      {docsSelecionados.size === docsExistentes.length
+                        ? "Desmarcar todos"
+                        : "Selecionar todos"}
                     </button>
-                  ))}
-                </div>
+                  </div>
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {docsExistentes.map((doc) => {
+                      const selecionado = docsSelecionados.has(doc.id);
+                      return (
+                        <button
+                          key={doc.id}
+                          onClick={() => toggleDoc(doc.id)}
+                          className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                            selecionado
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div
+                            className={`h-5 w-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+                              selecionado
+                                ? "border-primary bg-primary"
+                                : "border-slate-300"
+                            }`}
+                          >
+                            {selecionado && (
+                              <svg
+                                className="h-3 w-3 text-white"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={3}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-xl flex-shrink-0">
+                            {docIcon(doc.tipo)}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-body text-sm font-semibold text-fg truncate">
+                              {doc.nome}
+                            </p>
+                            <p className="font-body text-xs text-muted">
+                              {doc.tamanho ? formatBytes(doc.tamanho) : ""} ·{" "}
+                              {doc.created_at_formatted}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -624,24 +684,53 @@ export default function IaAnalisarModal({
             </div>
           )}
 
+          {/* Progresso */}
+          {progresso && (
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="font-body text-xs font-semibold text-blue-700">
+                  Analisando {progresso.atual}/{progresso.total}
+                </p>
+                <p className="font-body text-xs text-blue-500">
+                  {Math.round((progresso.atual / progresso.total) * 100)}%
+                </p>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-blue-100">
+                <div
+                  className="h-1.5 rounded-full bg-blue-500 transition-all duration-300"
+                  style={{
+                    width: `${(progresso.atual / progresso.total) * 100}%`,
+                  }}
+                />
+              </div>
+              <p className="font-body text-xs text-blue-600 truncate">
+                {progresso.nome}
+              </p>
+            </div>
+          )}
+
           {/* Ações */}
           <button
             onClick={analisar}
             disabled={
               carregando ||
-              (modo === "existente" ? !docSelecionado : arquivos.length === 0)
+              (modo === "existente"
+                ? docsSelecionados.size === 0
+                : arquivos.length === 0)
             }
             className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary font-body text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {carregando ? (
               <>
                 <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Analisando...
+                {progresso
+                  ? `Analisando ${progresso.atual}/${progresso.total}...`
+                  : "Analisando..."}
               </>
             ) : resultados.length > 0 ? (
-              "🔄 Reanalisar"
+              `🔄 Reanalisar${docsSelecionados.size > 1 ? ` (${docsSelecionados.size})` : ""}`
             ) : (
-              "🔍 Analisar com Dr. Lex"
+              `🔍 Analisar com Dr. Lex${docsSelecionados.size > 1 ? ` (${docsSelecionados.size} docs)` : ""}`
             )}
           </button>
         </div>

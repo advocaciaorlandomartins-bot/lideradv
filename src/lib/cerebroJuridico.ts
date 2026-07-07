@@ -1,6 +1,5 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { getDownloadUrl } from "@vercel/blob";
 import sql from "@/lib/db";
 
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
@@ -1196,7 +1195,7 @@ export async function prepararAnalise(
   `;
   if (!processo) throw new Error("Processo não encontrado");
 
-  const [andamentos, documentos, contexto] = await Promise.all([
+  const [andamentos, documentos, contexto, docAnalises] = await Promise.all([
     sql`
       SELECT texto, tipo, data_referencia, situacao
       FROM historico_registros
@@ -1212,13 +1211,18 @@ export async function prepararAnalise(
         }[]
     ),
     sql`
-      SELECT nome, tipo FROM documentos
+      SELECT nome, tipo, url FROM documentos
       WHERE entity_type = 'processo' AND entity_id = ${processoId}::uuid
-    `.catch(() => [] as { nome: unknown; tipo: unknown }[]),
+    `.catch(() => [] as { nome: unknown; tipo: unknown; url: unknown }[]),
     obterContextoCerebro(
       processo.tipo_acao || "",
       processo.area || "Previdenciário"
     ).catch(() => ""),
+    sql`
+      SELECT titulo, analise FROM cerebro_analises
+      WHERE processo_id = ${processoId}::uuid AND tipo = 'documento'
+      ORDER BY created_at DESC LIMIT 5
+    `.catch(() => [] as { titulo: unknown; analise: unknown }[]),
   ]);
 
   const modo = detectarModo(String(processo.tipo_acao || ""));
@@ -1284,6 +1288,16 @@ ${
 
 DOCUMENTOS ANEXADOS (${documentos.length}):
 ${documentos.map((d) => d.nome).join(", ") || "Nenhum"}
+${
+  docAnalises.length > 0
+    ? `\nCONTEÚDO DOS DOCUMENTOS (lidos pelo Dr. Lex):\n${docAnalises
+        .map(
+          (da) =>
+            `\n--- ${da.titulo} ---\n${String(da.analise || "").substring(0, 800)}`
+        )
+        .join("\n")}`
+    : ""
+}
 
 DADOS FALTANTES (${faltantes.filter((f) => f.prioridade === "alta").length} críticos):
 ${faltantes.map((f) => `• [${f.prioridade.toUpperCase()}] ${f.campo}`).join("\n") || "Nenhum — dados completos"}
@@ -1296,6 +1310,7 @@ ${promptModoEspecializado(modo)}
 ${contexto}
 
 TAREFA: Análise jurídica completa, estruturada em módulos, para este caso.
+IMPORTANTE: Considere o conteúdo real dos documentos lidos pelo Dr. Lex (seção CONTEÚDO DOS DOCUMENTOS) ao avaliar a probabilidade de êxito e os pontos fortes.
 
 ${dadosProcesso}
 
@@ -1761,11 +1776,14 @@ export async function analisarDocumento(
   ]);
   if (!doc) throw new Error("Documento não encontrado");
 
-  let fetchUrl = doc.url as string;
-  if (fetchUrl.includes(".private.blob.vercel-storage.com")) {
-    fetchUrl = await getDownloadUrl(fetchUrl);
-  }
-  const resp = await fetch(fetchUrl);
+  const docUrl = doc.url as string;
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  const resp =
+    docUrl.includes(".private.blob.vercel-storage.com") && blobToken
+      ? await fetch(docUrl, {
+          headers: { Authorization: `Bearer ${blobToken}` },
+        })
+      : await fetch(docUrl);
   if (!resp.ok) return "Não foi possível acessar o documento.";
 
   const buffer = await resp.arrayBuffer();

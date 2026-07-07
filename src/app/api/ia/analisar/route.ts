@@ -8,7 +8,6 @@
  *      (para documentos já salvos no Supabase Storage)
  */
 import { NextResponse } from "next/server";
-import { getDownloadUrl } from "@vercel/blob";
 import { getSession } from "@/lib/session";
 import { analisarDocumentoExtendido } from "@/lib/ai-juridico";
 import { getClientFull } from "@/lib/clients-db";
@@ -38,11 +37,14 @@ function isUrlPermitida(url: string): boolean {
   }
 }
 
-async function resolveUrl(url: string): Promise<string> {
+async function fetchBlobContent(url: string): Promise<Response | null> {
   if (url.includes(".private.blob.vercel-storage.com")) {
-    return getDownloadUrl(url);
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    return fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).catch(() => null);
   }
-  return url;
+  return fetch(url).catch(() => null);
 }
 
 const MAX_MB = 20;
@@ -92,8 +94,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const fetchUrl = await resolveUrl(body.documentoUrl);
-    const fileRes = await fetch(fetchUrl).catch(() => null);
+    const fileRes = await fetchBlobContent(body.documentoUrl);
     if (!fileRes || !fileRes.ok) {
       return NextResponse.json(
         {

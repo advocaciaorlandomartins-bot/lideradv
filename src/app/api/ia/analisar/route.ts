@@ -13,6 +13,7 @@ import { analisarDocumentoExtendido } from "@/lib/ai-juridico";
 import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
+import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -181,6 +182,25 @@ export async function POST(req: Request) {
       },
       extrairDados: !!clienteId,
     });
+
+    // Salva no banco para o Cérebro poder ler depois
+    if (processoId) {
+      try {
+        await sql`
+          INSERT INTO cerebro_analises (processo_id, tipo, titulo, analise, metadata)
+          VALUES (
+            ${processoId}::uuid,
+            'documento',
+            ${"Análise: " + nomeArquivo},
+            ${resultado},
+            ${JSON.stringify({ nome: nomeArquivo, tipo_analise: tipoAnalise })}
+          )
+        `;
+      } catch {
+        // não bloqueia a resposta se falhar
+      }
+    }
+
     return NextResponse.json({
       resultado,
       dadosExtraidos: dadosExtraidos ?? null,

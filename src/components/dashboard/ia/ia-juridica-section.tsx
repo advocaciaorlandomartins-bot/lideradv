@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import {
   SKILLS,
@@ -61,6 +61,25 @@ export default function IaJuridicaSection({
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [workflowStep, setWorkflowStep] = useState<WorkflowStep>(0);
+
+  // Restaura o passo do workflow a partir do banco ao montar
+  useEffect(() => {
+    if (!processoId) return;
+    fetch(`/api/cerebro/status/${processoId}`)
+      .then((r) => r.json())
+      .then(({ analises }) => {
+        if (!Array.isArray(analises)) return;
+        const temDoc = analises.some(
+          (a: { tipo: string }) => a.tipo === "documento"
+        );
+        const temCerebro = analises.some(
+          (a: { tipo: string }) => a.tipo === "inicial"
+        );
+        if (temCerebro) setWorkflowStep(3);
+        else if (temDoc) setWorkflowStep(1);
+      })
+      .catch(() => {});
+  }, [processoId]);
 
   const analisar = async () => {
     setCarregando(true);

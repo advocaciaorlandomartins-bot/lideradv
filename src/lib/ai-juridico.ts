@@ -308,26 +308,34 @@ export async function analisarDocumentoExtendido(
   const extrairInstrucao = params.extrairDados
     ? `
 
----
-EXTRAÇÃO DE DADOS (ao final da análise, adicione exatamente este bloco JSON — não invente dados ausentes):
+INSTRUÇÃO OBRIGATÓRIA — EXTRAÇÃO DE DADOS:
+Após concluir a análise, você DEVE adicionar obrigatoriamente o bloco abaixo, exatamente com este marcador.
+Preencha apenas o que estiver explicitamente no documento. Use null (sem aspas) para campos ausentes.
+NÃO copie os exemplos — use os valores reais do documento.
 
 \`\`\`json_dados_previd
 {
-  "cid_principal": "CXX.X ou null",
-  "tipo_incapacidade": "total permanente | total temporária | parcial | null",
-  "data_diagnostico": "YYYY-MM-DD ou null",
-  "data_afastamento": "YYYY-MM-DD ou null",
-  "atividade_anterior": "última ocupação ou null",
-  "nis": "11 dígitos ou null",
-  "num_beneficio": "número ou null",
-  "status_beneficio": "ativo | cessado | indeferido | null",
-  "tipo_beneficio": "B31 | B32 | B41 | B42 | B93 | B94 | B96 | outro | null",
-  "data_inicio_beneficio": "YYYY-MM-DD ou null",
-  "valor_beneficio": número_decimal_ou_null,
-  "filiacao_mae": "nome ou null",
-  "filiacao_pai": "nome ou null"
+  "cid_principal": null,
+  "tipo_incapacidade": null,
+  "data_diagnostico": null,
+  "data_afastamento": null,
+  "atividade_anterior": null,
+  "nis": null,
+  "num_beneficio": null,
+  "status_beneficio": null,
+  "tipo_beneficio": null,
+  "data_inicio_beneficio": null,
+  "valor_beneficio": null,
+  "filiacao_mae": null,
+  "filiacao_pai": null
 }
-\`\`\``
+\`\`\`
+
+Exemplos de preenchimento:
+- CID encontrado "M54.5" → "cid_principal": "M54.5"
+- Data "15/03/2023" → "data_diagnostico": "2023-03-15"
+- Valor "R$ 1.412,00" → "valor_beneficio": 1412.00
+- Campo não mencionado no documento → null`
     : "";
 
   const isImage = params.mimeType.startsWith("image/");
@@ -362,7 +370,7 @@ EXTRAÇÃO DE DADOS (ao final da análise, adicione exatamente este bloco JSON �
   const res = await client.messages.create(
     {
       model: "claude-sonnet-4-6",
-      max_tokens: 2500,
+      max_tokens: 3500,
       system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
       messages: [
         {
@@ -393,20 +401,37 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
       : "Não foi possível analisar o documento.";
 
   // Extrai o bloco JSON de dados previdenciários
+  // Tenta múltiplos padrões para robustez contra variações de formatação do AI
   let dadosExtraidos: DadosPrevidenciarios | null = null;
-  const jsonMatch = fullText.match(/```json_dados_previd\s*([\s\S]*?)```/);
+  const jsonMatch =
+    fullText.match(/```json_dados_previd\s*([\s\S]*?)```/) ??
+    fullText.match(/```json_dados_previd\s*([\s\S]*?)(?:```|$)/) ??
+    fullText.match(/json_dados_previd[^\n]*\n([\s\S]*?\})/);
+
   const resultado = fullText
-    .replace(/\n?---\s*\nEXTRAÇÃO DE DADOS[\s\S]*$/, "")
+    .replace(/\nINSTRUÇÃO OBRIGATÓRIA[\s\S]*$/, "")
     .replace(/```json_dados_previd[\s\S]*?```/g, "")
+    .replace(/```json_dados_previd[\s\S]*$/, "")
     .trim();
 
   if (jsonMatch) {
     try {
-      const parsed = JSON.parse(jsonMatch[1].trim()) as DadosPrevidenciarios;
-      // Filtra só campos com valor real (não null/undefined/"null")
+      const raw = jsonMatch[1].trim();
+      // Garante que pega apenas o objeto JSON mesmo se houver texto extra
+      const objMatch = raw.match(/\{[\s\S]*\}/);
+      const parsed = JSON.parse(
+        objMatch ? objMatch[0] : raw
+      ) as DadosPrevidenciarios;
+      // Filtra só campos com valor real (não null/undefined/"null"/string vazia)
       const filtrado: DadosPrevidenciarios = {};
       for (const [k, v] of Object.entries(parsed)) {
-        if (v !== null && v !== undefined && v !== "null" && v !== "") {
+        if (
+          v !== null &&
+          v !== undefined &&
+          v !== "null" &&
+          v !== "" &&
+          String(v).toLowerCase() !== "null"
+        ) {
           (filtrado as Record<string, unknown>)[k] = v;
         }
       }

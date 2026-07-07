@@ -39,7 +39,6 @@ export default async function ProcessoDetailPage({
     tarefas,
     pendencias,
     colaboradores,
-    documentos,
     modelos,
   ] = await Promise.all([
     getProcessoExtended(id),
@@ -48,11 +47,19 @@ export default async function ProcessoDetailPage({
     getTarefasByProcesso(id),
     getPendenciasByProcesso(id),
     getColaboradoresAtivos(),
-    getDocumentosByEntityId("processo", id),
     getModelosAtivos(),
   ]);
 
   if (!processo) notFound();
+
+  // Carrega documentos do processo + documentos do cliente (enviados pela ficha do cliente)
+  const [docsProcesso, docsCliente] = await Promise.all([
+    getDocumentosByEntityId("processo", id),
+    processo.client_id
+      ? getDocumentosByEntityId("cliente", processo.client_id)
+      : Promise.resolve([]),
+  ]);
+  const documentos = [...docsProcesso, ...docsCliente];
 
   return (
     <div className="space-y-5">

@@ -1,5 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { getDownloadUrl } from "@vercel/blob";
 import sql from "@/lib/db";
 
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
@@ -1438,7 +1439,11 @@ export async function analisarDocumento(
   ]);
   if (!doc) throw new Error("Documento não encontrado");
 
-  const resp = await fetch(doc.url as string);
+  let fetchUrl = doc.url as string;
+  if (fetchUrl.includes(".private.blob.vercel-storage.com")) {
+    fetchUrl = await getDownloadUrl(fetchUrl);
+  }
+  const resp = await fetch(fetchUrl);
   if (!resp.ok) return "Não foi possível acessar o documento.";
 
   const buffer = await resp.arrayBuffer();

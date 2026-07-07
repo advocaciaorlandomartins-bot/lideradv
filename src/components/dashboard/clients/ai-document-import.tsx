@@ -201,6 +201,14 @@ export default function AiDocumentImport({
   const [stateUf, setStateUf] = useState("");
   const [notes, setNotes] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
+
+  // Responsável legal (menor/incapaz)
+  const [respNome, setRespNome] = useState("");
+  const [respCpf, setRespCpf] = useState("");
+  const [respTelefone, setRespTelefone] = useState("");
+  const [respImporting, setRespImporting] = useState(false);
+  const respFileRef = useRef<HTMLInputElement>(null);
+
   const [, startTransition] = useTransition();
 
   // force=true: sempre sobrescreve (usuário digitou CEP manualmente)
@@ -228,6 +236,40 @@ export default function AiDocumentImport({
       // silently fail
     } finally {
       setCepLoading(false);
+    }
+  }
+
+  async function handleRespFileSelect(file: File) {
+    const errs = validateFile(file);
+    if (errs.length > 0) {
+      setErrors(errs);
+      return;
+    }
+    setRespImporting(true);
+    setErrors([]);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/clientes/importacao-ia", {
+        method: "POST",
+        body: fd,
+      });
+      const result: { data?: AiExtractedData; error?: string } = await res
+        .json()
+        .catch(() => ({}));
+      if (!res.ok || result.error || !result.data) {
+        setErrors([
+          result.error ?? "Erro ao processar documento do responsável.",
+        ]);
+        return;
+      }
+      const d = result.data;
+      if (d.name) setRespNome(d.name);
+      if (d.cpf) setRespCpf(maskCPF(d.cpf));
+    } catch {
+      setErrors(["Erro ao processar documento do responsável."]);
+    } finally {
+      setRespImporting(false);
     }
   }
 
@@ -370,16 +412,14 @@ export default function AiDocumentImport({
     const missing: string[] = [];
     if (!name.trim()) missing.push("nome");
     if (!cpf.trim()) missing.push("CPF");
-    if (!phone.trim())
-      missing.push(
-        "telefone (não encontrado no documento — preencha manualmente)"
-      );
     if (missing.length > 0) {
       setErrors([`Informe os campos obrigatórios: ${missing.join(", ")}.`]);
       return;
     }
     setErrors([]);
     setStep("creating");
+
+    const temResponsavel = respNome.trim().length > 0;
 
     const fd = new FormData();
     fd.set("type", "PF");
@@ -398,7 +438,10 @@ export default function AiDocumentImport({
     fd.set("city", city || "A preencher");
     fd.set("state", stateUf || "AL");
     fd.set("notes", notes);
-    fd.set("menor_incapaz", "false");
+    fd.set("menor_incapaz", temResponsavel ? "true" : "false");
+    fd.set("responsavel_nome", respNome.trim());
+    fd.set("responsavel_cpf", respCpf.trim());
+    fd.set("responsavel_telefone", respTelefone.trim());
     fd.set("origem_tipo", "");
     fd.set("origem_texto", "");
     fd.set("indicador_id", "");
@@ -446,6 +489,10 @@ export default function AiDocumentImport({
     setCity("");
     setStateUf("");
     setNotes("");
+    setRespNome("");
+    setRespCpf("");
+    setRespTelefone("");
+    lastFetchedCep.current = "";
   }
 
   const isProcessing = step === "extracting" || step === "creating";
@@ -721,20 +768,14 @@ export default function AiDocumentImport({
                   placeholder="email@exemplo.com"
                 />
               </Field>
-              <Field label="Telefone *">
+              <Field label="Telefone">
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className={`${inputCls} ${!phone.trim() ? "border-amber-300 focus:border-amber-400 focus:ring-amber-100" : ""}`}
+                  className={inputCls}
                   placeholder="(82) 9 0000-0000"
                 />
-                {!phone.trim() && (
-                  <p className="mt-1 font-body text-xs text-amber-600">
-                    Documentos geralmente não contêm telefone — preencha
-                    manualmente
-                  </p>
-                )}
               </Field>
             </div>
           </div>
@@ -835,6 +876,73 @@ export default function AiDocumentImport({
             </div>
           </div>
 
+          {/* Responsável Legal */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="h-px flex-1 bg-border" />
+              <span className="font-body text-xs font-bold uppercase tracking-wide text-muted">
+                Responsável Legal (opcional)
+              </span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <input
+              ref={respFileRef}
+              type="file"
+              accept={ACCEPTED_TYPES.join(",")}
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleRespFileSelect(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => respFileRef.current?.click()}
+              disabled={respImporting}
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-2.5 font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+            >
+              {respImporting ? (
+                <SpinnerIcon className="h-4 w-4 animate-spin" />
+              ) : (
+                <DocumentArrowUpIcon className="h-4 w-4" />
+              )}
+              {respImporting
+                ? "Importando documento…"
+                : "Importar documento do responsável (genitora/pai/tutor)"}
+            </button>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Field label="Nome do responsável">
+                  <input
+                    value={respNome}
+                    onChange={(e) => setRespNome(e.target.value)}
+                    className={inputCls}
+                    placeholder="Nome completo"
+                  />
+                </Field>
+              </div>
+              <Field label="CPF do responsável">
+                <input
+                  value={respCpf}
+                  onChange={(e) => setRespCpf(maskCPF(e.target.value))}
+                  className={inputCls}
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
+                />
+              </Field>
+              <Field label="Telefone do responsável">
+                <input
+                  value={respTelefone}
+                  onChange={(e) => setRespTelefone(e.target.value)}
+                  className={inputCls}
+                  placeholder="(82) 9 0000-0000"
+                  type="tel"
+                />
+              </Field>
+            </div>
+          </div>
+
           {/* Observações */}
           <div>
             <Field label="Observações">
@@ -860,9 +968,7 @@ export default function AiDocumentImport({
             </button>
             <button
               onClick={handleCreateClient}
-              disabled={
-                isProcessing || !name.trim() || !cpf.trim() || !phone.trim()
-              }
+              disabled={isProcessing || !name.trim() || !cpf.trim()}
               className="flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-cta px-6 font-body text-sm font-semibold text-white transition-colors hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               <UserPlusIcon className="h-4 w-4" />

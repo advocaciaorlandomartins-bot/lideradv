@@ -1052,7 +1052,7 @@ function FolhaTab({
                 key={colId}
                 className="rounded-xl border border-border bg-white overflow-hidden"
               >
-                <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-border">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 bg-slate-50 border-b border-border">
                   <div>
                     <span className="font-heading text-sm font-semibold text-fg">
                       {first.colaborador_nome}
@@ -1070,46 +1070,48 @@ function FolhaTab({
                     </span>
                   </div>
                 </div>
-                <table className="w-full table-auto text-sm">
-                  <tbody className="divide-y divide-border">
-                    {items.map((r) => (
-                      <tr
-                        key={r.id}
-                        className="hover:bg-primary/5 transition-colors"
-                      >
-                        <td className="px-4 py-2.5 font-body text-xs text-muted whitespace-nowrap w-24">
-                          {r.competencia ?? "—"}
-                        </td>
-                        <td className="px-4 py-2.5 w-28">
-                          <span
-                            className={`inline-block rounded px-1.5 py-0.5 font-body text-xs font-semibold ${REM_TIPO_COLORS[r.tipo] ?? "bg-slate-100 text-slate-600"}`}
-                          >
-                            {REM_TIPO_LABELS[r.tipo] ?? r.tipo}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 font-body text-xs text-muted max-w-[180px] truncate">
-                          {r.fonte}
-                        </td>
-                        <td className="px-4 py-2.5 font-body text-xs text-fg max-w-[200px] truncate">
-                          {r.descricao ?? "—"}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-body text-sm font-semibold text-violet-600 whitespace-nowrap">
-                          {fmt(r.valor)}
-                        </td>
-                        <td className="px-4 py-2.5 w-24">
-                          <span
-                            className={`inline-block rounded-full px-2 py-0.5 font-body text-xs font-semibold ${STATUS_COLORS[r.status] ?? ""}`}
-                          >
-                            {STATUS_LABELS[r.status] ?? r.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 font-body text-xs text-muted whitespace-nowrap">
-                          {r.data_pagamento ?? "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="w-full table-auto text-sm">
+                    <tbody className="divide-y divide-border">
+                      {items.map((r) => (
+                        <tr
+                          key={r.id}
+                          className="hover:bg-primary/5 transition-colors"
+                        >
+                          <td className="px-4 py-2.5 font-body text-xs text-muted whitespace-nowrap w-24">
+                            {r.competencia ?? "—"}
+                          </td>
+                          <td className="px-4 py-2.5 w-28">
+                            <span
+                              className={`inline-block rounded px-1.5 py-0.5 font-body text-xs font-semibold ${REM_TIPO_COLORS[r.tipo] ?? "bg-slate-100 text-slate-600"}`}
+                            >
+                              {REM_TIPO_LABELS[r.tipo] ?? r.tipo}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 font-body text-xs text-muted max-w-[180px] truncate">
+                            {r.fonte}
+                          </td>
+                          <td className="px-4 py-2.5 font-body text-xs text-fg max-w-[200px] truncate">
+                            {r.descricao ?? "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-body text-sm font-semibold text-violet-600 whitespace-nowrap">
+                            {fmt(r.valor)}
+                          </td>
+                          <td className="px-4 py-2.5 w-24">
+                            <span
+                              className={`inline-block rounded-full px-2 py-0.5 font-body text-xs font-semibold ${STATUS_COLORS[r.status] ?? ""}`}
+                            >
+                              {STATUS_LABELS[r.status] ?? r.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 font-body text-xs text-muted whitespace-nowrap">
+                            {r.data_pagamento ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             );
           })}
@@ -1833,7 +1835,7 @@ function ReciboTab({
       {clienteId && filtered.length > 0 && (
         <>
           {/* Resumo KPIs */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
               <p className="font-body text-xs font-semibold uppercase tracking-wide text-emerald-700">
                 Total Pago

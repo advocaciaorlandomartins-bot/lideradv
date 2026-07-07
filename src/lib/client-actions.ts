@@ -138,7 +138,7 @@ export async function createClientAction(
     ? parseInt(numContribuicoesRaw, 10)
     : null;
 
-  if (!type || !name || !doc || !phone) {
+  if (!type || !name || !doc) {
     return { error: "Preencha todos os campos obrigatórios." };
   }
 
@@ -385,7 +385,7 @@ export async function updateClientAction(
     ? parseInt(numContribuicoesRaw, 10)
     : null;
 
-  if (!type || !name || !doc || !phone) {
+  if (!type || !name || !doc) {
     return { error: "Preencha todos os campos obrigatórios." };
   }
 

@@ -533,117 +533,176 @@ export default function ControlesContent({
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-slate-50/80">
-                  <th className="w-1 px-0 py-0" />{" "}
-                  {/* borda esquerda urgência */}
-                  <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted whitespace-nowrap">
-                    {tipoConfig.col_data}
-                  </th>
-                  <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    {tipoConfig.col_evento}
-                  </th>
-                  <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Cliente / Processo
-                  </th>
-                  <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Responsável
-                  </th>
-                  <th className="px-4 py-3 text-center font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Status
-                  </th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {controles.map((c) => (
-                  <tr
-                    key={c.id}
-                    onClick={() =>
-                      router.push(
-                        `/dashboard/controles/${c.id}/editar?tipo=${c.tipo}`
-                      )
-                    }
-                    className={`group cursor-pointer hover:bg-primary/5 transition-colors ${urgencyRowBorder(c.data_evento, c.status)}`}
-                  >
-                    {/* Borda urgência (visual) — a coluna vazia recebe a cor via border-left na tr */}
-                    <td className="w-0 p-0" />
-
-                    {/* Data + urgência */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+          <>
+            {/* ── Mobile card list (< md) ───────────────────────── */}
+            <div className="md:hidden divide-y divide-border">
+              {controles.map((c) => (
+                <div
+                  key={c.id}
+                  className={`px-4 py-3 ${urgencyRowBorder(c.data_evento, c.status)}`}
+                >
+                  {/* Top row: date + urgency + status */}
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2">
                       <p className="font-body text-sm font-semibold text-fg">
                         {formatDate(c.data_evento)}
                       </p>
-                      <div className="mt-0.5">
-                        <UrgencyBadge
-                          dataEvento={c.data_evento}
-                          status={c.status}
-                        />
-                      </div>
-                    </td>
-
-                    {/* Descrição */}
-                    <td className="px-4 py-3 max-w-xs">
-                      <p className="font-body text-sm text-fg line-clamp-2 group-hover:text-primary transition-colors">
-                        {c.descricao}
-                      </p>
-                      {c.tipo_demanda && (
-                        <span className="mt-0.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 font-body text-[10px] font-medium text-slate-600">
-                          {c.tipo_demanda}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Cliente / Processo */}
-                    <td className="px-4 py-3">
-                      {c.cliente_nome ? (
-                        <p className="font-body text-sm font-medium text-fg">
-                          {c.cliente_nome}
-                        </p>
-                      ) : (
-                        <p className="font-body text-sm text-muted">—</p>
-                      )}
-                      {c.processo_numero && (
-                        <p className="font-body text-xs text-muted mt-0.5">
-                          {c.processo_numero}
-                        </p>
-                      )}
-                    </td>
-
-                    {/* Responsável */}
-                    <td className="px-4 py-3">
-                      {c.responsavel_login ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 font-body text-xs font-medium text-slate-700">
-                          <span className="h-4 w-4 flex-shrink-0 rounded-full bg-primary/20 text-center font-heading text-[9px] font-bold text-primary leading-4">
-                            {c.responsavel_login.charAt(0).toUpperCase()}
-                          </span>
-                          {c.responsavel_login}
-                        </span>
-                      ) : (
-                        <span className="font-body text-xs text-muted">—</span>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-body text-[11px] font-semibold ${STATUS_CONTROLE[c.status].color}`}
-                      >
-                        {STATUS_CONTROLE[c.status].label}
+                      <UrgencyBadge
+                        dataEvento={c.data_evento}
+                        status={c.status}
+                      />
+                    </div>
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-body text-[11px] font-semibold ${STATUS_CONTROLE[c.status].color}`}
+                    >
+                      {STATUS_CONTROLE[c.status].label}
+                    </span>
+                  </div>
+                  {/* Description */}
+                  <p className="font-body text-sm text-fg mb-1 line-clamp-2">
+                    {c.descricao}
+                  </p>
+                  {/* Client / process / responsible */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mb-2">
+                    {c.cliente_nome && (
+                      <span className="font-body text-xs font-semibold text-primary">
+                        {c.cliente_nome}
                       </span>
-                    </td>
+                    )}
+                    {c.processo_numero && (
+                      <span className="font-body text-xs text-muted">
+                        {c.processo_numero}
+                      </span>
+                    )}
+                    {c.responsavel_login && (
+                      <span className="font-body text-xs text-muted">
+                        {c.responsavel_login}
+                      </span>
+                    )}
+                  </div>
+                  {/* Actions */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <RowActions controle={c} />
+                  </div>
+                </div>
+              ))}
+            </div>
 
-                    {/* Ações */}
-                    <td className="px-4 py-3">
-                      <RowActions controle={c} />
-                    </td>
+            {/* ── Desktop table (≥ md) ──────────────────────────── */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-slate-50/80">
+                    <th className="w-1 px-0 py-0" />{" "}
+                    {/* borda esquerda urgência */}
+                    <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted whitespace-nowrap">
+                      {tipoConfig.col_data}
+                    </th>
+                    <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      {tipoConfig.col_evento}
+                    </th>
+                    <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      Cliente / Processo
+                    </th>
+                    <th className="px-4 py-3 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      Responsável
+                    </th>
+                    <th className="px-4 py-3 text-center font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      Status
+                    </th>
+                    <th className="px-4 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {controles.map((c) => (
+                    <tr
+                      key={c.id}
+                      onClick={() =>
+                        router.push(
+                          `/dashboard/controles/${c.id}/editar?tipo=${c.tipo}`
+                        )
+                      }
+                      className={`group cursor-pointer hover:bg-primary/5 transition-colors ${urgencyRowBorder(c.data_evento, c.status)}`}
+                    >
+                      {/* Borda urgência (visual) — a coluna vazia recebe a cor via border-left na tr */}
+                      <td className="w-0 p-0" />
+
+                      {/* Data + urgência */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <p className="font-body text-sm font-semibold text-fg">
+                          {formatDate(c.data_evento)}
+                        </p>
+                        <div className="mt-0.5">
+                          <UrgencyBadge
+                            dataEvento={c.data_evento}
+                            status={c.status}
+                          />
+                        </div>
+                      </td>
+
+                      {/* Descrição */}
+                      <td className="px-4 py-3 max-w-xs">
+                        <p className="font-body text-sm text-fg line-clamp-2 group-hover:text-primary transition-colors">
+                          {c.descricao}
+                        </p>
+                        {c.tipo_demanda && (
+                          <span className="mt-0.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 font-body text-[10px] font-medium text-slate-600">
+                            {c.tipo_demanda}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Cliente / Processo */}
+                      <td className="px-4 py-3">
+                        {c.cliente_nome ? (
+                          <p className="font-body text-sm font-medium text-fg">
+                            {c.cliente_nome}
+                          </p>
+                        ) : (
+                          <p className="font-body text-sm text-muted">—</p>
+                        )}
+                        {c.processo_numero && (
+                          <p className="font-body text-xs text-muted mt-0.5">
+                            {c.processo_numero}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Responsável */}
+                      <td className="px-4 py-3">
+                        {c.responsavel_login ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 font-body text-xs font-medium text-slate-700">
+                            <span className="h-4 w-4 flex-shrink-0 rounded-full bg-primary/20 text-center font-heading text-[9px] font-bold text-primary leading-4">
+                              {c.responsavel_login.charAt(0).toUpperCase()}
+                            </span>
+                            {c.responsavel_login}
+                          </span>
+                        ) : (
+                          <span className="font-body text-xs text-muted">
+                            —
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-body text-[11px] font-semibold ${STATUS_CONTROLE[c.status].color}`}
+                        >
+                          {STATUS_CONTROLE[c.status].label}
+                        </span>
+                      </td>
+
+                      {/* Ações */}
+                      <td className="px-4 py-3">
+                        <RowActions controle={c} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Paginação */}

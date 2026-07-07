@@ -49,6 +49,7 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
   const [idExpandida, setIdExpandida] = useState<string | null>(null);
   const [mostrarChecklist, setMostrarChecklist] = useState(false);
   const [erro, setErro] = useState("");
+  const [streamText, setStreamText] = useState("");
   const autoRef = useRef(false);
   const didMount = useRef(false);
 
@@ -67,19 +68,58 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
   const analisar = useCallback(async () => {
     setAnalisando(true);
     setErro("");
+    setStreamText("");
+
     try {
-      const r = await fetch("/api/cerebro/analisar", {
+      const response = await fetch("/api/cerebro/analisar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ processo_id: processoId }),
       });
-      if (!r.ok) {
-        const d = await r.json().catch(() => ({}));
+
+      if (!response.ok || !response.body) {
+        const d = await response.json().catch(() => ({}));
         const msg = (d as { error?: string }).error;
-        setErro(msg || `Erro ao analisar (HTTP ${r.status}). Tente novamente.`);
-      } else {
-        await carregar();
-        setExpandido(true);
+        setErro(
+          msg || `Erro ao analisar (HTTP ${response.status}). Tente novamente.`
+        );
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6)) as {
+              t?: string;
+              done?: boolean;
+              error?: string;
+            };
+            if (data.t) {
+              setStreamText((prev) => prev + data.t);
+            } else if (data.done) {
+              await carregar();
+              setExpandido(true);
+              setStreamText("");
+            } else if (data.error) {
+              setErro(data.error);
+            }
+          } catch {
+            // evento mal-formado — ignora
+          }
+        }
       }
     } catch {
       setErro("Erro de conexão.");
@@ -415,14 +455,27 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
         </div>
       )}
 
-      {/* ── Loading ── */}
+      {/* ── Loading / Streaming ── */}
       {analisando && (
-        <div className="px-5 py-6 flex items-center gap-3">
-          <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
-          <p className="font-body text-sm text-muted">
-            O Cérebro Jurídico está analisando o caso completo — legislação,
-            histórico, documentos e jurisprudência. Isso leva alguns segundos...
-          </p>
+        <div className="px-5 py-4">
+          {streamText ? (
+            <div className="space-y-0.5 max-h-80 overflow-y-auto">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-500 border-t-transparent flex-shrink-0" />
+                <p className="font-body text-xs text-violet-600 font-semibold">
+                  Analisando...
+                </p>
+              </div>
+              {renderAnalise(streamText)}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+              <p className="font-body text-sm text-muted">
+                Preparando análise jurídica completa...
+              </p>
+            </div>
+          )}
         </div>
       )}
 

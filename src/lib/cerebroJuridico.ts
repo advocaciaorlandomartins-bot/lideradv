@@ -1159,6 +1159,315 @@ export async function obterContextoCerebro(
 
 // ─── 1. Análise completa do processo ─────────────────────────────────────────
 
+export interface PreparedAnalise {
+  prompt: string;
+  modo: string;
+  clientId: string;
+  completudePct: number;
+  faltantes: DadoFaltante[];
+  alertas: AlertaJuridico[];
+}
+
+export async function prepararAnalise(
+  processoId: string
+): Promise<PreparedAnalise> {
+  const [processo] = await sql`
+    SELECT p.*,
+           c.name             AS cliente_nome,
+           c.birth_date       AS data_nascimento,
+           c.nis,
+           c.cid_principal,
+           c.tipo_incapacidade,
+           c.data_diagnostico,
+           c.data_afastamento,
+           c.num_contribuicoes,
+           c.categoria_contribuinte,
+           c.atividade_anterior,
+           c.carencia_atingida,
+           c.status_beneficio,
+           c.tipo_beneficio,
+           c.valor_beneficio,
+           ec.salario_minimo   AS sm_escritorio
+    FROM processos p
+    JOIN clients c ON p.client_id = c.id
+    LEFT JOIN escritorio_config ec ON true
+    WHERE p.id = ${processoId}::uuid
+    LIMIT 1
+  `;
+  if (!processo) throw new Error("Processo não encontrado");
+
+  const [andamentos, documentos, contexto] = await Promise.all([
+    sql`
+      SELECT texto, tipo, data_referencia, situacao
+      FROM historico_registros
+      WHERE processo_id = ${processoId}::uuid
+      ORDER BY data_referencia DESC, created_at DESC LIMIT 15
+    `.catch(
+      () =>
+        [] as {
+          texto: unknown;
+          tipo: unknown;
+          data_referencia: unknown;
+          situacao: unknown;
+        }[]
+    ),
+    sql`
+      SELECT nome, tipo FROM documentos
+      WHERE entity_type = 'processo' AND entity_id = ${processoId}::uuid
+    `.catch(() => [] as { nome: unknown; tipo: unknown }[]),
+    obterContextoCerebro(
+      processo.tipo_acao || "",
+      processo.area || "Previdenciário"
+    ).catch(() => ""),
+  ]);
+
+  const modo = detectarModo(String(processo.tipo_acao || ""));
+  const { pct: completudePct, faltantes } = calcularCompletude(
+    processo as Record<string, unknown>
+  );
+  const alertas = calcularAlertas(processo as Record<string, unknown>);
+
+  const idadeCliente = processo.data_nascimento
+    ? Math.floor(
+        (Date.now() - new Date(processo.data_nascimento).getTime()) /
+          31_557_600_000
+      )
+    : null;
+
+  const dadosProcesso = `
+PROCESSO Nº ${processo.numero || "Sem número CNJ"}
+Tipo de ação: ${processo.tipo_acao || "Não informado"}
+Área: ${processo.area || "Previdenciário"} | Fase: ${processo.fase || "N/A"}
+Vara: ${processo.vara || "N/A"} | Comarca: ${processo.comarca || "N/A"}
+Prioridade: ${processo.prioridade || "Normal"} | Status: ${processo.status}
+Parte contrária: ${processo.parte_contraria || "INSS"}
+Valor da causa: ${processo.valor_causa ? `R$ ${Number(processo.valor_causa).toLocaleString("pt-BR")}` : "N/A"}
+Completude dos dados: ${completudePct}%${completudePct < 70 ? " — INCOMPLETO" : ""}
+
+MÓDULO 1 — CLIENTE E ESPÉCIE DE SEGURADO:
+Nome: ${processo.cliente_nome}
+Idade: ${idadeCliente ? `${idadeCliente} anos` : "Não informada"}
+Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}
+Atividade anterior: ${processo.atividade_anterior || "Não informada"}
+NIS/PIS: ${processo.nis || "Não informado"}
+Carência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}
+Nº contribuições: ${processo.num_contribuicoes ?? "Não informado"}
+
+MÓDULO 2 — INCAPACIDADE E DOCUMENTAÇÃO MÉDICA:
+CID Principal: ${processo.cid_principal || "Não informado"}
+Tipo de incapacidade: ${processo.tipo_incapacidade || "Não informado"}
+Data do diagnóstico: ${processo.data_diagnostico || "Não informada"}
+Data do afastamento: ${processo.data_afastamento || "Não informada"}
+
+MÓDULO 3 — DADOS ADMINISTRATIVOS E PRAZOS:
+DER: ${processo.der || "Não informado"}
+DIB: ${processo.dib || "N/A"} | DCB: ${processo.dcb || "N/A"}
+Protocolo INSS: ${processo.protocolo_inss || "N/A"} | Agência: ${processo.agencia_inss || "N/A"}
+Resultado administrativo: ${processo.resultado_admin || "Pendente"}
+Motivo indeferimento: ${processo.motivo_indeferimento || "N/A"}
+Nº benefício concedido: ${processo.num_beneficio_concedido || "N/A"}
+${alertas.length > 0 ? `\n⚠️ ALERTAS JURÍDICOS DETECTADOS:\n${alertas.map((a) => `• [${a.nivel.toUpperCase()}] ${a.mensagem} — ${a.base_legal}`).join("\n")}` : ""}
+
+MÓDULO 4 — RELATO DO CASO:
+${processo.relato || "Não informado"}
+
+ANDAMENTOS (${andamentos.length} registros):
+${
+  andamentos
+    .slice(0, 6)
+    .map(
+      (a) =>
+        `[${a.data_referencia || "S/D"}] ${a.tipo || ""}: ${String(a.texto || "").substring(0, 120)}`
+    )
+    .join("\n") || "Nenhum"
+}
+
+DOCUMENTOS ANEXADOS (${documentos.length}):
+${documentos.map((d) => d.nome).join(", ") || "Nenhum"}
+
+DADOS FALTANTES (${faltantes.filter((f) => f.prioridade === "alta").length} críticos):
+${faltantes.map((f) => `• [${f.prioridade.toUpperCase()}] ${f.campo}`).join("\n") || "Nenhum — dados completos"}
+
+Data da análise: ${new Date().toLocaleDateString("pt-BR")}
+`;
+
+  const prompt = `${BASE_LEGAL}
+${promptModoEspecializado(modo)}
+${contexto}
+
+TAREFA: Análise jurídica completa, estruturada em módulos, para este caso.
+
+${dadosProcesso}
+
+Responda com os cabeçalhos exatos abaixo:
+
+## AVALIAÇÃO GERAL
+Síntese em 3-4 frases diretivas. Identifique o perfil do segurado e o benefício mais pertinente.
+
+## MÓDULO: ESPÉCIE DE SEGURADO
+Classifique: empregado / autônomo / rural / avulso / doméstico / segurado especial. Verifique qualidade de segurado e período de graça aplicável (art. 15 Lei 8.213/91).
+
+## MÓDULO: BENEFÍCIO MAIS PROVÁVEL
+Indique a espécie com maior probabilidade de êxito, cite o código B (B31, B32, B87, B93, etc.) e o artigo aplicável.
+
+## MÓDULO: ESTRATÉGIA — Administrativo | Judicial | Ambos
+Recomende a via com justificativa. Se já houve negativa INSS, indique se cabe recurso CRPS ou ação judicial.
+
+## PONTOS FORTES
+Liste com base legal específica (cite artigo, lei, súmula).
+
+## PONTOS FRACOS E RISCOS
+Liste vulnerabilidades jurídicas e lacunas probatórias que podem comprometer o caso.
+
+## TESE PRINCIPAL RECOMENDADA
+A estratégia jurídica mais forte para este caso, com fundamento legal.
+
+## BASE LEGAL APLICÁVEL
+Artigos, súmulas e precedentes diretamente aplicáveis a este caso.
+
+## DOCUMENTOS QUE FALTAM
+Ordene por prioridade: crítico / importante / complementar.
+
+## PRÓXIMA AÇÃO IMEDIATA
+Uma ação específica e prática para executar AGORA. Ex: "Solicitar CNIS atualizado ao cliente" ou "Protocolar recurso CRPS antes de [data]".
+
+## PROBABILIDADE DE ÊXITO: XX%
+Justifique com base nos dados disponíveis.
+
+## RISCO GERAL: Alto | Médio | Baixo
+`;
+
+  return {
+    prompt,
+    modo,
+    clientId: String(processo.client_id),
+    completudePct,
+    faltantes,
+    alertas,
+  };
+}
+
+export async function salvarAnalise(
+  processoId: string,
+  clientId: string,
+  analise: string,
+  modo: string,
+  completudePct: number,
+  faltantes: DadoFaltante[],
+  alertas: AlertaJuridico[]
+): Promise<{
+  risco: string;
+  prob: number;
+  proximaAcao: string;
+  baseLegal: string[];
+  tarefaCriada: boolean;
+  beneficioProvavel?: string;
+  estrategiaRecomendada?: string;
+  metadata: MetadadosCerebro;
+}> {
+  const riscoMatch = analise.match(/RISCO GERAL[:\s*]+(\w+)/i);
+  const probMatch = analise.match(/PROBABILIDADE DE ÊXITO[:\s*]+(\d+)/i);
+  const acaoMatch = analise.match(
+    /## PRÓXIMA AÇÃO IMEDIATA\n([\s\S]*?)(?=\n##|$)/i
+  );
+  const beneficioMatch = analise.match(
+    /## MÓDULO: BENEFÍCIO MAIS PROVÁVEL\n([\s\S]*?)(?=\n##|$)/i
+  );
+  const estrategiaMatch = analise.match(
+    /## MÓDULO: ESTRATÉGIA[^\n]*\n([\s\S]*?)(?=\n##|$)/i
+  );
+
+  const risco = riscoMatch?.[1]?.toLowerCase().includes("alto")
+    ? "alto"
+    : riscoMatch?.[1]?.toLowerCase().includes("baixo")
+      ? "baixo"
+      : "medio";
+  const prob = probMatch
+    ? Math.min(100, Math.max(0, parseInt(probMatch[1])))
+    : 50;
+  const proximaAcao =
+    acaoMatch?.[1]?.trim().split("\n")[0] ||
+    "Verificar documentação com cliente";
+  const beneficioProvavel =
+    beneficioMatch?.[1]?.trim().split("\n")[0] || undefined;
+  const estrategiaRecomendada =
+    estrategiaMatch?.[1]?.trim().split("\n")[0] || undefined;
+
+  const baseLegal = [
+    ...analise.matchAll(
+      /(?:art(?:igo)?\.?\s*\d+[\w\-]*|Súmula\s+\d+\s+(?:TNU|STJ|STF|TRF\d*)|Tema\s+\d+|Lei\s+[\d.\/]+)/gi
+    ),
+  ]
+    .map((m) => m[0])
+    .slice(0, 15);
+
+  let tarefaCriada = false;
+  try {
+    const [tarefaExistente] = await sql`
+      SELECT id FROM tarefas_processo
+      WHERE processo_id = ${processoId}::uuid
+        AND status NOT IN ('Concluída', 'Cancelada')
+        AND comentarios ILIKE '%Cérebro Jurídico%'
+      LIMIT 1
+    `;
+    if (!tarefaExistente) {
+      const prioridadeTarefa =
+        risco === "alto" ? "Alta" : risco === "medio" ? "Média" : "Normal";
+      await sql`
+        INSERT INTO tarefas_processo
+          (processo_id, client_id, titulo, prioridade, comentarios)
+        VALUES (
+          ${processoId}::uuid,
+          ${clientId}::uuid,
+          ${proximaAcao.substring(0, 200)},
+          ${prioridadeTarefa},
+          ${"✅ Criada automaticamente pelo Cérebro Jurídico em " + new Date().toLocaleDateString("pt-BR")}
+        )
+      `;
+      tarefaCriada = true;
+    }
+  } catch {
+    // tarefa é bônus
+  }
+
+  const metadata: MetadadosCerebro = {
+    completude_pct: completudePct,
+    dados_faltantes: faltantes,
+    alertas,
+    modo_especializado: modo,
+    tarefa_criada: tarefaCriada,
+    beneficio_provavel: beneficioProvavel,
+    estrategia_recomendada: estrategiaRecomendada,
+  };
+
+  try {
+    await sql`
+      INSERT INTO cerebro_analises
+        (processo_id, tipo, titulo, analise, risco, probabilidade_sucesso,
+         proxima_acao, base_legal, metadata)
+      VALUES (
+        ${processoId}::uuid, 'inicial',
+        ${"Análise — " + modo},
+        ${analise}, ${risco}, ${prob}, ${proximaAcao}, ${baseLegal},
+        ${JSON.stringify(metadata)}
+      )
+    `;
+  } catch (err) {
+    console.error("[cerebro] Falha ao salvar análise:", err);
+  }
+
+  return {
+    risco,
+    prob,
+    proximaAcao,
+    baseLegal,
+    tarefaCriada,
+    beneficioProvavel,
+    estrategiaRecomendada,
+    metadata,
+  };
+}
+
 export async function analisarProcesso(processoId: string) {
   const [processo] = await sql`
     SELECT p.*,

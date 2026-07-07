@@ -6,6 +6,7 @@ import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_ENTITY_TYPES = ["processo", "cliente", "pericia"] as const;
@@ -32,6 +33,15 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Campos obrigatórios ausentes." },
       { status: 400 }
+    );
+  }
+
+  if (file.size > MAX_FILE_BYTES) {
+    return NextResponse.json(
+      {
+        error: `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Limite: 5 MB.`,
+      },
+      { status: 413 }
     );
   }
 

@@ -6,6 +6,9 @@ import { deleteDocumentoAction } from "@/lib/document-actions";
 import type { Documento } from "@/lib/documents-db";
 import { PlusIcon, SpinnerIcon } from "@/components/icons";
 
+const MAX_FILE_MB = 5;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+
 // ── Helpers ────────────────────────────────────────────────
 
 function fileColor(tipo: string | null) {
@@ -71,6 +74,13 @@ export default function DocumentsSection({
     setUploadError(null);
 
     for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_BYTES) {
+        setUploadError(
+          `"${file.name}" é muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Limite: ${MAX_FILE_MB} MB.`
+        );
+        continue;
+      }
+
       const fd = new FormData();
       fd.append("file", file);
       fd.append("entityType", entityType);
@@ -130,13 +140,29 @@ export default function DocumentsSection({
     handleFiles(e.dataTransfer.files);
   }
 
+  const totalBytes = documents.reduce((s, d) => s + (d.tamanho ?? 0), 0);
+  const totalMB = totalBytes / (1024 * 1024);
+  const totalLabel =
+    totalBytes === 0
+      ? "0 B"
+      : totalBytes < 1024 * 1024
+        ? `${(totalBytes / 1024).toFixed(0)} KB`
+        : `${totalMB.toFixed(1)} MB`;
+
   return (
     <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="font-heading text-base font-semibold text-fg">
-          Documentos ({documents.length})
-        </h2>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div>
+          <h2 className="font-heading text-base font-semibold text-fg">
+            Documentos ({documents.length})
+          </h2>
+          {documents.length > 0 && (
+            <p className="mt-0.5 font-body text-xs text-muted">
+              {totalLabel} usados · limite por arquivo: {MAX_FILE_MB} MB
+            </p>
+          )}
+        </div>
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}

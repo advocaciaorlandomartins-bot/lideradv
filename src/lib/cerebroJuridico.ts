@@ -398,15 +398,347 @@ const CAMPOS_CRITICOS: Array<{
   },
 ];
 
+const CAMPOS_BPC: typeof CAMPOS_CRITICOS = [
+  {
+    campo: "tipo_acao",
+    label: "Tipo de ação / benefício",
+    peso: 15,
+    prioridade: "alta",
+    impacto: "Define o benefício BPC (B87/B88) e a tese principal",
+  },
+  {
+    campo: "cid_principal",
+    label: "CID Principal da deficiência",
+    peso: 12,
+    prioridade: "alta",
+    impacto: "Obrigatório para reconhecimento do impedimento de longo prazo",
+  },
+  {
+    campo: "relato",
+    label: "Relato detalhado do caso e situação familiar",
+    peso: 10,
+    prioridade: "alta",
+    impacto:
+      "Fundamenta a miserabilidade e o impedimento funcional do requerente",
+  },
+  {
+    campo: "nis",
+    label: "NIS/PIS do cliente",
+    peso: 10,
+    prioridade: "alta",
+    impacto: "Obrigatório para requerimento BPC e consulta CadÚnico",
+  },
+  {
+    campo: "der",
+    label: "DER (Data de Entrada do Requerimento)",
+    peso: 8,
+    prioridade: "alta",
+    impacto: "Determina o termo inicial do BPC e cálculo de atrasados",
+  },
+  {
+    campo: "resultado_admin",
+    label: "Resultado administrativo INSS",
+    peso: 7,
+    prioridade: "media",
+    impacto:
+      "Informa se houve indeferimento e qual o fundamento — direciona estratégia",
+  },
+  {
+    campo: "tipo_incapacidade",
+    label: "Tipo de incapacidade / deficiência",
+    peso: 7,
+    prioridade: "media",
+    impacto:
+      "Classifica o impedimento (físico, mental, intelectual, sensorial) para ICF",
+  },
+  {
+    campo: "protocolo_inss",
+    label: "Protocolo INSS",
+    peso: 4,
+    prioridade: "baixa",
+    impacto: "Comprova protocolo administrativo e data do requerimento",
+  },
+];
+
+function isBPC(processo: Record<string, unknown>): boolean {
+  const t = String(processo.tipo_acao || "").toLowerCase();
+  return (
+    t.includes("bpc") ||
+    t.includes("loas") ||
+    t.includes("assistencial") ||
+    t.includes("b87") ||
+    t.includes("b88")
+  );
+}
+
+function isPensao(processo: Record<string, unknown>): boolean {
+  const t = String(processo.tipo_acao || "").toLowerCase();
+  return (
+    t.includes("pensão") ||
+    t.includes("pensao") ||
+    t.includes("b21") ||
+    t.includes("b22")
+  );
+}
+
+function isMaternidade(processo: Record<string, unknown>): boolean {
+  const t = String(processo.tipo_acao || "").toLowerCase();
+  return (
+    t.includes("maternidade") ||
+    t.includes("b80") ||
+    t.includes("b81") ||
+    t.includes("b82")
+  );
+}
+
+function isAposentadoria(processo: Record<string, unknown>): boolean {
+  const t = String(processo.tipo_acao || "").toLowerCase();
+  return (
+    (t.includes("aposentadoria") && !t.includes("incapacidade")) ||
+    t.includes("b41") ||
+    t.includes("b42") ||
+    t.includes("b57") ||
+    t.includes("tempo de contribuição") ||
+    t.includes("tempo de contribuicao") ||
+    (t.includes("aposentadoria") &&
+      (t.includes("idade") || t.includes("especial") || t.includes("tempo")))
+  );
+}
+
+function isOperacional(processo: Record<string, unknown>): boolean {
+  const t = String(processo.tipo_acao || "").toLowerCase();
+  return (
+    t.includes("cnis") ||
+    t.includes("mandado de segurança") ||
+    t.includes("mandado de seguranca") ||
+    t.includes("pap ") ||
+    t.includes("processo administrativo") ||
+    t.includes("quesito") ||
+    t.includes("audiência") ||
+    t.includes("audiencia") ||
+    t.includes("pente-fino") ||
+    t.includes("pente fino") ||
+    t.includes("sdr") ||
+    t.includes("qualificação") ||
+    t.includes("qualificacao") ||
+    t.includes("captação") ||
+    t.includes("captacao")
+  );
+}
+
+const CAMPOS_PENSAO: typeof CAMPOS_CRITICOS = [
+  {
+    campo: "tipo_acao",
+    label: "Tipo de ação / benefício",
+    peso: 15,
+    prioridade: "alta",
+    impacto: "Define o tipo de pensão e os dependentes habilitados",
+  },
+  {
+    campo: "relato",
+    label:
+      "Relato detalhado (qualidade de segurado do falecido + vínculo com dependente)",
+    peso: 12,
+    prioridade: "alta",
+    impacto: "Fundamenta qualidade de segurado e dependência",
+  },
+  {
+    campo: "der",
+    label: "DER (Data de Entrada do Requerimento)",
+    peso: 10,
+    prioridade: "alta",
+    impacto: "Pensão requerida em até 90 dias do óbito = DIB na data do óbito",
+  },
+  {
+    campo: "resultado_admin",
+    label: "Resultado administrativo INSS",
+    peso: 8,
+    prioridade: "alta",
+    impacto: "Informa se foi indeferida e o fundamento — direciona estratégia",
+  },
+  {
+    campo: "nis",
+    label: "NIS/PIS do cliente (dependente)",
+    peso: 7,
+    prioridade: "media",
+    impacto: "Necessário para requerimento administrativo",
+  },
+  {
+    campo: "protocolo_inss",
+    label: "Protocolo INSS",
+    peso: 4,
+    prioridade: "baixa",
+    impacto: "Comprova o protocolo do requerimento",
+  },
+];
+
+const CAMPOS_MATERNIDADE: typeof CAMPOS_CRITICOS = [
+  {
+    campo: "tipo_acao",
+    label: "Tipo de ação / salário-maternidade",
+    peso: 15,
+    prioridade: "alta",
+    impacto: "Define a espécie de segurada e o benefício aplicável",
+  },
+  {
+    campo: "relato",
+    label: "Relato detalhado (data do parto/adoção, tipo de segurada)",
+    peso: 12,
+    prioridade: "alta",
+    impacto:
+      "Fundamental para calcular DIB e carência (agora dispensada — ADI 2.110/2024)",
+  },
+  {
+    campo: "der",
+    label: "DER (Data de Entrada do Requerimento)",
+    peso: 10,
+    prioridade: "alta",
+    impacto: "Requerimento até 90 dias do parto = DIB na data do parto",
+  },
+  {
+    campo: "categoria_contribuinte",
+    label: "Categoria da segurada (empregada/individual/especial/facultativa)",
+    peso: 10,
+    prioridade: "alta",
+    impacto: "Define o valor do benefício e os requisitos aplicáveis",
+  },
+  {
+    campo: "resultado_admin",
+    label: "Resultado administrativo INSS",
+    peso: 7,
+    prioridade: "media",
+    impacto: "Informa fundamento do indeferimento se houver",
+  },
+  {
+    campo: "nis",
+    label: "NIS/PIS da cliente",
+    peso: 5,
+    prioridade: "media",
+    impacto: "Necessário para requerimento",
+  },
+];
+
+const CAMPOS_APOSENTADORIA: typeof CAMPOS_CRITICOS = [
+  {
+    campo: "tipo_acao",
+    label: "Tipo de aposentadoria (tempo/idade/especial)",
+    peso: 15,
+    prioridade: "alta",
+    impacto:
+      "Define os requisitos e a regra de transição aplicável (EC 103/2019)",
+  },
+  {
+    campo: "num_contribuicoes",
+    label: "Tempo de contribuição / carência",
+    peso: 12,
+    prioridade: "alta",
+    impacto: "Requisito fundamental para todas as aposentadorias",
+  },
+  {
+    campo: "relato",
+    label: "Relato detalhado do caso",
+    peso: 8,
+    prioridade: "alta",
+    impacto: "Fundamenta a tese e os pedidos subsidiários",
+  },
+  {
+    campo: "der",
+    label: "DER (Data de Entrada do Requerimento)",
+    peso: 8,
+    prioridade: "alta",
+    impacto: "Determina o termo inicial e as regras de transição aplicáveis",
+  },
+  {
+    campo: "categoria_contribuinte",
+    label: "Categoria do contribuinte",
+    peso: 7,
+    prioridade: "alta",
+    impacto: "Define regras de carência e período de graça aplicáveis",
+  },
+  {
+    campo: "resultado_admin",
+    label: "Resultado administrativo INSS",
+    peso: 7,
+    prioridade: "media",
+    impacto: "Fundamento do indeferimento — direciona estratégia de recurso",
+  },
+  {
+    campo: "atividade_anterior",
+    label: "Atividade profissional (para aposentadoria especial)",
+    peso: 5,
+    prioridade: "media",
+    impacto: "Necessário para aposentadoria especial por agentes nocivos",
+  },
+  {
+    campo: "nis",
+    label: "NIS/PIS do cliente",
+    peso: 5,
+    prioridade: "media",
+    impacto: "Necessário para consulta CNIS e requerimento",
+  },
+  {
+    campo: "protocolo_inss",
+    label: "Protocolo INSS",
+    peso: 4,
+    prioridade: "baixa",
+    impacto: "Comprova protocolo administrativo",
+  },
+];
+
+const CAMPOS_OPERACIONAL: typeof CAMPOS_CRITICOS = [
+  {
+    campo: "tipo_acao",
+    label: "Tipo de ação / demanda",
+    peso: 20,
+    prioridade: "alta",
+    impacto: "Define o objeto e a estratégia a adotar",
+  },
+  {
+    campo: "relato",
+    label: "Relato detalhado da situação",
+    peso: 15,
+    prioridade: "alta",
+    impacto: "Fundamenta a análise e as providências necessárias",
+  },
+  {
+    campo: "der",
+    label: "Data do protocolo / requerimento",
+    peso: 10,
+    prioridade: "alta",
+    impacto: "Define prazo e urgência da demanda",
+  },
+  {
+    campo: "resultado_admin",
+    label: "Situação atual no INSS",
+    peso: 10,
+    prioridade: "alta",
+    impacto: "Estado atual do processo administrativo",
+  },
+  {
+    campo: "protocolo_inss",
+    label: "Protocolo INSS / número do processo",
+    peso: 8,
+    prioridade: "media",
+    impacto: "Permite rastrear e acompanhar a demanda",
+  },
+];
+
 function calcularCompletude(processo: Record<string, unknown>): {
   pct: number;
   faltantes: DadoFaltante[];
 } {
-  const totalPeso = CAMPOS_CRITICOS.reduce((acc, c) => acc + c.peso, 0);
+  let campos: typeof CAMPOS_CRITICOS;
+  if (isBPC(processo)) campos = CAMPOS_BPC;
+  else if (isPensao(processo)) campos = CAMPOS_PENSAO;
+  else if (isMaternidade(processo)) campos = CAMPOS_MATERNIDADE;
+  else if (isAposentadoria(processo)) campos = CAMPOS_APOSENTADORIA;
+  else if (isOperacional(processo)) campos = CAMPOS_OPERACIONAL;
+  else campos = CAMPOS_CRITICOS; // B31/B32/B91/B92/B93 e demais incapacidades
+  const totalPeso = campos.reduce((acc, c) => acc + c.peso, 0);
   let preenchido = 0;
   const faltantes: DadoFaltante[] = [];
 
-  for (const def of CAMPOS_CRITICOS) {
+  for (const def of campos) {
     const valor = processo[def.campo];
     const preencheu =
       valor !== null &&
@@ -1248,20 +1580,30 @@ Parte contrária: ${processo.parte_contraria || "INSS"}
 Valor da causa: ${processo.valor_causa ? `R$ ${Number(processo.valor_causa).toLocaleString("pt-BR")}` : "N/A"}
 Completude dos dados: ${completudePct}%${completudePct < 70 ? " — INCOMPLETO" : ""}
 
-MÓDULO 1 — CLIENTE E ESPÉCIE DE SEGURADO:
+MÓDULO 1 — CLIENTE:
 Nome: ${processo.cliente_nome}
-Idade: ${idadeCliente ? `${idadeCliente} anos` : "Não informada"}
-Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}
-Atividade anterior: ${processo.atividade_anterior || "Não informada"}
+Idade: ${idadeCliente !== null ? `${idadeCliente} anos${idadeCliente < 18 ? " (MENOR DE IDADE)" : ""}` : "Não informada"}
 NIS/PIS: ${processo.nis || "Não informado"}
-Carência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}
-Nº contribuições: ${processo.num_contribuicoes ?? "Não informado"}
+${(() => {
+  const p = processo as Record<string, unknown>;
+  if (isBPC(p))
+    return `⚠️ CASO BPC/LOAS — benefício ASSISTENCIAL: NÃO exige carência, contribuições nem histórico trabalhista.\nCritério: deficiência (impedimento de longo prazo ≥2 anos) + miserabilidade (renda per capita ≤ ¼ SM — relativizável via Tema 995 STF).`;
+  if (isPensao(p))
+    return `⚠️ PENSÃO POR MORTE — SEM carência (art. 26, I, Lei 8.213/91). Verificar QUALIDADE DE SEGURADO DO FALECIDO na data do óbito e grau de parentesco do dependente.`;
+  if (isMaternidade(p))
+    return `⚠️ SALÁRIO-MATERNIDADE — carência DISPENSADA após ADI 2.110 (STF, 21/03/2024). Único requisito: qualidade de segurada na data do parto/adoção.\nCategoria da segurada: ${processo.categoria_contribuinte || "Não informada"}`;
+  if (isAposentadoria(p))
+    return `Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}\nAtividade anterior: ${processo.atividade_anterior || "Não informada"}\nCarência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}\nNº contribuições / tempo total: ${processo.num_contribuicoes ?? "Não informado"}`;
+  return `Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}\nAtividade anterior: ${processo.atividade_anterior || "Não informada"}\nCarência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}\nNº contribuições: ${processo.num_contribuicoes ?? "Não informado"}`;
+})()}
 
 MÓDULO 2 — INCAPACIDADE E DOCUMENTAÇÃO MÉDICA:
-CID Principal: ${processo.cid_principal || "Não informado"}
-Tipo de incapacidade: ${processo.tipo_incapacidade || "Não informado"}
-Data do diagnóstico: ${processo.data_diagnostico || "Não informada"}
-Data do afastamento: ${processo.data_afastamento || "Não informada"}
+${(() => {
+  const p = processo as Record<string, unknown>;
+  if (isPensao(p) || isMaternidade(p) || isAposentadoria(p) || isOperacional(p))
+    return `(Não aplicável para este tipo de caso)`;
+  return `CID Principal: ${processo.cid_principal || "Não informado"}\nTipo de incapacidade: ${processo.tipo_incapacidade || "Não informado"}\nData do diagnóstico: ${processo.data_diagnostico || "Não informada"}\nData do afastamento: ${processo.data_afastamento || "Não informada"}`;
+})()}
 
 MÓDULO 3 — DADOS ADMINISTRATIVOS E PRAZOS:
 DER: ${processo.der || "Não informado"}
@@ -1558,20 +1900,30 @@ Parte contrária: ${processo.parte_contraria || "INSS"}
 Valor da causa: ${processo.valor_causa ? `R$ ${Number(processo.valor_causa).toLocaleString("pt-BR")}` : "N/A"}
 Completude dos dados: ${completudePct}%${completudePct < 70 ? " — INCOMPLETO" : ""}
 
-MÓDULO 1 — CLIENTE E ESPÉCIE DE SEGURADO:
+MÓDULO 1 — CLIENTE:
 Nome: ${processo.cliente_nome}
-Idade: ${idadeCliente ? `${idadeCliente} anos` : "Não informada"}
-Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}
-Atividade anterior: ${processo.atividade_anterior || "Não informada"}
+Idade: ${idadeCliente !== null ? `${idadeCliente} anos${idadeCliente < 18 ? " (MENOR DE IDADE)" : ""}` : "Não informada"}
 NIS/PIS: ${processo.nis || "Não informado"}
-Carência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}
-Nº contribuições: ${processo.num_contribuicoes ?? "Não informado"}
+${(() => {
+  const p = processo as Record<string, unknown>;
+  if (isBPC(p))
+    return `⚠️ CASO BPC/LOAS — benefício ASSISTENCIAL: NÃO exige carência, contribuições nem histórico trabalhista.\nCritério: deficiência (impedimento de longo prazo ≥2 anos) + miserabilidade (renda per capita ≤ ¼ SM — relativizável via Tema 995 STF).`;
+  if (isPensao(p))
+    return `⚠️ PENSÃO POR MORTE — SEM carência (art. 26, I, Lei 8.213/91). Verificar QUALIDADE DE SEGURADO DO FALECIDO na data do óbito e grau de parentesco do dependente.`;
+  if (isMaternidade(p))
+    return `⚠️ SALÁRIO-MATERNIDADE — carência DISPENSADA após ADI 2.110 (STF, 21/03/2024). Único requisito: qualidade de segurada na data do parto/adoção.\nCategoria da segurada: ${processo.categoria_contribuinte || "Não informada"}`;
+  if (isAposentadoria(p))
+    return `Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}\nAtividade anterior: ${processo.atividade_anterior || "Não informada"}\nCarência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}\nNº contribuições / tempo total: ${processo.num_contribuicoes ?? "Não informado"}`;
+  return `Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}\nAtividade anterior: ${processo.atividade_anterior || "Não informada"}\nCarência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}\nNº contribuições: ${processo.num_contribuicoes ?? "Não informado"}`;
+})()}
 
 MÓDULO 2 — INCAPACIDADE E DOCUMENTAÇÃO MÉDICA:
-CID Principal: ${processo.cid_principal || "Não informado"}
-Tipo de incapacidade: ${processo.tipo_incapacidade || "Não informado"}
-Data do diagnóstico: ${processo.data_diagnostico || "Não informada"}
-Data do afastamento: ${processo.data_afastamento || "Não informada"}
+${(() => {
+  const p = processo as Record<string, unknown>;
+  if (isPensao(p) || isMaternidade(p) || isAposentadoria(p) || isOperacional(p))
+    return `(Não aplicável para este tipo de caso)`;
+  return `CID Principal: ${processo.cid_principal || "Não informado"}\nTipo de incapacidade: ${processo.tipo_incapacidade || "Não informado"}\nData do diagnóstico: ${processo.data_diagnostico || "Não informada"}\nData do afastamento: ${processo.data_afastamento || "Não informada"}`;
+})()}
 
 MÓDULO 3 — DADOS ADMINISTRATIVOS E PRAZOS:
 DER: ${processo.der || "Não informado"}

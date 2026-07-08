@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { getMeuFinanceiroDados } from "@/lib/lancamentos-db";
+import { getMeuFinanceiroInitial } from "@/lib/meu-financeiro-db";
 import MeuFinanceiroContent from "@/components/dashboard/financeiro/meu-financeiro-content";
 
 export const metadata = {
@@ -15,7 +15,7 @@ export default async function MeuFinanceiroPage() {
   if (!session) redirect("/login");
   if (!hasPermission(session, "meu_financeiro", "ver")) redirect("/dashboard");
 
-  const dados = await getMeuFinanceiroDados();
+  const dados = await getMeuFinanceiroInitial(session.id);
 
   return (
     <div className="space-y-6">
@@ -24,10 +24,13 @@ export default async function MeuFinanceiroPage() {
           Meu Financeiro
         </h1>
         <p className="mt-1 font-body text-sm text-muted">
-          Sua visão pessoal de honorários, receitas e despesas
+          Controle financeiro pessoal — receitas, despesas e visão do escritório
         </p>
       </div>
-      <MeuFinanceiroContent dados={dados} />
+      <MeuFinanceiroContent
+        lancamentos={dados.lancamentos}
+        honorariosEscritorio={dados.honorariosEscritorio}
+      />
     </div>
   );
 }

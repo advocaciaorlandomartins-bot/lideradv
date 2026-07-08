@@ -88,8 +88,21 @@ export async function POST(req: NextRequest) {
 
         send({ done: true, ...result });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[cerebro/analisar]", msg);
+        const raw = err instanceof Error ? err.message : String(err);
+        console.error("[cerebro/analisar]", raw);
+        let msg = "Erro ao gerar análise. Tente novamente.";
+        if (
+          raw.includes("credit balance is too low") ||
+          raw.includes("insufficient_quota")
+        )
+          msg =
+            "Créditos da API de IA esgotados. Acesse console.anthropic.com → Billing para recarregar.";
+        else if (raw.includes("overloaded") || raw.includes("529"))
+          msg =
+            "Serviço de IA temporariamente sobrecarregado. Aguarde 1 minuto e tente novamente.";
+        else if (raw.includes("rate_limit") || raw.includes("429"))
+          msg =
+            "Limite de requisições atingido. Aguarde alguns segundos e tente novamente.";
         send({ error: msg });
       } finally {
         controller.close();

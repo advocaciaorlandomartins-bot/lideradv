@@ -207,9 +207,16 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("[/api/ia/analisar]", err);
-    return NextResponse.json(
-      { error: "Erro ao analisar o documento." },
-      { status: 500 }
-    );
+    const raw = err instanceof Error ? err.message : String(err);
+    let msg = "Erro ao analisar o documento.";
+    if (
+      raw.includes("credit balance is too low") ||
+      raw.includes("insufficient_quota")
+    )
+      msg =
+        "Créditos da API de IA esgotados. Acesse console.anthropic.com → Billing para recarregar.";
+    else if (raw.includes("overloaded") || raw.includes("529"))
+      msg = "Serviço de IA sobrecarregado. Aguarde 1 minuto e tente novamente.";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

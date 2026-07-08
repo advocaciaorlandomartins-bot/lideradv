@@ -289,8 +289,8 @@ export default function Sidebar({
     return pathname.startsWith(href);
   }
 
-  const initials = user.login.slice(0, 2).toUpperCase();
-  const displayName = user.login.charAt(0).toUpperCase() + user.login.slice(1);
+  const initials = (user.nome || user.login).slice(0, 2).toUpperCase();
+  const displayName = user.nome || user.login;
 
   return (
     <>

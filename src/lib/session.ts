@@ -18,6 +18,7 @@ function sign(payload: string): string {
 export interface SessionUser {
   id: string;
   login: string;
+  nome: string;
   categoria: string;
   permissoes: Permissoes;
 }
@@ -57,6 +58,7 @@ export async function getSession(): Promise<SessionUser | null> {
     return {
       id: data.id,
       login: data.login,
+      nome: data.nome ?? data.login,
       categoria: data.categoria,
       permissoes: data.permissoes ?? {},
     };

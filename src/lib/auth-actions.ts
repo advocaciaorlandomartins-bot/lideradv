@@ -22,13 +22,21 @@ function verifyPassword(input: string, stored: string): boolean {
     const [, salt, hash] = parts;
     try {
       const check = crypto.scryptSync(input, salt, 64).toString("hex");
-      return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(check, "hex"));
-    } catch { return false; }
+      return crypto.timingSafeEqual(
+        Buffer.from(hash, "hex"),
+        Buffer.from(check, "hex")
+      );
+    } catch {
+      return false;
+    }
   }
   // Legacy sha256 — aceito mas migrado automaticamente no login
   if (parts[0] === "sha256" && parts.length === 3) {
     const [, salt, hash] = parts;
-    const check = crypto.createHash("sha256").update(input + salt).digest("hex");
+    const check = crypto
+      .createHash("sha256")
+      .update(input + salt)
+      .digest("hex");
     return check === hash;
   }
   return false;
@@ -48,7 +56,7 @@ export async function loginAction(
   }
 
   const rows = await sql`
-    SELECT id::text, login, categoria, senha_hash, ativo, validade, permissoes
+    SELECT id::text, login, nome, categoria, senha_hash, ativo, validade, permissoes
     FROM usuarios
     WHERE login = ${login}
     LIMIT 1
@@ -92,6 +100,7 @@ export async function loginAction(
   await createSession({
     id: String(user.id),
     login: String(user.login),
+    nome: String(user.nome ?? user.login),
     categoria: String(user.categoria),
     permissoes,
   });
@@ -187,6 +196,7 @@ export async function registerAction(
     await createSession({
       id: String(user.id),
       login: String(user.login),
+      nome: name,
       categoria: String(user.categoria),
       permissoes,
     });

@@ -303,11 +303,11 @@ export default function Topbar({
             className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/10"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 font-heading text-xs font-bold text-white select-none">
-              {user.login.slice(0, 2).toUpperCase()}
+              {(user.nome || user.login).slice(0, 2).toUpperCase()}
             </div>
             <div className="hidden leading-tight text-left sm:block">
               <p className="font-body text-xs font-semibold text-white">
-                {user.login.charAt(0).toUpperCase() + user.login.slice(1)}
+                {user.nome || user.login}
               </p>
               <p className="font-body text-[10px] text-white/60">
                 {user.categoria}
@@ -325,7 +325,7 @@ export default function Topbar({
               <div className="absolute right-0 top-full z-40 mt-1 w-44 overflow-hidden rounded-xl border border-border bg-white shadow-xl">
                 <div className="border-b border-border px-4 py-3">
                   <p className="font-body text-xs font-semibold text-fg">
-                    {user.login.charAt(0).toUpperCase() + user.login.slice(1)}
+                    {user.nome || user.login}
                   </p>
                   <p className="font-body text-[11px] text-muted">
                     {user.categoria}

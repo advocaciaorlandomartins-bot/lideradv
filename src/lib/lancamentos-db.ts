@@ -311,3 +311,192 @@ export async function getContasAReceber(): Promise<ContaCliente[]> {
     (a, b) => b.totalPendente - a.totalPendente
   );
 }
+
+// ── Meu Painel Financeiro ─────────────────────────────────────────────────────
+
+export interface MeuFinanceiroKpis {
+  recebidoMes: number;
+  aReceberMes: number;
+  despesasMes: number;
+  saldoMes: number;
+  totalPrevisto: number; // honorários esperados de todos os processos ativos
+  totalAReceber: number; // lançamentos pendentes tipo entrada (total, não só mês)
+}
+
+export interface FluxoMensal {
+  mes: string; // "Jan/2026"
+  mesISO: string; // "2026-01"
+  entradas: number;
+  saidas: number;
+  saldo: number;
+}
+
+export interface ProcessoHonorario {
+  id: string;
+  tipo_acao: string;
+  client_name: string;
+  status: string;
+  modelo_honorario: string | null;
+  valor_honorario: number | null;
+  percentual_honorario: number | null;
+  valor_causa: number | null;
+  honorario_estimado: number;
+}
+
+export interface MeuFinanceiroDados {
+  kpis: MeuFinanceiroKpis;
+  fluxo: FluxoMensal[]; // próximos 6 meses + mês atual
+  processosHonorarios: ProcessoHonorario[];
+}
+
+export async function getMeuFinanceiroDados(): Promise<MeuFinanceiroDados> {
+  const agora = new Date();
+  const anoMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+
+  // KPIs do mês atual
+  const [kpisRows, processosRows, fluxoRows] = await Promise.all([
+    sql`
+      SELECT
+        COALESCE(SUM(valor) FILTER (
+          WHERE tipo = 'entrada' AND status = 'pago'
+            AND to_char(data_pagamento, 'YYYY-MM') = ${anoMes}
+        ), 0) AS recebido_mes,
+        COALESCE(SUM(valor) FILTER (
+          WHERE tipo = 'entrada' AND status = 'pendente'
+            AND to_char(data_vencimento, 'YYYY-MM') = ${anoMes}
+        ), 0) AS a_receber_mes,
+        COALESCE(SUM(valor) FILTER (
+          WHERE tipo = 'saida' AND status IN ('pendente', 'pago')
+            AND to_char(data_vencimento, 'YYYY-MM') = ${anoMes}
+        ), 0) AS despesas_mes,
+        COALESCE(SUM(valor) FILTER (
+          WHERE tipo = 'entrada' AND status = 'pendente'
+        ), 0) AS total_a_receber
+      FROM lancamentos
+      WHERE status != 'cancelado'
+    `,
+    sql`
+      SELECT
+        p.id::text,
+        p.tipo_acao,
+        c.name AS client_name,
+        p.status,
+        p.modelo_honorario,
+        p.valor_honorario,
+        p.percentual_honorario,
+        p.valor_causa
+      FROM processos p
+      LEFT JOIN clients c ON c.id = p.client_id
+      WHERE p.status IN ('ativo', 'em_andamento')
+        AND (
+          p.valor_honorario IS NOT NULL
+          OR (p.percentual_honorario IS NOT NULL AND p.valor_causa IS NOT NULL)
+        )
+      ORDER BY
+        COALESCE(p.valor_honorario, p.valor_causa * p.percentual_honorario / 100) DESC NULLS LAST
+      LIMIT 50
+    `,
+    sql`
+      SELECT
+        to_char(date_trunc('month', data_vencimento), 'YYYY-MM') AS mes_iso,
+        COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada'), 0) AS entradas,
+        COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'),   0) AS saidas
+      FROM lancamentos
+      WHERE status IN ('pendente', 'pago')
+        AND data_vencimento >= date_trunc('month', CURRENT_DATE)
+        AND data_vencimento <  date_trunc('month', CURRENT_DATE) + INTERVAL '6 months'
+      GROUP BY 1
+      ORDER BY 1
+    `,
+  ]);
+
+  const kr = kpisRows[0];
+  const recebidoMes = Number(kr.recebido_mes);
+  const aReceberMes = Number(kr.a_receber_mes);
+  const despesasMes = Number(kr.despesas_mes);
+  const totalAReceber = Number(kr.total_a_receber);
+
+  // Mapeia processos com honorário estimado
+  const processosHonorarios: ProcessoHonorario[] = processosRows.map((r) => {
+    const fixo = r.valor_honorario != null ? Number(r.valor_honorario) : null;
+    const perc =
+      r.percentual_honorario != null && r.valor_causa != null
+        ? (Number(r.percentual_honorario) / 100) * Number(r.valor_causa)
+        : null;
+    const honorario_estimado = fixo ?? perc ?? 0;
+    return {
+      id: r.id,
+      tipo_acao: r.tipo_acao,
+      client_name: r.client_name,
+      status: r.status,
+      modelo_honorario: r.modelo_honorario ?? null,
+      valor_honorario:
+        r.valor_honorario != null ? Number(r.valor_honorario) : null,
+      percentual_honorario:
+        r.percentual_honorario != null ? Number(r.percentual_honorario) : null,
+      valor_causa: r.valor_causa != null ? Number(r.valor_causa) : null,
+      honorario_estimado,
+    };
+  });
+
+  const totalPrevisto = processosHonorarios.reduce(
+    (s, p) => s + p.honorario_estimado,
+    0
+  );
+
+  // Fluxo mensal: preenche todos os 6 meses mesmo sem dados
+  const fluxoMap = new Map<string, { entradas: number; saidas: number }>();
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    fluxoMap.set(key, { entradas: 0, saidas: 0 });
+  }
+  for (const r of fluxoRows) {
+    if (fluxoMap.has(r.mes_iso)) {
+      fluxoMap.set(r.mes_iso, {
+        entradas: Number(r.entradas),
+        saidas: Number(r.saidas),
+      });
+    }
+  }
+
+  const MESES_PT = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
+  const fluxo: FluxoMensal[] = Array.from(fluxoMap.entries()).map(
+    ([iso, v]) => {
+      const [y, m] = iso.split("-");
+      return {
+        mes: `${MESES_PT[Number(m) - 1]}/${y}`,
+        mesISO: iso,
+        entradas: v.entradas,
+        saidas: v.saidas,
+        saldo: v.entradas - v.saidas,
+      };
+    }
+  );
+
+  return {
+    kpis: {
+      recebidoMes,
+      aReceberMes,
+      despesasMes,
+      saldoMes: recebidoMes - despesasMes,
+      totalPrevisto,
+      totalAReceber,
+    },
+    fluxo,
+    processosHonorarios,
+  };
+}

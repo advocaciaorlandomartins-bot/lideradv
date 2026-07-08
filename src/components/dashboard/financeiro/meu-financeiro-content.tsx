@@ -147,6 +147,7 @@ function formInicial(tipo: "receita" | "despesa", mesAtivo: string) {
   return {
     tipo,
     categoria: "",
+    categoriaCustom: "",
     descricao: "",
     valor: "",
     data: `${y}-${m}-${dia}`,
@@ -328,6 +329,25 @@ export default function MeuFinanceiroContent({
       }));
   }, [doMes]);
 
+  // Categorias customizadas usadas pelo usuário (extraídas dos lançamentos)
+  const categoriasCustomReceita = useMemo(() => {
+    const predefinidas = new Set(CATEGORIAS_RECEITA.map((c) => c.value));
+    const custom = new Set<string>();
+    lancamentos
+      .filter((l) => l.tipo === "receita" && !predefinidas.has(l.categoria))
+      .forEach((l) => custom.add(l.categoria));
+    return Array.from(custom).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [lancamentos]);
+
+  const categoriasCustomDespesa = useMemo(() => {
+    const predefinidas = new Set(CATEGORIAS_DESPESA.map((c) => c.value));
+    const custom = new Set<string>();
+    lancamentos
+      .filter((l) => l.tipo === "despesa" && !predefinidas.has(l.categoria))
+      .forEach((l) => custom.add(l.categoria));
+    return Array.from(custom).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [lancamentos]);
+
   // ── Helpers ──
   function navMes(delta: number) {
     const [y, m] = mesAtivo.split("-").map(Number);
@@ -349,6 +369,7 @@ export default function MeuFinanceiroContent({
       setForm({
         tipo: item.tipo,
         categoria: item.categoria,
+        categoriaCustom: "",
         descricao: item.descricao,
         valor: String(item.valor),
         data: item.data,
@@ -379,10 +400,21 @@ export default function MeuFinanceiroContent({
       setErro("Informe a descrição.");
       return;
     }
-    if (!form.categoria) {
-      setErro("Selecione a categoria.");
+
+    const catFinal =
+      form.categoria === "nova_categoria"
+        ? form.categoriaCustom.trim()
+        : form.categoria;
+
+    if (!catFinal) {
+      setErro(
+        form.categoria === "nova_categoria"
+          ? "Digite o nome da nova categoria."
+          : "Selecione a categoria."
+      );
       return;
     }
+
     const parsed = parseFloat(String(form.valor).replace(",", "."));
     if (isNaN(parsed) || parsed <= 0) {
       setErro("Informe um valor válido.");
@@ -394,7 +426,7 @@ export default function MeuFinanceiroContent({
     try {
       const body = {
         tipo: form.tipo,
-        categoria: form.categoria,
+        categoria: catFinal,
         descricao: form.descricao.trim(),
         valor: parsed,
         data: form.data,
@@ -1052,6 +1084,7 @@ export default function MeuFinanceiroContent({
                         ...f,
                         tipo: "receita",
                         categoria: "",
+                        categoriaCustom: "",
                         status: "a_receber",
                       }))
                     }
@@ -1069,6 +1102,7 @@ export default function MeuFinanceiroContent({
                         ...f,
                         tipo: "despesa",
                         categoria: "",
+                        categoriaCustom: "",
                         status: "pendente",
                       }))
                     }
@@ -1090,19 +1124,58 @@ export default function MeuFinanceiroContent({
                   </label>
                   <select
                     value={form.categoria}
-                    onChange={(e) => setField("categoria", e.target.value)}
+                    onChange={(e) => {
+                      setField("categoria", e.target.value);
+                      if (e.target.value !== "nova_categoria")
+                        setField("categoriaCustom", "");
+                    }}
                     className="h-9 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="">Selecione a categoria...</option>
+                    <optgroup label="Categorias padrão">
+                      {(form.tipo === "receita"
+                        ? CATEGORIAS_RECEITA
+                        : CATEGORIAS_DESPESA
+                      ).map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </optgroup>
                     {(form.tipo === "receita"
-                      ? CATEGORIAS_RECEITA
-                      : CATEGORIAS_DESPESA
-                    ).map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
+                      ? categoriasCustomReceita
+                      : categoriasCustomDespesa
+                    ).length > 0 && (
+                      <optgroup label="Minhas categorias">
+                        {(form.tipo === "receita"
+                          ? categoriasCustomReceita
+                          : categoriasCustomDespesa
+                        ).map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="nova_categoria">＋ Nova categoria...</option>
                   </select>
+
+                  {form.categoria === "nova_categoria" && (
+                    <input
+                      autoFocus
+                      value={form.categoriaCustom}
+                      onChange={(e) =>
+                        setField("categoriaCustom", e.target.value)
+                      }
+                      placeholder={
+                        form.tipo === "receita"
+                          ? "Ex: Combustível, Honorário extra, Dividendo..."
+                          : "Ex: Combustível, Academia, Veterinário..."
+                      }
+                      maxLength={80}
+                      className="mt-2 h-9 w-full rounded-lg border border-primary px-3 font-body text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  )}
                 </div>
 
                 <div>

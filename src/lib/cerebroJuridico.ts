@@ -1412,21 +1412,22 @@ ANÁLISE ROI (Honorários):
 
 export async function obterContextoCerebro(
   tipoAcao: string,
-  area: string
+  area: string,
+  opts?: { cid?: string; vara?: string; comarca?: string }
 ): Promise<string> {
-  const [casos, teses, peticoes] = await Promise.all([
+  const [casos, teses, peticoes, casosSimilares] = await Promise.all([
     sql`
       SELECT tipo_acao, resultado_final, argumentos_vencedores, erros_cometidos,
              teses_utilizadas, licao, vara, comarca, motivo_indeferimento
       FROM cerebro_juridico
       WHERE tipo_acao ILIKE ${`%${tipoAcao}%`} OR area = ${area}
-      ORDER BY created_at DESC LIMIT 12
+      ORDER BY created_at DESC LIMIT 10
     `,
     sql`
       SELECT titulo, tese, base_legal, taxa_sucesso, vezes_venceu, vezes_aplicada
       FROM cerebro_teses
       WHERE (tipo_acao ILIKE ${`%${tipoAcao}%`} OR area = ${area}) AND ativa = true
-      ORDER BY taxa_sucesso DESC NULLS LAST, vezes_venceu DESC LIMIT 5
+      ORDER BY taxa_sucesso DESC NULLS LAST, vezes_venceu DESC LIMIT 6
     `,
     sql`
       SELECT titulo, tipo_peticao, texto
@@ -1435,6 +1436,20 @@ export async function obterContextoCerebro(
         AND aprovada = true
       ORDER BY vezes_usada DESC LIMIT 2
     `,
+    // Casos com CID semelhante ou mesma vara — inteligência cruzada
+    opts?.cid || opts?.vara
+      ? sql`
+          SELECT cj.tipo_acao, cj.resultado_final, cj.licao, cj.argumentos_vencedores,
+                 cj.motivo_indeferimento, cj.vara
+          FROM cerebro_juridico cj
+          WHERE (
+            ${opts?.cid ? sql`cj.metadata->>'cid' ILIKE ${`%${opts.cid.substring(0, 3)}%`}` : sql`false`}
+            OR ${opts?.vara ? sql`cj.vara ILIKE ${`%${opts.vara}%`}` : sql`false`}
+          )
+          AND cj.tipo_acao ILIKE ${`%${tipoAcao}%`}
+          ORDER BY cj.created_at DESC LIMIT 5
+        `.catch(() => [] as Record<string, unknown>[])
+      : Promise.resolve([] as Record<string, unknown>[]),
   ]);
 
   if (!casos.length && !teses.length) return "";
@@ -1480,8 +1495,35 @@ export async function obterContextoCerebro(
     ctx += `\n📄 PETIÇÕES APROVADAS DO MESMO TIPO (referência de argumentação):\n`;
     peticoes.forEach(
       (p, i) =>
-        (ctx += `[Ref ${i + 1}] ${p.titulo}\n${String(p.texto || "").substring(0, 600)}...\n\n`)
+        (ctx += `[Ref ${i + 1}] ${p.titulo}\n${String(p.texto || "").substring(0, 500)}...\n\n`)
     );
+  }
+
+  // Inteligência cruzada: casos com CID semelhante ou mesma vara
+  if (casosSimilares.length > 0) {
+    const ganhosSim = casosSimilares.filter(
+      (c) => c.resultado_final === "deferido"
+    );
+    const perdidosSim = casosSimilares.filter(
+      (c) => c.resultado_final === "indeferido"
+    );
+    ctx += `\n🔍 CASOS SEMELHANTES (mesmo CID ou vara):\n`;
+    if (ganhosSim.length) {
+      ctx += `  ✅ Ganhos (${ganhosSim.length}): `;
+      ctx += ganhosSim
+        .map((c) => c.licao || (c.argumentos_vencedores as string[])?.[0])
+        .filter(Boolean)
+        .join(" | ");
+      ctx += "\n";
+    }
+    if (perdidosSim.length) {
+      ctx += `  ❌ Perdidos (${perdidosSim.length}): `;
+      ctx += perdidosSim
+        .map((c) => c.motivo_indeferimento)
+        .filter(Boolean)
+        .join(" | ");
+      ctx += "\n";
+    }
   }
 
   ctx += "════════════════════════════════════════════\n";
@@ -1553,7 +1595,11 @@ export async function prepararAnalise(
     `.catch(() => [] as { nome: unknown; tipo: unknown; url: unknown }[]),
     obterContextoCerebro(
       processo.tipo_acao || "",
-      processo.area || "Previdenciário"
+      processo.area || "Previdenciário",
+      {
+        cid: processo.cid_principal || undefined,
+        vara: processo.vara || undefined,
+      }
     ).catch(() => ""),
     sql`
       SELECT titulo, analise FROM cerebro_analises
@@ -1824,6 +1870,62 @@ export async function salvarAnalise(
     console.error("[cerebro] Falha ao salvar análise:", err);
   }
 
+  // ── Aprendizado imediato: salva tese principal extraída no banco de teses ──
+  // Não espera o caso fechar — cada análise já alimenta a inteligência coletiva
+  try {
+    const teseMatch = analise.match(
+      /## TESE PRINCIPAL RECOMENDADA\n([\s\S]*?)(?=\n##|$)/i
+    );
+    const pontosFortesMatch = analise.match(
+      /## PONTOS FORTES\n([\s\S]*?)(?=\n##|$)/i
+    );
+    const teseTexto = teseMatch?.[1]?.trim();
+    const pontosTexto = pontosFortesMatch?.[1]?.trim();
+
+    if (teseTexto && teseTexto.length > 30) {
+      const tituloTese = teseTexto
+        .split("\n")[0]
+        .replace(/^[•\-\*]\s*/, "")
+        .substring(0, 100);
+      const teseCompleta = [
+        teseTexto,
+        pontosTexto ? `\nPontos fortes: ${pontosTexto}` : "",
+      ]
+        .join("")
+        .substring(0, 800);
+
+      const [existeTese] = await sql`
+        SELECT id, vezes_aplicada FROM cerebro_teses
+        WHERE tipo_acao ILIKE ${`%${modo}%`}
+          AND tese ILIKE ${`%${teseTexto.substring(0, 60).replace(/%/g, "")}%`}
+        LIMIT 1
+      `;
+
+      if (existeTese) {
+        await sql`
+          UPDATE cerebro_teses
+          SET vezes_aplicada = vezes_aplicada + 1,
+              taxa_sucesso = ROUND(
+                (vezes_venceu::numeric / GREATEST(vezes_aplicada + 1, 1)) * 100, 1
+              )
+          WHERE id = ${existeTese.id}::uuid
+        `;
+      } else {
+        await sql`
+          INSERT INTO cerebro_teses (titulo, tese, area, tipo_acao, taxa_sucesso, vezes_aplicada, vezes_venceu)
+          VALUES (
+            ${tituloTese}, ${teseCompleta},
+            ${"Previdenciário"}, ${modo},
+            0, 1, 0
+          )
+          ON CONFLICT DO NOTHING
+        `;
+      }
+    }
+  } catch {
+    // não bloqueia — aprendizado é bônus
+  }
+
   return {
     risco,
     prob,
@@ -1883,7 +1985,11 @@ export async function analisarProcesso(processoId: string) {
     `.catch(() => [] as { nome: unknown; tipo: unknown }[]),
     obterContextoCerebro(
       processo.tipo_acao || "",
-      processo.area || "Previdenciário"
+      processo.area || "Previdenciário",
+      {
+        cid: processo.cid_principal || undefined,
+        vara: processo.vara || undefined,
+      }
     ).catch(() => ""),
   ]);
 
@@ -2519,7 +2625,11 @@ export async function gerarContextoPeticao(
     `.catch(() => [] as Record<string, unknown>[]),
     obterContextoCerebro(
       processo.tipo_acao || tipoPeticao,
-      processo.area || "Previdenciário"
+      processo.area || "Previdenciário",
+      {
+        cid: processo.cid_principal || undefined,
+        vara: processo.vara || undefined,
+      }
     ).catch(() => ""),
   ]);
 

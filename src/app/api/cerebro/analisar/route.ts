@@ -57,11 +57,21 @@ export async function POST(req: NextRequest) {
           apiKey: process.env.ANTHROPIC_API_KEY!,
         });
 
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1500,
-          messages: [{ role: "user", content: prepared.prompt }],
-        });
+        const claudeStream = client.messages.stream(
+          {
+            model: "claude-sonnet-4-6",
+            max_tokens: 1500,
+            system: [
+              {
+                type: "text",
+                text: prepared.systemPrompt,
+                cache_control: { type: "ephemeral" },
+              },
+            ],
+            messages: [{ role: "user", content: prepared.userContent }],
+          },
+          { headers: { "anthropic-beta": "prompt-caching-2024-07-31" } }
+        );
 
         let fullText = "";
 

@@ -1491,6 +1491,11 @@ export async function obterContextoCerebro(
 // ─── 1. Análise completa do processo ─────────────────────────────────────────
 
 export interface PreparedAnalise {
+  /** Conteúdo estático (BASE_LEGAL + modo + contexto) — vai para system com cache */
+  systemPrompt: string;
+  /** Dados do processo específico — vai para user message (sem cache) */
+  userContent: string;
+  /** @deprecated use systemPrompt + userContent */
   prompt: string;
   modo: string;
   clientId: string;
@@ -1647,14 +1652,12 @@ ${faltantes.map((f) => `• [${f.prioridade.toUpperCase()}] ${f.campo}`).join("\
 Data da análise: ${new Date().toLocaleDateString("pt-BR")}
 `;
 
-  const prompt = `${BASE_LEGAL}
+  // Parte ESTÁTICA (cacheável) — BASE_LEGAL + modo + contexto + formato de resposta
+  const systemPrompt = `${BASE_LEGAL}
 ${promptModoEspecializado(modo)}
 ${contexto}
 
-TAREFA: Análise jurídica completa, estruturada em módulos, para este caso.
-IMPORTANTE: Considere o conteúdo real dos documentos lidos pelo Dr. Lex (seção CONTEÚDO DOS DOCUMENTOS) ao avaliar a probabilidade de êxito e os pontos fortes.
-
-${dadosProcesso}
+IMPORTANTE: Considere o conteúdo real dos documentos lidos pelo Dr. Lex ao avaliar probabilidade de êxito e pontos fortes.
 
 Responda com os cabeçalhos exatos abaixo:
 
@@ -1686,15 +1689,23 @@ Artigos, súmulas e precedentes diretamente aplicáveis a este caso.
 Ordene por prioridade: crítico / importante / complementar.
 
 ## PRÓXIMA AÇÃO IMEDIATA
-Uma ação específica e prática para executar AGORA. Ex: "Solicitar CNIS atualizado ao cliente" ou "Protocolar recurso CRPS antes de [data]".
+Uma ação específica e prática para executar AGORA.
 
 ## PROBABILIDADE DE ÊXITO: XX%
 Justifique com base nos dados disponíveis.
 
-## RISCO GERAL: Alto | Médio | Baixo
-`;
+## RISCO GERAL: Alto | Médio | Baixo`;
+
+  // Parte DINÂMICA (por processo) — enviada como mensagem do usuário
+  const userContent = `TAREFA: Análise jurídica completa para este caso.
+
+${dadosProcesso}`;
+
+  const prompt = `${systemPrompt}\n\n${userContent}`;
 
   return {
+    systemPrompt,
+    userContent,
     prompt,
     modo,
     clientId: String(processo.client_id),
@@ -2493,8 +2504,85 @@ export async function gerarContextoPeticao(
   `;
   if (!processo) return "";
 
-  return obterContextoCerebro(
-    processo.tipo_acao || tipoPeticao,
-    processo.area || "Previdenciário"
-  );
+  const [cerebroRows, docRows, contextoAprendido] = await Promise.all([
+    sql`
+      SELECT analise, risco, probabilidade_sucesso, proxima_acao, base_legal, metadata
+      FROM cerebro_analises
+      WHERE processo_id = ${processoId}::uuid AND tipo = 'inicial'
+      ORDER BY created_at DESC LIMIT 1
+    `.catch(() => [] as Record<string, unknown>[]),
+    sql`
+      SELECT titulo, analise
+      FROM cerebro_analises
+      WHERE processo_id = ${processoId}::uuid AND tipo = 'documento'
+      ORDER BY created_at DESC LIMIT 3
+    `.catch(() => [] as Record<string, unknown>[]),
+    obterContextoCerebro(
+      processo.tipo_acao || tipoPeticao,
+      processo.area || "Previdenciário"
+    ).catch(() => ""),
+  ]);
+
+  const parts: string[] = [];
+  if (contextoAprendido) parts.push(contextoAprendido);
+
+  // Diagnóstico completo do Cérebro — extraindo seções chave
+  if (cerebroRows.length > 0) {
+    const ca = cerebroRows[0];
+    const analiseText = String(ca.analise || "");
+
+    const secoes = [
+      "## AVALIAÇÃO GERAL",
+      "## MÓDULO: BENEFÍCIO MAIS PROVÁVEL",
+      "## MÓDULO: ESTRATÉGIA",
+      "## PONTOS FORTES",
+      "## PONTOS FRACOS E RISCOS",
+      "## TESE PRINCIPAL RECOMENDADA",
+      "## BASE LEGAL APLICÁVEL",
+      "## PRÓXIMA AÇÃO IMEDIATA",
+    ];
+
+    let resumoCerebro = "";
+    for (const secao of secoes) {
+      const escaped = secao.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = analiseText.match(
+        new RegExp(`${escaped}\\n([\\s\\S]*?)(?=\\n##|$)`, "i")
+      );
+      if (match?.[1]?.trim()) {
+        resumoCerebro += `${secao}\n${match[1].trim()}\n\n`;
+      }
+    }
+
+    if (resumoCerebro) {
+      parts.push(`
+════════════════════════════════════════════
+DIAGNÓSTICO DO CÉREBRO JURÍDICO — USE COMO DIRETRIZ DA PETIÇÃO
+════════════════════════════════════════════
+Probabilidade de êxito: ${ca.probabilidade_sucesso}% | Risco: ${String(ca.risco || "").toUpperCase()}
+Próxima ação identificada: ${ca.proxima_acao}
+
+${resumoCerebro.trim()}
+
+⚠️ INSTRUÇÃO CRÍTICA: A TESE PRINCIPAL acima é o eixo central da petição.
+Use os PONTOS FORTES e BASE LEGAL como fundamentos jurídicos reais.
+NÃO substitua nem invente teses diferentes das indicadas acima.`);
+    }
+  }
+
+  // Análises de documentos pelo Dr. Lex
+  if (docRows.length > 0) {
+    let blocoDoc = `
+════════════════════════════════════════════
+DOCUMENTOS DO CASO — ANALISADOS PELO DR. LEX
+════════════════════════════════════════════
+Use as informações abaixo como prova material concreta na petição:\n`;
+    for (const doc of docRows) {
+      blocoDoc += `\n--- ${doc.titulo} ---\n${String(doc.analise || "").substring(0, 700)}\n`;
+    }
+    blocoDoc +=
+      "\n⚠️ Mencione esses documentos especificamente ao fundamentar os pedidos.";
+    parts.push(blocoDoc);
+  }
+
+  return parts.filter(Boolean).join("\n");
 }

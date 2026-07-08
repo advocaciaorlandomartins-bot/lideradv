@@ -50,7 +50,6 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
   const [mostrarChecklist, setMostrarChecklist] = useState(false);
   const [erro, setErro] = useState("");
   const [streamText, setStreamText] = useState("");
-  const autoRef = useRef(false);
   const didMount = useRef(false);
 
   const carregar = useCallback(async () => {
@@ -142,20 +141,7 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
     });
   }, [processoId, processoStatus, carregar]);
 
-  useEffect(() => {
-    if (analises.length > 0) autoRef.current = true;
-  }, [analises]);
-
-  useEffect(() => {
-    if (autoRef.current || !didMount.current) return;
-    const t = setTimeout(() => {
-      if (!autoRef.current && analises.length === 0 && !analisando) {
-        autoRef.current = true;
-        analisar();
-      }
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [analises, analisando, analisar]);
+  // Auto-análise removida — só roda ao clicar no botão "Diagnóstico Estratégico"
 
   const ultima = analises.find((a) => a.tipo === "inicial");
   const meta = ultima?.metadata ?? null;

@@ -126,29 +126,55 @@ export async function gerarPeticaoStream(
   const ctxTexto = buildContextoTexto(params.contexto);
   const encoder = new TextEncoder();
 
-  const stream = client.messages.stream({
-    model: "claude-sonnet-4-6",
-    max_tokens: 3000,
-    system: skill.systemPrompt,
-    messages: [
-      {
-        role: "user",
-        content: `${ctxTexto}
+  const stream = client.messages.stream(
+    {
+      model: "claude-sonnet-4-6",
+      max_tokens: 3000,
+      system: [
+        {
+          type: "text",
+          text: skill.systemPrompt,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [
+        {
+          role: "user",
+          content: `${ctxTexto}
 
-=== TAREFA ===
-Redija uma ${params.tipoPeticao} completa e de excelência.
+════════════════════════════════════════════
+TAREFA: Redija a ${params.tipoPeticao} para este caso específico.
+════════════════════════════════════════════
 
-IMPORTANTE:
-- Use TODOS os dados específicos do cliente e processo acima
-- Cada parágrafo deve conter dados concretos do caso, não frases genéricas
-- Cite jurisprudência atual e local (${params.skill === "previdenciario" ? "TRF5, TNU, STJ" : "tribunal competente, STJ, STF"})
-- Varie o comprimento das frases e parágrafos
-- A peça deve soar como escrita por um advogado experiente de Maceió/AL, não por IA
-- Inclua o cabeçalho completo (endereçamento ao juízo), qualificação das partes, fatos, direito, pedidos e encerramento com local, data e assinatura
-- Para campos desconhecidos use [COMPLETAR], mas NUNCA deixe em branco dados disponíveis acima`,
-      },
-    ],
-  });
+REGRAS ABSOLUTAS — CADA UMA DELAS É INEGOCIÁVEL:
+
+1. DADOS REAIS APENAS: use exclusivamente os dados do CLIENTE, PROCESSO e DIAGNÓSTICO DO CÉREBRO acima. Nunca invente nome, CPF, data, endereço, CID, número de benefício, protocolo, valor ou qualquer outro dado.
+
+2. JURISPRUDÊNCIA VERIFICÁVEL: cite apenas artigos de lei, súmulas e precedentes que estão nas "BASE LEGAL APLICÁVEL" ou nas "INSTRUÇÕES ESPECÍFICAS DO ADVOGADO" acima. Nunca cite número de acórdão, processo ou decisão que não esteja explicitamente nos dados.
+
+3. TESE DO CÉREBRO É OBRIGATÓRIA: a TESE PRINCIPAL RECOMENDADA e o BENEFÍCIO MAIS PROVÁVEL indicados no diagnóstico são a diretriz da petição — não crie tese diferente.
+
+4. [COMPLETAR] PARA LACUNAS: se qualquer dado necessário não estiver nos dados acima, escreva literalmente [COMPLETAR] — nunca suponha ou preencha com dados hipotéticos.
+
+5. DOCUMENTOS COMO PROVA: mencione especificamente os documentos analisados pelo Dr. Lex ao fundamentar os pedidos — eles são a prova material do caso.
+
+ESTRUTURA OBRIGATÓRIA DA PEÇA:
+- Cabeçalho: endereçamento ao juízo (vara e comarca dos dados do processo)
+- Qualificação das partes: cliente completo (dados acima) × INSS ou parte contrária
+- I — DOS FATOS: cronologia real baseada no relato, andamentos e documentos analisados
+- II — DO DIREITO: tese principal do Cérebro + base legal indicada + jurisprudência listada
+- III — DOS PEDIDOS: benefício específico indicado + pedidos subsidiários + honorários + gratuidade
+- Encerramento: [cidade dos dados], [data atual], [nome e OAB do escritório dos dados]
+
+QUALIDADE TÉCNICA:
+- Cada argumento jurídico deve ter sustentação no caso concreto (fato + prova + norma)
+- Linguagem formal jurídica brasileira, sem clichês genéricos
+- A peça deve soar como escrita por especialista previdenciário experiente de Maceió/AL`,
+        },
+      ],
+    },
+    { headers: { "anthropic-beta": "prompt-caching-2024-07-31" } }
+  );
 
   return new ReadableStream({
     async start(controller) {

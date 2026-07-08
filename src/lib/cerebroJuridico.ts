@@ -1293,7 +1293,7 @@ ${
     ? `\nCONTEÚDO DOS DOCUMENTOS (lidos pelo Dr. Lex):\n${docAnalises
         .map(
           (da) =>
-            `\n--- ${da.titulo} ---\n${String(da.analise || "").substring(0, 800)}`
+            `\n--- ${da.titulo} ---\n${String(da.analise || "").substring(0, 500)}`
         )
         .join("\n")}`
     : ""
@@ -1847,8 +1847,8 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
 
   const aiResp = await claude.messages.create(
     {
-      model: "claude-sonnet-4-6",
-      max_tokens: 1500,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1000,
       messages: [{ role: "user", content }],
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
@@ -1909,8 +1909,8 @@ Se houver prazo, quando vence e qual a base legal do prazo.
 Dispositivo que fundamenta a providência.`;
 
   const resp = await claude.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 800,
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 600,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -2034,8 +2034,8 @@ Responda SOMENTE o JSON abaixo (sem markdown, sem texto fora do JSON):
 }`;
 
   const resp = await claude.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1000,
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 800,
     messages: [{ role: "user", content: prompt }],
   });
 

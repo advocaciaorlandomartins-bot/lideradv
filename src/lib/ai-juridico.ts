@@ -128,7 +128,7 @@ export async function gerarPeticaoStream(
 
   const stream = client.messages.stream({
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    max_tokens: 3000,
     system: skill.systemPrompt,
     messages: [
       {
@@ -232,8 +232,8 @@ export async function analisarDocumento(
 
   const res = await client.messages.create(
     {
-      model: "claude-sonnet-4-6",
-      max_tokens: 2048,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1200,
       system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
       messages: [
         {
@@ -369,8 +369,8 @@ Exemplos de preenchimento:
 
   const res = await client.messages.create(
     {
-      model: "claude-sonnet-4-6",
-      max_tokens: 3500,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1800,
       system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
       messages: [
         {
@@ -461,8 +461,8 @@ export async function revisarPeticao(
   const ctxTexto = buildContextoTexto(params.contexto);
 
   const res = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2048,
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1500,
     system: skill.systemPrompt,
     messages: [
       {
@@ -511,7 +511,7 @@ export async function corrigirPeticao(
 
   const res = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    max_tokens: 3000,
     system: SKILLS[params.skill].systemPrompt,
     messages: [
       {
@@ -559,7 +559,7 @@ export async function estrategiaProcessual(
 
   const res = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 2048,
+    max_tokens: 1500,
     system: skill.systemPrompt,
     messages: [
       {

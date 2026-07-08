@@ -11,14 +11,21 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import type { LancamentoPessoal } from "@/lib/meu-financeiro-db";
+import type {
+  LancamentoPessoal,
+  ProcessoHonorario,
+  EscritorioMes,
+  FluxoMensalItem,
+} from "@/lib/meu-financeiro-db";
 import {
   PlusIcon,
   XMarkIcon,
   TrashIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   BanknotesIcon,
+  BuildingOfficeIcon,
   CurrencyIcon,
   TrendUpIcon,
   TrendDownIcon,
@@ -207,6 +214,9 @@ function KpiCard({
 interface Props {
   lancamentos: LancamentoPessoal[];
   honorariosEscritorio: number;
+  processosHonorarios: ProcessoHonorario[];
+  escritorioMes: EscritorioMes;
+  fluxoEscritorio: FluxoMensalItem[];
 }
 
 type FiltroTipo = "todos" | "receita" | "despesa";
@@ -214,6 +224,9 @@ type FiltroTipo = "todos" | "receita" | "despesa";
 export default function MeuFinanceiroContent({
   lancamentos: inicial,
   honorariosEscritorio,
+  processosHonorarios,
+  escritorioMes,
+  fluxoEscritorio,
 }: Props) {
   const hoje = new Date();
   const mesHojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
@@ -228,6 +241,7 @@ export default function MeuFinanceiroContent({
   const [salvando, setSalvando] = useState(false);
   const [deletando, setDeletando] = useState<string | null>(null);
   const [erro, setErro] = useState("");
+  const [honorariosExpanded, setHorariosExpanded] = useState(false);
 
   // ── Derived ──
   const doMes = useMemo(
@@ -517,6 +531,200 @@ export default function MeuFinanceiroContent({
           color="amber"
           icon={CheckCircleIcon}
         />
+      </div>
+
+      {/* ── Escritório — Honorários ── */}
+      <div className="overflow-hidden rounded-xl border border-blue-200 bg-blue-50/40 shadow-sm">
+        {/* Header */}
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+          <div className="flex flex-1 items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-100 ring-1 ring-blue-200">
+              <BuildingOfficeIcon className="h-3.5 w-3.5 text-blue-600" />
+            </span>
+            <span className="font-heading text-sm font-semibold text-blue-900">
+              Meus Honorários e Remunerações
+            </span>
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 font-body text-[10px] font-semibold text-blue-500">
+              dados do escritório · somente leitura
+            </span>
+          </div>
+          <button
+            onClick={() => setHorariosExpanded((v) => !v)}
+            className="flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2.5 py-1 font-body text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50"
+          >
+            {honorariosExpanded
+              ? "Ocultar detalhes"
+              : "Ver processos e previsão"}
+            <ChevronDownIcon
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${honorariosExpanded ? "rotate-180" : ""}`}
+            />
+          </button>
+        </div>
+
+        {/* Mini KPIs */}
+        <div className="grid grid-cols-2 gap-3 px-4 pb-4 sm:grid-cols-4">
+          <div className="rounded-lg border border-blue-100 bg-white px-3 py-2.5">
+            <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-blue-400">
+              Honorários — meus processos
+            </p>
+            <p className="mt-0.5 font-heading text-base font-bold tabular-nums text-blue-700">
+              {fmt(honorariosEscritorio)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-blue-100 bg-white px-3 py-2.5">
+            <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-blue-400">
+              Remuneração — a receber {MESES_CURTO[new Date().getMonth()]}
+            </p>
+            <p className="mt-0.5 font-heading text-base font-bold tabular-nums text-amber-600">
+              {fmt(escritorioMes.aReceberMes)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-blue-100 bg-white px-3 py-2.5">
+            <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-blue-400">
+              Remuneração — recebido {MESES_CURTO[new Date().getMonth()]}
+            </p>
+            <p className="mt-0.5 font-heading text-base font-bold tabular-nums text-emerald-600">
+              {fmt(escritorioMes.recebidoMes)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-blue-100 bg-white px-3 py-2.5">
+            <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-blue-400">
+              Total pendente do escritório
+            </p>
+            <p className="mt-0.5 font-heading text-base font-bold tabular-nums text-slate-700">
+              {fmt(escritorioMes.totalAReceber)}
+            </p>
+          </div>
+        </div>
+
+        {/* Expanded content */}
+        {honorariosExpanded && (
+          <div className="space-y-5 border-t border-blue-100 px-4 py-4">
+            {/* Tabela de processos */}
+            <div>
+              <h4 className="mb-3 font-heading text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Processos ativos com honorários
+                <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 font-body text-[10px] font-semibold text-blue-500">
+                  {processosHonorarios.length}
+                </span>
+              </h4>
+              {processosHonorarios.length === 0 ? (
+                <p className="py-6 text-center font-body text-sm text-muted">
+                  Nenhum processo ativo com honorários definidos.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-blue-100">
+                  <table className="w-full min-w-[520px]">
+                    <thead className="bg-blue-50/60">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
+                          Cliente
+                        </th>
+                        <th className="px-3 py-2 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
+                          Tipo de ação
+                        </th>
+                        <th className="px-3 py-2 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
+                          Modelo
+                        </th>
+                        <th className="px-3 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
+                          Estimado
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-blue-50 bg-white">
+                      {processosHonorarios.map((p) => (
+                        <tr
+                          key={p.id}
+                          className="transition-colors hover:bg-blue-50/40"
+                        >
+                          <td className="px-3 py-2.5 font-body text-sm font-semibold text-fg">
+                            {p.client_name}
+                          </td>
+                          <td className="px-3 py-2.5 font-body text-xs text-muted">
+                            {p.tipo_acao}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 font-body text-[10px] font-semibold text-blue-700">
+                              {p.modelo_honorario === "fixo"
+                                ? "Fixo"
+                                : p.modelo_honorario === "percentual" &&
+                                    p.percentual_honorario != null
+                                  ? `${p.percentual_honorario}% s/ causa`
+                                  : (p.modelo_honorario ?? "–")}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-heading text-sm font-bold tabular-nums text-blue-700">
+                            {fmt(p.honorario_estimado)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-blue-50/60">
+                      <tr className="border-t border-blue-200">
+                        <td
+                          colSpan={3}
+                          className="px-3 py-2.5 font-body text-xs font-semibold text-blue-600"
+                        >
+                          Total estimado ({processosHonorarios.length} processo
+                          {processosHonorarios.length !== 1 ? "s" : ""})
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-heading text-sm font-bold tabular-nums text-blue-800">
+                          {fmt(honorariosEscritorio)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Previsão mensal de entradas */}
+            <div>
+              <h4 className="mb-3 font-heading text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Minhas remunerações previstas — próximos 6 meses
+              </h4>
+              {fluxoEscritorio.every((f) => f.entradas === 0) ? (
+                <p className="py-4 text-center font-body text-sm text-muted">
+                  Nenhuma remuneração pendente agendada nos próximos meses.
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {fluxoEscritorio.map((f) => {
+                    const isCurrent =
+                      f.mesISO ===
+                      `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+                    return (
+                      <div
+                        key={f.mesISO}
+                        className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors ${
+                          isCurrent
+                            ? "border-blue-300 bg-blue-100/60"
+                            : "border-blue-100 bg-white"
+                        }`}
+                      >
+                        <span
+                          className={`font-body text-[10px] font-semibold uppercase ${isCurrent ? "text-blue-600" : "text-blue-400"}`}
+                        >
+                          {f.mes}
+                          {isCurrent && (
+                            <span className="ml-1 rounded-full bg-blue-500 px-1 py-0.5 text-[9px] text-white">
+                              atual
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`mt-1 font-heading text-sm font-bold tabular-nums ${f.entradas > 0 ? "text-blue-700" : "text-slate-300"}`}
+                        >
+                          {f.entradas > 0 ? fmt(f.entradas) : "–"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Charts ── */}

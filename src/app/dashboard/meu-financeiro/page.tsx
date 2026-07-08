@@ -30,6 +30,9 @@ export default async function MeuFinanceiroPage() {
       <MeuFinanceiroContent
         lancamentos={dados.lancamentos}
         honorariosEscritorio={dados.honorariosEscritorio}
+        processosHonorarios={dados.processosHonorarios}
+        escritorioMes={dados.escritorioMes}
+        fluxoEscritorio={dados.fluxoEscritorio}
       />
     </div>
   );

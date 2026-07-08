@@ -15,14 +15,18 @@ export async function GET(
 
   const { processoId } = await params;
 
-  const analises = await sql`
-    SELECT id::text, tipo, titulo, analise, risco, probabilidade_sucesso,
-           proxima_acao, base_legal, metadata, created_at
-    FROM cerebro_analises
-    WHERE processo_id = ${processoId}::uuid
-    ORDER BY created_at DESC
-    LIMIT 20
-  `;
-
-  return NextResponse.json({ analises });
+  try {
+    const analises = await sql`
+      SELECT id::text, tipo, titulo, analise, risco, probabilidade_sucesso,
+             proxima_acao, base_legal, metadata, created_at
+      FROM cerebro_analises
+      WHERE processo_id = ${processoId}::uuid
+      ORDER BY created_at DESC
+      LIMIT 20
+    `;
+    return NextResponse.json({ analises });
+  } catch (err) {
+    console.error("[cerebro/status]", err);
+    return NextResponse.json({ analises: [] });
+  }
 }

@@ -193,51 +193,133 @@ export async function verificarPublicacoesAction(): Promise<{
   }
 
   const apiKey = process.env.DATAJUD_API_KEY;
-  if (!apiKey) {
-    return {
-      ok: false,
-      mensagem:
-        "DATAJUD_API_KEY não configurada. Cadastre-se em datajud-wiki.cnj.jus.br e adicione a chave no Vercel.",
-      inseridos: 0,
-    };
-  }
+  let total = 0;
 
   const rows = await sql`
     SELECT id::text, numero, estado, nome_advogado
     FROM oabs_monitoradas WHERE ativa = true
   `;
 
-  if (rows.length === 0) {
-    return {
-      ok: true,
-      mensagem: "Nenhuma OAB ativa cadastrada para monitorar.",
-      inseridos: 0,
-    };
+  const { buscarPublicacoesPorOab, buscarMovimentosPorProcesso } =
+    await import("./datajud");
+  const { buscarPublicacoesDjeEsaj } = await import("./dje-esaj");
+
+  // 1. Busca por OAB no DataJud (só funciona em tribunais que indexam partes)
+  if (apiKey && rows.length > 0) {
+    for (const row of rows) {
+      total += await buscarPublicacoesPorOab(
+        {
+          id: String(row.id),
+          numero: String(row.numero),
+          estado: String(row.estado),
+          nome_advogado: row.nome_advogado ? String(row.nome_advogado) : null,
+        },
+        apiKey,
+        30
+      );
+    }
   }
 
-  const { buscarPublicacoesPorOab } = await import("./datajud");
-  let total = 0;
-  for (const row of rows) {
-    total += await buscarPublicacoesPorOab(
-      {
-        id: String(row.id),
-        numero: String(row.numero),
-        estado: String(row.estado),
-        nome_advogado: row.nome_advogado ? String(row.nome_advogado) : null,
-      },
-      apiKey,
-      30 // busca manual: últimos 30 dias para capturar histórico
-    );
+  // 2. Busca por OAB no DJe/eSAJ (funciona para TJAL, TJCE, TJSP e outros eSAJ)
+  if (rows.length > 0) {
+    for (const row of rows) {
+      total += await buscarPublicacoesDjeEsaj(
+        {
+          id: String(row.id),
+          numero: String(row.numero),
+          estado: String(row.estado),
+          nome_advogado: row.nome_advogado ? String(row.nome_advogado) : null,
+        },
+        30
+      );
+    }
+  }
+
+  // 3. Busca por número de processo no DataJud (funciona mesmo sem indexação de partes)
+  if (apiKey) {
+    const processos = await sql`
+      SELECT p.id::text, p.numero, c.name AS cliente_nome
+      FROM processos p
+      LEFT JOIN clients c ON c.id = p.client_id
+      WHERE p.numero IS NOT NULL AND p.numero != ''
+        AND LENGTH(REGEXP_REPLACE(p.numero, '[^0-9]', '', 'g')) = 20
+    `;
+    for (const proc of processos) {
+      total += await buscarMovimentosPorProcesso(
+        String(proc.id),
+        String(proc.numero),
+        proc.cliente_nome ? String(proc.cliente_nome) : null,
+        apiKey,
+        30
+      );
+    }
   }
 
   revalidatePath("/dashboard/publicacoes");
+
+  if (!apiKey && rows.length === 0) {
+    return {
+      ok: true,
+      mensagem:
+        "Nenhuma OAB ativa e DATAJUD_API_KEY não configurada. Apenas DJe está ativo.",
+      inseridos: total,
+    };
+  }
 
   return {
     ok: true,
     mensagem:
       total > 0
-        ? `${total} nova${total !== 1 ? "s publicações encontradas" : " publicação encontrada"}!`
-        : "Nenhuma publicação nova encontrada.",
+        ? `${total} nova${total !== 1 ? "s publicações/intimações encontradas" : " publicação encontrada"}!`
+        : "Nenhuma publicação nova encontrada. Se esperava resultados, tente novamente ou adicione a publicação manualmente.",
     inseridos: total,
   };
+}
+
+export async function adicionarPublicacaoManualAction(data: {
+  processo: string;
+  tipo: string;
+  destinatario: string;
+  orgao: string;
+  tribunal: string;
+  disponibilizacao: string;
+  conteudo: string;
+}): Promise<{ ok: boolean; mensagem: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "publicacoes", "criar")) {
+    return { ok: false, mensagem: "Sem permissão." };
+  }
+
+  const {
+    processo,
+    tipo,
+    destinatario,
+    orgao,
+    tribunal,
+    disponibilizacao,
+    conteudo,
+  } = data;
+  if (!processo.trim() || !tipo.trim() || !disponibilizacao.trim()) {
+    return { ok: false, mensagem: "Processo, tipo e data são obrigatórios." };
+  }
+
+  await sql`
+    INSERT INTO publicacoes
+      (processo, tipo, destinatario, advogados, orgao, tribunal, disponibilizacao, status, origem, conteudo)
+    VALUES (
+      ${processo.trim()},
+      ${tipo.trim()},
+      ${destinatario.trim() || null},
+      ${[]},
+      ${orgao.trim() || "—"},
+      ${tribunal.trim() || "—"},
+      ${disponibilizacao}::date,
+      'nao_lida',
+      'manual',
+      ${conteudo.trim() || null}
+    )
+  `;
+
+  revalidatePath("/dashboard/publicacoes");
+  return { ok: true, mensagem: "Publicação registrada com sucesso!" };
 }

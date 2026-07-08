@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LgpdActions({ clienteId }: { clienteId: string }) {
+  const router = useRouter();
   const [anonimizando, setAnonimizando] = useState(false);
   const [feito, setFeito] = useState(false);
 
@@ -19,7 +21,7 @@ export default function LgpdActions({ clienteId }: { clienteId: string }) {
       });
       if (res.ok) {
         setFeito(true);
-        setTimeout(() => window.location.reload(), 1500);
+        setTimeout(() => router.refresh(), 1500);
       } else {
         const data = await res.json();
         alert(data.error ?? "Erro ao anonimizar dados.");

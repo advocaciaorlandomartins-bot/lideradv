@@ -2,7 +2,11 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
 
-const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+function getClaudeClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada.");
+  return new Anthropic({ apiKey });
+}
 
 // ─── Base legal embedada ──────────────────────────────────────────────────────
 
@@ -1894,10 +1898,11 @@ export async function salvarAnalise(
         .join("")
         .substring(0, 800);
 
+      const teseSlug60 = teseTexto.substring(0, 60).replace(/[%_]/g, "\\$&");
       const [existeTese] = await sql`
         SELECT id, vezes_aplicada FROM cerebro_teses
-        WHERE tipo_acao ILIKE ${`%${modo}%`}
-          AND tese ILIKE ${`%${teseTexto.substring(0, 60).replace(/%/g, "")}%`}
+        WHERE tipo_acao ILIKE ${`%${modo.replace(/[%_]/g, "\\$&")}%`}
+          AND tese ILIKE ${`%${teseSlug60}%`} ESCAPE '\\'
         LIMIT 1
       `;
 
@@ -2120,7 +2125,7 @@ Justifique com base nos dados disponíveis.
 ## RISCO GERAL: Alto | Médio | Baixo
 `;
 
-  const resp = await claude.messages.create({
+  const resp = await getClaudeClient().messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 3500,
     messages: [{ role: "user", content: prompt }],
@@ -2314,7 +2319,7 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
     { type: "text", text: prompt },
   ];
 
-  const aiResp = await claude.messages.create(
+  const aiResp = await getClaudeClient().messages.create(
     {
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1000,
@@ -2377,7 +2382,7 @@ Se houver prazo, quando vence e qual a base legal do prazo.
 ## BASE LEGAL
 Dispositivo que fundamenta a providência.`;
 
-  const resp = await claude.messages.create({
+  const resp = await getClaudeClient().messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 600,
     messages: [{ role: "user", content: prompt }],
@@ -2502,7 +2507,7 @@ Responda SOMENTE o JSON abaixo (sem markdown, sem texto fora do JSON):
   "perfil_caso": "descrição do perfil de caso ideal para este tipo de ação"
 }`;
 
-  const resp = await claude.messages.create({
+  const resp = await getClaudeClient().messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 800,
     messages: [{ role: "user", content: prompt }],
@@ -2559,10 +2564,11 @@ Responda SOMENTE o JSON abaixo (sem markdown, sem texto fora do JSON):
 
   if (resultNorm === "deferido") {
     for (const tese of (ap.teses_utilizadas || []).slice(0, 3)) {
+      const teseSlug = String(tese).substring(0, 40).replace(/[%_]/g, "\\$&");
       const [exist] = await sql`
         SELECT id FROM cerebro_teses
-        WHERE tipo_acao ILIKE ${`%${processo.tipo_acao || ""}%`}
-          AND titulo ILIKE ${`%${String(tese).substring(0, 40)}%`}
+        WHERE tipo_acao ILIKE ${`%${(processo.tipo_acao || "").replace(/[%_]/g, "\\$&")}%`}
+          AND titulo ILIKE ${`%${teseSlug}%`} ESCAPE '\\'
         LIMIT 1
       `;
       if (exist) {

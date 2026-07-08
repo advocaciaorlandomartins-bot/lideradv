@@ -11,6 +11,7 @@ import {
   toggleOabAction,
   removerOabAction,
   verificarPublicacoesAction,
+  adicionarPublicacaoManualAction,
 } from "@/lib/publicacoes-actions";
 import {
   SpinnerIcon,
@@ -445,9 +446,36 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
 
 // ── Tab: Manual ───────────────────────────────────────────────────────────────
 
+const TIPOS_PUBLICACAO = [
+  "Intimação",
+  "Publicação",
+  "Decisão",
+  "Despacho",
+  "Sentença",
+  "Acórdão",
+  "Homologação",
+  "Trânsito em julgado",
+  "Cumprimento de sentença",
+  "Outro",
+];
+
 function TabManual({ publicacoes }: { publicacoes: Publicacao[] }) {
   const [search, setSearch] = useState("");
   const [buscou, setBuscou] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(
+    null
+  );
+  const [form, setForm] = useState({
+    processo: "",
+    tipo: "Intimação",
+    destinatario: "",
+    orgao: "",
+    tribunal: "",
+    disponibilizacao: new Date().toISOString().slice(0, 10),
+    conteudo: "",
+  });
 
   const resultados = useMemo(() => {
     if (!search.trim()) return [];
@@ -466,12 +494,53 @@ function TabManual({ publicacoes }: { publicacoes: Publicacao[] }) {
     setBuscou(true);
   }
 
+  function handleSubmitForm(e: React.FormEvent) {
+    e.preventDefault();
+    setFeedback(null);
+    startTransition(async () => {
+      const res = await adicionarPublicacaoManualAction(form);
+      setFeedback({ ok: res.ok, msg: res.mensagem });
+      if (res.ok) {
+        setShowForm(false);
+        setForm({
+          processo: "",
+          tipo: "Intimação",
+          destinatario: "",
+          orgao: "",
+          tribunal: "",
+          disponibilizacao: new Date().toISOString().slice(0, 10),
+          conteudo: "",
+        });
+      }
+    });
+  }
+
   return (
     <div className="space-y-4">
+      {/* Aviso sobre DJe e INSS */}
+      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 font-body text-sm text-blue-800">
+        ℹ️ Use <strong>Verificar agora</strong> (aba OABs) para buscar
+        publicações e intimações do DJe automaticamente. Se uma intimação do
+        INSS ou publicação não foi capturada, registre-a manualmente aqui.
+      </div>
+
+      {/* Busca nas publicações existentes */}
       <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
-        <h2 className="mb-4 font-heading text-sm font-semibold text-fg">
-          Busca Manual de Publicações
-        </h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-heading text-sm font-semibold text-fg">
+            Busca de Publicações
+          </h2>
+          <button
+            onClick={() => {
+              setShowForm((v) => !v);
+              setFeedback(null);
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <PlusIcon className="h-4 w-4" />
+            {showForm ? "Cancelar" : "Registrar manualmente"}
+          </button>
+        </div>
         <form onSubmit={handleBusca} className="flex gap-2">
           <div className="relative flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
@@ -494,12 +563,149 @@ function TabManual({ publicacoes }: { publicacoes: Publicacao[] }) {
             Buscar
           </button>
         </form>
-        <p className="mt-2 font-body text-xs text-muted">
-          Busca nas publicações já capturadas pelo sistema. Para buscar no
-          DJe/PJe em tempo real, configure as OABs monitoradas na aba{" "}
-          <strong>OABs</strong>.
-        </p>
       </div>
+
+      {/* Formulário de registro manual */}
+      {showForm && (
+        <form
+          onSubmit={handleSubmitForm}
+          className="rounded-xl border border-border bg-white p-5 shadow-sm space-y-4"
+        >
+          <h3 className="font-heading text-sm font-semibold text-fg">
+            Registrar Publicação / Intimação Manualmente
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                Número do Processo *
+              </label>
+              <input
+                value={form.processo}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, processo: e.target.value }))
+                }
+                placeholder="0000000-00.0000.0.00.0000"
+                required
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                Tipo *
+              </label>
+              <select
+                value={form.tipo}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, tipo: e.target.value }))
+                }
+                required
+                className="h-10 w-full cursor-pointer rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+              >
+                {TIPOS_PUBLICACAO.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                Destinatário / Cliente
+              </label>
+              <input
+                value={form.destinatario}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, destinatario: e.target.value }))
+                }
+                placeholder="Nome do cliente ou advogado"
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                Data de Disponibilização *
+              </label>
+              <input
+                type="date"
+                value={form.disponibilizacao}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, disponibilizacao: e.target.value }))
+                }
+                required
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                Órgão
+              </label>
+              <input
+                value={form.orgao}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, orgao: e.target.value }))
+                }
+                placeholder="Ex.: 1ª Vara Federal de Maceió"
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                Tribunal
+              </label>
+              <input
+                value={form.tribunal}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, tribunal: e.target.value }))
+                }
+                placeholder="Ex.: TJAL, TRF5, INSS"
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+              Conteúdo / Resumo
+            </label>
+            <textarea
+              value={form.conteudo}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, conteudo: e.target.value }))
+              }
+              placeholder="Cole aqui o texto da intimação ou publicação…"
+              rows={4}
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100 resize-none"
+            />
+          </div>
+          {feedback && (
+            <p
+              className={`font-body text-xs font-semibold ${feedback.ok ? "text-emerald-600" : "text-red-600"}`}
+            >
+              {feedback.ok ? "✅" : "❌"} {feedback.msg}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={isPending}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              {isPending ? (
+                <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <PlusIcon className="h-3.5 w-3.5" />
+              )}
+              Registrar
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="rounded-lg border border-border px-4 py-2 font-body text-sm font-semibold text-muted transition-colors hover:text-fg"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
 
       {buscou && search.trim() && (
         <>

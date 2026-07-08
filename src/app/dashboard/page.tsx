@@ -45,7 +45,9 @@ function fmtDateShort(iso: string) {
 }
 
 function getGreeting() {
-  const h = new Date().getHours();
+  const h = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  ).getHours();
   if (h < 12) return "Bom dia";
   if (h < 18) return "Boa tarde";
   return "Boa noite";
@@ -235,9 +237,7 @@ export default async function DashboardPage() {
     0
   );
 
-  const nomeUsuario = session.login
-    ? session.login.charAt(0).toUpperCase() + session.login.slice(1)
-    : "Usuário";
+  const nomeUsuario = session.nome || session.login || "Usuário";
 
   // ── Ações rápidas — apenas módulos com acesso ─────────────────────────────
   const quickActions = [

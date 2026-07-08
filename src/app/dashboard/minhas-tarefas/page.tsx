@@ -21,7 +21,7 @@ export default async function MinhasTarefasPage() {
           Minhas Tarefas
         </h1>
         <p className="mt-1 font-body text-sm text-muted">
-          Demandas atribuídas a você — {session.login}
+          Demandas atribuídas a você — {session.nome || session.login}
         </p>
       </div>
       <KanbanColaborador

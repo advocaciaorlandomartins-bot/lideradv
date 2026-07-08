@@ -3,7 +3,6 @@ import {
   getAllLancamentos,
   getLancamentoKpis,
   getContasAReceber,
-  getMeuFinanceiroDados,
 } from "@/lib/lancamentos-db";
 import {
   getAllRemuneracoes,
@@ -13,13 +12,11 @@ import {
 import FinanceiroContent from "@/components/dashboard/financeiro/financeiro-content";
 import RemuneracoesContent from "@/components/dashboard/remuneracoes/remuneracoes-content";
 import ContasContent from "@/components/dashboard/financeiro/contas-content";
-import MeuFinanceiroContent from "@/components/dashboard/financeiro/meu-financeiro-content";
 import {
   BanknotesIcon,
   CurrencyIcon,
   ClipboardListIcon,
   PlusIcon,
-  ChartBarIcon,
 } from "@/components/icons";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
@@ -38,13 +35,12 @@ export default async function FinanceiroPage({
   const { tab } = await searchParams;
   const isRemuneracoes = tab === "remuneracoes";
   const isContas = tab === "contas";
-  const isMeuPainel = tab === "meu_painel";
 
   const session = await getSession();
   const canEdit = !!session && hasPermission(session, "financeiro", "editar");
 
   const [lancamentos, lancamentoKpis] =
-    !isRemuneracoes && !isContas && !isMeuPainel
+    !isRemuneracoes && !isContas
       ? await Promise.all([getAllLancamentos(), getLancamentoKpis()])
       : [
           [],
@@ -65,8 +61,6 @@ export default async function FinanceiroPage({
   const [contasReceber, contasPagar] = isContas
     ? await Promise.all([getContasAReceber(), getContasAPagar()])
     : [null, null];
-
-  const meuFinanceiro = isMeuPainel ? await getMeuFinanceiroDados() : null;
 
   const total = lancamentos.length;
   const pendentes = lancamentos.filter((l) => l.status === "pendente").length;
@@ -119,17 +113,6 @@ export default async function FinanceiroPage({
               <ClipboardListIcon className="h-4 w-4 flex-shrink-0" />
               Contas
             </Link>
-            <Link
-              href="/dashboard/financeiro?tab=meu_painel"
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-semibold transition-colors duration-150 sm:gap-2 sm:px-4 sm:py-2 ${
-                isMeuPainel
-                  ? "bg-primary text-white shadow-sm"
-                  : "text-muted hover:text-fg"
-              }`}
-            >
-              <ChartBarIcon className="h-4 w-4 flex-shrink-0" />
-              Meu Painel
-            </Link>
           </div>
         </div>
 
@@ -164,8 +147,6 @@ export default async function FinanceiroPage({
           contasReceber={contasReceber!}
           contasPagar={contasPagar!}
         />
-      ) : isMeuPainel ? (
-        <MeuFinanceiroContent dados={meuFinanceiro!} />
       ) : (
         <FinanceiroContent
           lancamentos={lancamentos}

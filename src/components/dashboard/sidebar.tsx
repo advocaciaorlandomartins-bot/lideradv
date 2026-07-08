@@ -32,6 +32,7 @@ import {
   CheckCircleIcon,
   IdentificationIcon,
   BellAlertIcon,
+  CurrencyIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -143,6 +144,12 @@ const GROUPS: {
         icon: CheckCircleIcon,
         label: "Minhas Tarefas",
         modulo: null,
+      },
+      {
+        href: "/dashboard/meu-financeiro",
+        icon: CurrencyIcon,
+        label: "Meu Financeiro",
+        modulo: "meu_financeiro",
       },
       {
         href: "/dashboard/colaboradores",

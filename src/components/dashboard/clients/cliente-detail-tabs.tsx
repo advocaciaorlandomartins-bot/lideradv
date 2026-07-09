@@ -75,6 +75,52 @@ function ProcessStatusBadge({ status }: { status: Processo["status"] }) {
   );
 }
 
+// ── CopyButton ────────────────────────────────────────────────
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!value || value === "—") return null;
+  function handleCopy() {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      title="Copiar"
+      className="ml-1 flex-shrink-0 rounded p-0.5 text-muted transition-colors hover:bg-slate-100 hover:text-primary"
+    >
+      {copied ? (
+        <svg
+          className="h-3.5 w-3.5 text-emerald-500"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M2 8l4 4 8-8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        <svg
+          className="h-3.5 w-3.5"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
+          <rect x="5" y="5" width="9" height="9" rx="1.5" />
+          <path
+            d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 // ── InfoRow ───────────────────────────────────────────────────
 
 function InfoRow({
@@ -87,15 +133,39 @@ function InfoRow({
   value: string;
 }) {
   return (
-    <div className="flex items-baseline gap-3">
-      {Icon && <Icon className="h-4 w-4 flex-shrink-0 text-muted mt-0.5" />}
+    <div className="flex items-start gap-3">
+      {Icon && <Icon className="h-4 w-4 flex-shrink-0 text-muted mt-3.5" />}
       <div className="min-w-0 flex-1">
         <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
           {label}
         </p>
-        <p className="mt-0.5 font-body text-sm text-fg break-words">
-          {value || "—"}
-        </p>
+        <div className="mt-0.5 flex items-center gap-1">
+          <p className="font-body text-sm text-fg break-words flex-1">
+            {value || "—"}
+          </p>
+          <CopyButton value={value} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SectionCard ───────────────────────────────────────────────
+
+function SectionCard({
+  title,
+  children,
+  cols = 2,
+}: {
+  title: string;
+  children: React.ReactNode;
+  cols?: number;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+      <h3 className="font-heading text-sm font-bold text-fg mb-4">{title}</h3>
+      <div className={`grid gap-x-6 gap-y-4 grid-cols-1 sm:grid-cols-${cols}`}>
+        {children}
       </div>
     </div>
   );
@@ -247,44 +317,181 @@ export default function ClienteDetailTabs({
             </div>
           </div>
 
-          {/* Info card */}
-          <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-            <h3 className="font-heading text-sm font-bold text-fg mb-4">
-              Informações de contato
-            </h3>
-            <div className="space-y-4">
+          {/* Contato + Endereço + Dados pessoais */}
+          <div className="lg:col-span-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {/* Contato */}
+            <SectionCard title="Contato" cols={1}>
               <InfoRow icon={MailIcon} label="E-mail" value={client.email} />
               <InfoRow icon={PhoneIcon} label="Telefone" value={client.phone} />
               <InfoRow
-                icon={MapPinIcon}
-                label="Cidade/UF"
-                value={`${client.city} — ${client.state}`}
+                icon={UsersIcon}
+                label={client.type === "PJ" ? "CNPJ" : "CPF"}
+                value={client.doc}
               />
-              <InfoRow icon={UsersIcon} label="Documento" value={client.doc} />
-              <InfoRow
-                icon={CalendarIcon}
-                label="Cliente desde"
-                value={client.since}
-              />
-            </div>
+              {client.rg && (
+                <InfoRow
+                  label="RG"
+                  value={
+                    client.rg + (client.rg_orgao ? ` — ${client.rg_orgao}` : "")
+                  }
+                />
+              )}
+              {client.birth_date && (
+                <InfoRow
+                  icon={CalendarIcon}
+                  label="Data de nascimento"
+                  value={new Date(
+                    client.birth_date + "T12:00:00"
+                  ).toLocaleDateString("pt-BR")}
+                />
+              )}
+              {client.estado_civil && (
+                <InfoRow label="Estado civil" value={client.estado_civil} />
+              )}
+              {client.genero && (
+                <InfoRow label="Gênero" value={client.genero} />
+              )}
+              {client.profissao && (
+                <InfoRow label="Profissão" value={client.profissao} />
+              )}
+              {client.nacionalidade && (
+                <InfoRow label="Nacionalidade" value={client.nacionalidade} />
+              )}
+              {/* Quick actions */}
+              <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                <a
+                  href={`mailto:${client.email}`}
+                  className="flex h-9 items-center gap-2 rounded-lg border border-border px-3 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
+                >
+                  <MailIcon className="h-4 w-4" />
+                  Enviar e-mail
+                </a>
+                <a
+                  href={`tel:${client.phone.replace(/\D/g, "")}`}
+                  className="flex h-9 items-center gap-2 rounded-lg border border-border px-3 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
+                >
+                  <PhoneIcon className="h-4 w-4" />
+                  Ligar
+                </a>
+              </div>
+            </SectionCard>
 
-            {/* Quick actions */}
-            <div className="mt-6 flex flex-col gap-2">
-              <a
-                href={`mailto:${client.email}`}
-                className="flex h-9 items-center gap-2 rounded-lg border border-border px-3 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
-              >
-                <MailIcon className="h-4 w-4" />
-                Enviar e-mail
-              </a>
-              <a
-                href={`tel:${client.phone.replace(/\D/g, "")}`}
-                className="flex h-9 items-center gap-2 rounded-lg border border-border px-3 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
-              >
-                <PhoneIcon className="h-4 w-4" />
-                Ligar
-              </a>
-            </div>
+            {/* Endereço */}
+            <SectionCard title="Endereço" cols={1}>
+              <InfoRow icon={MapPinIcon} label="CEP" value={client.cep} />
+              <InfoRow label="Logradouro" value={client.street} />
+              <InfoRow label="Número" value={client.addr_number} />
+              {client.complement && (
+                <InfoRow label="Complemento" value={client.complement} />
+              )}
+              <InfoRow label="Bairro" value={client.neighborhood} />
+              <InfoRow label="Cidade" value={client.city} />
+              <InfoRow label="Estado" value={client.state} />
+              {/* Endereço completo para copiar de uma vez */}
+              {client.street && (
+                <div className="pt-2 border-t border-border">
+                  <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-1">
+                    Endereço completo
+                  </p>
+                  <div className="flex items-start gap-1">
+                    <p className="font-body text-sm text-fg flex-1 break-words">
+                      {[
+                        client.street,
+                        client.addr_number,
+                        client.complement,
+                        client.neighborhood,
+                        client.city,
+                        client.state,
+                        client.cep,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                    <CopyButton
+                      value={[
+                        client.street,
+                        client.addr_number,
+                        client.complement,
+                        client.neighborhood,
+                        client.city,
+                        client.state,
+                        client.cep,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    />
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+
+            {/* Responsável legal (se for menor/incapaz) */}
+            {client.menor_incapaz && client.responsavel_nome ? (
+              <SectionCard title="Responsável Legal" cols={1}>
+                <InfoRow
+                  icon={UsersIcon}
+                  label="Nome"
+                  value={client.responsavel_nome}
+                />
+                {client.responsavel_cpf && (
+                  <InfoRow label="CPF" value={client.responsavel_cpf} />
+                )}
+                {client.responsavel_rg && (
+                  <InfoRow
+                    label="RG"
+                    value={
+                      client.responsavel_rg +
+                      (client.responsavel_rg_orgao
+                        ? ` — ${client.responsavel_rg_orgao}`
+                        : "")
+                    }
+                  />
+                )}
+                {client.responsavel_parentesco && (
+                  <InfoRow
+                    label="Parentesco"
+                    value={client.responsavel_parentesco}
+                  />
+                )}
+                {client.responsavel_telefone && (
+                  <InfoRow
+                    icon={PhoneIcon}
+                    label="Telefone"
+                    value={client.responsavel_telefone}
+                  />
+                )}
+                {client.responsavel_email && (
+                  <InfoRow
+                    icon={MailIcon}
+                    label="E-mail"
+                    value={client.responsavel_email}
+                  />
+                )}
+              </SectionCard>
+            ) : (
+              /* Naturalidade + Filiação (INSS) */
+              <SectionCard title="Filiação e Naturalidade" cols={1}>
+                {client.filiacao_mae && (
+                  <InfoRow label="Nome da mãe" value={client.filiacao_mae} />
+                )}
+                {client.filiacao_pai && (
+                  <InfoRow label="Nome do pai" value={client.filiacao_pai} />
+                )}
+                {client.naturalidade_cidade && (
+                  <InfoRow
+                    label="Naturalidade"
+                    value={`${client.naturalidade_cidade}${client.naturalidade_estado ? ` / ${client.naturalidade_estado}` : ""}`}
+                  />
+                )}
+                {!client.filiacao_mae &&
+                  !client.filiacao_pai &&
+                  !client.naturalidade_cidade && (
+                    <p className="font-body text-sm text-muted">
+                      Nenhum dado cadastrado
+                    </p>
+                  )}
+              </SectionCard>
+            )}
           </div>
 
           {/* Recent processes preview */}
@@ -362,8 +569,8 @@ export default function ClienteDetailTabs({
               client.num_beneficio ||
               client.status_beneficio ||
               client.cid_principal ||
-              client.filiacao_mae ||
-              client.naturalidade_cidade) && (
+              client.data_diagnostico ||
+              client.data_afastamento) && (
               <div className="lg:col-span-3 rounded-xl border border-blue-100 bg-blue-50/40 p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white font-body text-[10px] font-bold">
@@ -373,7 +580,7 @@ export default function ClienteDetailTabs({
                     Dados Previdenciários
                   </h3>
                 </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
                   {client.nis && (
                     <InfoRow label="NIS / PIS" value={client.nis} />
                   )}
@@ -440,6 +647,12 @@ export default function ClienteDetailTabs({
                       value={client.carencia_atingida ? "Sim" : "Não"}
                     />
                   )}
+                  {client.num_contribuicoes != null && (
+                    <InfoRow
+                      label="Nº contribuições"
+                      value={String(client.num_contribuicoes)}
+                    />
+                  )}
                   {client.cid_principal && (
                     <InfoRow
                       label="CID principal"
@@ -479,18 +692,6 @@ export default function ClienteDetailTabs({
                       label="Atividade anterior"
                       value={client.atividade_anterior}
                     />
-                  )}
-                  {client.naturalidade_cidade && (
-                    <InfoRow
-                      label="Naturalidade"
-                      value={`${client.naturalidade_cidade}${client.naturalidade_estado ? ` / ${client.naturalidade_estado}` : ""}`}
-                    />
-                  )}
-                  {client.filiacao_mae && (
-                    <InfoRow label="Nome da mãe" value={client.filiacao_mae} />
-                  )}
-                  {client.filiacao_pai && (
-                    <InfoRow label="Nome do pai" value={client.filiacao_pai} />
                   )}
                 </div>
               </div>

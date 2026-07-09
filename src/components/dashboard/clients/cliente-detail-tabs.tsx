@@ -30,6 +30,7 @@ import ClientDebitsSection from "./client-debits-section";
 import DocumentsSection from "../documents/documents-section";
 import GerarDocumentoButton from "./gerar-documento-button";
 import InboundEmailTab from "./inbound-email-tab";
+import InssProcessarModal from "./inss-processar-modal";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -193,6 +194,7 @@ export default function ClienteDetailTabs({
   initialTab,
 }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "geral");
+  const [inssModalAberto, setInssModalAberto] = useState(false);
   const naoLidos = inboundEmails.filter((e) => !e.lida).length;
 
   const activeProcesses = processes.filter(
@@ -856,10 +858,29 @@ export default function ClienteDetailTabs({
               {documentos.length === 1 ? "documento" : "documentos"} arquivado
               {documentos.length !== 1 ? "s" : ""}
             </p>
-            <GerarDocumentoButton
-              clientId={client.id}
-              clientName={client.name}
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setInssModalAberto(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-body text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-3.5 w-3.5"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Processar INSS
+              </button>
+              <GerarDocumentoButton
+                clientId={client.id}
+                clientName={client.name}
+              />
+            </div>
           </div>
           <DocumentsSection
             entityType="cliente"
@@ -867,6 +888,16 @@ export default function ClienteDetailTabs({
             documents={documentos}
           />
         </div>
+      )}
+
+      {inssModalAberto && (
+        <InssProcessarModal
+          clienteId={client.id}
+          clienteNome={client.name}
+          telefoneCliente={client.phone ?? null}
+          processos={processes}
+          onClose={() => setInssModalAberto(false)}
+        />
       )}
 
       {tab === "email" && (

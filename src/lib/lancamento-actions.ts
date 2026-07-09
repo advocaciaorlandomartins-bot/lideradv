@@ -7,6 +7,11 @@ import { logAction } from "./audit";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { notificarPrevBot } from "./prevbot-outbound";
+import {
+  agendarLembretesHonorario,
+  cancelarLembretesLancamento,
+  agendarConfirmacaoPagamento,
+} from "./lembretes";
 
 export type LancamentoFormState = { error: string } | null;
 
@@ -411,6 +416,71 @@ export async function createLancamentoAction(
         `;
       }
     }
+
+    // Agenda lembretes de cobrança para entradas pendentes com cliente
+    if (tipo === "entrada" && clientId && status === "pendente") {
+      try {
+        const clienteRows = await sql`
+          SELECT name, phone FROM clients WHERE id = ${clientId}::uuid LIMIT 1
+        `;
+        if (clienteRows.length > 0 && clienteRows[0].phone) {
+          const clienteNome = String(clienteRows[0].name);
+          const telefone = String(clienteRows[0].phone);
+
+          const toSchedule: Array<{
+            id: string;
+            dataStr: string;
+            val: number;
+          }> = [];
+
+          if (entradaLancamentoId && valorEntrada > 0) {
+            toSchedule.push({
+              id: entradaLancamentoId,
+              dataStr: baseDateStr,
+              val: valorEntrada,
+            });
+          }
+
+          if (parcelaLancamentoIds.length > 0) {
+            const baseDate = new Date(`${baseDateStr}T12:00:00`);
+            const valParcela = mensalidade
+              ? valorMensalidade
+              : Math.round(
+                  ((valor - valorEntrada) / Math.max(totalParcelas, 1)) * 100
+                ) / 100;
+            for (let i = 0; i < parcelaLancamentoIds.length; i++) {
+              const parcDate = new Date(baseDate);
+              parcDate.setMonth(parcDate.getMonth() + (i + 1));
+              toSchedule.push({
+                id: parcelaLancamentoIds[i],
+                dataStr: parcDate.toISOString().split("T")[0],
+                val: valParcela,
+              });
+            }
+          } else if (firstLancamentoId && !recorrente) {
+            toSchedule.push({
+              id: firstLancamentoId,
+              dataStr: baseDateStr,
+              val: valor,
+            });
+          }
+
+          for (const item of toSchedule) {
+            await agendarLembretesHonorario({
+              lancamentoId: item.id,
+              clienteId: clientId,
+              clienteNome,
+              telefone,
+              valor: item.val,
+              dataVencimento: new Date(`${item.dataStr}T12:00:00`),
+              descricao,
+            }).catch(() => null);
+          }
+        }
+      } catch {
+        // lembretes são não-críticos, não falha o lançamento
+      }
+    }
   } catch (err) {
     console.error("createLancamentoAction DB error:", err);
     return { error: "Erro ao salvar lançamento. Tente novamente." };
@@ -611,6 +681,32 @@ export async function markAsPagoAction(id: string): Promise<void> {
         clientId: lan.client_id,
         dados: { valor_honorario: lan.valor },
       });
+    }
+    // Lembretes: cancela pendentes + envia confirmação de pagamento
+    if (lan?.client_id && lan.tipo === "entrada") {
+      await cancelarLembretesLancamento(id).catch(() => null);
+      const clienteRows = await sql`
+        SELECT name, phone FROM clients WHERE id = ${lan.client_id}::uuid LIMIT 1
+      `.catch(() => []);
+      if (clienteRows.length > 0) {
+        const pendentesRows = await sql`
+          SELECT COALESCE(SUM(valor), 0) AS total
+          FROM lancamentos
+          WHERE client_id = ${lan.client_id}::uuid
+            AND tipo = 'entrada'
+            AND status = 'pendente'
+        `.catch(() => []);
+        const saldo = Number(pendentesRows[0]?.total ?? 0);
+        await agendarConfirmacaoPagamento({
+          lancamentoId: id,
+          clienteId: lan.client_id,
+          clienteNome: String(clienteRows[0].name),
+          telefone: String(clienteRows[0].phone ?? ""),
+          valorPago: lan.valor,
+          dataPagamento: new Date(),
+          saldoRestante: saldo,
+        }).catch(() => null);
+      }
     }
   } catch (err) {
     console.error("markAsPagoAction DB error:", err);

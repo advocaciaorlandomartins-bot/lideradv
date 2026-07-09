@@ -9,7 +9,8 @@ export type PrevBotEvento =
   | "processo_deferido"
   | "processo_indeferido"
   | "processo_extinto"
-  | "cliente_inativo";
+  | "cliente_inativo"
+  | "mensagem_direta";
 
 interface ContatoPrevBot {
   leadId: string;
@@ -87,6 +88,27 @@ export async function _enviarWebhook(
   } catch (err) {
     return { ok: false, error: String(err).slice(0, 500) };
   }
+}
+
+/**
+ * Envia uma mensagem de texto diretamente para um número de WhatsApp.
+ * Não requer que o contato seja um lead do PrevBot.
+ */
+export async function enviarMensagemDireta(opts: {
+  telefone: string;
+  mensagem: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const key = process.env.PREVBOT_WEBHOOK_KEY ?? process.env.PREVBOT_API_KEY;
+  if (!key) return { ok: false, error: "PREVBOT_API_KEY não configurada" };
+
+  const telefone = opts.telefone.replace(/\D/g, "");
+  if (!telefone) return { ok: false, error: "Telefone inválido" };
+
+  return _enviarWebhook(key, {
+    evento: "mensagem_direta",
+    telefone,
+    dados: { texto: opts.mensagem },
+  });
 }
 
 /**

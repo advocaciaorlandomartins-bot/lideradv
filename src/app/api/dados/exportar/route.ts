@@ -18,11 +18,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const { searchParams } = new URL(req.url);
   const clienteId = (searchParams.get("cliente_id") ?? "").trim();
-  if (!clienteId) {
+  if (!clienteId || !UUID_RE.test(clienteId)) {
     return NextResponse.json(
-      { error: "Parâmetro cliente_id obrigatório." },
+      { error: "Parâmetro cliente_id inválido." },
       { status: 400 }
     );
   }

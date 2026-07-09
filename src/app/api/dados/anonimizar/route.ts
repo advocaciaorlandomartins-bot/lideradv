@@ -39,11 +39,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
   }
 
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const clienteId = (body.cliente_id ?? "").trim();
   const motivo = (body.motivo ?? "Solicitação LGPD").trim();
-  if (!clienteId) {
+  if (!clienteId || !UUID_RE.test(clienteId)) {
     return NextResponse.json(
-      { error: "Campo cliente_id obrigatório." },
+      { error: "Campo cliente_id inválido." },
       { status: 422 }
     );
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import {
   getAddressByEmail,
   saveInboundEmail,
@@ -9,6 +10,25 @@ import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { resumirEmail } from "@/lib/ai";
 import { notificarEmailRecebido } from "@/lib/email";
 import sql from "@/lib/db";
+
+function verificarWebhookAuth(request: Request): boolean {
+  const secret = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  // Se a variável não estiver configurada, bloqueia por segurança
+  if (!secret) return false;
+  const header =
+    request.headers.get("x-webhook-secret") ??
+    request.headers.get("authorization")?.replace(/^Bearer /, "") ??
+    "";
+  if (!header) return false;
+  try {
+    const a = Buffer.from(header);
+    const b = Buffer.from(secret);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +131,10 @@ async function getClientName(clientId: string): Promise<string> {
 // ── Webhook handler ───────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
+  if (!verificarWebhookAuth(request)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  }
+
   let body: Record<string, unknown>;
 
   const contentType = request.headers.get("content-type") ?? "";

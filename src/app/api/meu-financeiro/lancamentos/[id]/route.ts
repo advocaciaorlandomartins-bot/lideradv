@@ -5,6 +5,9 @@ import {
   deletarLancamentoPessoal,
 } from "@/lib/meu-financeiro-db";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,7 +17,8 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  if (!id || !UUID_RE.test(id))
+    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
   try {
     const body = await req.json();
@@ -65,7 +69,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  if (!id) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
+  if (!id || !UUID_RE.test(id))
+    return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
   try {
     const ok = await deletarLancamentoPessoal(id, session.id);

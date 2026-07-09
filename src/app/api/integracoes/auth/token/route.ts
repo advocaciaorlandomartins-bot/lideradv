@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import sql from "@/lib/db";
 import { jwtSign } from "@/lib/integracoes-jwt";
 
@@ -27,7 +28,17 @@ export async function POST(req: NextRequest) {
 
   const { colaborador_id, api_key } = body;
 
-  if (!api_key || api_key !== apiKey) {
+  let apiKeyValida = false;
+  if (api_key && apiKey) {
+    try {
+      const a = Buffer.from(api_key);
+      const b = Buffer.from(apiKey);
+      apiKeyValida = a.length === b.length && timingSafeEqual(a, b);
+    } catch {
+      apiKeyValida = false;
+    }
+  }
+  if (!apiKeyValida) {
     return NextResponse.json({ error: "api_key inválida" }, { status: 401 });
   }
 

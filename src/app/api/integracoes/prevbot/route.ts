@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import sql from "@/lib/db";
 import { converterLeadAssinado } from "@/lib/crm-contrato";
 
@@ -10,7 +11,15 @@ function authOk(request: Request): boolean {
     ? authHeader.slice(7).trim()
     : "";
   const expectedKey = process.env.PREVBOT_API_KEY;
-  return !!expectedKey && token === expectedKey;
+  if (!expectedKey || !token) return false;
+  try {
+    const a = Buffer.from(token);
+    const b = Buffer.from(expectedKey);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 // POST /api/integracoes/prevbot — cria lead no CRM (ou atualiza contrato se lead já existe)

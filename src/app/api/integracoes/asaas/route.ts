@@ -41,6 +41,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({}, { status: 401 });
+  if (session.categoria !== "Administrador(a)") {
+    return NextResponse.json(
+      { error: "Acesso restrito a administradores." },
+      { status: 403 }
+    );
+  }
 
   const body = await req.json();
   const { token, ambiente, juros, multa, gateway } = body as {

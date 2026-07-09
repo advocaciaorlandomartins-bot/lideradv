@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDownloadUrl } from "@vercel/blob";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ const UUID_RE =
 
 export async function GET(request: Request) {
   const session = await getSession();
-  if (!session) {
+  if (!session || !hasPermission(session, "processos", "ver")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

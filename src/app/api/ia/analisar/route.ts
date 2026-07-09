@@ -26,6 +26,14 @@ const ALLOWED_TYPES = new Set([
   "image/webp",
 ]);
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function sanitizeUuid(val: unknown): string | null {
+  const s = typeof val === "string" ? val.trim() : "";
+  return UUID_RE.test(s) ? s : null;
+}
+
 function isUrlPermitida(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -117,8 +125,8 @@ export async function POST(req: Request) {
     nomeArquivo = body.nomeArquivo;
     mimeType = body.mimeType;
     base64 = Buffer.from(arrayBuf).toString("base64");
-    clienteId = body.clienteId ?? null;
-    processoId = body.processoId ?? null;
+    clienteId = sanitizeUuid(body.clienteId);
+    processoId = sanitizeUuid(body.processoId);
     tipoAnalise = body.tipoAnalise ?? "completa";
   } else {
     // Modo FormData: arquivo enviado diretamente
@@ -158,8 +166,8 @@ export async function POST(req: Request) {
     nomeArquivo = arquivo.name;
     mimeType = arquivo.type;
     base64 = Buffer.from(buffer).toString("base64");
-    clienteId = form.get("clienteId") as string | null;
-    processoId = form.get("processoId") as string | null;
+    clienteId = sanitizeUuid(form.get("clienteId"));
+    processoId = sanitizeUuid(form.get("processoId"));
     tipoAnalise = (form.get("tipoAnalise") as string | null) ?? "completa";
   }
 

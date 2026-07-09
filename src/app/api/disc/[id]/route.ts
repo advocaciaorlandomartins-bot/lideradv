@@ -15,12 +15,15 @@ export async function GET(
 
   const { id } = await params;
 
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   }
 
   const [teste] = await sql`
-    SELECT * FROM testes_comportamentais WHERE id = ${id}
+    SELECT * FROM testes_comportamentais
+    WHERE id = ${id}::uuid AND created_by = ${session.id}::uuid
   `;
 
   if (!teste) {
@@ -44,11 +47,13 @@ export async function DELETE(
 
   const { id } = await params;
 
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   }
 
-  await sql`DELETE FROM testes_comportamentais WHERE id = ${id}`;
+  await sql`DELETE FROM testes_comportamentais WHERE id = ${id}::uuid AND created_by = ${session.id}::uuid`;
 
   return NextResponse.json({ ok: true });
 }

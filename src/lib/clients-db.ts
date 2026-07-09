@@ -125,6 +125,7 @@ export interface ClientFull {
   data_afastamento: string | null;
   atividade_anterior: string | null;
   num_contribuicoes: number | null;
+  bloquear_mensagens: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -205,6 +206,7 @@ function mapClientFull(r: any, hasOrigemCols: boolean): ClientFull {
     atividade_anterior: r.atividade_anterior ?? null,
     num_contribuicoes:
       r.num_contribuicoes != null ? Number(r.num_contribuicoes) : null,
+    bloquear_mensagens: r.bloquear_mensagens ?? false,
   };
 }
 
@@ -242,6 +244,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         to_char(c.data_afastamento, 'YYYY-MM-DD') AS data_afastamento,
         c.atividade_anterior,
         c.num_contribuicoes,
+        c.bloquear_mensagens,
         (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
@@ -279,6 +282,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       to_char(c.data_afastamento, 'YYYY-MM-DD') AS data_afastamento,
       c.atividade_anterior,
       c.num_contribuicoes,
+      c.bloquear_mensagens,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
     WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL

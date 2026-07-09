@@ -681,6 +681,47 @@ export async function complementarClienteAction(
   return { camposAtualizados: campos };
 }
 
+export async function toggleBloquearMensagensAction(
+  clientId: string,
+  bloquear: boolean
+): Promise<{ error?: string; bloquear_mensagens?: boolean }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "editar"))
+    return { error: "Sem permissão." };
+
+  try {
+    await sql`
+      UPDATE clients
+      SET bloquear_mensagens = ${bloquear}
+      WHERE id = ${clientId}::uuid AND deleted_at IS NULL
+    `;
+
+    if (bloquear) {
+      // Cancela todos os lembretes pendentes do cliente
+      await sql`
+        UPDATE lembretes_agendados
+        SET enviado = TRUE, enviado_em = NOW(), erro = 'bloqueado_manualmente'
+        WHERE cliente_id = ${clientId}::uuid
+          AND NOT enviado
+      `;
+    }
+
+    await logAction({
+      acao: "editar",
+      entidade: "cliente",
+      entidadeId: clientId,
+      descricao: bloquear
+        ? "Bloqueou envio de mensagens automáticas"
+        : "Reativou envio de mensagens automáticas",
+    });
+
+    return { bloquear_mensagens: bloquear };
+  } catch (err) {
+    console.error("toggleBloquearMensagensAction DB error:", err);
+    return { error: "Erro ao atualizar configuração de mensagens." };
+  }
+}
+
 export async function deleteClientAction(
   id: string
 ): Promise<{ error?: string }> {

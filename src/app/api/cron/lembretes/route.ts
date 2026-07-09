@@ -18,12 +18,14 @@ export async function GET(req: Request) {
 
   try {
     const pendentes = await sql`
-      SELECT id::text, destinatario_telefone, destinatario_nome, mensagem, tipo
-      FROM lembretes_agendados
-      WHERE NOT enviado
-        AND enviar_em <= NOW()
-        AND tentativas < 3
-      ORDER BY enviar_em ASC
+      SELECT l.id::text, l.destinatario_telefone, l.destinatario_nome, l.mensagem, l.tipo
+      FROM lembretes_agendados l
+      LEFT JOIN clients c ON c.id = l.cliente_id
+      WHERE NOT l.enviado
+        AND l.enviar_em <= NOW()
+        AND l.tentativas < 3
+        AND (c.id IS NULL OR c.bloquear_mensagens IS NOT TRUE)
+      ORDER BY l.enviar_em ASC
       LIMIT ${BATCH}
     `;
 

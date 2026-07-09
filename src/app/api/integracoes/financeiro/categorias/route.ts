@@ -58,15 +58,18 @@ export async function GET(req: NextRequest) {
       SELECT DISTINCT tipo, categoria
       FROM meu_financeiro_lancamentos
       WHERE usuario_id = ${usuarioId}::uuid
-        AND categoria NOT IN (${sql.array(Array.from(predefinidas))})
       ORDER BY tipo, categoria
     `;
 
     customReceita = catRows
-      .filter((r) => r.tipo === "receita")
+      .filter(
+        (r) => r.tipo === "receita" && !predefinidas.has(String(r.categoria))
+      )
       .map((r) => String(r.categoria));
     customDespesa = catRows
-      .filter((r) => r.tipo === "despesa")
+      .filter(
+        (r) => r.tipo === "despesa" && !predefinidas.has(String(r.categoria))
+      )
       .map((r) => String(r.categoria));
   }
 

@@ -31,6 +31,7 @@ import DocumentsSection from "../documents/documents-section";
 import GerarDocumentoButton from "./gerar-documento-button";
 import InboundEmailTab from "./inbound-email-tab";
 import InssProcessarModal from "./inss-processar-modal";
+import JudicialProcessarModal from "./judicial-processar-modal";
 import { toggleBloquearMensagensAction } from "@/lib/client-actions";
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -243,6 +244,7 @@ export default function ClienteDetailTabs({
 }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "geral");
   const [inssModalAberto, setInssModalAberto] = useState(false);
+  const [judicialModalAberto, setJudicialModalAberto] = useState(false);
   const naoLidos = inboundEmails.filter((e) => !e.lida).length;
 
   const activeProcesses = processes.filter(
@@ -928,6 +930,23 @@ export default function ClienteDetailTabs({
                 </svg>
                 Processar INSS
               </button>
+              <button
+                onClick={() => setJudicialModalAberto(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 font-body text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-3.5 w-3.5"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 2a8 8 0 100 16A8 8 0 0010 2zm1 11H9v-2h2v2zm0-4H9V5h2v4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Processar Judicial
+              </button>
               <GerarDocumentoButton
                 clientId={client.id}
                 clientName={client.name}
@@ -949,6 +968,15 @@ export default function ClienteDetailTabs({
           telefoneCliente={client.phone ?? null}
           processos={processes}
           onClose={() => setInssModalAberto(false)}
+        />
+      )}
+
+      {judicialModalAberto && (
+        <JudicialProcessarModal
+          clienteId={client.id}
+          clienteNome={client.name}
+          processos={processes}
+          onClose={() => setJudicialModalAberto(false)}
         />
       )}
 

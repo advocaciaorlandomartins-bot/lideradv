@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     telefoneCliente?: string | null;
     telefoneResponsavel?: string | null;
     nomeResponsavel?: string | null;
+    tipoDocumento?: string | null;
     tipoServico: string;
     dataAgendamento: string; // YYYY-MM-DD
     horaAgendamento: string; // HH:MM
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
     telefoneCliente,
     telefoneResponsavel,
     nomeResponsavel,
+    tipoDocumento,
     tipoServico,
     dataAgendamento,
     horaAgendamento,
@@ -80,6 +82,45 @@ export async function POST(req: NextRequest) {
     `;
 
     const compromissoId = String(compromisso.id);
+
+    // Cria registro na tabela pericias (módulo Controles → Perícias)
+    const tipoPericia =
+      tipoDocumento === "agendamento_avaliacao_social"
+        ? "avaliacao_social_administrativa"
+        : tipoDocumento === "agendamento_pericia_medica" ||
+            tipoDocumento === "agendamento_generico"
+          ? "pericia_administrativa"
+          : null;
+
+    if (tipoPericia) {
+      await sql`
+        INSERT INTO pericias
+          (tipo, client_id, processo_id, data_pericia, hora_pericia, local_pericia, status, observacoes)
+        VALUES
+          (${tipoPericia},
+           ${clienteId}::uuid,
+           ${processoId ?? null}::uuid,
+           ${dataAgendamento}::date,
+           ${horaAgendamento}::time,
+           ${localCompleto},
+           'agendado',
+           ${protocolo ? `Protocolo INSS: ${protocolo}` : null})
+      `.catch(() => null);
+
+      // Cria registro em controles (módulo Controles → Perícias e Av. Sociais)
+      await sql`
+        INSERT INTO controles
+          (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade)
+        VALUES
+          ('pericias',
+           ${dataAgendamento}::date,
+           ${tipoServico},
+           ${clienteId}::uuid,
+           ${processoId ?? null}::uuid,
+           ${tipoServico},
+           'alta')
+      `.catch(() => null);
+    }
 
     // Salva protocolo no processo se informado
     if (processoId && protocolo) {

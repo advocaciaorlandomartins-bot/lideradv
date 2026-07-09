@@ -135,6 +135,7 @@ export default function InssProcessarModal({
           telefoneCliente: telefoneCliente ?? null,
           telefoneResponsavel: doc.telefoneResponsavel || null,
           nomeResponsavel: doc.nomeResponsavel || null,
+          tipoDocumento: doc.tipo_documento,
           tipoServico: doc.tipo_servico ?? labelTipo(doc.tipo_documento),
           dataAgendamento: doc.data_agendamento!,
           horaAgendamento: doc.hora_agendamento ?? "09:00",

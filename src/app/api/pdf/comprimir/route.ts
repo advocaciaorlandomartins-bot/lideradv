@@ -76,6 +76,11 @@ export async function POST(req: NextRequest) {
         { error: "Nenhum arquivo enviado." },
         { status: 400 }
       );
+    if (file.size > 50 * 1024 * 1024)
+      return NextResponse.json(
+        { error: "Arquivo muito grande. Limite: 50 MB." },
+        { status: 413 }
+      );
 
     const buf = await file.arrayBuffer();
     const doc = await PDFDocument.load(buf, { ignoreEncryption: true });

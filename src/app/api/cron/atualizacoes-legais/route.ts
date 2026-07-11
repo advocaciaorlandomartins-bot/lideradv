@@ -213,7 +213,7 @@ export async function GET(req: Request) {
 
   if (!isVercel) {
     const session = await getSession();
-    if (!session) {
+    if (!session || session.categoria !== "Administrador(a)") {
       return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
     }
   }

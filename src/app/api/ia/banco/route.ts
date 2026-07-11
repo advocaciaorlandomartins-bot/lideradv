@@ -83,10 +83,10 @@ export async function POST(request: Request) {
   return NextResponse.json({ id: row.id, titulo: row.titulo });
 }
 
-// PATCH — aprovar petição (torna-a referência para o banco global)
+// PATCH — aprovar petição (torna-a referência para o banco global) — apenas admin
 export async function PATCH(request: Request) {
   const session = await getSession();
-  if (!session)
+  if (!session || session.categoria !== "Administrador(a)")
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const body = await request.json().catch(() => null);
@@ -100,10 +100,10 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
-// DELETE — remover petição
+// DELETE — remover petição — apenas admin
 export async function DELETE(request: Request) {
   const session = await getSession();
-  if (!session)
+  if (!session || session.categoria !== "Administrador(a)")
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const { searchParams } = new URL(request.url);

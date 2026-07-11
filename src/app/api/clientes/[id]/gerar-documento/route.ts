@@ -47,6 +47,13 @@ export async function GET(
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const { id } = await params;
+
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: "ID inválido." }, { status: 400 });
+  }
+
   const { searchParams } = new URL(request.url);
   const template = searchParams.get("template") as TemplateKey | null;
 

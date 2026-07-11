@@ -14,7 +14,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const session = await getSession();
-  if (!session || !hasPermission(session, "clientes", "ver")) {
+  const isAdminOrSocio =
+    session?.categoria === "Administrador(a)" ||
+    session?.categoria === "Sócio(a)";
+  if (!session || !isAdminOrSocio) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

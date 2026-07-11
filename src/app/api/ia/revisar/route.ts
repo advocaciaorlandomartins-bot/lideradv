@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { revisarPeticao, SKILLS, type SkillId } from "@/lib/ai-juridico";
+import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
@@ -18,6 +19,16 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "ver")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  }
+
+  if (await iaRateLimitExcedido(session.login)) {
+    return NextResponse.json(
+      {
+        error:
+          "Limite de requisições de IA excedido. Tente novamente em 1 hora.",
+      },
+      { status: 429 }
+    );
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {

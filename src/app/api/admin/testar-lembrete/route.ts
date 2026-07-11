@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 // Endpoint para testar envio de mensagem WhatsApp (apenas admins)
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session || session.categoria !== "admin") {
+  if (!session || session.categoria !== "Administrador(a)") {
     return NextResponse.json(
       { error: "Apenas administradores." },
       { status: 403 }

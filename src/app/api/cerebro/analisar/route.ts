@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
 import { prepararAnalise, salvarAnalise } from "@/lib/cerebroJuridico";
+import { iaRateLimitExcedido } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,6 +14,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
+  if (await iaRateLimitExcedido(session.login)) {
+    return NextResponse.json(
+      {
+        error:
+          "Limite de requisições de IA excedido. Tente novamente em 1 hora.",
+      },
+      { status: 429 }
+    );
+  }
+
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   let processo_id: string;
   try {
     const body = await req.json();
@@ -21,9 +35,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Payload inválido" }, { status: 400 });
   }
 
-  if (!processo_id) {
+  if (!processo_id || !UUID_RE.test(processo_id)) {
     return NextResponse.json(
-      { error: "processo_id obrigatório" },
+      { error: "processo_id obrigatório e deve ser UUID válido" },
       { status: 400 }
     );
   }

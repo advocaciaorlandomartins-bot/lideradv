@@ -69,6 +69,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(clienteId)) {
+    return NextResponse.json({ error: "clienteId inválido." }, { status: 400 });
+  }
+  if (processoId && !UUID_RE.test(processoId)) {
+    return NextResponse.json(
+      { error: "processoId inválido." },
+      { status: 400 }
+    );
+  }
+
   const ehAgendamento = TIPOS_AGENDAMENTO.has(tipoDocumento ?? "");
   const dataRef =
     dataAgendamento ?? dataEventoRaw ?? new Date().toISOString().split("T")[0];

@@ -15,6 +15,12 @@ export async function POST(req: NextRequest) {
         { error: "Nenhuma imagem enviada." },
         { status: 400 }
       );
+    const totalSize = files.reduce((s, f) => s + f.size, 0);
+    if (totalSize > 100 * 1024 * 1024)
+      return NextResponse.json(
+        { error: "Arquivos muito grandes. Limite total: 100 MB." },
+        { status: 413 }
+      );
 
     const doc = await PDFDocument.create();
 

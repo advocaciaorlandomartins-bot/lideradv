@@ -54,9 +54,7 @@ function normalizarTelefone(tel: string): string {
 }
 
 // Resolve usuário a partir do telefone (via colaboradores) ou cai no admin
-async function resolverUsuario(
-  telefone?: string
-): Promise<{
+async function resolverUsuario(telefone?: string): Promise<{
   usuarioId: string;
   usuarioLogin: string;
   colaboradorNome: string;
@@ -198,6 +196,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "Envie 'texto', 'transcricao' ou 'imagemBase64'." },
       { status: 400 }
+    );
+  }
+
+  if (
+    imagemBase64 &&
+    Buffer.byteLength(imagemBase64, "base64") > 5 * 1024 * 1024
+  ) {
+    return NextResponse.json(
+      { error: "Imagem muito grande. Limite: 5 MB." },
+      { status: 413 }
     );
   }
 

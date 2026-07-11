@@ -20,6 +20,11 @@ export async function POST(req: NextRequest) {
       );
     if (!senha)
       return NextResponse.json({ error: "Informe a senha." }, { status: 400 });
+    if (file.size > 50 * 1024 * 1024)
+      return NextResponse.json(
+        { error: "Arquivo muito grande. Limite: 50 MB." },
+        { status: 413 }
+      );
 
     const buf = await file.arrayBuffer();
     // Re-serialize with pdf-lib (useObjectStreams: false = traditional xref, needed for post-processing)

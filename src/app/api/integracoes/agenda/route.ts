@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const data = searchParams.get("data");
-  const colaboradorId = searchParams.get("colaborador_id") ?? auth.sub;
+  // Ignora colaborador_id do caller — sempre usa o sub do token
+  const colaboradorId = auth.sub;
 
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
     return NextResponse.json(
@@ -97,8 +98,9 @@ export async function POST(req: NextRequest) {
     hora_fim = null,
     local_link = null,
     descricao = null,
-    colaborador_id = auth.sub,
+    // colaborador_id ignorado — sempre vincula ao token do caller
   } = body;
+  const colaborador_id = auth.sub;
 
   if (!titulo?.trim()) {
     return NextResponse.json(

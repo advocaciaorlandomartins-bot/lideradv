@@ -22,8 +22,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   }
 
+  // Verifica que o documento pertence a um processo ou cliente acessível
   const rows = await sql`
-    SELECT url, nome FROM documentos WHERE id = ${id}::uuid LIMIT 1
+    SELECT d.url, d.nome
+    FROM documentos d
+    WHERE d.id = ${id}::uuid
+      AND (
+        -- documento de processo
+        (d.entity_type = 'processo' AND EXISTS (
+          SELECT 1 FROM processos p WHERE p.id = d.entity_id
+        ))
+        OR
+        -- documento de cliente
+        (d.entity_type = 'cliente' AND EXISTS (
+          SELECT 1 FROM clients c WHERE c.id = d.entity_id
+        ))
+        OR
+        -- documento sem vínculo de entidade (legado)
+        (d.entity_type IS NULL)
+      )
+    LIMIT 1
   `;
 
   if (rows.length === 0) {

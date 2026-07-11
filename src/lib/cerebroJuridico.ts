@@ -918,6 +918,7 @@ function augmentProcessFromDocs(
     if (ext.afastamento) fill("data_afastamento", ext.afastamento);
     if (ext.contribuicoes != null) fill("num_contribuicoes", ext.contribuicoes);
     if (ext.motivo) fill("motivo_indeferimento", ext.motivo);
+    if (ext.tipo_incapacidade) fill("tipo_incapacidade", ext.tipo_incapacidade);
   }
 
   // 2. Fallback: regex no texto livre das análises (para docs antigos sem metadata)
@@ -946,11 +947,24 @@ function augmentProcessFromDocs(
         fill("resultado_admin", "deferido");
     }
     if (!aug.der) {
-      const m = allText.match(/\bDER[^:]{0,10}:\s*(\d{2}\/\d{2}\/\d{4})/i);
+      const m =
+        allText.match(/\bDER[^:]{0,10}:\s*(\d{2}\/\d{2}\/\d{4})/i) ||
+        allText.match(
+          /Data\s+de\s+Entrada[^:]{0,10}:\s*(\d{2}\/\d{2}\/\d{4})/i
+        ) ||
+        allText.match(
+          /Data\s+do\s+Requerimento[^:]{0,10}:\s*(\d{2}\/\d{2}\/\d{4})/i
+        );
       if (m) {
         const [d, mo, y] = m[1].split("/");
         fill("der", `${y}-${mo}-${d}`);
       }
+    }
+    if (!aug.tipo_incapacidade) {
+      const m = allText.match(
+        /tipo\s+(?:de\s+)?(?:defici[eê]ncia|incapacidade)[^:]{0,15}:?\s*([^\n.]{3,40})/i
+      );
+      if (m) fill("tipo_incapacidade", m[1].trim().substring(0, 50));
     }
   }
 
@@ -2436,11 +2450,12 @@ Ação concreta com base neste documento.
 
 ## CAMPOS_JSON
 Preencha o JSON abaixo com dados EXPLÍCITOS do documento. Use null para campos ausentes.
-Atenção: "contribuicoes" deve ser um número inteiro (ex: 120) ou null; "resultado" aceita apenas DEFERIDO, INDEFERIDO ou CESSADO; datas no formato YYYY-MM-DD.
+Atenção: "contribuicoes" deve ser um número inteiro (ex: 120) ou null; "resultado" aceita apenas DEFERIDO, INDEFERIDO ou CESSADO; datas no formato YYYY-MM-DD; "tipo_incapacidade" aceita Mental, Físico, Intelectual, Sensorial (ou combinação) — extraia APENAS se for laudo/relatório médico, null nos demais documentos.
 Retorne SOMENTE o JSON abaixo, sem texto extra antes ou depois:
 {
   "cid": null,
   "nis": null,
+  "tipo_incapacidade": null,
   "der": null,
   "dib": null,
   "dcb": null,
@@ -2533,6 +2548,11 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
       );
     if (nisVal)
       await sql`UPDATE clients SET nis = ${nisVal} WHERE id = ${clientId}::uuid AND (nis IS NULL OR nis = '')`.catch(
+        () => null
+      );
+    const tipoIncapacidadeVal = strOrNull(extracted.tipo_incapacidade);
+    if (tipoIncapacidadeVal)
+      await sql`UPDATE clients SET tipo_incapacidade = ${tipoIncapacidadeVal} WHERE id = ${clientId}::uuid AND (tipo_incapacidade IS NULL OR tipo_incapacidade = '')`.catch(
         () => null
       );
     if (afastamentoVal)

@@ -556,6 +556,197 @@ export async function agendarLembretesCompromissoPrevBot(opts: {
   }
 }
 
+// ── Notificações automáticas para compromissos criados no sistema ──────────────
+
+const TIPO_LABEL_COMP: Record<string, string> = {
+  videochamada: "Videochamada",
+  reuniao: "Reunião",
+  fechamento: "Fechamento de Contrato",
+  consulta: "Consulta",
+  outro: "Compromisso",
+};
+const TIPO_ICON_COMP: Record<string, string> = {
+  videochamada: "📹",
+  reuniao: "🤝",
+  fechamento: "✍️",
+  consulta: "👥",
+  outro: "📅",
+};
+
+export async function agendarNotificacoesCompromisso(opts: {
+  compromissoId: string;
+  titulo: string;
+  tipo: string;
+  dataEvento: Date;
+  hora: string | null;
+  local: string | null;
+  link: string | null;
+  colaborador: { telefone: string; nome: string } | null;
+  cliente: { id: string; telefone: string; nome: string } | null;
+}): Promise<void> {
+  const agora = new Date();
+  const diaSemana = formatarDiaSemana(opts.dataEvento);
+  const data = formatarData(opts.dataEvento);
+  const horaStr = opts.hora ? ` às ${opts.hora}` : "";
+  const localStr = opts.local ? `\n📍 ${opts.local}` : "";
+  const linkStr = opts.link ? `\n🔗 ${opts.link}` : "";
+  const label = TIPO_LABEL_COMP[opts.tipo] ?? "Compromisso";
+  const icon = TIPO_ICON_COMP[opts.tipo] ?? "📅";
+
+  // Helper para inserir lembrete com ou sem clienteId
+  const inserirLembrete = async (row: {
+    tipo: string;
+    enviarEm: Date;
+    mensagem: string;
+    destinatarioTipo: string;
+    destinatarioTelefone: string;
+    destinatarioNome: string;
+    clienteId: string | null;
+    clienteNome: string;
+  }) => {
+    if (row.enviarEm <= agora) return;
+    if (row.clienteId) {
+      await sql`
+        INSERT INTO lembretes_agendados
+          (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+           destinatario_tipo, destinatario_telefone, destinatario_nome,
+           mensagem, enviar_em)
+        VALUES
+          (${row.tipo}, 'compromisso', ${opts.compromissoId}::uuid,
+           ${row.clienteId}::uuid, ${row.clienteNome},
+           ${row.destinatarioTipo}, ${row.destinatarioTelefone}, ${row.destinatarioNome},
+           ${row.mensagem}, ${row.enviarEm.toISOString()})
+      `.catch(() => null);
+    } else {
+      await sql`
+        INSERT INTO lembretes_agendados
+          (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+           destinatario_tipo, destinatario_telefone, destinatario_nome,
+           mensagem, enviar_em)
+        VALUES
+          (${row.tipo}, 'compromisso', ${opts.compromissoId}::uuid,
+           NULL, ${row.clienteNome},
+           ${row.destinatarioTipo}, ${row.destinatarioTelefone}, ${row.destinatarioNome},
+           ${row.mensagem}, ${row.enviarEm.toISOString()})
+      `.catch(() => null);
+    }
+  };
+
+  // ── Notificações para o COLABORADOR ──
+  if (opts.colaborador?.telefone) {
+    const clienteNomeStr = opts.cliente?.nome
+      ? `👤 ${opts.cliente.nome}\n`
+      : "";
+
+    // Para videochamada com link: convite imediato
+    if (opts.tipo === "videochamada" && opts.link) {
+      await inserirLembrete({
+        tipo: "videochamada_convite",
+        enviarEm: new Date(agora.getTime() + 60_000),
+        mensagem:
+          `${icon} *Videochamada agendada!*\n\n` +
+          `${clienteNomeStr}` +
+          `🗓️ ${diaSemana}, ${data}${horaStr}${linkStr}\n\n` +
+          `_Agendado via LiderAdv._`,
+        destinatarioTipo: "colaborador",
+        destinatarioTelefone: opts.colaborador.telefone,
+        destinatarioNome: opts.colaborador.nome,
+        clienteId: null,
+        clienteNome: opts.colaborador.nome,
+      });
+    }
+
+    // D-1 às 8h
+    await inserirLembrete({
+      tipo: "compromisso_1d",
+      enviarEm: diasAntes(opts.dataEvento, 1, 8),
+      mensagem:
+        `📅 *Lembrete para amanhã!*\n\n` +
+        `${icon} *${opts.titulo}*\n` +
+        `${clienteNomeStr}` +
+        `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}${linkStr}\n\n` +
+        `_Acesse a Agenda no LiderAdv._`,
+      destinatarioTipo: "colaborador",
+      destinatarioTelefone: opts.colaborador.telefone,
+      destinatarioNome: opts.colaborador.nome,
+      clienteId: null,
+      clienteNome: opts.colaborador.nome,
+    });
+
+    // No dia às 7h
+    await inserirLembrete({
+      tipo: "compromisso_dia",
+      enviarEm: mesmoDia(opts.dataEvento, 7),
+      mensagem:
+        `⏰ *${label} hoje!*\n\n` +
+        `${icon} *${opts.titulo}*\n` +
+        `${clienteNomeStr}` +
+        `🗓️ ${data}${horaStr}${localStr}${linkStr}\n\n` +
+        `_Boa reunião! 💼_`,
+      destinatarioTipo: "colaborador",
+      destinatarioTelefone: opts.colaborador.telefone,
+      destinatarioNome: opts.colaborador.nome,
+      clienteId: null,
+      clienteNome: opts.colaborador.nome,
+    });
+  }
+
+  // ── Notificações para o CLIENTE ──
+  if (opts.cliente?.telefone) {
+    const primeiroNomeCliente = primeiroNome(opts.cliente.nome);
+
+    // Para videochamada: convite imediato com link
+    if (opts.tipo === "videochamada" && opts.link) {
+      await inserirLembrete({
+        tipo: "videochamada_convite",
+        enviarEm: new Date(agora.getTime() + 60_000),
+        mensagem:
+          `${icon} *${label} confirmada!*\n\n` +
+          `Olá, ${primeiroNomeCliente}! Sua ${label.toLowerCase()} com o escritório foi agendada:\n\n` +
+          `🗓️ ${diaSemana}, ${data}${horaStr}${linkStr}\n\n` +
+          `_Qualquer dúvida, nos contate. Até lá! 😊_`,
+        destinatarioTipo: "cliente",
+        destinatarioTelefone: opts.cliente.telefone,
+        destinatarioNome: opts.cliente.nome,
+        clienteId: opts.cliente.id,
+        clienteNome: opts.cliente.nome,
+      });
+    }
+
+    // D-1 às 8h
+    await inserirLembrete({
+      tipo: "compromisso_1d",
+      enviarEm: diasAntes(opts.dataEvento, 1, 8),
+      mensagem:
+        `📅 *Lembrete para amanhã!*\n\n` +
+        `${icon} Olá, ${primeiroNomeCliente}! Você tem um *${label}* com nosso escritório amanhã:\n\n` +
+        `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}${linkStr}\n\n` +
+        `_Qualquer imprevisto, nos avise com antecedência._`,
+      destinatarioTipo: "cliente",
+      destinatarioTelefone: opts.cliente.telefone,
+      destinatarioNome: opts.cliente.nome,
+      clienteId: opts.cliente.id,
+      clienteNome: opts.cliente.nome,
+    });
+
+    // No dia às 7h
+    await inserirLembrete({
+      tipo: "compromisso_dia",
+      enviarEm: mesmoDia(opts.dataEvento, 7),
+      mensagem:
+        `⏰ *${label} hoje!*\n\n` +
+        `${icon} Olá, ${primeiroNomeCliente}! Lembrando que você tem um *${label}* com nosso escritório *hoje*:\n\n` +
+        `🗓️ ${data}${horaStr}${localStr}${linkStr}\n\n` +
+        `_Até logo! 😊_`,
+      destinatarioTipo: "cliente",
+      destinatarioTelefone: opts.cliente.telefone,
+      destinatarioNome: opts.cliente.nome,
+      clienteId: opts.cliente.id,
+      clienteNome: opts.cliente.nome,
+    });
+  }
+}
+
 // ── Lembretes de conta pendente para colaborador (criado via PrevBot) ─────────
 
 export async function agendarLembretesContaPendente(opts: {

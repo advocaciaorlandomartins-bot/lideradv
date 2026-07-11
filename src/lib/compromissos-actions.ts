@@ -17,6 +17,7 @@ interface CompromissoData {
   localLink: string | null;
   descricao: string | null;
   status?: string;
+  clienteId?: string | null;
 }
 
 export async function criarCompromissoAction(

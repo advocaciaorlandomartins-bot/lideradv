@@ -94,10 +94,11 @@ export async function criarCompromisso(data: {
   descricao: string | null;
   cor?: string;
   criadoPor: string;
+  clienteId?: string | null;
 }): Promise<string> {
   const rows = await sql`
     INSERT INTO compromissos
-      (titulo, tipo, data_inicio, hora_inicio, hora_fim, local_link, descricao, cor, criado_por)
+      (titulo, tipo, data_inicio, hora_inicio, hora_fim, local_link, descricao, cor, criado_por, cliente_id)
     VALUES (
       ${data.titulo},
       ${data.tipo},
@@ -107,7 +108,8 @@ export async function criarCompromisso(data: {
       ${data.localLink || null},
       ${data.descricao || null},
       ${data.cor ?? "#0ea5e9"},
-      ${data.criadoPor}
+      ${data.criadoPor},
+      ${data.clienteId ? sql`${data.clienteId}::uuid` : sql`NULL`}
     )
     RETURNING id::text
   `;
@@ -125,6 +127,7 @@ export async function atualizarCompromisso(
     localLink: string | null;
     descricao: string | null;
     status?: string;
+    clienteId?: string | null;
   }
 ): Promise<void> {
   await sql`
@@ -138,6 +141,7 @@ export async function atualizarCompromisso(
       local_link    = ${data.localLink},
       descricao     = ${data.descricao},
       status        = ${data.status ?? "pendente"},
+      cliente_id    = ${data.clienteId ? sql`${data.clienteId}::uuid` : sql`NULL`},
       atualizado_em = NOW()
     WHERE id = ${id}::uuid
   `;

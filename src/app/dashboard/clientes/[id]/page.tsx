@@ -16,6 +16,7 @@ import {
 import DeleteClientButton from "@/components/dashboard/clients/delete-client-button";
 import ClienteDetailTabs from "@/components/dashboard/clients/cliente-detail-tabs";
 import LgpdActions from "@/components/dashboard/clients/lgpd-actions";
+import AgendarVideochamadaButton from "@/components/dashboard/clients/agendar-videochamada-button";
 import { ChevronRightIcon } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -143,13 +144,17 @@ export default async function ClienteDetailPage({
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
-            <DeleteClientButton id={client.id} />
+            <AgendarVideochamadaButton
+              clienteId={client.id}
+              clienteNome={client.name}
+            />
             <Link
               href={`/dashboard/clientes/${client.id}/editar`}
               className="flex h-9 items-center rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
             >
               Editar cadastro
             </Link>
+            <DeleteClientButton id={client.id} />
           </div>
         </div>
       </div>

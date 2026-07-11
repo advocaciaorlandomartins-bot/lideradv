@@ -369,6 +369,14 @@ export default function ClienteDetailTabs({
             </div>
           </div>
 
+          {/* Toggle mensagens WhatsApp — topo da Visão Geral */}
+          <div className="lg:col-span-3">
+            <BloquearMensagensToggle
+              clientId={client.id}
+              inicial={client.bloquear_mensagens ?? false}
+            />
+          </div>
+
           {/* Contato + Endereço + Dados pessoais */}
           <div className="lg:col-span-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
             {/* Contato */}

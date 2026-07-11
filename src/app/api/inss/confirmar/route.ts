@@ -6,6 +6,12 @@ import { getEscritorioConfig } from "@/lib/escritorio-db";
 
 export const dynamic = "force-dynamic";
 
+const TIPOS_AGENDAMENTO = new Set([
+  "agendamento_avaliacao_social",
+  "agendamento_pericia_medica",
+  "agendamento_generico",
+]);
+
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
@@ -20,12 +26,15 @@ export async function POST(req: NextRequest) {
     nomeResponsavel?: string | null;
     tipoDocumento?: string | null;
     tipoServico: string;
-    dataAgendamento: string; // YYYY-MM-DD
-    horaAgendamento: string; // HH:MM
-    localNome: string;
+    dataAgendamento?: string | null;
+    dataEvento?: string | null;
+    horaAgendamento?: string | null;
+    localNome?: string | null;
     localEndereco?: string | null;
     protocolo?: string | null;
     processoId?: string | null;
+    valor?: string | null;
+    nomeRequerente?: string | null;
   };
 
   try {
@@ -43,56 +52,63 @@ export async function POST(req: NextRequest) {
     tipoDocumento,
     tipoServico,
     dataAgendamento,
+    dataEvento: dataEventoRaw,
     horaAgendamento,
     localNome,
     localEndereco,
     protocolo,
     processoId,
+    valor,
+    nomeRequerente,
   } = body;
 
-  if (!clienteId || !dataAgendamento || !horaAgendamento || !tipoServico) {
+  if (!clienteId || !tipoServico) {
     return NextResponse.json(
       { error: "Campos obrigatórios ausentes." },
       { status: 400 }
     );
   }
 
+  const ehAgendamento = TIPOS_AGENDAMENTO.has(tipoDocumento ?? "");
+  const dataRef =
+    dataAgendamento ?? dataEventoRaw ?? new Date().toISOString().split("T")[0];
+  const hora = horaAgendamento ?? "09:00";
+  const localCompleto = [localNome ?? "INSS", localEndereco]
+    .filter(Boolean)
+    .join(" — ");
+
   try {
     const escritorio = await getEscritorioConfig().catch(() => null);
     const nomeEscritorio = escritorio?.nome ?? "nosso escritório";
 
-    const localCompleto = [localNome, localEndereco]
-      .filter(Boolean)
-      .join(" — ");
+    let compromissoId: string | null = null;
 
-    // Cria compromisso na agenda
-    const [compromisso] = await sql`
-      INSERT INTO compromissos
-        (titulo, tipo, data_inicio, hora_inicio, local_link, descricao, criado_por, status)
-      VALUES
-        (${tipoServico},
-         'audiencia',
-         ${dataAgendamento}::date,
-         ${horaAgendamento},
-         ${localCompleto},
-         ${protocolo ? `Protocolo: ${protocolo}` : null},
-         ${session.login},
-         'agendado')
-      RETURNING id::text
-    `;
+    // Agendamentos: cria compromisso na agenda
+    if (ehAgendamento) {
+      const [compromisso] = await sql`
+        INSERT INTO compromissos
+          (titulo, tipo, data_inicio, hora_inicio, local_link, descricao, criado_por, cliente_id)
+        VALUES
+          (${tipoServico},
+           'consulta',
+           ${dataRef}::date,
+           ${hora},
+           ${localCompleto},
+           ${protocolo ? `Protocolo: ${protocolo}` : null},
+           ${session.login},
+           ${clienteId}::uuid)
+        RETURNING id::text
+      `;
+      compromissoId = String(compromisso.id);
+    }
 
-    const compromissoId = String(compromisso.id);
+    // Agendamentos: cria registro em pericias + controles
+    if (ehAgendamento) {
+      const tipoPericia =
+        tipoDocumento === "agendamento_avaliacao_social"
+          ? "avaliacao_social_administrativa"
+          : "pericia_administrativa";
 
-    // Cria registro na tabela pericias (módulo Controles → Perícias)
-    const tipoPericia =
-      tipoDocumento === "agendamento_avaliacao_social"
-        ? "avaliacao_social_administrativa"
-        : tipoDocumento === "agendamento_pericia_medica" ||
-            tipoDocumento === "agendamento_generico"
-          ? "pericia_administrativa"
-          : null;
-
-    if (tipoPericia) {
       await sql`
         INSERT INTO pericias
           (tipo, client_id, processo_id, data_pericia, hora_pericia, local_pericia, status, observacoes)
@@ -100,20 +116,85 @@ export async function POST(req: NextRequest) {
           (${tipoPericia},
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
-           ${dataAgendamento}::date,
-           ${horaAgendamento}::time,
+           ${dataRef}::date,
+           ${hora}::time,
            ${localCompleto},
            'agendado',
            ${protocolo ? `Protocolo INSS: ${protocolo}` : null})
       `.catch(() => null);
 
-      // Cria registro em controles (módulo Controles → Perícias e Av. Sociais)
       await sql`
         INSERT INTO controles
           (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade)
         VALUES
           ('pericias',
-           ${dataAgendamento}::date,
+           ${dataRef}::date,
+           ${tipoServico},
+           ${clienteId}::uuid,
+           ${processoId ?? null}::uuid,
+           ${tipoServico},
+           'alta')
+      `.catch(() => null);
+    }
+
+    // RPV → controles como alvará
+    if (tipoDocumento === "rpv") {
+      const descricao = [
+        "RPV",
+        nomeRequerente ? `— ${nomeRequerente}` : null,
+        valor ? `— R$ ${valor}` : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      await sql`
+        INSERT INTO controles
+          (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade, dados)
+        VALUES
+          ('alvaras',
+           ${dataRef}::date,
+           ${descricao},
+           ${clienteId}::uuid,
+           ${processoId ?? null}::uuid,
+           ${tipoServico},
+           'alta',
+           ${valor ? JSON.stringify({ valor }) : null}::jsonb)
+      `.catch(() => null);
+    }
+
+    // Comprovante de pagamento → implantados
+    if (tipoDocumento === "comprovante_pagamento") {
+      const descricao = [
+        "Benefício implantado",
+        nomeRequerente ? `— ${nomeRequerente}` : null,
+        valor ? `— R$ ${valor}` : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      await sql`
+        INSERT INTO controles
+          (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade, dados)
+        VALUES
+          ('implantados',
+           ${dataRef}::date,
+           ${descricao},
+           ${clienteId}::uuid,
+           ${processoId ?? null}::uuid,
+           ${tipoServico},
+           'alta',
+           ${valor ? JSON.stringify({ valor }) : null}::jsonb)
+      `.catch(() => null);
+    }
+
+    // Resultado de perícia → controles pericias
+    if (tipoDocumento === "resultado_pericia") {
+      await sql`
+        INSERT INTO controles
+          (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade)
+        VALUES
+          ('pericias',
+           ${dataRef}::date,
            ${tipoServico},
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
@@ -131,27 +212,31 @@ export async function POST(req: NextRequest) {
       `.catch(() => null);
     }
 
-    // Agenda lembretes
-    const dataEvento = new Date(dataAgendamento + "T12:00:00");
-    await agendarLembretesInss({
-      compromissoId,
-      clienteId,
-      clienteNome,
-      telefoneCliente: telefoneCliente ?? null,
-      telefoneResponsavel: telefoneResponsavel ?? null,
-      nomeResponsavel: nomeResponsavel ?? null,
-      dataEvento,
-      horaEvento: horaAgendamento,
-      tipoServico,
-      local: localCompleto,
-      protocolo: protocolo ?? undefined,
-      escritorio: nomeEscritorio,
-    });
+    // Agenda lembretes (apenas para agendamentos)
+    if (ehAgendamento && compromissoId) {
+      const dataEventoDate = new Date(dataRef + "T12:00:00");
+      await agendarLembretesInss({
+        compromissoId,
+        clienteId,
+        clienteNome,
+        telefoneCliente: telefoneCliente ?? null,
+        telefoneResponsavel: telefoneResponsavel ?? null,
+        nomeResponsavel: nomeResponsavel ?? null,
+        dataEvento: dataEventoDate,
+        horaEvento: hora,
+        tipoServico,
+        local: localCompleto,
+        protocolo: protocolo ?? undefined,
+        escritorio: nomeEscritorio,
+      });
+    }
 
     return NextResponse.json({
       ok: true,
       compromissoId,
-      mensagem: "Agendamento criado e lembretes programados com sucesso.",
+      mensagem: ehAgendamento
+        ? "Agendamento criado e lembretes programados com sucesso."
+        : "Documento registrado nos controles com sucesso.",
     });
   } catch (err) {
     console.error("[inss/confirmar]", err);

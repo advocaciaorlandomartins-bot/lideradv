@@ -266,8 +266,9 @@ Audiência telepresencial: a pedido da parte (Resolução CNJ 354/2020 + 481/202
 Pedido indeferido de audiência: CERCEAMENTO DE DEFESA → JEF: recurso inominado; VARA: agravo de instrumento (CPC art. 1.015)
 
 CÁLCULOS:
-• Teto INSS 2025: R$ 7.786,02
-• Salário mínimo 2025: R$ 1.622,00
+• Teto INSS 2026: R$ 8.157,41
+• Salário mínimo 2026: R$ 1.621,00
+⚠️ IMPORTANTE: Use SEMPRE os valores atuais fornecidos no contexto do processo (campo "Salário mínimo vigente"). NUNCA cite valores de anos anteriores (2024: R$ 1.412 / 2025: R$ 1.518) como "atuais".
 • GPS Salário-Maternidade (mensal, 11%): Facultativa=1473 (R$178,42), Individual=1163 (R$178,42), Especial Rural=1503 (20%, R$324,40)
 • GPS Salário-Maternidade (trimestral, 11%): Facultativa=1490 (R$535,26), Individual=1180 (R$535,26), Especial Rural=1554 (20%, R$973,20)
 • Fator previdenciário: aplicado a aposentadorias por tempo (EC 103/2019)
@@ -1088,7 +1089,7 @@ FLUXO DE DECISÃO POR TIPO DE SEGURADA:
 RETROATIVIDADE — PARTOS ANTERIORES A 05/04/2024:
 • Aplica-se a partos dentro dos últimos 5 anos (prescrição quinquenal)
 • Se foi indeferido antes: PODE REQUERER NOVAMENTE — coisa julgada anterior NÃO impede (RE 586.068, Tema 100 STF)
-• Valor: 1 salário mínimo (R$ 1.622,00) — DIB: data do parto
+• Valor: 1 salário mínimo (R$ 1.621,00 em 2026) — DIB: data do parto
 
 ESTRATÉGIA DE RECOLHIMENTO (se cliente ainda não tem contribuição):
 • ANTES do parto: GPS até o dia do parto; DEPOIS do parto: GPS até o dia 15 do mês seguinte
@@ -1625,7 +1626,16 @@ export async function prepararAnalise(
       )
     : null;
 
+  const smVigente = processo.sm_escritorio
+    ? `R$ ${Number(processo.sm_escritorio).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+    : "R$ 1.621,00";
+
   const dadosProcesso = `
+⚠️ DADOS FINANCEIROS VIGENTES — USE SEMPRE ESTES VALORES, NUNCA VALORES DE ANOS ANTERIORES:
+Salário mínimo vigente (${new Date().getFullYear()}): ${smVigente}
+BPC/LOAS = 1 salário mínimo = ${smVigente}
+Teto INSS vigente: R$ 8.157,41
+
 PROCESSO Nº ${processo.numero || "Sem número CNJ"}
 Tipo de ação: ${processo.tipo_acao || "Não informado"}
 Área: ${processo.area || "Previdenciário"} | Fase: ${processo.fase || "N/A"}
@@ -2012,7 +2022,16 @@ export async function analisarProcesso(processoId: string) {
       )
     : null;
 
+  const smVigente = processo.sm_escritorio
+    ? `R$ ${Number(processo.sm_escritorio).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+    : "R$ 1.621,00";
+
   const dadosProcesso = `
+⚠️ DADOS FINANCEIROS VIGENTES — USE SEMPRE ESTES VALORES, NUNCA VALORES DE ANOS ANTERIORES:
+Salário mínimo vigente (${new Date().getFullYear()}): ${smVigente}
+BPC/LOAS = 1 salário mínimo = ${smVigente}
+Teto INSS vigente: R$ 8.157,41
+
 PROCESSO Nº ${processo.numero || "Sem número CNJ"}
 Tipo de ação: ${processo.tipo_acao || "Não informado"}
 Área: ${processo.area || "Previdenciário"} | Fase: ${processo.fase || "N/A"}

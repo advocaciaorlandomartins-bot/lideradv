@@ -69,6 +69,8 @@ interface CompromissoModalState {
   localLink?: string;
   descricao?: string;
   status?: string;
+  clienteId?: string;
+  clienteNome?: string;
 }
 
 const TIPOS_COMP = [
@@ -164,6 +166,8 @@ type ModalFormState = {
   descricao: string;
   status: "pendente" | "concluido";
   deleteConfirm: boolean;
+  clienteId: string;
+  clienteNome: string;
 };
 const EMPTY_FORM: ModalFormState = {
   titulo: "",
@@ -175,6 +179,8 @@ const EMPTY_FORM: ModalFormState = {
   descricao: "",
   status: "pendente",
   deleteConfirm: false,
+  clienteId: "",
+  clienteNome: "",
 };
 function formReducer(
   s: ModalFormState,
@@ -203,6 +209,14 @@ export default function AgendaCalendar() {
     type: "ok" | "err";
     text: string;
   } | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // ── Busca de cliente para o modal ───────────────────────────────────────────
+  const [clienteSearch, setClienteSearch] = useState("");
+  const [clienteResults, setClienteResults] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [clienteDropOpen, setClienteDropOpen] = useState(false);
 
   // ── Modal de compromisso ────────────────────────────────────────────────────
   const [modalComp, setModalComp] = useState<CompromissoModalState | null>(
@@ -213,33 +227,69 @@ export default function AgendaCalendar() {
   // Preenche o formulário quando o modal abre (dispatch = único setState)
   useEffect(() => {
     if (!modalComp) return;
+    const snap = modalComp;
     const today = new Date().toISOString().slice(0, 10);
-    if (modalComp.mode === "create") {
-      dispatch({
-        titulo: "",
-        tipo: modalComp.tipo ?? "reuniao",
-        data: modalComp.dateStr ?? today,
-        horaInicio: "",
-        horaFim: "",
-        localLink: "",
-        descricao: "",
-        status: "pendente",
-        deleteConfirm: false,
-      });
-    } else {
-      dispatch({
-        titulo: modalComp.titulo ?? "",
-        tipo: modalComp.tipo ?? "reuniao",
-        data: modalComp.dateStr ?? today,
-        horaInicio: modalComp.horaInicio ?? "",
-        horaFim: modalComp.horaFim ?? "",
-        localLink: modalComp.localLink ?? "",
-        descricao: modalComp.descricao ?? "",
-        status: (modalComp.status ?? "pendente") as "pendente" | "concluido",
-        deleteConfirm: false,
-      });
-    }
+    queueMicrotask(() => {
+      setClienteResults([]);
+      setClienteDropOpen(false);
+      if (snap.mode === "create") {
+        setClienteSearch("");
+        dispatch({
+          titulo: "",
+          tipo: snap.tipo ?? "reuniao",
+          data: snap.dateStr ?? today,
+          horaInicio: "",
+          horaFim: "",
+          localLink: "",
+          descricao: "",
+          status: "pendente",
+          deleteConfirm: false,
+          clienteId: "",
+          clienteNome: "",
+        });
+      } else {
+        setClienteSearch(snap.clienteNome ?? "");
+        dispatch({
+          titulo: snap.titulo ?? "",
+          tipo: snap.tipo ?? "reuniao",
+          data: snap.dateStr ?? today,
+          horaInicio: snap.horaInicio ?? "",
+          horaFim: snap.horaFim ?? "",
+          localLink: snap.localLink ?? "",
+          descricao: snap.descricao ?? "",
+          status: (snap.status ?? "pendente") as "pendente" | "concluido",
+          deleteConfirm: false,
+          clienteId: snap.clienteId ?? "",
+          clienteNome: snap.clienteNome ?? "",
+        });
+      }
+    });
   }, [modalComp]);
+
+  // Busca clientes ao digitar no campo do modal
+  useEffect(() => {
+    if (form.clienteId) return; // já selecionado
+    const timer = setTimeout(async () => {
+      if (!clienteSearch || clienteSearch.length < 1) {
+        setClienteResults([]);
+        setClienteDropOpen(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/clientes/search?q=${encodeURIComponent(clienteSearch)}`
+        );
+        if (res.ok) {
+          const data: { id: string; name: string }[] = await res.json();
+          setClienteResults(data);
+          setClienteDropOpen(data.length > 0);
+        }
+      } catch {
+        // silently ignore
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [clienteSearch, form.clienteId]);
 
   function openNovoCompromisso(dateStr?: string) {
     setDayPopover(null);
@@ -261,6 +311,7 @@ export default function AgendaCalendar() {
       localLink: form.localLink.trim() || null,
       descricao: form.descricao.trim() || null,
       status: form.status,
+      clienteId: form.clienteId || null,
     };
     startTransition(async () => {
       if (modalComp?.mode === "edit" && modalComp.id) {
@@ -421,6 +472,8 @@ export default function AgendaCalendar() {
         localLink: props.compromissoLocalLink ?? "",
         descricao: props.compromissoDescricao ?? "",
         status: props.compromissoStatus ?? "pendente",
+        clienteId: (props.clienteId as string | undefined) ?? "",
+        clienteNome: (props.clienteNome as string | undefined) ?? "",
       });
     } else if (props.href) {
       router.push(props.href);
@@ -496,8 +549,52 @@ export default function AgendaCalendar() {
 
   return (
     <div className="agenda-layout">
+      {/* ── Barra de ações rápidas (mobile only) ────────────────────────────── */}
+      <div className="agenda-mobile-bar">
+        <button
+          onClick={() => openNovoCompromisso()}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 font-body text-sm font-semibold text-white"
+        >
+          <svg
+            className="h-4 w-4 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          Novo
+        </button>
+        <button
+          onClick={() => setMobileSidebarOpen((v) => !v)}
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-2 font-body text-sm font-semibold text-fg"
+        >
+          <svg
+            className="h-4 w-4 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+          {mobileSidebarOpen ? "Fechar" : "Filtros"}
+        </button>
+      </div>
+
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
-      <aside className="agenda-sidebar">
+      <aside
+        className={`agenda-sidebar${mobileSidebarOpen ? " mobile-open" : ""}`}
+      >
         {/* Novo compromisso */}
         <button
           onClick={() => openNovoCompromisso()}
@@ -807,9 +904,12 @@ export default function AgendaCalendar() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={(e) => e.target === e.currentTarget && setModalComp(null)}
         >
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+          <div
+            className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl"
+            style={{ maxHeight: "90dvh" }}
+          >
             {/* Cabeçalho */}
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-6 py-4">
               <h2 className="font-heading text-base font-semibold text-fg">
                 {modalComp.mode === "create"
                   ? "Novo Compromisso"
@@ -826,113 +926,177 @@ export default function AgendaCalendar() {
             {/* Formulário */}
             <form
               onSubmit={handleSaveCompromisso}
-              className="px-6 py-5 space-y-4"
+              className="flex min-h-0 flex-1 flex-col"
             >
-              {/* Tipo */}
-              <div>
-                <label className="mb-2 block font-body text-xs font-semibold text-muted">
-                  Tipo
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {TIPOS_COMP.map((t) => (
-                    <button
-                      key={t.key}
-                      type="button"
-                      onClick={() => dispatch({ tipo: t.key })}
-                      className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-body text-xs font-semibold transition-colors ${form.tipo === t.key ? "border-sky-300 bg-sky-50 text-sky-700" : "border-border text-muted hover:border-sky-200 hover:text-fg"}`}
-                    >
-                      <span>{t.icon}</span>
-                      {t.label}
-                    </button>
-                  ))}
+              {/* Campos — área scrollável */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                {/* Tipo */}
+                <div>
+                  <label className="mb-2 block font-body text-xs font-semibold text-muted">
+                    Tipo
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TIPOS_COMP.map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => dispatch({ tipo: t.key })}
+                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-body text-xs font-semibold transition-colors ${form.tipo === t.key ? "border-sky-300 bg-sky-50 text-sky-700" : "border-border text-muted hover:border-sky-200 hover:text-fg"}`}
+                      >
+                        <span>{t.icon}</span>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Título */}
-              <div>
-                <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
-                  Título *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={form.titulo}
-                  onChange={(e) => dispatch({ titulo: e.target.value })}
-                  placeholder="Ex.: Reunião com cliente João Silva"
-                  className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                />
-              </div>
-
-              {/* Data */}
-              <div>
-                <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
-                  Data *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={form.data}
-                  onChange={(e) => dispatch({ data: e.target.value })}
-                  className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                />
-              </div>
-
-              {/* Horário */}
-              <div className="grid grid-cols-2 gap-3">
+                {/* Título */}
                 <div>
                   <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
-                    Hora início
+                    Título *
                   </label>
                   <input
-                    type="time"
-                    value={form.horaInicio}
-                    onChange={(e) => dispatch({ horaInicio: e.target.value })}
+                    type="text"
+                    required
+                    value={form.titulo}
+                    onChange={(e) => dispatch({ titulo: e.target.value })}
+                    placeholder="Ex.: Reunião com cliente João Silva"
+                    className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  />
+                </div>
+
+                {/* Cliente (opcional) */}
+                <div>
+                  <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                    Cliente (opcional)
+                  </label>
+                  {form.clienteId ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2">
+                      <span className="flex-1 truncate font-body text-sm font-medium text-sky-800">
+                        {form.clienteNome}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          dispatch({ clienteId: "", clienteNome: "" });
+                          setClienteSearch("");
+                          setClienteDropOpen(false);
+                        }}
+                        className="flex-shrink-0 text-sky-400 hover:text-sky-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={clienteSearch}
+                        onChange={(e) => setClienteSearch(e.target.value)}
+                        onFocus={() =>
+                          clienteResults.length > 0 && setClienteDropOpen(true)
+                        }
+                        placeholder="Buscar cliente..."
+                        className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                      />
+                      {clienteDropOpen && clienteResults.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-44 overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+                          {clienteResults.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                dispatch({
+                                  clienteId: c.id,
+                                  clienteNome: c.name,
+                                });
+                                setClienteSearch(c.name);
+                                setClienteDropOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left font-body text-sm text-fg hover:bg-sky-50"
+                            >
+                              {c.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Data */}
+                <div>
+                  <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                    Data *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={form.data}
+                    onChange={(e) => dispatch({ data: e.target.value })}
                     className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                   />
                 </div>
+
+                {/* Horário */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                      Hora início
+                    </label>
+                    <input
+                      type="time"
+                      value={form.horaInicio}
+                      onChange={(e) => dispatch({ horaInicio: e.target.value })}
+                      className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                      Hora fim
+                    </label>
+                    <input
+                      type="time"
+                      value={form.horaFim}
+                      onChange={(e) => dispatch({ horaFim: e.target.value })}
+                      className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                    />
+                  </div>
+                </div>
+
+                {/* Local / Link */}
                 <div>
                   <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
-                    Hora fim
+                    Local ou link (opcional)
                   </label>
                   <input
-                    type="time"
-                    value={form.horaFim}
-                    onChange={(e) => dispatch({ horaFim: e.target.value })}
-                    className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                    type="text"
+                    value={form.localLink}
+                    onChange={(e) => dispatch({ localLink: e.target.value })}
+                    placeholder="Ex.: Sala de reunião / https://meet.google.com/…"
+                    className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  />
+                </div>
+
+                {/* Descrição */}
+                <div>
+                  <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                    Observações (opcional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={form.descricao}
+                    onChange={(e) => dispatch({ descricao: e.target.value })}
+                    placeholder="Detalhes adicionais…"
+                    className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                   />
                 </div>
               </div>
+              {/* fim campos scrolláveis */}
 
-              {/* Local / Link */}
-              <div>
-                <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
-                  Local ou link (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={form.localLink}
-                  onChange={(e) => dispatch({ localLink: e.target.value })}
-                  placeholder="Ex.: Sala de reunião / https://meet.google.com/…"
-                  className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                />
-              </div>
-
-              {/* Descrição */}
-              <div>
-                <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
-                  Observações (opcional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={form.descricao}
-                  onChange={(e) => dispatch({ descricao: e.target.value })}
-                  placeholder="Detalhes adicionais…"
-                  className="w-full resize-none rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
-                />
-              </div>
-
-              {/* Botões */}
-              <div className="flex items-center gap-2 pt-1">
+              {/* Botões — rodapé fixo */}
+              <div className="flex flex-shrink-0 items-center gap-2 border-t border-border px-6 py-4">
                 <button
                   type="submit"
                   disabled={isPending || !form.titulo.trim()}

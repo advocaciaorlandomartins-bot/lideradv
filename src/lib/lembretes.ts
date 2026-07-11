@@ -1,4 +1,10 @@
 import sql from "./db";
+import {
+  INSS_MENSAGENS,
+  HONORARIO_MENSAGENS,
+  renderMensagem,
+} from "@/config/mensagens";
+import { getMensagensConfig } from "@/lib/mensagens-config-db";
 
 // ── Tipos ─────────────────────────────────────────────────────
 
@@ -84,15 +90,51 @@ export function mensagemInss(opts: {
   const escritorio = opts.escritorio || "nosso escritório";
 
   const mapas: Record<string, string> = {
-    inss_15d: `Oi ${nome}! 👋 Aqui é do ${escritorio}. Passando pra avisar que seu ${servico} está marcado para ${diaSemana}, dia ${data} às ${opts.hora}, em ${opts.local}.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
-
-    inss_5d: `Olá ${nome}! Lembrando que seu ${servico} no INSS está chegando — ${diaSemana}, ${data} às ${opts.hora}, em ${opts.local}.\n\nFaltam só 5 dias! Aproveite pra separar documentos: RG, CPF, Certidão de Nascimento e qualquer documentação médica ou social que tiver. Qualquer dúvida, o ${escritorio} está à disposição! 💪`,
-
-    inss_2d: `Oi ${nome}! Seu ${servico} é daqui a 2 dias — ${diaSemana}, ${data} às ${opts.hora}.\n\n📍 Local: ${opts.local}\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar com a gente!`,
-
-    inss_1d_manha: `Bom dia, ${nome}! 🌅 Amanhã é o grande dia! Seu ${servico} está marcado para:\n\n📅 ${data} (${diaSemana})\n⏰ ${opts.hora}\n📍 ${opts.local}\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estamos torcendo por você! 🍀`,
-
-    inss_1d_tarde: `Boa tarde, ${nome}! Só passando pra reforçar: amanhã cedo é seu ${servico} no INSS às ${opts.hora}.\n\n📍 ${opts.local}\n\nJá separou os documentos? Qualquer dúvida de última hora, pode chamar o ${escritorio} que a gente te ajuda! 😊`,
+    inss_15d: INSS_MENSAGENS.lembrete1(
+      nome,
+      escritorio,
+      servico,
+      diaSemana,
+      data,
+      opts.hora,
+      opts.local
+    ),
+    inss_5d: INSS_MENSAGENS.lembrete2(
+      nome,
+      escritorio,
+      servico,
+      diaSemana,
+      data,
+      opts.hora,
+      opts.local
+    ),
+    inss_2d: INSS_MENSAGENS.lembrete3(
+      nome,
+      escritorio,
+      servico,
+      diaSemana,
+      data,
+      opts.hora,
+      opts.local
+    ),
+    inss_1d_manha: INSS_MENSAGENS.vespera_manha(
+      nome,
+      escritorio,
+      servico,
+      diaSemana,
+      data,
+      opts.hora,
+      opts.local
+    ),
+    inss_1d_tarde: INSS_MENSAGENS.vespera_tarde(
+      nome,
+      escritorio,
+      servico,
+      diaSemana,
+      data,
+      opts.hora,
+      opts.local
+    ),
   };
 
   return mapas[opts.tipo] ?? "";
@@ -116,13 +158,15 @@ export function mensagemHonorario(opts: {
   const escritorio = opts.escritorio || "nosso escritório";
 
   const mapas: Record<string, string> = {
-    honorario_10d: `Olá ${nome}! Passando pra lembrar que seu honorário no valor de *${valor}* vence em *${data}* (faltam 10 dias).\n\nSe já realizou o pagamento, pode desconsiderar esta mensagem. Qualquer dúvida, pode falar com o ${escritorio}! 😊`,
-
-    honorario_5d: `Oi ${nome}! Sua cobrança de honorários de *${valor}* vence em *${data}* — faltam apenas 5 dias.\n\nSe ainda não realizou o pagamento, é uma boa hora pra se organizar. Caso já tenha pago, desconsidere esta mensagem. Obrigado! 🙏`,
-
-    honorario_1d: `Olá ${nome}! Amanhã, dia *${data}*, vence seu honorário de *${valor}*.\n\nPedimos que regularize até amanhã para evitar atrasos. Se já pagou, pode desconsiderar esta mensagem. Qualquer dúvida estamos disponíveis! 😊`,
-
-    honorario_vence_hoje: `Oi ${nome}! Hoje é o dia do vencimento do seu honorário de *${valor}*.\n\nPor favor, realize o pagamento para evitar pendências. Se já pagou, desconsidere esta mensagem — e muito obrigado pela pontualidade! 🙏`,
+    honorario_10d: HONORARIO_MENSAGENS.lembrete1(nome, escritorio, valor, data),
+    honorario_5d: HONORARIO_MENSAGENS.lembrete2(nome, escritorio, valor, data),
+    honorario_1d: HONORARIO_MENSAGENS.lembrete3(nome, escritorio, valor, data),
+    honorario_vence_hoje: HONORARIO_MENSAGENS.vence_hoje(
+      nome,
+      escritorio,
+      valor,
+      data
+    ),
   };
 
   return mapas[opts.tipo] ?? "";
@@ -140,11 +184,11 @@ export function mensagemPagamentoConfirmado(opts: {
   const data = formatarData(opts.dataPagamento);
 
   if (opts.saldoRestante <= 0) {
-    return `✅ ${nome}, confirmamos o recebimento do seu pagamento de *${valorPago}* em ${data}.\n\nSua conta está totalmente quitada! Muito obrigado pela confiança e pontualidade! 🎉`;
+    return HONORARIO_MENSAGENS.pagamento_quitado(nome, valorPago, data);
   }
 
   const saldo = formatarMoeda(opts.saldoRestante);
-  return `✅ ${nome}, confirmamos o recebimento do seu pagamento de *${valorPago}* em ${data}.\n\nSeu saldo restante é de *${saldo}*. Em breve você receberá os próximos lembretes de vencimento. Qualquer dúvida, estamos à disposição! 😊`;
+  return HONORARIO_MENSAGENS.pagamento_parcial(nome, valorPago, data, saldo);
 }
 
 // ── Agendamento de lembretes INSS ─────────────────────────────
@@ -163,6 +207,8 @@ export async function agendarLembretesInss(opts: {
   protocolo?: string;
   escritorio?: string;
 }): Promise<void> {
+  const cfg = await getMensagensConfig();
+
   const destinos: Array<{ tipo: string; telefone: string; nome: string }> = [];
 
   if (opts.telefoneCliente) {
@@ -187,29 +233,51 @@ export async function agendarLembretesInss(opts: {
       | "inss_2d"
       | "inss_1d_manha"
       | "inss_1d_tarde";
+    template: string;
     enviarEm: Date;
   }> = [
-    { tipo: "inss_15d", enviarEm: diasAntes(opts.dataEvento, 15, 8) },
-    { tipo: "inss_5d", enviarEm: diasAntes(opts.dataEvento, 5, 8) },
-    { tipo: "inss_2d", enviarEm: diasAntes(opts.dataEvento, 2, 8) },
-    { tipo: "inss_1d_manha", enviarEm: diasAntes(opts.dataEvento, 1, 8) },
-    { tipo: "inss_1d_tarde", enviarEm: diasAntes(opts.dataEvento, 1, 18) },
+    {
+      tipo: "inss_15d",
+      template: cfg.inss_lembrete1,
+      enviarEm: diasAntes(opts.dataEvento, cfg.inss_lembrete1_dias, 8),
+    },
+    {
+      tipo: "inss_5d",
+      template: cfg.inss_lembrete2,
+      enviarEm: diasAntes(opts.dataEvento, cfg.inss_lembrete2_dias, 8),
+    },
+    {
+      tipo: "inss_2d",
+      template: cfg.inss_lembrete3,
+      enviarEm: diasAntes(opts.dataEvento, cfg.inss_lembrete3_dias, 8),
+    },
+    {
+      tipo: "inss_1d_manha",
+      template: cfg.inss_vespera_manha,
+      enviarEm: diasAntes(opts.dataEvento, 1, cfg.inss_vespera_manha_hora),
+    },
+    {
+      tipo: "inss_1d_tarde",
+      template: cfg.inss_vespera_tarde,
+      enviarEm: diasAntes(opts.dataEvento, 1, cfg.inss_vespera_tarde_hora),
+    },
   ];
 
   for (const dest of destinos) {
     for (const lembrete of tiposLembrete) {
-      if (lembrete.enviarEm <= new Date()) continue; // não agenda passado
+      if (lembrete.enviarEm <= new Date()) continue;
 
-      const mensagem = mensagemInss({
-        tipo: lembrete.tipo,
-        nomeDestinatario: dest.nome,
-        tipoServico: opts.tipoServico,
-        dataEvento: opts.dataEvento,
+      const vars = {
+        nome: primeiroNome(dest.nome),
+        escritorio: opts.escritorio ?? "nosso escritório",
+        servico: opts.tipoServico || "atendimento no INSS",
+        diaSemana: formatarDiaSemana(opts.dataEvento),
+        data: formatarData(opts.dataEvento),
         hora: opts.horaEvento,
         local: opts.local,
-        protocolo: opts.protocolo,
-        escritorio: opts.escritorio,
-      });
+      };
+
+      const mensagem = renderMensagem(lembrete.template, vars);
 
       await sql`
         INSERT INTO lembretes_agendados
@@ -240,33 +308,54 @@ export async function agendarLembretesHonorario(opts: {
 }): Promise<void> {
   if (!opts.telefone) return;
 
+  const cfg = await getMensagensConfig();
+
   const tiposLembrete: Array<{
     tipo:
       | "honorario_10d"
       | "honorario_5d"
       | "honorario_1d"
       | "honorario_vence_hoje";
+    template: string;
     enviarEm: Date;
   }> = [
-    { tipo: "honorario_10d", enviarEm: diasAntes(opts.dataVencimento, 10, 8) },
-    { tipo: "honorario_5d", enviarEm: diasAntes(opts.dataVencimento, 5, 8) },
-    { tipo: "honorario_1d", enviarEm: diasAntes(opts.dataVencimento, 1, 8) },
+    {
+      tipo: "honorario_10d",
+      template: cfg.honorario_lembrete1,
+      enviarEm: diasAntes(opts.dataVencimento, cfg.honorario_lembrete1_dias, 8),
+    },
+    {
+      tipo: "honorario_5d",
+      template: cfg.honorario_lembrete2,
+      enviarEm: diasAntes(opts.dataVencimento, cfg.honorario_lembrete2_dias, 8),
+    },
+    {
+      tipo: "honorario_1d",
+      template: cfg.honorario_lembrete3,
+      enviarEm: diasAntes(opts.dataVencimento, cfg.honorario_lembrete3_dias, 8),
+    },
     {
       tipo: "honorario_vence_hoje",
-      enviarEm: mesmoDia(opts.dataVencimento, 8),
+      template: cfg.honorario_vence_hoje,
+      enviarEm: mesmoDia(
+        opts.dataVencimento,
+        cfg.honorario_vencimento_hoje_hora
+      ),
     },
   ];
+
+  const nome = primeiroNome(opts.clienteNome);
+  const escritorio = opts.escritorio ?? "nosso escritório";
+  const valor = formatarMoeda(opts.valor);
 
   for (const lembrete of tiposLembrete) {
     if (lembrete.enviarEm <= new Date()) continue;
 
-    const mensagem = mensagemHonorario({
-      tipo: lembrete.tipo,
-      nomeDestinatario: opts.clienteNome,
-      valor: opts.valor,
-      dataVencimento: opts.dataVencimento,
-      descricao: opts.descricao,
-      escritorio: opts.escritorio,
+    const mensagem = renderMensagem(lembrete.template, {
+      nome,
+      escritorio,
+      valor,
+      data: formatarData(opts.dataVencimento),
     });
 
     await sql`
@@ -276,6 +365,71 @@ export async function agendarLembretesHonorario(opts: {
          mensagem, enviar_em)
       VALUES
         (${lembrete.tipo}, 'lancamento', ${opts.lancamentoId}::uuid,
+         ${opts.clienteId}::uuid, ${opts.clienteNome},
+         'cliente', ${opts.telefone}, ${opts.clienteNome},
+         ${mensagem}, ${lembrete.enviarEm.toISOString()})
+    `;
+  }
+}
+
+// ── Videochamada — convite imediato + lembretes ───────────────────────────────
+
+export async function agendarVideochamadaWhatsApp(opts: {
+  compromissoId: string;
+  clienteId: string;
+  clienteNome: string;
+  telefone: string;
+  dataEvento: Date;
+  horaEvento: string;
+  /** Link do Google Meet. Omitir para ligação direta pelo WhatsApp. */
+  link?: string;
+  tipoReuniao?: "meet" | "whatsapp";
+  escritorio?: string;
+}): Promise<void> {
+  const cfg = await getMensagensConfig();
+  const isMeet = (opts.tipoReuniao ?? "meet") === "meet";
+
+  const vars = {
+    nome: primeiroNome(opts.clienteNome),
+    escritorio: opts.escritorio ?? "nosso escritório",
+    diaSemana: formatarDiaSemana(opts.dataEvento),
+    data: formatarData(opts.dataEvento),
+    hora: opts.horaEvento,
+    link: opts.link ?? "",
+  };
+
+  const agora = new Date();
+
+  const lembretes: Array<{ tipo: string; template: string; enviarEm: Date }> = [
+    {
+      tipo: isMeet ? "videochamada_convite" : "wpp_call_convite",
+      template: isMeet ? cfg.videochamada_convite : cfg.wpp_call_convite,
+      enviarEm: new Date(agora.getTime() + 60_000),
+    },
+    {
+      tipo: isMeet ? "videochamada_vespera" : "wpp_call_vespera",
+      template: isMeet ? cfg.videochamada_vespera : cfg.wpp_call_vespera,
+      enviarEm: diasAntes(opts.dataEvento, 1, cfg.videochamada_vespera_hora),
+    },
+    {
+      tipo: isMeet ? "videochamada_dia" : "wpp_call_dia",
+      template: isMeet ? cfg.videochamada_dia : cfg.wpp_call_dia,
+      enviarEm: mesmoDia(opts.dataEvento, cfg.videochamada_dia_hora),
+    },
+  ];
+
+  for (const lembrete of lembretes) {
+    if (lembrete.enviarEm <= agora) continue;
+
+    const mensagem = renderMensagem(lembrete.template, vars);
+
+    await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+         destinatario_tipo, destinatario_telefone, destinatario_nome,
+         mensagem, enviar_em)
+      VALUES
+        (${lembrete.tipo}, 'compromisso', ${opts.compromissoId}::uuid,
          ${opts.clienteId}::uuid, ${opts.clienteNome},
          'cliente', ${opts.telefone}, ${opts.clienteNome},
          ${mensagem}, ${lembrete.enviarEm.toISOString()})
@@ -308,12 +462,20 @@ export async function agendarConfirmacaoPagamento(opts: {
 }): Promise<void> {
   if (!opts.telefone) return;
 
-  const mensagem = mensagemPagamentoConfirmado({
-    nomeDestinatario: opts.clienteNome,
-    valorPago: opts.valorPago,
-    dataPagamento: opts.dataPagamento,
-    saldoRestante: opts.saldoRestante,
-  });
+  const cfg = await getMensagensConfig();
+  const nome = primeiroNome(opts.clienteNome);
+  const valor = formatarMoeda(opts.valorPago);
+  const data = formatarData(opts.dataPagamento);
+
+  const mensagem =
+    opts.saldoRestante <= 0
+      ? renderMensagem(cfg.honorario_pagamento_quitado, { nome, valor, data })
+      : renderMensagem(cfg.honorario_pagamento_parcial, {
+          nome,
+          valor,
+          data,
+          saldo: formatarMoeda(opts.saldoRestante),
+        });
 
   // Envia imediatamente (1 minuto no futuro para dar tempo ao DB commit)
   const enviarEm = new Date(Date.now() + 60_000);

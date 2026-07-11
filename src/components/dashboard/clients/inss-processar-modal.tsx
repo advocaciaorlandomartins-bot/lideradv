@@ -29,8 +29,29 @@ const TIPOS_AGENDAMENTO = new Set([
   "agendamento_generico",
 ]);
 
+const TIPOS_PROCESSAVEIS = new Set([
+  "agendamento_avaliacao_social",
+  "agendamento_pericia_medica",
+  "agendamento_generico",
+  "rpv",
+  "comprovante_pagamento",
+  "resultado_pericia",
+]);
+
 function ehAgendamento(tipo: DocumentoInssExtraido["tipo_documento"]) {
   return TIPOS_AGENDAMENTO.has(tipo);
+}
+
+function ehProcessavel(tipo: DocumentoInssExtraido["tipo_documento"]) {
+  return TIPOS_PROCESSAVEIS.has(tipo);
+}
+
+function dataEvento(doc: DocumentoInssExtraido): string {
+  return (
+    doc.data_agendamento ??
+    doc.data_pagamento ??
+    new Date().toISOString().split("T")[0]
+  );
 }
 
 function labelTipo(tipo: DocumentoInssExtraido["tipo_documento"]): string {
@@ -104,7 +125,7 @@ export default function InssProcessarModal({
       const revisao: DocRevisao[] = data.resultados.map((r, i) => ({
         ...r,
         arquivo_nome: arquivos[i]?.name ?? `Arquivo ${i + 1}`,
-        confirmar: ehAgendamento(r.tipo_documento) && !!r.data_agendamento,
+        confirmar: ehProcessavel(r.tipo_documento),
       }));
       setDocs(revisao);
       setEtapa("revisao");
@@ -117,8 +138,7 @@ export default function InssProcessarModal({
 
   async function confirmar() {
     const paraConfirmar = docs.filter(
-      (d) =>
-        d.confirmar && ehAgendamento(d.tipo_documento) && d.data_agendamento
+      (d) => d.confirmar && ehProcessavel(d.tipo_documento)
     );
     if (!paraConfirmar.length) {
       onClose();
@@ -137,12 +157,15 @@ export default function InssProcessarModal({
           nomeResponsavel: doc.nomeResponsavel || null,
           tipoDocumento: doc.tipo_documento,
           tipoServico: doc.tipo_servico ?? labelTipo(doc.tipo_documento),
-          dataAgendamento: doc.data_agendamento!,
+          dataAgendamento: doc.data_agendamento ?? null,
+          dataEvento: dataEvento(doc),
           horaAgendamento: doc.hora_agendamento ?? "09:00",
           localNome: doc.local_nome ?? "INSS",
           localEndereco: doc.local_endereco ?? null,
           protocolo: doc.protocolo ?? null,
           processoId: doc.processoId ?? null,
+          valor: doc.valor ?? null,
+          nomeRequerente: doc.nome_requerente ?? null,
         };
         const res = await fetch("/api/inss/confirmar", {
           method: "POST",
@@ -390,6 +413,7 @@ export default function InssProcessarModal({
                       </span>
                     </div>
 
+                    {/* Agendamentos: campos completos */}
                     {ehAgendamento(doc.tipo_documento) &&
                       doc.data_agendamento && (
                         <>
@@ -479,11 +503,75 @@ export default function InssProcessarModal({
                         </>
                       )}
 
-                    {!ehAgendamento(doc.tipo_documento) && (
-                      <p className="font-body text-xs text-muted">
-                        Este tipo de documento não gera agendamento automático.
-                      </p>
-                    )}
+                    {/* RPV, comprovante, resultado: registra em Controles */}
+                    {!ehAgendamento(doc.tipo_documento) &&
+                      ehProcessavel(doc.tipo_documento) && (
+                        <div className="mt-2 space-y-2">
+                          <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                            {doc.tipo_documento === "rpv" &&
+                              "Será registrado em Controles → Alvarás"}
+                            {doc.tipo_documento === "comprovante_pagamento" &&
+                              "Será registrado em Controles → Implantados"}
+                            {doc.tipo_documento === "resultado_pericia" &&
+                              "Será registrado em Controles → Perícias"}
+                          </div>
+
+                          {doc.valor && (
+                            <div className="font-body text-xs text-slate-600">
+                              Valor extraído:{" "}
+                              <span className="font-medium text-slate-900">
+                                R$ {doc.valor}
+                              </span>
+                            </div>
+                          )}
+
+                          {processos.length > 0 && (
+                            <div>
+                              <label className="mb-1 block font-body text-xs text-muted">
+                                Vincular ao processo
+                              </label>
+                              <select
+                                value={doc.processoId ?? ""}
+                                onChange={(e) =>
+                                  updateDoc(i, {
+                                    processoId: e.target.value || undefined,
+                                  })
+                                }
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-body text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              >
+                                <option value="">Nenhum processo</option>
+                                {processos.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.tipo_acao}{" "}
+                                    {p.numero ? `— ${p.numero}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          <label className="flex cursor-pointer items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={doc.confirmar}
+                              onChange={(e) =>
+                                updateDoc(i, { confirmar: e.target.checked })
+                              }
+                              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                            />
+                            <span className="font-body text-sm text-slate-700">
+                              Registrar nos Controles
+                            </span>
+                          </label>
+                        </div>
+                      )}
+
+                    {!ehAgendamento(doc.tipo_documento) &&
+                      !ehProcessavel(doc.tipo_documento) && (
+                        <p className="font-body text-xs text-muted">
+                          Este tipo de documento não gera registro automático.
+                        </p>
+                      )}
                   </div>
                 ))}
               </div>
@@ -526,7 +614,7 @@ export default function InssProcessarModal({
                       Salvando...
                     </>
                   ) : (
-                    `Confirmar ${docs.filter((d) => d.confirmar).length > 0 ? `(${docs.filter((d) => d.confirmar).length} agendamento${docs.filter((d) => d.confirmar).length !== 1 ? "s" : ""})` : "e fechar"}`
+                    `Confirmar ${docs.filter((d) => d.confirmar).length > 0 ? `(${docs.filter((d) => d.confirmar).length} documento${docs.filter((d) => d.confirmar).length !== 1 ? "s" : ""})` : "e fechar"}`
                   )}
                 </button>
               </div>
@@ -554,11 +642,11 @@ export default function InssProcessarModal({
               <div>
                 <p className="font-heading text-lg font-semibold text-slate-900">
                   {sucessoCount > 0
-                    ? `${sucessoCount} agendamento${sucessoCount !== 1 ? "s" : ""} cadastrado${sucessoCount !== 1 ? "s" : ""}!`
+                    ? `${sucessoCount} documento${sucessoCount !== 1 ? "s" : ""} registrado${sucessoCount !== 1 ? "s" : ""}!`
                     : "Documentos processados!"}
                 </p>
                 <p className="font-body text-sm text-muted">
-                  Os lembretes por WhatsApp foram agendados automaticamente.
+                  Os dados foram salvos nos Controles e na Agenda.
                 </p>
               </div>
               <button

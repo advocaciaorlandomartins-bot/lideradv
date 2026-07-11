@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDownloadUrl } from "@vercel/blob";
+import { head } from "@vercel/blob";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
@@ -33,13 +33,15 @@ export async function GET(request: Request) {
     );
   }
 
-  const { url, nome } = rows[0] as { url: string; nome: string };
+  const { url } = rows[0] as { url: string; nome: string };
 
   try {
-    const downloadUrl = await getDownloadUrl(url);
-    return NextResponse.redirect(downloadUrl);
+    // Para blobs privados, head() retorna um downloadUrl assinado
+    const blob = await head(url);
+    const target = blob.downloadUrl ?? url;
+    return NextResponse.redirect(target);
   } catch {
-    // Fallback: redirect directly (for old public URLs or non-blob URLs)
+    // Fallback para URLs públicas ou externas
     return NextResponse.redirect(url);
   }
 }

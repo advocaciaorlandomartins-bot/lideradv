@@ -255,6 +255,18 @@ export async function verificarPublicacoesAction(): Promise<{
     }
   }
 
+  // 4. Sincronização com TramitaSign (traz publicações que já estão lá)
+  try {
+    const { sincronizarTramitaSign, tramitaSyncAtivo } =
+      await import("./tramitasign-sync");
+    if (tramitaSyncAtivo()) {
+      const res = await sincronizarTramitaSign();
+      total += res.inseridos;
+    }
+  } catch (e) {
+    console.error("[verificarPublicacoes] TramitaSign sync error:", e);
+  }
+
   revalidatePath("/dashboard/publicacoes");
 
   if (!apiKey && rows.length === 0) {

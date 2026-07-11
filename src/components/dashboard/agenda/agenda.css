@@ -3,6 +3,7 @@
 .agenda-layout {
   display: flex;
   gap: 20px;
+  /* Desktop (lg+): sem topbar, p-8 pb-8 + heading ~65px + gap ~16px */
   height: calc(100dvh - 180px);
   min-height: 500px;
 }
@@ -25,6 +26,13 @@
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+
+/* Tablet (768-1023px): topbar visível (48px) + p-4 pb-20 (96px) + heading + gap */
+@media (max-width: 1023px) {
+  .agenda-layout {
+    height: calc(100dvh - 250px);
+  }
 }
 
 /* ── Barra de progresso ───────────────────────────────────────────────────── */
@@ -304,16 +312,43 @@
   font-weight: 600;
 }
 
-@media (max-width: 768px) {
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
+
+/* Barra de ações rápidas (apenas mobile) */
+.agenda-mobile-bar {
+  display: none;
+}
+
+@media (max-width: 767px) {
   .agenda-layout {
     flex-direction: column;
     height: auto;
+    gap: 8px;
   }
+
+  /* Sidebar oculta por padrão no mobile */
   .agenda-sidebar {
     flex: none;
+    display: none;
+    max-height: 300px;
+    overflow-y: auto;
   }
+
+  /* Classe adicionada via JS quando o usuário abre */
+  .agenda-sidebar.mobile-open {
+    display: flex;
+  }
+
+  /* Barra de botões rápidos: Novo + Filtros */
+  .agenda-mobile-bar {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
   .agenda-main {
-    height: calc(100dvh - 300px);
-    min-height: 400px;
+    /* topbar 48 + pt-4 16 + heading ~65 + gap 16 + mobile-bar ~40 + inner-gap 8 + pb-20 80 */
+    height: calc(100dvh - 290px);
+    min-height: 380px;
   }
 }

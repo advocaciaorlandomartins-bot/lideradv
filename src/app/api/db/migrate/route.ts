@@ -257,6 +257,30 @@ export async function GET() {
       sql`CREATE INDEX IF NOT EXISTS atualizacoes_legais_lida_idx ON atualizacoes_legais (lida) WHERE lida = FALSE`
   );
 
+  await run(
+    "compromissos.cliente_id",
+    () =>
+      sql`ALTER TABLE compromissos ADD COLUMN IF NOT EXISTS cliente_id UUID REFERENCES clients(id) ON DELETE SET NULL`
+  );
+
+  await run(
+    "mensagens_config",
+    () => sql`
+      CREATE TABLE IF NOT EXISTS mensagens_config (
+        id         INT  PRIMARY KEY DEFAULT 1,
+        config     JSONB NOT NULL DEFAULT '{}',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT mensagens_config_single CHECK (id = 1)
+      )
+    `
+  );
+
+  await run(
+    "mensagens_config.seed",
+    () =>
+      sql`INSERT INTO mensagens_config (id, config) VALUES (1, '{}') ON CONFLICT (id) DO NOTHING`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

@@ -18,7 +18,11 @@ export type TipoLembrete =
   | "honorario_5d"
   | "honorario_1d"
   | "honorario_vence_hoje"
-  | "honorario_pago_confirmacao";
+  | "honorario_pago_confirmacao"
+  | "compromisso_1d"
+  | "compromisso_dia"
+  | "conta_1d"
+  | "conta_vence_hoje";
 
 // ── Helpers de data ───────────────────────────────────────────
 
@@ -381,22 +385,13 @@ export async function agendarVideochamadaWhatsApp(opts: {
   telefone: string;
   dataEvento: Date;
   horaEvento: string;
-  /** Link do Google Meet. Omitir para ligação direta pelo WhatsApp. */
   link?: string;
   tipoReuniao?: "meet" | "whatsapp";
   escritorio?: string;
+  responsavel?: { telefone: string; nome: string };
 }): Promise<void> {
   const cfg = await getMensagensConfig();
   const isMeet = (opts.tipoReuniao ?? "meet") === "meet";
-
-  const vars = {
-    nome: primeiroNome(opts.clienteNome),
-    escritorio: opts.escritorio ?? "nosso escritório",
-    diaSemana: formatarDiaSemana(opts.dataEvento),
-    data: formatarData(opts.dataEvento),
-    hora: opts.horaEvento,
-    link: opts.link ?? "",
-  };
 
   const agora = new Date();
 
@@ -418,11 +413,19 @@ export async function agendarVideochamadaWhatsApp(opts: {
     },
   ];
 
+  // Notifica o cliente
+  const varsCliente = {
+    nome: primeiroNome(opts.clienteNome),
+    escritorio: opts.escritorio ?? "nosso escritório",
+    diaSemana: formatarDiaSemana(opts.dataEvento),
+    data: formatarData(opts.dataEvento),
+    hora: opts.horaEvento,
+    link: opts.link ?? "",
+  };
+
   for (const lembrete of lembretes) {
     if (lembrete.enviarEm <= agora) continue;
-
-    const mensagem = renderMensagem(lembrete.template, vars);
-
+    const mensagem = renderMensagem(lembrete.template, varsCliente);
     await sql`
       INSERT INTO lembretes_agendados
         (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
@@ -434,6 +437,54 @@ export async function agendarVideochamadaWhatsApp(opts: {
          'cliente', ${opts.telefone}, ${opts.clienteNome},
          ${mensagem}, ${lembrete.enviarEm.toISOString()})
     `;
+  }
+
+  // Notifica o responsável (colaborador) com lembretes D-1 e no dia
+  if (opts.responsavel?.telefone) {
+    const diaSemana = formatarDiaSemana(opts.dataEvento);
+    const data = formatarData(opts.dataEvento);
+    const tipoLabel = isMeet ? "Videochamada" : "Ligação WhatsApp";
+    const linkStr = opts.link ? `\n🔗 ${opts.link}` : "";
+
+    const lembretesResp: Array<{
+      tipo: string;
+      enviarEm: Date;
+      mensagem: string;
+    }> = [
+      {
+        tipo: "compromisso_1d",
+        enviarEm: diasAntes(opts.dataEvento, 1, 8),
+        mensagem:
+          `📅 *Lembrete para amanhã!*\n\n` +
+          `*${tipoLabel} com ${opts.clienteNome}*\n` +
+          `🗓️ ${diaSemana}, ${data} às ${opts.horaEvento}${linkStr}\n\n` +
+          `_Acesse a Agenda no LiderAdv para mais detalhes._`,
+      },
+      {
+        tipo: "compromisso_dia",
+        enviarEm: mesmoDia(opts.dataEvento, 7),
+        mensagem:
+          `⏰ *${tipoLabel} hoje!*\n\n` +
+          `*Com ${opts.clienteNome}*\n` +
+          `🗓️ ${diaSemana}, ${data} às ${opts.horaEvento}${linkStr}\n\n` +
+          `_Boa reunião! 💼_`,
+      },
+    ];
+
+    for (const lembrete of lembretesResp) {
+      if (lembrete.enviarEm <= agora) continue;
+      await sql`
+        INSERT INTO lembretes_agendados
+          (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+           destinatario_tipo, destinatario_telefone, destinatario_nome,
+           mensagem, enviar_em)
+        VALUES
+          (${lembrete.tipo}, 'compromisso', ${opts.compromissoId}::uuid,
+           ${opts.clienteId}::uuid, ${opts.clienteNome},
+           'responsavel', ${opts.responsavel.telefone}, ${opts.responsavel.nome},
+           ${lembrete.mensagem}, ${lembrete.enviarEm.toISOString()})
+      `;
+    }
   }
 }
 
@@ -449,6 +500,113 @@ export async function cancelarLembretesLancamento(
       AND tipo LIKE 'honorario_%'
       AND tipo != 'honorario_pago_confirmacao'
   `;
+}
+
+// ── Lembretes de compromisso para colaborador (criado via PrevBot) ────────────
+
+export async function agendarLembretesCompromissoPrevBot(opts: {
+  compromissoId: string;
+  titulo: string;
+  dataEvento: Date;
+  hora: string | null;
+  local: string | null;
+  colaboradorTelefone: string;
+  colaboradorNome: string;
+}): Promise<void> {
+  const diaSemana = formatarDiaSemana(opts.dataEvento);
+  const data = formatarData(opts.dataEvento);
+  const horaStr = opts.hora ? ` às ${opts.hora}` : "";
+  const localStr = opts.local ? `\n📍 ${opts.local}` : "";
+
+  const lembretes: Array<{ tipo: string; enviarEm: Date; mensagem: string }> = [
+    {
+      tipo: "compromisso_1d",
+      enviarEm: diasAntes(opts.dataEvento, 1, 8),
+      mensagem:
+        `📅 *Lembrete para amanhã!*\n\n` +
+        `*${opts.titulo}*\n` +
+        `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}\n\n` +
+        `_Acesse a Agenda no LiderAdv para mais detalhes._`,
+    },
+    {
+      tipo: "compromisso_dia",
+      enviarEm: mesmoDia(opts.dataEvento, 7),
+      mensagem:
+        `⏰ *Compromisso hoje!*\n\n` +
+        `*${opts.titulo}*\n` +
+        `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}\n\n` +
+        `_Boa sorte! 💼_`,
+    },
+  ];
+
+  const agora = new Date();
+  for (const lembrete of lembretes) {
+    if (lembrete.enviarEm <= agora) continue;
+    await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+         destinatario_tipo, destinatario_telefone, destinatario_nome,
+         mensagem, enviar_em)
+      VALUES
+        (${lembrete.tipo}, 'compromisso', ${opts.compromissoId}::uuid,
+         NULL, ${opts.colaboradorNome},
+         'colaborador', ${opts.colaboradorTelefone}, ${opts.colaboradorNome},
+         ${lembrete.mensagem}, ${lembrete.enviarEm.toISOString()})
+    `;
+  }
+}
+
+// ── Lembretes de conta pendente para colaborador (criado via PrevBot) ─────────
+
+export async function agendarLembretesContaPendente(opts: {
+  lancamentoId: string;
+  descricao: string;
+  valor: number;
+  dataVencimento: Date;
+  colaboradorTelefone: string;
+  colaboradorNome: string;
+}): Promise<void> {
+  const data = formatarData(opts.dataVencimento);
+  const valor = formatarMoeda(opts.valor);
+
+  const lembretes: Array<{ tipo: string; enviarEm: Date; mensagem: string }> = [
+    {
+      tipo: "conta_1d",
+      enviarEm: diasAntes(opts.dataVencimento, 1, 8),
+      mensagem:
+        `💸 *Lembrete de vencimento*\n\n` +
+        `*${opts.descricao}*\n` +
+        `💵 ${valor}\n` +
+        `📅 Vence amanhã (${data})\n\n` +
+        `_Lembre de pagar e registrar no Meu Financeiro._`,
+    },
+    {
+      tipo: "conta_vence_hoje",
+      enviarEm: mesmoDia(opts.dataVencimento, 8),
+      mensagem:
+        `🔔 *Conta vence hoje!*\n\n` +
+        `*${opts.descricao}*\n` +
+        `💵 ${valor}\n` +
+        `📅 Vencimento: ${data}\n\n` +
+        `_Após pagar, registre no Meu Financeiro do LiderAdv._`,
+    },
+  ];
+
+  const agora = new Date();
+  for (const lembrete of lembretes) {
+    if (lembrete.enviarEm <= agora) continue;
+    await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+         destinatario_tipo, destinatario_telefone, destinatario_nome,
+         mensagem, enviar_em)
+      VALUES
+        (${lembrete.tipo}, 'lancamento', ${opts.lancamentoId}::uuid,
+         NULL, ${opts.colaboradorNome},
+         'colaborador', ${opts.colaboradorTelefone}, ${opts.colaboradorNome},
+         ${lembrete.mensagem}, ${lembrete.enviarEm.toISOString()})
+    `;
+  }
 }
 
 export async function agendarConfirmacaoPagamento(opts: {

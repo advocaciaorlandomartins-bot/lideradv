@@ -72,6 +72,22 @@ export async function POST(req: NextRequest) {
     clienteId,
   });
 
+  // Busca telefone do responsável (colaborador vinculado ao usuário da sessão)
+  let responsavel: { telefone: string; nome: string } | undefined;
+  const respRows = await sql`
+    SELECT col.telefone, COALESCE(col.nome, u.login) AS nome
+    FROM usuarios u
+    LEFT JOIN colaboradores col ON col.id = u.colaborador_id AND col.status = 'ativo'
+    WHERE u.login = ${session.login} AND u.ativo = true
+    LIMIT 1
+  `;
+  if (respRows.length > 0 && respRows[0].telefone) {
+    responsavel = {
+      telefone: String(respRows[0].telefone),
+      nome: String(respRows[0].nome),
+    };
+  }
+
   // Schedule WhatsApp messages
   if (telefone) {
     const [year, month, day] = data.split("-").map(Number);
@@ -87,6 +103,7 @@ export async function POST(req: NextRequest) {
       link: link ?? "",
       tipoReuniao: isMeet ? "meet" : "whatsapp",
       escritorio: escritorioConfig.nome,
+      responsavel,
     });
   }
 

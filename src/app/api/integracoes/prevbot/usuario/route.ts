@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
+import {
+  agendarLembretesCompromissoPrevBot,
+  agendarLembretesContaPendente,
+} from "@/lib/lembretes";
 
 export const dynamic = "force-dynamic";
 
@@ -52,14 +56,18 @@ function normalizarTelefone(tel: string): string {
 // Resolve usuário a partir do telefone (via colaboradores) ou cai no admin
 async function resolverUsuario(
   telefone?: string
-): Promise<{ usuarioId: string; usuarioLogin: string }> {
-  // Tenta encontrar pelo telefone do colaborador
+): Promise<{
+  usuarioId: string;
+  usuarioLogin: string;
+  colaboradorNome: string;
+}> {
   if (telefone) {
     const tel = normalizarTelefone(telefone);
     const rows = await sql`
       SELECT
-        u.id::text   AS usuario_id,
-        u.login      AS usuario_login
+        u.id::text                        AS usuario_id,
+        u.login                           AS usuario_login,
+        COALESCE(col.nome, u.login)       AS colaborador_nome
       FROM colaboradores col
       INNER JOIN usuarios u ON u.colaborador_id = col.id AND u.ativo = true
       WHERE col.status = 'ativo'
@@ -70,13 +78,14 @@ async function resolverUsuario(
       return {
         usuarioId: String(rows[0].usuario_id),
         usuarioLogin: String(rows[0].usuario_login),
+        colaboradorNome: String(rows[0].colaborador_nome),
       };
     }
   }
 
   // Fallback: primeiro admin ativo
   const rows = await sql`
-    SELECT id::text AS usuario_id, login AS usuario_login
+    SELECT id::text AS usuario_id, login AS usuario_login, login AS colaborador_nome
     FROM usuarios
     WHERE categoria = 'admin' AND ativo = true
     ORDER BY id LIMIT 1
@@ -85,6 +94,7 @@ async function resolverUsuario(
   return {
     usuarioId: String(rows[0].usuario_id),
     usuarioLogin: String(rows[0].usuario_login),
+    colaboradorNome: String(rows[0].colaborador_nome),
   };
 }
 
@@ -193,7 +203,9 @@ export async function POST(req: NextRequest) {
 
   try {
     // Resolve o usuário pelo telefone (ou cai no admin como fallback)
-    const { usuarioId, usuarioLogin } = await resolverUsuario(body.telefone);
+    const { usuarioId, usuarioLogin, colaboradorNome } = await resolverUsuario(
+      body.telefone
+    );
 
     // Monta conteúdo para o Claude
     const userContent: Anthropic.MessageParam["content"] = [];
@@ -273,6 +285,18 @@ export async function POST(req: NextRequest) {
         RETURNING id::text
       `;
 
+      // Agenda lembrete de vencimento para despesas pendentes
+      if (status === "pendente" && body.telefone) {
+        await agendarLembretesContaPendente({
+          lancamentoId: String((row as { id: string }).id),
+          descricao,
+          valor,
+          dataVencimento: new Date(data + "T12:00:00"),
+          colaboradorTelefone: normalizarTelefone(body.telefone),
+          colaboradorNome,
+        }).catch((e) => console.error("[prevbot/lembrete-conta]", e));
+      }
+
       const icone = tipo === "receita" ? "💰" : "💸";
       const tipoLabel = tipo === "receita" ? "Receita" : "Despesa";
       const valorFmt = formatarMoeda(valor);
@@ -317,11 +341,25 @@ export async function POST(req: NextRequest) {
       `;
 
       const dataFmt = formatarDataPT(data);
+      const compId = String((comp as { id: string }).id);
+
+      // Agenda lembretes D-1 e no dia para o colaborador
+      if (body.telefone) {
+        await agendarLembretesCompromissoPrevBot({
+          compromissoId: compId,
+          titulo,
+          dataEvento: new Date(data + "T12:00:00"),
+          hora,
+          local,
+          colaboradorTelefone: normalizarTelefone(body.telefone),
+          colaboradorNome,
+        }).catch((e) => console.error("[prevbot/lembrete-comp]", e));
+      }
 
       return NextResponse.json({
         ok: true,
         acao: "compromisso_criado",
-        id: String((comp as { id: string }).id),
+        id: compId,
         resposta:
           `📅 *Compromisso agendado!* ✅\n\n` +
           `📌 ${titulo}\n` +

@@ -2435,18 +2435,20 @@ O que este documento prova juridicamente (e o que não prova).
 Ação concreta com base neste documento.
 
 ## CAMPOS_JSON
-Extraia os campos abaixo APENAS se estiverem explicitamente no documento. Use null para campos ausentes. Retorne SOMENTE o JSON, sem texto extra:
+Preencha o JSON abaixo com dados EXPLÍCITOS do documento. Use null para campos ausentes.
+Atenção: "contribuicoes" deve ser um número inteiro (ex: 120) ou null; "resultado" aceita apenas DEFERIDO, INDEFERIDO ou CESSADO; datas no formato YYYY-MM-DD.
+Retorne SOMENTE o JSON abaixo, sem texto extra antes ou depois:
 {
-  "cid": "código CID sem descrição, ex: F32.0",
-  "nis": "número NIS/PIS sem formatação",
-  "der": "data no formato YYYY-MM-DD",
-  "dib": "data no formato YYYY-MM-DD",
-  "dcb": "data no formato YYYY-MM-DD",
-  "protocolo": "número do protocolo INSS",
-  "resultado": "DEFERIDO ou INDEFERIDO ou CESSADO",
-  "afastamento": "data no formato YYYY-MM-DD",
-  "contribuicoes": número inteiro ou null,
-  "motivo": "motivo resumido em até 80 caracteres"
+  "cid": null,
+  "nis": null,
+  "der": null,
+  "dib": null,
+  "dcb": null,
+  "protocolo": null,
+  "resultado": null,
+  "afastamento": null,
+  "contribuicoes": null,
+  "motivo": null
 }
 
 Nunca invente dados que não estejam no documento. Se não conseguir ler alguma parte, informe.`;
@@ -2514,8 +2516,9 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
         ? String(v).trim()
         : null;
     const numOrNull = (v: unknown): number | null => {
+      if (v === null || v === undefined || String(v).trim() === "") return null;
       const n = Number(v);
-      return !isNaN(n) && v !== null && v !== undefined ? n : null;
+      return !isNaN(n) ? n : null;
     };
 
     const cidVal = strOrNull(extracted.cid);

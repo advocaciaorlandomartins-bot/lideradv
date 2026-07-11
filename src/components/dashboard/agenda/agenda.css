@@ -347,8 +347,12 @@
   }
 
   .agenda-main {
-    /* topbar 48 + pt-4 16 + heading ~65 + gap 16 + mobile-bar ~40 + inner-gap 8 + pb-20 80 */
-    height: calc(100dvh - 290px);
-    min-height: 380px;
+    height: auto;
+    min-height: 480px;
+  }
+
+  /* No mobile o fc usa height=auto, não precisa de 100% */
+  .agenda-main .fc {
+    height: auto !important;
   }
 }

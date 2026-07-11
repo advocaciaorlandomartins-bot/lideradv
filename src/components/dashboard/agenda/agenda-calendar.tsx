@@ -210,6 +210,14 @@ export default function AgendaCalendar() {
     text: string;
   } | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    queueMicrotask(handler);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   // ── Busca de cliente para o modal ───────────────────────────────────────────
   const [clienteSearch, setClienteSearch] = useState("");
@@ -820,8 +828,9 @@ export default function AgendaCalendar() {
           eventClick={handleEventClick}
           eventContent={renderEventContent}
           loading={handleLoading}
-          height="100%"
-          dayMaxEvents={4}
+          height={isMobile ? "auto" : "100%"}
+          fixedWeekCount={!isMobile}
+          dayMaxEvents={isMobile ? 2 : 4}
           moreLinkText={(n) => `+${n} mais`}
           noEventsText="Nenhum evento neste período"
           listDayFormat={{ weekday: "long", day: "numeric", month: "long" }}

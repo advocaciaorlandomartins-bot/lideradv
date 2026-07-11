@@ -847,7 +847,7 @@ export default async function DashboardPage() {
                   id: c.id,
                   tipo_label: `${TIPO_ICONS_COMP[c.tipo] ?? "📌"} ${TIPO_LABELS_COMP[c.tipo] ?? "Compromisso"}`,
                   descricao: c.titulo,
-                  cliente_nome: null,
+                  cliente_nome: c.cliente_nome ?? null,
                   data_evento: c.data_inicio,
                   dias_restantes: Math.max(
                     0,
@@ -858,7 +858,7 @@ export default async function DashboardPage() {
                     )
                   ),
                   source: "compromisso" as const,
-                  href: "/dashboard/agenda",
+                  href: `/dashboard/agenda?date=${c.data_inicio}`,
                 })),
               ]}
             />

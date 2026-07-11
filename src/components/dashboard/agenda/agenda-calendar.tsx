@@ -793,6 +793,7 @@ export default function AgendaCalendar() {
           ]}
           locale="pt-br"
           initialView="dayGridMonth"
+          initialDate={searchParams.get("date") ?? undefined}
           firstDay={1}
           timeZone="local"
           headerToolbar={{

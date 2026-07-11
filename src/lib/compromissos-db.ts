@@ -13,6 +13,8 @@ export interface Compromisso {
   status: "pendente" | "concluido";
   criado_por: string;
   criado_em: string;
+  cliente_nome: string | null;
+  cliente_id: string | null;
 }
 
 export const TIPO_LABELS_COMP: Record<string, string> = {
@@ -50,6 +52,8 @@ function mapRow(r: Record<string, unknown>): Compromisso {
     status: (String(r.status) as Compromisso["status"]) ?? "pendente",
     criado_por: String(r.criado_por),
     criado_em: String(r.criado_em),
+    cliente_nome: r.cliente_nome ? String(r.cliente_nome) : null,
+    cliente_id: r.cliente_id ? String(r.cliente_id) : null,
   };
 }
 
@@ -73,12 +77,17 @@ export async function listarCompromissosProximos(
   dias = 14
 ): Promise<Compromisso[]> {
   const rows = await sql`
-    SELECT * FROM compromissos
-    WHERE criado_por  = ${criadoPor}
-      AND status      = 'pendente'
-      AND data_inicio >= CURRENT_DATE
-      AND data_inicio <= CURRENT_DATE + (${dias} || ' days')::interval
-    ORDER BY data_inicio, hora_inicio NULLS LAST
+    SELECT
+      comp.*,
+      cl.name     AS cliente_nome,
+      cl.id::text AS cliente_id
+    FROM compromissos comp
+    LEFT JOIN clients cl ON cl.id = comp.cliente_id
+    WHERE comp.criado_por  = ${criadoPor}
+      AND comp.status      = 'pendente'
+      AND comp.data_inicio >= CURRENT_DATE
+      AND comp.data_inicio <= CURRENT_DATE + (${dias} || ' days')::interval
+    ORDER BY comp.data_inicio, comp.hora_inicio NULLS LAST
     LIMIT 20
   `;
   return rows.map(mapRow);

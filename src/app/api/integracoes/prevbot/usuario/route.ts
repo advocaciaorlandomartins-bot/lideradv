@@ -43,26 +43,49 @@ function formatarDataPT(iso: string): string {
   });
 }
 
-// Retorna o UUID do primeiro usuário admin ativo
-async function getAdminUserId(): Promise<string> {
-  const rows = await sql`
-    SELECT id::text FROM usuarios
-    WHERE categoria = 'admin' AND ativo = true
-    ORDER BY id LIMIT 1
-  `;
-  if (rows.length === 0) throw new Error("Nenhum admin encontrado");
-  return String(rows[0].id);
+function normalizarTelefone(tel: string): string {
+  const digits = tel.replace(/\D/g, "");
+  if (digits.length === 13 && digits.startsWith("55")) return digits.slice(2);
+  return digits;
 }
 
-// Retorna o login do primeiro usuário admin ativo
-async function getAdminLogin(): Promise<string> {
+// Resolve usuário a partir do telefone (via colaboradores) ou cai no admin
+async function resolverUsuario(
+  telefone?: string
+): Promise<{ usuarioId: string; usuarioLogin: string }> {
+  // Tenta encontrar pelo telefone do colaborador
+  if (telefone) {
+    const tel = normalizarTelefone(telefone);
+    const rows = await sql`
+      SELECT
+        u.id::text   AS usuario_id,
+        u.login      AS usuario_login
+      FROM colaboradores col
+      INNER JOIN usuarios u ON u.colaborador_id = col.id AND u.ativo = true
+      WHERE col.status = 'ativo'
+        AND regexp_replace(col.telefone, '\D', '', 'g') LIKE ${"%" + tel.slice(-9)}
+      LIMIT 1
+    `;
+    if (rows.length > 0) {
+      return {
+        usuarioId: String(rows[0].usuario_id),
+        usuarioLogin: String(rows[0].usuario_login),
+      };
+    }
+  }
+
+  // Fallback: primeiro admin ativo
   const rows = await sql`
-    SELECT login FROM usuarios
+    SELECT id::text AS usuario_id, login AS usuario_login
+    FROM usuarios
     WHERE categoria = 'admin' AND ativo = true
     ORDER BY id LIMIT 1
   `;
-  if (rows.length === 0) throw new Error("Nenhum admin encontrado");
-  return String(rows[0].login);
+  if (rows.length === 0) throw new Error("Nenhum usuário encontrado");
+  return {
+    usuarioId: String(rows[0].usuario_id),
+    usuarioLogin: String(rows[0].usuario_login),
+  };
 }
 
 // ── Prompt Claude ─────────────────────────────────────────────────────────────
@@ -147,6 +170,7 @@ export async function POST(req: NextRequest) {
     transcricao?: string;
     imagemBase64?: string;
     imagemMimeType?: string;
+    telefone?: string;
   };
 
   try {
@@ -168,6 +192,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Resolve o usuário pelo telefone (ou cai no admin como fallback)
+    const { usuarioId, usuarioLogin } = await resolverUsuario(body.telefone);
+
     // Monta conteúdo para o Claude
     const userContent: Anthropic.MessageParam["content"] = [];
 
@@ -237,8 +264,6 @@ export async function POST(req: NextRequest) {
             ? "pendente"
             : "pago";
 
-      const usuarioId = await getAdminUserId();
-
       const [row] = await sql`
         INSERT INTO meu_financeiro_lancamentos
           (usuario_id, tipo, categoria, descricao, valor, data, status)
@@ -282,14 +307,12 @@ export async function POST(req: NextRequest) {
       const local = result.local ? String(result.local) : null;
       const descricao = result.descricao ? String(result.descricao) : null;
 
-      const login = await getAdminLogin();
-
       const [comp] = await sql`
         INSERT INTO compromissos
           (titulo, tipo, data_inicio, hora_inicio, local_link, descricao, cor, criado_por)
         VALUES
           (${titulo}, ${tipo}, ${data}::date, ${hora}, ${local},
-           ${descricao}, '#0ea5e9', ${login})
+           ${descricao}, '#0ea5e9', ${usuarioLogin})
         RETURNING id::text
       `;
 

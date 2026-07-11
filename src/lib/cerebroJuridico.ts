@@ -883,6 +883,80 @@ function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
   return alertas;
 }
 
+// Augmenta dados do processo com campos extraídos de documentos lidos pelo Dr. Lex
+// Preenche APENAS campos nulos — nunca sobrescreve dados do cadastro
+function augmentProcessFromDocs(
+  processo: Record<string, unknown>,
+  docAnalises: Array<{ analise?: unknown; metadata?: unknown }>
+): Record<string, unknown> {
+  if (!docAnalises.length) return processo;
+  const aug = { ...processo };
+
+  const fill = (campo: string, valor: unknown) => {
+    const v = aug[campo];
+    if (
+      v === null ||
+      v === undefined ||
+      String(v).trim() === "" ||
+      String(v) === "0"
+    ) {
+      aug[campo] = valor;
+    }
+  };
+
+  // 1. Prioridade: metadata.extracted (parseado e confiável, salvo pelo Dr. Lex)
+  for (const da of docAnalises) {
+    const meta = (da.metadata ?? {}) as Record<string, unknown>;
+    const ext = (meta.extracted ?? {}) as Record<string, unknown>;
+    if (ext.cid) fill("cid_principal", ext.cid);
+    if (ext.nis) fill("nis", ext.nis);
+    if (ext.der) fill("der", ext.der);
+    if (ext.dib) fill("dib", ext.dib);
+    if (ext.dcb) fill("dcb", ext.dcb);
+    if (ext.protocolo) fill("protocolo_inss", ext.protocolo);
+    if (ext.resultado) fill("resultado_admin", ext.resultado);
+    if (ext.afastamento) fill("data_afastamento", ext.afastamento);
+    if (ext.contribuicoes != null) fill("num_contribuicoes", ext.contribuicoes);
+    if (ext.motivo) fill("motivo_indeferimento", ext.motivo);
+  }
+
+  // 2. Fallback: regex no texto livre das análises (para docs antigos sem metadata)
+  const allText = docAnalises.map((d) => String(d.analise || "")).join("\n\n");
+  if (allText) {
+    if (!aug.cid_principal) {
+      const m = allText.match(/CID[^:]{0,15}:?\s*([A-Z]\d{2}(?:[.\-]\d+)?)/i);
+      if (m) fill("cid_principal", m[1].toUpperCase());
+    }
+    if (!aug.nis) {
+      const m = allText.match(/(?:NIS|PIS)[^\d]*(\d{11})/i);
+      if (m) fill("nis", m[1]);
+    }
+    if (!aug.protocolo_inss) {
+      const m = allText.match(/[Pp]rotocolo[^\d]*(\d{13,})/);
+      if (m) fill("protocolo_inss", m[1]);
+    }
+    if (!aug.resultado_admin) {
+      if (
+        /benefício\s+indeferid[oa]|foi\s+indeferid[oa]|indeferimento/i.test(
+          allText
+        )
+      )
+        fill("resultado_admin", "indeferido");
+      else if (/benefício\s+deferido|foi\s+deferido|concessão/i.test(allText))
+        fill("resultado_admin", "deferido");
+    }
+    if (!aug.der) {
+      const m = allText.match(/\bDER[^:]{0,10}:\s*(\d{2}\/\d{2}\/\d{4})/i);
+      if (m) {
+        const [d, mo, y] = m[1].split("/");
+        fill("der", `${y}-${mo}-${d}`);
+      }
+    }
+  }
+
+  return aug;
+}
+
 function detectarModo(tipoAcao: string): string {
   const t = (tipoAcao || "").toLowerCase();
   if (t.includes("bpc") || t.includes("loas") || t.includes("assistencial"))
@@ -1607,17 +1681,24 @@ export async function prepararAnalise(
       }
     ).catch(() => ""),
     sql`
-      SELECT titulo, analise FROM cerebro_analises
+      SELECT titulo, analise, metadata FROM cerebro_analises
       WHERE processo_id = ${processoId}::uuid AND tipo = 'documento'
       ORDER BY created_at DESC LIMIT 5
-    `.catch(() => [] as { titulo: unknown; analise: unknown }[]),
+    `.catch(
+      () => [] as { titulo: unknown; analise: unknown; metadata?: unknown }[]
+    ),
   ]);
 
   const modo = detectarModo(String(processo.tipo_acao || ""));
-  const { pct: completudePct, faltantes } = calcularCompletude(
-    processo as Record<string, unknown>
+
+  // Augmenta dados com campos extraídos dos documentos lidos pelo Dr. Lex
+  const processoAug = augmentProcessFromDocs(
+    processo as Record<string, unknown>,
+    docAnalises
   );
-  const alertas = calcularAlertas(processo as Record<string, unknown>);
+
+  const { pct: completudePct, faltantes } = calcularCompletude(processoAug);
+  const alertas = calcularAlertas(processoAug);
 
   const idadeCliente = processo.data_nascimento
     ? Math.floor(
@@ -1625,6 +1706,10 @@ export async function prepararAnalise(
           31_557_600_000
       )
     : null;
+
+  // Identifica campos que vieram dos documentos (não do cadastro)
+  const campoDeDoc = (campo: string) =>
+    !processo[campo as keyof typeof processo] && processoAug[campo];
 
   const smVigente = processo.sm_escritorio
     ? `R$ ${Number(processo.sm_escritorio).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
@@ -1643,39 +1728,39 @@ Vara: ${processo.vara || "N/A"} | Comarca: ${processo.comarca || "N/A"}
 Prioridade: ${processo.prioridade || "Normal"} | Status: ${processo.status}
 Parte contrária: ${processo.parte_contraria || "INSS"}
 Valor da causa: ${processo.valor_causa ? `R$ ${Number(processo.valor_causa).toLocaleString("pt-BR")}` : "N/A"}
-Completude dos dados: ${completudePct}%${completudePct < 70 ? " — INCOMPLETO" : ""}
+Completude dos dados: ${completudePct}%${completudePct < 70 ? " — use o conteúdo dos documentos abaixo para complementar" : ""}
 
 MÓDULO 1 — CLIENTE:
 Nome: ${processo.cliente_nome}
 Idade: ${idadeCliente !== null ? `${idadeCliente} anos${idadeCliente < 18 ? " (MENOR DE IDADE)" : ""}` : "Não informada"}
-NIS/PIS: ${processo.nis || "Não informado"}
+NIS/PIS: ${processoAug.nis || "Não informado"}${campoDeDoc("nis") ? " ✓doc" : ""}
 ${(() => {
-  const p = processo as Record<string, unknown>;
+  const p = processoAug;
   if (isBPC(p))
     return `⚠️ CASO BPC/LOAS — benefício ASSISTENCIAL: NÃO exige carência, contribuições nem histórico trabalhista.\nCritério: deficiência (impedimento de longo prazo ≥2 anos) + miserabilidade (renda per capita ≤ ¼ SM — relativizável via Tema 995 STF).`;
   if (isPensao(p))
     return `⚠️ PENSÃO POR MORTE — SEM carência (art. 26, I, Lei 8.213/91). Verificar QUALIDADE DE SEGURADO DO FALECIDO na data do óbito e grau de parentesco do dependente.`;
   if (isMaternidade(p))
-    return `⚠️ SALÁRIO-MATERNIDADE — carência DISPENSADA após ADI 2.110 (STF, 21/03/2024). Único requisito: qualidade de segurada na data do parto/adoção.\nCategoria da segurada: ${processo.categoria_contribuinte || "Não informada"}`;
+    return `⚠️ SALÁRIO-MATERNIDADE — carência DISPENSADA após ADI 2.110 (STF, 21/03/2024). Único requisito: qualidade de segurada na data do parto/adoção.\nCategoria da segurada: ${p.categoria_contribuinte || "Não informada"}`;
   if (isAposentadoria(p))
-    return `Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}\nAtividade anterior: ${processo.atividade_anterior || "Não informada"}\nCarência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}\nNº contribuições / tempo total: ${processo.num_contribuicoes ?? "Não informado"}`;
-  return `Categoria contribuinte: ${processo.categoria_contribuinte || "Não informada"}\nAtividade anterior: ${processo.atividade_anterior || "Não informada"}\nCarência verificada: ${processo.carencia_atingida != null ? (processo.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}\nNº contribuições: ${processo.num_contribuicoes ?? "Não informado"}`;
+    return `Categoria contribuinte: ${p.categoria_contribuinte || "Não informada"}\nAtividade anterior: ${p.atividade_anterior || "Não informada"}\nCarência verificada: ${p.carencia_atingida != null ? (p.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}\nNº contribuições / tempo total: ${p.num_contribuicoes ?? "Não informado"}`;
+  return `Categoria contribuinte: ${p.categoria_contribuinte || "Não informada"}\nAtividade anterior: ${p.atividade_anterior || "Não informada"}\nCarência verificada: ${p.carencia_atingida != null ? (p.carencia_atingida ? "Sim" : "Não — VERIFICAR") : "Não verificado"}\nNº contribuições: ${p.num_contribuicoes ?? "Não informado"}`;
 })()}
 
 MÓDULO 2 — INCAPACIDADE E DOCUMENTAÇÃO MÉDICA:
 ${(() => {
-  const p = processo as Record<string, unknown>;
+  const p = processoAug;
   if (isPensao(p) || isMaternidade(p) || isAposentadoria(p) || isOperacional(p))
     return `(Não aplicável para este tipo de caso)`;
-  return `CID Principal: ${processo.cid_principal || "Não informado"}\nTipo de incapacidade: ${processo.tipo_incapacidade || "Não informado"}\nData do diagnóstico: ${processo.data_diagnostico || "Não informada"}\nData do afastamento: ${processo.data_afastamento || "Não informada"}`;
+  return `CID Principal: ${p.cid_principal || "Não informado"}${campoDeDoc("cid_principal") ? " ✓doc" : ""}\nTipo de incapacidade: ${p.tipo_incapacidade || "Não informado"}\nData do diagnóstico: ${p.data_diagnostico || "Não informada"}\nData do afastamento: ${p.data_afastamento || "Não informada"}${campoDeDoc("data_afastamento") ? " ✓doc" : ""}`;
 })()}
 
 MÓDULO 3 — DADOS ADMINISTRATIVOS E PRAZOS:
-DER: ${processo.der || "Não informado"}
-DIB: ${processo.dib || "N/A"} | DCB: ${processo.dcb || "N/A"}
-Protocolo INSS: ${processo.protocolo_inss || "N/A"} | Agência: ${processo.agencia_inss || "N/A"}
-Resultado administrativo: ${processo.resultado_admin || "Pendente"}
-Motivo indeferimento: ${processo.motivo_indeferimento || "N/A"}
+DER: ${processoAug.der || "Não informado"}${campoDeDoc("der") ? " ✓doc" : ""}
+DIB: ${processoAug.dib || "N/A"} | DCB: ${processoAug.dcb || "N/A"}
+Protocolo INSS: ${processoAug.protocolo_inss || "N/A"}${campoDeDoc("protocolo_inss") ? " ✓doc" : ""} | Agência: ${processo.agencia_inss || "N/A"}
+Resultado administrativo: ${processoAug.resultado_admin || "Pendente"}${campoDeDoc("resultado_admin") ? " ✓doc" : ""}
+Motivo indeferimento: ${processoAug.motivo_indeferimento || processo.motivo_indeferimento || "N/A"}
 Nº benefício concedido: ${processo.num_beneficio_concedido || "N/A"}
 ${alertas.length > 0 ? `\n⚠️ ALERTAS JURÍDICOS DETECTADOS:\n${alertas.map((a) => `• [${a.nivel.toUpperCase()}] ${a.mensagem} — ${a.base_legal}`).join("\n")}` : ""}
 
@@ -1785,7 +1870,7 @@ export async function salvarAnalise(
   alertas: AlertaJuridico[]
 ): Promise<{
   risco: string;
-  prob: number;
+  prob: number | null;
   proximaAcao: string;
   baseLegal: string[];
   tarefaCriada: boolean;
@@ -1794,7 +1879,10 @@ export async function salvarAnalise(
   metadata: MetadadosCerebro;
 }> {
   const riscoMatch = analise.match(/RISCO GERAL[:\s*]+(\w+)/i);
-  const probMatch = analise.match(/PROBABILIDADE DE ÊXITO[:\s*]+(\d+)/i);
+  const probMatch =
+    analise.match(/PROBABILIDADE DE [ÊE]XITO[:\s*]+(\d+)/i) ||
+    analise.match(/ÊXITO[:\s]*\*{0,2}\s*(\d+)\s*%/i) ||
+    analise.match(/(\d+)\s*%\s*(?:de probabilidade|de êxito|de sucesso)/i);
   const acaoMatch = analise.match(
     /## PRÓXIMA AÇÃO IMEDIATA\n([\s\S]*?)(?=\n##|$)/i
   );
@@ -1812,14 +1900,30 @@ export async function salvarAnalise(
       : "medio";
   const prob = probMatch
     ? Math.min(100, Math.max(0, parseInt(probMatch[1])))
-    : 50;
+    : (() => {
+        // fallback: qualquer "XX%" que apareça no bloco de probabilidade
+        const fallback = analise.match(
+          /probabilidade[\s\S]{0,200}?(\d{1,3})\s*%/i
+        );
+        return fallback
+          ? Math.min(100, Math.max(0, parseInt(fallback[1])))
+          : null;
+      })();
   const proximaAcao =
     acaoMatch?.[1]?.trim().split("\n")[0] ||
     "Verificar documentação com cliente";
-  const beneficioProvavel =
-    beneficioMatch?.[1]?.trim().split("\n")[0] || undefined;
-  const estrategiaRecomendada =
-    estrategiaMatch?.[1]?.trim().split("\n")[0] || undefined;
+  const firstMeaningfulLine = (
+    text: string | undefined
+  ): string | undefined => {
+    if (!text) return undefined;
+    return text
+      .trim()
+      .split("\n")
+      .map((l) => l.replace(/\*\*/g, "").trim())
+      .find((l) => l.length > 0 && !/^[|#\-]/.test(l));
+  };
+  const beneficioProvavel = firstMeaningfulLine(beneficioMatch?.[1]);
+  const estrategiaRecomendada = firstMeaningfulLine(estrategiaMatch?.[1]);
 
   const baseLegal = [
     ...analise.matchAll(
@@ -2154,7 +2258,10 @@ Justifique com base nos dados disponíveis.
 
   // ── Extrair campos estruturados ───────────────────────────────────────────
   const riscoMatch = analise.match(/RISCO GERAL[:\s*]+(\w+)/i);
-  const probMatch = analise.match(/PROBABILIDADE DE ÊXITO[:\s*]+(\d+)/i);
+  const probMatch =
+    analise.match(/PROBABILIDADE DE [ÊE]XITO[:\s*]+(\d+)/i) ||
+    analise.match(/ÊXITO[:\s]*\*{0,2}\s*(\d+)\s*%/i) ||
+    analise.match(/(\d+)\s*%\s*(?:de probabilidade|de êxito|de sucesso)/i);
   const acaoMatch = analise.match(
     /## PRÓXIMA AÇÃO IMEDIATA\n([\s\S]*?)(?=\n##|$)/i
   );
@@ -2172,14 +2279,30 @@ Justifique com base nos dados disponíveis.
       : "medio";
   const prob = probMatch
     ? Math.min(100, Math.max(0, parseInt(probMatch[1])))
-    : 50;
+    : (() => {
+        // fallback: qualquer "XX%" que apareça no bloco de probabilidade
+        const fallback = analise.match(
+          /probabilidade[\s\S]{0,200}?(\d{1,3})\s*%/i
+        );
+        return fallback
+          ? Math.min(100, Math.max(0, parseInt(fallback[1])))
+          : null;
+      })();
   const proximaAcao =
     acaoMatch?.[1]?.trim().split("\n")[0] ||
     "Verificar documentação com cliente";
-  const beneficioProvavel =
-    beneficioMatch?.[1]?.trim().split("\n")[0] || undefined;
-  const estrategiaRecomendada =
-    estrategiaMatch?.[1]?.trim().split("\n")[0] || undefined;
+  const firstMeaningfulLine = (
+    text: string | undefined
+  ): string | undefined => {
+    if (!text) return undefined;
+    return text
+      .trim()
+      .split("\n")
+      .map((l) => l.replace(/\*\*/g, "").trim())
+      .find((l) => l.length > 0 && !/^[|#\-]/.test(l));
+  };
+  const beneficioProvavel = firstMeaningfulLine(beneficioMatch?.[1]);
+  const estrategiaRecomendada = firstMeaningfulLine(estrategiaMatch?.[1]);
 
   const baseLegal = [
     ...analise.matchAll(
@@ -2265,7 +2388,7 @@ export async function analisarDocumento(
 ): Promise<string> {
   const [[doc], [processo]] = await Promise.all([
     sql`SELECT * FROM documentos WHERE id = ${documentoId}::uuid`,
-    sql`SELECT tipo_acao, area FROM processos WHERE id = ${processoId}::uuid`,
+    sql`SELECT tipo_acao, area, client_id FROM processos WHERE id = ${processoId}::uuid`,
   ]);
   if (!doc) throw new Error("Documento não encontrado");
 
@@ -2311,6 +2434,21 @@ O que este documento prova juridicamente (e o que não prova).
 ## RECOMENDAÇÃO PRÁTICA
 Ação concreta com base neste documento.
 
+## CAMPOS_JSON
+Extraia os campos abaixo APENAS se estiverem explicitamente no documento. Use null para campos ausentes. Retorne SOMENTE o JSON, sem texto extra:
+{
+  "cid": "código CID sem descrição, ex: F32.0",
+  "nis": "número NIS/PIS sem formatação",
+  "der": "data no formato YYYY-MM-DD",
+  "dib": "data no formato YYYY-MM-DD",
+  "dcb": "data no formato YYYY-MM-DD",
+  "protocolo": "número do protocolo INSS",
+  "resultado": "DEFERIDO ou INDEFERIDO ou CESSADO",
+  "afastamento": "data no formato YYYY-MM-DD",
+  "contribuicoes": número inteiro ou null,
+  "motivo": "motivo resumido em até 80 caracteres"
+}
+
 Nunca invente dados que não estejam no documento. Se não conseguir ler alguma parte, informe.`;
 
   const content: Anthropic.MessageParam["content"] = [
@@ -2341,21 +2479,116 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
   const aiResp = await getClaudeClient().messages.create(
     {
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1000,
+      max_tokens: 1500,
       messages: [{ role: "user", content }],
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
   );
 
-  const analise =
+  const rawAnalise =
     aiResp.content[0].type === "text"
       ? aiResp.content[0].text
       : "Não foi possível analisar o documento.";
 
+  // Extrai o bloco JSON de CAMPOS_JSON e separa do texto narrativo
+  let extracted: Record<string, unknown> = {};
+  let analise = rawAnalise;
+  const jsonBlockMatch = rawAnalise.match(
+    /##\s*CAMPOS_JSON[\s\S]*?(\{[\s\S]*?\})/i
+  );
+  if (jsonBlockMatch) {
+    try {
+      extracted = JSON.parse(jsonBlockMatch[1]) as Record<string, unknown>;
+      // Remove o bloco JSON do texto narrativo para não poluir a leitura
+      analise = rawAnalise.replace(jsonBlockMatch[0], "").trim();
+    } catch {
+      // JSON malformado: ignora e mantém o texto completo
+    }
+  }
+
+  // Write-back: preenche campos null no cadastro com dados extraídos do documento
+  if (Object.keys(extracted).length > 0 && processo?.client_id) {
+    const clientId = String(processo.client_id);
+    const strOrNull = (v: unknown): string | null =>
+      v !== null && v !== undefined && String(v).trim() !== ""
+        ? String(v).trim()
+        : null;
+    const numOrNull = (v: unknown): number | null => {
+      const n = Number(v);
+      return !isNaN(n) && v !== null && v !== undefined ? n : null;
+    };
+
+    const cidVal = strOrNull(extracted.cid);
+    const nisVal = strOrNull(extracted.nis);
+    const afastamentoVal = strOrNull(extracted.afastamento);
+    const contribuicoesVal = numOrNull(extracted.contribuicoes);
+
+    // clients: campos texto e numérico
+    if (cidVal)
+      await sql`UPDATE clients SET cid_principal = ${cidVal} WHERE id = ${clientId}::uuid AND (cid_principal IS NULL OR cid_principal = '')`.catch(
+        () => null
+      );
+    if (nisVal)
+      await sql`UPDATE clients SET nis = ${nisVal} WHERE id = ${clientId}::uuid AND (nis IS NULL OR nis = '')`.catch(
+        () => null
+      );
+    if (afastamentoVal)
+      await sql`UPDATE clients SET data_afastamento = ${afastamentoVal}::date WHERE id = ${clientId}::uuid AND data_afastamento IS NULL`.catch(
+        () => null
+      );
+    if (contribuicoesVal !== null)
+      await sql`UPDATE clients SET num_contribuicoes = ${contribuicoesVal} WHERE id = ${clientId}::uuid AND num_contribuicoes IS NULL`.catch(
+        () => null
+      );
+
+    // processos: datas e textos
+    const derVal = strOrNull(extracted.der);
+    const dibVal = strOrNull(extracted.dib);
+    const dcbVal = strOrNull(extracted.dcb);
+    const protocoloVal = strOrNull(extracted.protocolo);
+    const resultadoVal = strOrNull(extracted.resultado);
+    const motivoVal = strOrNull(extracted.motivo);
+
+    if (derVal)
+      await sql`UPDATE processos SET der = ${derVal}::date, updated_at = NOW() WHERE id = ${processoId}::uuid AND der IS NULL AND deleted_at IS NULL`.catch(
+        () => null
+      );
+    if (dibVal)
+      await sql`UPDATE processos SET dib = ${dibVal}::date, updated_at = NOW() WHERE id = ${processoId}::uuid AND dib IS NULL AND deleted_at IS NULL`.catch(
+        () => null
+      );
+    if (dcbVal)
+      await sql`UPDATE processos SET dcb = ${dcbVal}::date, updated_at = NOW() WHERE id = ${processoId}::uuid AND dcb IS NULL AND deleted_at IS NULL`.catch(
+        () => null
+      );
+    if (protocoloVal)
+      await sql`UPDATE processos SET protocolo_inss = ${protocoloVal}, updated_at = NOW() WHERE id = ${processoId}::uuid AND (protocolo_inss IS NULL OR protocolo_inss = '') AND deleted_at IS NULL`.catch(
+        () => null
+      );
+    if (resultadoVal)
+      await sql`UPDATE processos SET resultado_admin = ${resultadoVal}, updated_at = NOW() WHERE id = ${processoId}::uuid AND (resultado_admin IS NULL OR resultado_admin = '') AND deleted_at IS NULL`.catch(
+        () => null
+      );
+    if (motivoVal)
+      await sql`UPDATE processos SET motivo_indeferimento = ${motivoVal}, updated_at = NOW() WHERE id = ${processoId}::uuid AND (motivo_indeferimento IS NULL OR motivo_indeferimento = '') AND deleted_at IS NULL`.catch(
+        () => null
+      );
+  }
+
   await sql`
     INSERT INTO cerebro_analises (processo_id, tipo, titulo, analise, metadata)
-    VALUES (${processoId}::uuid, 'documento', ${`Análise: ${doc.nome}`},
-            ${analise}, ${JSON.stringify({ documento_id: documentoId, nome: doc.nome, url: doc.url })})
+    VALUES (
+      ${processoId}::uuid,
+      'documento',
+      ${`Análise: ${doc.nome}`},
+      ${analise},
+      ${JSON.stringify({
+        documento_id: documentoId,
+        nome: doc.nome,
+        url: doc.url,
+        extracted: Object.keys(extracted).length > 0 ? extracted : undefined,
+      })}
+    )
   `;
 
   return analise;

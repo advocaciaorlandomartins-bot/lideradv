@@ -93,6 +93,45 @@ export async function POST(req: NextRequest) {
     const escritorio = await getEscritorioConfig().catch(() => null);
     const nomeEscritorio = escritorio?.nome ?? "nosso escritório";
 
+    // Se o PrevBot não enviou o telefone do cliente, busca do banco de dados
+    let telefoneClienteEfetivo = telefoneCliente ?? null;
+    let telefoneResponsavelEfetivo = telefoneResponsavel ?? null;
+    let nomeResponsavelEfetivo = nomeResponsavel ?? null;
+
+    if (!telefoneClienteEfetivo || !telefoneResponsavelEfetivo) {
+      const [dbRows] = await Promise.all([
+        sql`
+          SELECT
+            cl.phone            AS cliente_telefone,
+            col.telefone        AS resp_telefone,
+            col.nome            AS resp_nome
+          FROM clients cl
+          LEFT JOIN LATERAL (
+            SELECT p.responsavel_id
+            FROM processos p
+            WHERE p.client_id = cl.id
+              AND p.deleted_at IS NULL
+              AND p.responsavel_id IS NOT NULL
+            ORDER BY p.created_at DESC
+            LIMIT 1
+          ) lp ON true
+          LEFT JOIN colaboradores col ON col.id = lp.responsavel_id AND col.status = 'ativo'
+          WHERE cl.id = ${clienteId}::uuid
+          LIMIT 1
+        `.catch(() => [] as Record<string, unknown>[]),
+      ]);
+
+      const row = Array.isArray(dbRows) ? dbRows[0] : dbRows;
+      if (row) {
+        if (!telefoneClienteEfetivo && row.cliente_telefone)
+          telefoneClienteEfetivo = String(row.cliente_telefone);
+        if (!telefoneResponsavelEfetivo && row.resp_telefone)
+          telefoneResponsavelEfetivo = String(row.resp_telefone);
+        if (!nomeResponsavelEfetivo && row.resp_nome)
+          nomeResponsavelEfetivo = String(row.resp_nome);
+      }
+    }
+
     let compromissoId: string | null = null;
 
     // Agendamentos: cria compromisso na agenda
@@ -231,9 +270,9 @@ export async function POST(req: NextRequest) {
         compromissoId,
         clienteId,
         clienteNome,
-        telefoneCliente: telefoneCliente ?? null,
-        telefoneResponsavel: telefoneResponsavel ?? null,
-        nomeResponsavel: nomeResponsavel ?? null,
+        telefoneCliente: telefoneClienteEfetivo,
+        telefoneResponsavel: telefoneResponsavelEfetivo,
+        nomeResponsavel: nomeResponsavelEfetivo,
         dataEvento: dataEventoDate,
         horaEvento: hora,
         tipoServico,

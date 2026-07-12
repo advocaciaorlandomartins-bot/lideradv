@@ -28,6 +28,7 @@ interface CompromissoData {
   descricao: string | null;
   status?: string;
   clienteId?: string | null;
+  responsavelLogin?: string | null;
 }
 
 export async function criarCompromissoAction(
@@ -42,13 +43,16 @@ export async function criarCompromissoAction(
   if (TIPOS_COM_NOTIFICACAO.has(data.tipo)) {
     const dataEvento = new Date(data.dataInicio + "T12:00:00");
     if (dataEvento > new Date()) {
+      // Usa o responsável escolhido no modal, senão o usuário da sessão
+      const loginEfetivo = data.responsavelLogin || session.login;
+
       // Busca dados do colaborador e do cliente em paralelo
       const [colaboradorRows, clienteRows, usuarioRows] = await Promise.all([
         sql`
           SELECT col.nome, col.telefone
           FROM colaboradores col
           JOIN usuarios u ON u.colaborador_id = col.id
-          WHERE u.login = ${session.login} AND col.status = 'ativo'
+          WHERE u.login = ${loginEfetivo} AND col.status = 'ativo'
           LIMIT 1
         `.catch(() => [] as Record<string, unknown>[]),
         data.clienteId
@@ -58,7 +62,7 @@ export async function criarCompromissoAction(
             `.catch(() => [] as Record<string, unknown>[])
           : Promise.resolve([] as Record<string, unknown>[]),
         sql`
-          SELECT id::text FROM usuarios WHERE login = ${session.login} LIMIT 1
+          SELECT id::text FROM usuarios WHERE login = ${loginEfetivo} LIMIT 1
         `.catch(() => [] as Record<string, unknown>[]),
       ]);
 

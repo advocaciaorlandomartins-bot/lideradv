@@ -73,15 +73,15 @@ export const MENSAGENS_PADROES: MensagensConfig = {
   inss_vespera_manha_hora: 8,
   inss_vespera_tarde_hora: 18,
 
-  inss_lembrete1: `Oi {{nome}}! 👋 Aqui é do {{escritorio}}. Passando pra avisar que seu {{servico}} está marcado para {{diaSemana}}, dia {{data}} às {{hora}}, em {{local}}.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
+  inss_lembrete1: `Oi {{nome}}! 👋 Aqui é do {{escritorio}}. Gostaríamos de informar que o *{{servico}}* está marcado para {{diaSemana}}, dia {{data}} às {{hora}}, em {{local}}.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
 
-  inss_lembrete2: `Olá {{nome}}! Lembrando que seu {{servico}} no INSS está chegando — {{diaSemana}}, {{data}} às {{hora}}, em {{local}}.\n\nFaltam só 5 dias! Aproveite pra separar documentos: RG, CPF, Certidão de Nascimento e qualquer documentação médica ou social que tiver. Qualquer dúvida, o {{escritorio}} está à disposição! 💪`,
+  inss_lembrete2: `Olá {{nome}}! Lembrando que o *{{servico}}* no INSS está chegando — {{diaSemana}}, {{data}} às {{hora}}, em {{local}}.\n\nFaltam só 5 dias! Aproveite pra separar documentos: RG, CPF, Certidão de Nascimento e qualquer documentação médica ou social que tiver. Qualquer dúvida, o {{escritorio}} está à disposição! 💪`,
 
-  inss_lembrete3: `Oi {{nome}}! Seu {{servico}} é daqui a 2 dias — {{diaSemana}}, {{data}} às {{hora}}.\n\n📍 Local: {{local}}\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar com a gente!`,
+  inss_lembrete3: `Oi {{nome}}! O *{{servico}}* é daqui a 2 dias — {{diaSemana}}, {{data}} às {{hora}}.\n\n📍 Local: {{local}}\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar com a gente!`,
 
-  inss_vespera_manha: `Bom dia, {{nome}}! 🌅 Amanhã é o grande dia! Seu {{servico}} está marcado para:\n\n📅 {{data}} ({{diaSemana}})\n⏰ {{hora}}\n📍 {{local}}\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estamos torcendo por você! 🍀`,
+  inss_vespera_manha: `Bom dia, {{nome}}! 🌅 Amanhã é o grande dia! O *{{servico}}* está marcado para:\n\n📅 {{data}} ({{diaSemana}})\n⏰ {{hora}}\n📍 {{local}}\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estamos torcendo por você! 🍀`,
 
-  inss_vespera_tarde: `Boa tarde, {{nome}}! Só passando pra reforçar: amanhã cedo é seu {{servico}} no INSS às {{hora}}.\n\n📍 {{local}}\n\nJá separou os documentos? Qualquer dúvida de última hora, pode chamar o {{escritorio}} que a gente te ajuda! 😊`,
+  inss_vespera_tarde: `Boa tarde, {{nome}}! Só passando pra reforçar: amanhã cedo é o *{{servico}}* no INSS às {{hora}}.\n\n📍 {{local}}\n\nJá separou os documentos? Qualquer dúvida de última hora, pode chamar o {{escritorio}} que a gente te ajuda! 😊`,
 
   honorario_lembrete1_dias: 10,
   honorario_lembrete2_dias: 5,

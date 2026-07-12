@@ -168,6 +168,9 @@ type ModalFormState = {
   deleteConfirm: boolean;
   clienteId: string;
   clienteNome: string;
+  responsavelId: string;
+  responsavelLogin: string;
+  responsavelNome: string;
 };
 const EMPTY_FORM: ModalFormState = {
   titulo: "",
@@ -181,6 +184,9 @@ const EMPTY_FORM: ModalFormState = {
   deleteConfirm: false,
   clienteId: "",
   clienteNome: "",
+  responsavelId: "",
+  responsavelLogin: "",
+  responsavelNome: "",
 };
 function formReducer(
   s: ModalFormState,
@@ -220,11 +226,32 @@ export default function AgendaCalendar() {
   }, []);
 
   // ── Busca de cliente para o modal ───────────────────────────────────────────
+  type ClienteResult = {
+    id: string;
+    name: string;
+    responsavel: {
+      usuarioId: string;
+      login: string;
+      nome: string;
+      telefone: string | null;
+    } | null;
+  };
   const [clienteSearch, setClienteSearch] = useState("");
-  const [clienteResults, setClienteResults] = useState<
-    { id: string; name: string }[]
-  >([]);
+  const [clienteResults, setClienteResults] = useState<ClienteResult[]>([]);
   const [clienteDropOpen, setClienteDropOpen] = useState(false);
+
+  // ── Busca de responsável para o modal ────────────────────────────────────────
+  type ColaboradorResult = {
+    usuarioId: string;
+    login: string;
+    nome: string;
+    telefone: string | null;
+  };
+  const [responsavelSearch, setResponsavelSearch] = useState("");
+  const [responsavelResults, setResponsavelResults] = useState<
+    ColaboradorResult[]
+  >([]);
+  const [responsavelDropOpen, setResponsavelDropOpen] = useState(false);
 
   // ── Modal de compromisso ────────────────────────────────────────────────────
   const [modalComp, setModalComp] = useState<CompromissoModalState | null>(
@@ -242,6 +269,8 @@ export default function AgendaCalendar() {
       setClienteDropOpen(false);
       if (snap.mode === "create") {
         setClienteSearch("");
+        setResponsavelSearch("");
+        setResponsavelDropOpen(false);
         dispatch({
           titulo: "",
           tipo: snap.tipo ?? "reuniao",
@@ -254,9 +283,14 @@ export default function AgendaCalendar() {
           deleteConfirm: false,
           clienteId: "",
           clienteNome: "",
+          responsavelId: "",
+          responsavelLogin: "",
+          responsavelNome: "",
         });
       } else {
         setClienteSearch(snap.clienteNome ?? "");
+        setResponsavelSearch("");
+        setResponsavelDropOpen(false);
         dispatch({
           titulo: snap.titulo ?? "",
           tipo: snap.tipo ?? "reuniao",
@@ -269,6 +303,9 @@ export default function AgendaCalendar() {
           deleteConfirm: false,
           clienteId: snap.clienteId ?? "",
           clienteNome: snap.clienteNome ?? "",
+          responsavelId: "",
+          responsavelLogin: "",
+          responsavelNome: "",
         });
       }
     });
@@ -288,7 +325,7 @@ export default function AgendaCalendar() {
           `/api/clientes/search?q=${encodeURIComponent(clienteSearch)}`
         );
         if (res.ok) {
-          const data: { id: string; name: string }[] = await res.json();
+          const data: ClienteResult[] = await res.json();
           setClienteResults(data);
           setClienteDropOpen(data.length > 0);
         }
@@ -298,6 +335,31 @@ export default function AgendaCalendar() {
     }, 250);
     return () => clearTimeout(timer);
   }, [clienteSearch, form.clienteId]);
+
+  // Busca responsável ao digitar no campo do modal
+  useEffect(() => {
+    if (form.responsavelId) return; // já selecionado
+    const timer = setTimeout(async () => {
+      if (!responsavelSearch || responsavelSearch.length < 1) {
+        setResponsavelResults([]);
+        setResponsavelDropOpen(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/colaboradores/search?q=${encodeURIComponent(responsavelSearch)}`
+        );
+        if (res.ok) {
+          const data: ColaboradorResult[] = await res.json();
+          setResponsavelResults(data);
+          setResponsavelDropOpen(data.length > 0);
+        }
+      } catch {
+        // silently ignore
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [responsavelSearch, form.responsavelId]);
 
   function openNovoCompromisso(dateStr?: string) {
     setDayPopover(null);
@@ -320,6 +382,7 @@ export default function AgendaCalendar() {
       descricao: form.descricao.trim() || null,
       status: form.status,
       clienteId: form.clienteId || null,
+      responsavelLogin: form.responsavelLogin || null,
     };
     startTransition(async () => {
       if (modalComp?.mode === "edit" && modalComp.id) {
@@ -1023,6 +1086,15 @@ export default function AgendaCalendar() {
                                 });
                                 setClienteSearch(c.name);
                                 setClienteDropOpen(false);
+                                // Auto-popula responsável se ainda não definido
+                                if (c.responsavel && !form.responsavelId) {
+                                  dispatch({
+                                    responsavelId: c.responsavel.usuarioId,
+                                    responsavelLogin: c.responsavel.login,
+                                    responsavelNome: c.responsavel.nome,
+                                  });
+                                  setResponsavelSearch(c.responsavel.nome);
+                                }
                               }}
                               className="w-full px-3 py-2 text-left font-body text-sm text-fg hover:bg-sky-50"
                             >
@@ -1033,6 +1105,76 @@ export default function AgendaCalendar() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Responsável (opcional) */}
+                <div>
+                  <label className="mb-1.5 block font-body text-xs font-semibold text-muted">
+                    Responsável (opcional)
+                  </label>
+                  {form.responsavelId ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-violet-300 bg-violet-50 px-3 py-2">
+                      <span className="flex-1 truncate font-body text-sm font-medium text-violet-800">
+                        {form.responsavelNome}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          dispatch({
+                            responsavelId: "",
+                            responsavelLogin: "",
+                            responsavelNome: "",
+                          });
+                          setResponsavelSearch("");
+                          setResponsavelDropOpen(false);
+                        }}
+                        className="flex-shrink-0 text-violet-400 hover:text-violet-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={responsavelSearch}
+                        onChange={(e) => setResponsavelSearch(e.target.value)}
+                        onFocus={() =>
+                          responsavelResults.length > 0 &&
+                          setResponsavelDropOpen(true)
+                        }
+                        placeholder="Buscar colaborador..."
+                        className="h-10 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                      />
+                      {responsavelDropOpen && responsavelResults.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-44 overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+                          {responsavelResults.map((r) => (
+                            <button
+                              key={r.usuarioId}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                dispatch({
+                                  responsavelId: r.usuarioId,
+                                  responsavelLogin: r.login,
+                                  responsavelNome: r.nome,
+                                });
+                                setResponsavelSearch(r.nome);
+                                setResponsavelDropOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left font-body text-sm text-fg hover:bg-violet-50"
+                            >
+                              {r.nome}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <p className="mt-1 font-body text-xs text-slate-400">
+                    Quem receberá a notificação e a tarefa. Se vazio, usa o
+                    usuário atual.
+                  </p>
                 </div>
 
                 {/* Data */}

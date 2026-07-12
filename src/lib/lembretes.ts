@@ -19,6 +19,7 @@ export type TipoLembrete =
   | "honorario_1d"
   | "honorario_vence_hoje"
   | "honorario_pago_confirmacao"
+  | "compromisso_convite"
   | "compromisso_1d"
   | "compromisso_dia"
   | "conta_1d"
@@ -638,16 +639,22 @@ export async function agendarNotificacoesCompromisso(opts: {
       ? `👤 ${opts.cliente.nome}\n`
       : "";
 
-    // Para videochamada com link: convite imediato
-    if (opts.tipo === "videochamada" && opts.link) {
+    // Confirmação imediata para o colaborador — todos os tipos
+    {
+      const localOuLink = opts.link
+        ? `\n🔗 ${opts.link}`
+        : opts.local
+          ? `\n📍 ${opts.local}`
+          : "";
       await inserirLembrete({
-        tipo: "videochamada_convite",
+        tipo: "compromisso_convite",
         enviarEm: new Date(agora.getTime() + 60_000),
         mensagem:
-          `${icon} *Videochamada agendada!*\n\n` +
+          `${icon} *${label} agendado!*\n\n` +
+          `📌 *${opts.titulo}*\n` +
           `${clienteNomeStr}` +
-          `🗓️ ${diaSemana}, ${data}${horaStr}${linkStr}\n\n` +
-          `_Agendado via LiderAdv._`,
+          `🗓️ ${diaSemana}, ${data}${horaStr}${localOuLink}\n\n` +
+          `_Registrado na sua Agenda — LiderAdv._`,
         destinatarioTipo: "colaborador",
         destinatarioTelefone: opts.colaborador.telefone,
         destinatarioNome: opts.colaborador.nome,
@@ -695,16 +702,21 @@ export async function agendarNotificacoesCompromisso(opts: {
   if (opts.cliente?.telefone) {
     const primeiroNomeCliente = primeiroNome(opts.cliente.nome);
 
-    // Para videochamada: convite imediato com link
-    if (opts.tipo === "videochamada" && opts.link) {
+    // Confirmação imediata para o cliente — todos os tipos, com pedido de confirmação
+    {
+      const localOuLink = opts.link
+        ? `\n🔗 ${opts.link}`
+        : opts.local
+          ? `\n📍 ${opts.local}`
+          : "";
       await inserirLembrete({
-        tipo: "videochamada_convite",
+        tipo: "compromisso_convite",
         enviarEm: new Date(agora.getTime() + 60_000),
         mensagem:
-          `${icon} *${label} confirmada!*\n\n` +
-          `Olá, ${primeiroNomeCliente}! Sua ${label.toLowerCase()} com o escritório foi agendada:\n\n` +
-          `🗓️ ${diaSemana}, ${data}${horaStr}${linkStr}\n\n` +
-          `_Qualquer dúvida, nos contate. Até lá! 😊_`,
+          `${icon} Olá, ${primeiroNomeCliente}! Gostaríamos de confirmar o seu *${label}* com o *Orlando Martins Advocacia*:\n\n` +
+          `📌 *${opts.titulo}*\n` +
+          `🗓️ ${diaSemana}, ${data}${horaStr}${localOuLink}\n\n` +
+          `Por favor, *confirme respondendo SIM* se esse horário está bom para você. Se precisar remarcar, é só nos chamar! 😊`,
         destinatarioTipo: "cliente",
         destinatarioTelefone: opts.cliente.telefone,
         destinatarioNome: opts.cliente.nome,

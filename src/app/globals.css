@@ -53,6 +53,49 @@ body {
   display: none;
 }
 
+/* ── Scrollbar moderna e transparente ────────────────────────────────────────
+   Dark mode (padrão): thumb branco semitransparente
+   Light mode: thumb azul-escuro semitransparente
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Firefox — dark */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* Webkit — dark */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox — light */
+[data-theme="light"] * {
+  scrollbar-color: rgba(0, 24, 72, 0.16) transparent;
+}
+
+/* Webkit — light */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 24, 72, 0.16);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 24, 72, 0.32);
+}
+
 @keyframes cardReveal {
   to {
     opacity: 1;

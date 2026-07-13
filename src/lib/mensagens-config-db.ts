@@ -18,11 +18,17 @@ export async function getMensagensConfig(): Promise<MensagensConfig> {
     const rows = await sql`SELECT config FROM mensagens_config LIMIT 1`;
     const saved = (rows[0]?.config ?? {}) as Partial<MensagensConfig>;
 
-    // Migração automática: se o template salvo ainda tem "seu {{servico}}" (versão antiga),
-    // substitui pelo padrão corrigido sem precisar de intervenção manual.
+    // Migração automática: descarta qualquer versão salva dos templates INSS que ainda
+    // contenha artigo antes de {{servico}} (versão antiga com "seu/Seu" ou "o/O").
+    // O template corrigido usa apenas *{{servico}}* sem artigo.
     for (const key of INSS_TEMPLATES_CORRIGIDOS) {
       const val = saved[key] as string | undefined;
-      if (val && /\bseu\s+\{\{servico\}\}|\bSeu\s+\{\{servico\}\}/i.test(val)) {
+      if (
+        val &&
+        /(\bseu\s+\{\{servico\}\}|\bSeu\s+\{\{servico\}\}|\bo\s+\*\{\{servico\}\}|\bO\s+\*\{\{servico\}\})/i.test(
+          val
+        )
+      ) {
         delete saved[key];
       }
     }

@@ -18,11 +18,13 @@ export async function POST() {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   // ── 1. Corrige textos antigos nos lembretes INSS ainda não enviados ──────────
+  // Remove "Seu " e "seu " dos textos armazenados (problema de gênero: avaliação é feminino).
+  // O nome do serviço em maiúsculas já se destaca; em futuros lembretes vem com *bold*.
   const fixResult = await sql`
     UPDATE lembretes_agendados
     SET mensagem = regexp_replace(
-          regexp_replace(mensagem, 'Seu\\s+([A-ZÁÉÍÓÚÃÕÂÊÔÇ])', 'O *\\1', 'g'),
-          'seu\\s+([A-ZÁÉÍÓÚÃÕÂÊÔÇ])', 'o *\\1', 'g'
+          regexp_replace(mensagem, '\\bSeu\\s+', '', 'g'),
+          '\\bseu\\s+', '', 'g'
         )
     WHERE enviado = false
       AND tipo LIKE 'inss_%'

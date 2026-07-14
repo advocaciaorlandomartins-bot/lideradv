@@ -122,14 +122,17 @@ async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
   const screenshots = await screenshotParser.getScreenshot({
     imageDataUrl: true,
     imageBuffer: false,
-    scale: 2.0,
+    scale: 1.5,
   });
+
+  // Claude API limit: 10 MB per image (base64 bytes)
+  const MAX_IMG_BYTES = 9 * 1024 * 1024;
 
   const parts: ContentPart[] = [{ type: "text", text: EXTRACTION_PROMPT }];
   for (const pg of screenshots.pages.slice(0, 2)) {
     if (pg.dataUrl) {
       const [, b64] = pg.dataUrl.split(",");
-      if (b64) {
+      if (b64 && b64.length <= MAX_IMG_BYTES) {
         parts.push({
           type: "image",
           source: { type: "base64", media_type: "image/png", data: b64 },

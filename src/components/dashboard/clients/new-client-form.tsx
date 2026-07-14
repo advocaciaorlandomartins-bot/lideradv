@@ -164,12 +164,15 @@ function maskCEP(v: string) {
   return d.replace(/(\d{5})(\d{1,3})$/, "$1-$2");
 }
 
-function formatPhone(raw: string) {
-  const d = raw.replace(/\D/g, "");
-  if (d.length < 10) return raw;
-  const ddd = d.slice(0, 2);
-  const num = d.slice(2);
-  return `(${ddd}) ${num.slice(0, num.length - 4)}-${num.slice(-4)}`;
+function maskPhone(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (!d) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10)
+    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  // Celular: (DDD) 9 XXXX-XXXX
+  return `(${d.slice(0, 2)}) ${d.slice(2, 3)} ${d.slice(3, 7)}-${d.slice(7)}`;
 }
 
 function formatMoneyInput(raw: string): string {
@@ -238,6 +241,7 @@ export default function NewClientForm({
   const [birthDate, setBirthDate] = useState("");
   const [menorIncapaz, setMenorIncapaz] = useState(false);
   const [respCpfValue, setRespCpfValue] = useState("");
+  const [respPhoneValue, setRespPhoneValue] = useState("");
 
   // Etapa 3 — Origem
   const [origemTipo, setOrigemTipo] = useState("");
@@ -275,7 +279,7 @@ export default function NewClientForm({
       if (data.razao_social) setNameValue(data.razao_social);
       if (data.nome_fantasia) setTradeNameValue(data.nome_fantasia);
       if (data.email) setEmailValue(data.email.toLowerCase());
-      if (data.ddd_telefone_1) setPhoneValue(formatPhone(data.ddd_telefone_1));
+      if (data.ddd_telefone_1) setPhoneValue(maskPhone(data.ddd_telefone_1));
       const rawCep = (data.cep ?? "").replace(/\D/g, "");
       if (rawCep) setCepValue(maskCEP(rawCep));
       if (data.logradouro) setStreet(data.logradouro);
@@ -452,7 +456,7 @@ export default function NewClientForm({
               required
               placeholder="(82) 9 0000-0000"
               value={phoneValue}
-              onChange={(e) => setPhoneValue(e.target.value)}
+              onChange={(e) => setPhoneValue(maskPhone(e.target.value))}
               disabled={disabled}
               className={inputClass}
             />
@@ -951,7 +955,12 @@ export default function NewClientForm({
                   <input
                     name="responsavel_telefone"
                     type="tel"
+                    inputMode="numeric"
                     placeholder="(82) 9 0000-0000"
+                    value={respPhoneValue}
+                    onChange={(e) =>
+                      setRespPhoneValue(maskPhone(e.target.value))
+                    }
                     disabled={isPending}
                     className={inputClass}
                   />

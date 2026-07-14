@@ -93,6 +93,17 @@ function maskCPFSimple(v: string) {
     .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 }
 
+function maskPhone(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (!d) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10)
+    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  // Celular: (DDD) 9 XXXX-XXXX
+  return `(${d.slice(0, 2)}) ${d.slice(2, 3)} ${d.slice(3, 7)}-${d.slice(7)}`;
+}
+
 function validarCPF(cpf: string): boolean {
   const d = cpf.replace(/\D/g, "");
   if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false;
@@ -238,7 +249,9 @@ export default function EditClientForm({
   const [tradeNameValue, setTradeNameValue] = useState(client.trade_name ?? "");
   const [docValue, setDocValue] = useState(client.doc);
   const [cpfError, setCpfError] = useState("");
-  const [phoneValue, setPhoneValue] = useState(client.phone);
+  const [phoneValue, setPhoneValue] = useState(() =>
+    maskPhone(client.phone ?? "")
+  );
   const [emailValue, setEmailValue] = useState(client.email);
 
   // Etapa 2 (PF)
@@ -250,6 +263,9 @@ export default function EditClientForm({
   );
   const [respCpfValue, setRespCpfValue] = useState(
     client.responsavel_cpf ?? ""
+  );
+  const [respPhoneValue, setRespPhoneValue] = useState(() =>
+    maskPhone(client.responsavel_telefone ?? "")
   );
 
   // Etapa 3 — Origem
@@ -433,7 +449,7 @@ export default function EditClientForm({
               autoComplete="tel"
               required
               value={phoneValue}
-              onChange={(e) => setPhoneValue(e.target.value)}
+              onChange={(e) => setPhoneValue(maskPhone(e.target.value))}
               disabled={isPending}
               className={inputClass}
             />
@@ -675,8 +691,12 @@ export default function EditClientForm({
                   <input
                     name="responsavel_telefone"
                     type="tel"
+                    inputMode="numeric"
                     placeholder="(82) 9 0000-0000"
-                    defaultValue={client.responsavel_telefone ?? ""}
+                    value={respPhoneValue}
+                    onChange={(e) =>
+                      setRespPhoneValue(maskPhone(e.target.value))
+                    }
                     disabled={isPending}
                     className={inputClass}
                   />

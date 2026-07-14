@@ -186,14 +186,40 @@ export async function verificarPublicacoesAction(): Promise<{
   ok: boolean;
   mensagem: string;
   inseridos: number;
+  detalhes: {
+    dje: number;
+    datajud_processo: number;
+    tramitasign: number;
+    tramitasign_ativo: boolean;
+    tramitasign_erro?: string;
+    processos_monitorados: number;
+    oabs_ativas: number;
+    datajud_disponivel: boolean;
+  };
 }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "publicacoes", "ver")) {
-    return { ok: false, mensagem: "Sem permissão.", inseridos: 0 };
+    return {
+      ok: false,
+      mensagem: "Sem permissão.",
+      inseridos: 0,
+      detalhes: {
+        dje: 0,
+        datajud_processo: 0,
+        tramitasign: 0,
+        tramitasign_ativo: false,
+        processos_monitorados: 0,
+        oabs_ativas: 0,
+        datajud_disponivel: false,
+      },
+    };
   }
 
   const apiKey = process.env.DATAJUD_API_KEY;
-  let total = 0;
+  let djeFonte = 0;
+  let datajudProcesso = 0;
+  let tramitasignFonte = 0;
+  let tramitasignErro: string | undefined;
 
   const rows = await sql`
     SELECT id::text, numero, estado, nome_advogado
@@ -204,10 +230,10 @@ export async function verificarPublicacoesAction(): Promise<{
     await import("./datajud");
   const { buscarPublicacoesDjeEsaj } = await import("./dje-esaj");
 
-  // 1. Busca por OAB no DataJud (só funciona em tribunais que indexam partes)
+  // 1. Busca por OAB no DataJud (limitado por LGPD — retorna 0 em quase todos tribunais)
   if (apiKey && rows.length > 0) {
     for (const row of rows) {
-      total += await buscarPublicacoesPorOab(
+      await buscarPublicacoesPorOab(
         {
           id: String(row.id),
           numero: String(row.numero),
@@ -220,10 +246,10 @@ export async function verificarPublicacoesAction(): Promise<{
     }
   }
 
-  // 2. Busca por OAB no DJe/eSAJ (funciona para TJAL, TJCE, TJSP e outros eSAJ)
+  // 2. Busca por OAB no DJe/eSAJ (TJAL e outros eSAJ — principal fonte automática)
   if (rows.length > 0) {
     for (const row of rows) {
-      total += await buscarPublicacoesDjeEsaj(
+      djeFonte += await buscarPublicacoesDjeEsaj(
         {
           id: String(row.id),
           numero: String(row.numero),
@@ -235,17 +261,20 @@ export async function verificarPublicacoesAction(): Promise<{
     }
   }
 
-  // 3. Busca por número de processo no DataJud (funciona mesmo sem indexação de partes)
+  // 3. Busca por número de processo no DataJud
+  const processos = apiKey
+    ? await sql`
+        SELECT p.id::text, p.numero, c.name AS cliente_nome
+        FROM processos p
+        LEFT JOIN clients c ON c.id = p.client_id
+        WHERE p.numero IS NOT NULL AND p.numero != ''
+          AND LENGTH(REGEXP_REPLACE(p.numero, '[^0-9]', '', 'g')) = 20
+      `
+    : [];
+
   if (apiKey) {
-    const processos = await sql`
-      SELECT p.id::text, p.numero, c.name AS cliente_nome
-      FROM processos p
-      LEFT JOIN clients c ON c.id = p.client_id
-      WHERE p.numero IS NOT NULL AND p.numero != ''
-        AND LENGTH(REGEXP_REPLACE(p.numero, '[^0-9]', '', 'g')) = 20
-    `;
     for (const proc of processos) {
-      total += await buscarMovimentosPorProcesso(
+      datajudProcesso += await buscarMovimentosPorProcesso(
         String(proc.id),
         String(proc.numero),
         proc.cliente_nome ? String(proc.cliente_nome) : null,
@@ -255,36 +284,102 @@ export async function verificarPublicacoesAction(): Promise<{
     }
   }
 
-  // 4. Sincronização com TramitaSign (traz publicações que já estão lá)
-  try {
-    const { sincronizarTramitaSign, tramitaSyncAtivo } =
-      await import("./tramitasign-sync");
-    if (tramitaSyncAtivo()) {
+  // 4. TramitaSign login sync
+  const { sincronizarTramitaSign, tramitaSyncAtivo } =
+    await import("./tramitasign-sync");
+  const tramitaAtivo = tramitaSyncAtivo();
+  if (tramitaAtivo) {
+    try {
       const res = await sincronizarTramitaSign();
-      total += res.inseridos;
+      tramitasignFonte = res.inseridos;
+      if (res.erro) tramitasignErro = res.erro;
+    } catch (e) {
+      tramitasignErro =
+        e instanceof Error ? e.message : "Erro desconhecido no TramitaSign";
+      console.error(
+        "[verificarPublicacoes] TramitaSign sync error:",
+        tramitasignErro
+      );
     }
-  } catch (e) {
-    console.error("[verificarPublicacoes] TramitaSign sync error:", e);
   }
 
+  const total = djeFonte + datajudProcesso + tramitasignFonte;
   revalidatePath("/dashboard/publicacoes");
 
-  if (!apiKey && rows.length === 0) {
-    return {
-      ok: true,
-      mensagem:
-        "Nenhuma OAB ativa e DATAJUD_API_KEY não configurada. Apenas DJe está ativo.",
-      inseridos: total,
-    };
+  let mensagem: string;
+  if (total > 0) {
+    mensagem = `${total} nova${total !== 1 ? "s publicações" : " publicação"} encontrada${total !== 1 ? "s" : ""}!`;
+  } else {
+    const fontes: string[] = [];
+    if (rows.length > 0) fontes.push(`DJe (${rows.length} OAB)`);
+    if (processos.length > 0)
+      fontes.push(`DataJud (${processos.length} processos)`);
+    if (tramitaAtivo) fontes.push("TramitaSign");
+    mensagem =
+      fontes.length > 0
+        ? `Nenhuma novidade encontrada via ${fontes.join(", ")}.`
+        : "Configure as fontes de busca (OABs, processos CNJ ou TramitaSign).";
   }
 
   return {
     ok: true,
-    mensagem:
-      total > 0
-        ? `${total} nova${total !== 1 ? "s publicações/intimações encontradas" : " publicação encontrada"}!`
-        : "Nenhuma publicação nova encontrada. Se esperava resultados, tente novamente ou adicione a publicação manualmente.",
+    mensagem,
     inseridos: total,
+    detalhes: {
+      dje: djeFonte,
+      datajud_processo: datajudProcesso,
+      tramitasign: tramitasignFonte,
+      tramitasign_ativo: tramitaAtivo,
+      tramitasign_erro: tramitasignErro,
+      processos_monitorados: processos.length,
+      oabs_ativas: rows.length,
+      datajud_disponivel: !!apiKey,
+    },
+  };
+}
+
+export async function getDiagnosticoAction(): Promise<{
+  tramitasign_webhook: boolean;
+  tramitasign_login: boolean;
+  datajud_api: boolean;
+  scraper_br: boolean;
+  processos_com_cnj: number;
+  oabs_ativas: number;
+}> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "publicacoes", "ver")) {
+    return {
+      tramitasign_webhook: false,
+      tramitasign_login: false,
+      datajud_api: false,
+      scraper_br: false,
+      processos_com_cnj: 0,
+      oabs_ativas: 0,
+    };
+  }
+
+  const [processoRows, oabRows] = await Promise.all([
+    sql`
+      SELECT COUNT(*)::int AS total
+      FROM processos
+      WHERE numero IS NOT NULL AND numero != ''
+        AND LENGTH(REGEXP_REPLACE(numero, '[^0-9]', '', 'g')) = 20
+    `,
+    sql`SELECT COUNT(*)::int AS total FROM oabs_monitoradas WHERE ativa = true`,
+  ]);
+
+  return {
+    tramitasign_webhook: !!process.env.TRAMITASIGN_WEBHOOK_SECRET,
+    tramitasign_login: !!(
+      process.env.TRAMITASIGN_LOGIN_EMAIL &&
+      process.env.TRAMITASIGN_LOGIN_PASSWORD
+    ),
+    datajud_api: !!process.env.DATAJUD_API_KEY,
+    scraper_br: !!process.env.SCRAPER_BR_URL,
+    processos_com_cnj: Number(
+      (processoRows[0] as { total: number })?.total ?? 0
+    ),
+    oabs_ativas: Number((oabRows[0] as { total: number })?.total ?? 0),
   };
 }
 

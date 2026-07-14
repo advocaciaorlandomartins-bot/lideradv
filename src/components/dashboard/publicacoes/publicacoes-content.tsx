@@ -11,6 +11,7 @@ import {
   toggleOabAction,
   removerOabAction,
   verificarPublicacoesAction,
+  getDiagnosticoAction,
   adicionarPublicacaoManualAction,
 } from "@/lib/publicacoes-actions";
 import {
@@ -1000,10 +1001,9 @@ function TabOabs({ oabs }: { oabs: OabMonitorada[] }) {
 
 function BotaoVerificar() {
   const [isPending, startTransition] = useTransition();
-  const [resultado, setResultado] = useState<{
-    ok: boolean;
-    mensagem: string;
-  } | null>(null);
+  const [resultado, setResultado] = useState<Awaited<
+    ReturnType<typeof verificarPublicacoesAction>
+  > | null>(null);
 
   function handleVerificar() {
     setResultado(null);
@@ -1012,6 +1012,8 @@ function BotaoVerificar() {
       setResultado(res);
     });
   }
+
+  const d = resultado?.detalhes;
 
   return (
     <div className="flex flex-col gap-2">
@@ -1025,15 +1027,95 @@ function BotaoVerificar() {
         ) : (
           <span>🔍</span>
         )}
-        {isPending ? "Verificando..." : "Verificar agora"}
+        {isPending ? "Verificando todas as fontes..." : "Verificar agora"}
       </button>
+
       {resultado && (
-        <p
-          className={`font-body text-xs font-semibold ${resultado.ok ? "text-emerald-600" : "text-red-600"}`}
-        >
-          {resultado.ok ? "✅" : "❌"} {resultado.mensagem}
-        </p>
+        <div className="rounded-lg border border-border bg-slate-50 p-3 font-body text-xs">
+          <p
+            className={`mb-2 font-semibold ${resultado.inseridos > 0 ? "text-emerald-600" : "text-slate-600"}`}
+          >
+            {resultado.inseridos > 0 ? "✅" : "🔍"} {resultado.mensagem}
+          </p>
+          {d && (
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div className="flex items-center justify-between rounded bg-white px-2 py-1 border border-border">
+                <span className="text-muted">DJe / eSAJ</span>
+                <span
+                  className={`font-semibold ${d.dje > 0 ? "text-emerald-600" : "text-slate-400"}`}
+                >
+                  {d.dje > 0 ? `+${d.dje}` : "0 novas"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded bg-white px-2 py-1 border border-border">
+                <span className="text-muted">DataJud por proc.</span>
+                <span
+                  className={`font-semibold ${d.datajud_processo > 0 ? "text-emerald-600" : d.datajud_disponivel ? "text-slate-400" : "text-amber-500"}`}
+                >
+                  {d.datajud_disponivel
+                    ? d.datajud_processo > 0
+                      ? `+${d.datajud_processo}`
+                      : `0 novas (${d.processos_monitorados} proc.)`
+                    : "sem API Key"}
+                </span>
+              </div>
+              <div className="col-span-2 flex items-center justify-between rounded bg-white px-2 py-1 border border-border">
+                <span className="text-muted">TramitaSign</span>
+                <span
+                  className={`font-semibold ${!d.tramitasign_ativo ? "text-amber-500" : d.tramitasign > 0 ? "text-emerald-600" : "text-slate-400"}`}
+                >
+                  {!d.tramitasign_ativo
+                    ? "credenciais não configuradas"
+                    : d.tramitasign_erro
+                      ? `erro: ${d.tramitasign_erro.slice(0, 40)}`
+                      : d.tramitasign > 0
+                        ? `+${d.tramitasign}`
+                        : "0 novas"}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       )}
+    </div>
+  );
+}
+
+// ── Status item helper ────────────────────────────────────────────────────────
+
+function StatusItem({
+  label,
+  ok,
+  okLabel,
+  failLabel,
+  info,
+}: {
+  label: string;
+  ok: boolean;
+  okLabel: string;
+  failLabel: string;
+  info?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-4 py-3">
+      <div>
+        <span className="font-body text-sm text-fg">{label}</span>
+        {info && (
+          <p className="mt-0.5 font-body text-[11px] text-muted">{info}</p>
+        )}
+      </div>
+      <span
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 font-body text-xs font-semibold ${
+          ok
+            ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border border-amber-200 bg-amber-50 text-amber-700"
+        }`}
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-emerald-500" : "bg-amber-500"}`}
+        />
+        {ok ? okLabel : failLabel}
+      </span>
     </div>
   );
 }
@@ -1059,6 +1141,18 @@ function TabStatus({
     },
     null as string | null
   );
+
+  const [isPending, startTransition] = useTransition();
+  const [diagnostico, setDiagnostico] = useState<Awaited<
+    ReturnType<typeof getDiagnosticoAction>
+  > | null>(null);
+
+  function handleDiagnostico() {
+    startTransition(async () => {
+      const d = await getDiagnosticoAction();
+      setDiagnostico(d);
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -1093,12 +1187,14 @@ function TabStatus({
         <h2 className="mb-4 font-heading text-sm font-semibold text-fg">
           Status do Sistema de Monitoramento
         </h2>
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
-            <span className="font-body text-sm text-fg">Busca automática</span>
+            <span className="font-body text-sm text-fg">
+              CRON automático (seg–sex 5h)
+            </span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 font-body text-xs font-semibold text-emerald-700">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Ativa — Diária
+              Ativo
             </span>
           </div>
           <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
@@ -1119,47 +1215,106 @@ function TabStatus({
           </div>
           <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
             <span className="font-body text-sm text-fg">
-              OABs ativas no monitoramento
-            </span>
-            <span className="font-body text-sm font-semibold text-primary">
-              {oabsAtivas}
-            </span>
-          </div>
-          <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
-            <span className="font-body text-sm text-fg">
-              Tribunais monitorados
+              Tribunais com publicações
             </span>
             <span className="font-body text-sm text-muted">
-              {[...new Set(publicacoes.map((p) => p.tribunal))].join(", ") ||
-                "—"}
+              {[...new Set(publicacoes.map((p) => p.tribunal))]
+                .filter(Boolean)
+                .join(", ") || "—"}
             </span>
           </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 font-body text-xs text-blue-700">
-          💡 Para adicionar OABs ao monitoramento automático, acesse a aba{" "}
-          <strong>OABs</strong>. As publicações são capturadas do DJe/PJe e
-          disponibilizadas aqui automaticamente.
+        {/* Diagnóstico detalhado */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between">
+            <p className="font-body text-xs font-semibold text-fg">
+              Diagnóstico das fontes
+            </p>
+            <button
+              onClick={handleDiagnostico}
+              disabled={isPending}
+              className="flex items-center gap-1 rounded-md border border-border bg-white px-2.5 py-1 font-body text-xs font-semibold text-muted transition-colors hover:bg-slate-50 disabled:opacity-60"
+            >
+              {isPending && <SpinnerIcon className="h-3 w-3 animate-spin" />}
+              {isPending ? "Verificando..." : "Verificar configuração"}
+            </button>
+          </div>
+
+          {diagnostico && (
+            <div className="mt-3 space-y-2">
+              <StatusItem
+                label="DJe / eSAJ (TJAL e outros)"
+                ok={diagnostico.oabs_ativas > 0}
+                okLabel={`${diagnostico.oabs_ativas} OAB(s) ativa(s)`}
+                failLabel="Nenhuma OAB cadastrada"
+                info="Scraping automático do Diário de Justiça eletrônico"
+              />
+              <StatusItem
+                label="DataJud por processo"
+                ok={
+                  diagnostico.datajud_api && diagnostico.processos_com_cnj > 0
+                }
+                okLabel={`${diagnostico.processos_com_cnj} processo(s) CNJ`}
+                failLabel={
+                  !diagnostico.datajud_api
+                    ? "DATAJUD_API_KEY não configurada"
+                    : diagnostico.processos_com_cnj === 0
+                      ? "Nenhum processo com número CNJ (20 dígitos)"
+                      : "Sem processos"
+                }
+                info="Requer número CNJ completo (ex: 0001234-56.2024.8.02.0001)"
+              />
+              <StatusItem
+                label="TramitaSign — Webhook"
+                ok={diagnostico.tramitasign_webhook}
+                okLabel="Configurado"
+                failLabel="TRAMITASIGN_WEBHOOK_SECRET não configurado"
+                info="Recebe publicações automaticamente quando o TramitaSign envia"
+              />
+              <StatusItem
+                label="TramitaSign — Sync automático"
+                ok={diagnostico.tramitasign_login}
+                okLabel="Credenciais configuradas"
+                failLabel="Configure no Vercel"
+                info="TRAMITASIGN_LOGIN_EMAIL + TRAMITASIGN_LOGIN_PASSWORD → sincroniza diariamente"
+              />
+
+              {!diagnostico.tramitasign_login && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 font-body text-xs text-amber-800">
+                  <strong>Principal fonte pendente:</strong> Configure{" "}
+                  <code className="rounded bg-amber-100 px-1">
+                    TRAMITASIGN_LOGIN_EMAIL
+                  </code>{" "}
+                  e{" "}
+                  <code className="rounded bg-amber-100 px-1">
+                    TRAMITASIGN_LOGIN_PASSWORD
+                  </code>{" "}
+                  nas variáveis de ambiente do Vercel. O sistema sincronizará
+                  todas as publicações do TramitaSign automaticamente todo dia.
+                </div>
+              )}
+
+              {diagnostico.processos_com_cnj === 0 &&
+                diagnostico.datajud_api && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 font-body text-xs text-blue-800">
+                    <strong>Dica:</strong> Cadastre o número CNJ completo nos
+                    processos (ex:{" "}
+                    <code className="rounded bg-blue-100 px-1">
+                      0001234-56.2024.8.02.0001
+                    </code>
+                    ) para que o DataJud monitore movimentações automaticamente.
+                  </div>
+                )}
+            </div>
+          )}
         </div>
 
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-5 border-t border-border pt-4 flex flex-col gap-2">
           <p className="font-body text-xs font-semibold text-fg">
             Verificar publicações agora
           </p>
           <BotaoVerificar />
-          <p className="font-body text-xs text-muted">
-            Requer <strong>DATAJUD_API_KEY</strong> configurada no Vercel.
-            Cadastro gratuito em{" "}
-            <a
-              href="https://datajud-wiki.cnj.jus.br/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary underline"
-            >
-              datajud-wiki.cnj.jus.br
-            </a>
-            .
-          </p>
         </div>
       </div>
     </div>

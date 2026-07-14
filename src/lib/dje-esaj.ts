@@ -325,37 +325,61 @@ export async function buscarPublicacoesDjeEsaj(
     const hoje = new Date();
     const inicio = new Date(hoje);
     inicio.setDate(inicio.getDate() - diasAtras);
-    const fmt = (d: Date) =>
+    const fmtData = (d: Date) =>
       `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     const cookie = await obterSessaoEsaj(baseUrl);
-    const body = new URLSearchParams({
-      "dadosConsulta.pesquisaLivre": `"${oab.numero}/${oab.estado}"`,
-      "dadosConsulta.dtInicio": fmt(inicio),
-      "dadosConsulta.dtFim": fmt(hoje),
-      "dadosConsulta.cdCaderno": "-11",
-    }).toString();
-    try {
-      const res = await fetch(`${baseUrl}/consultaAvancada.do`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
-          Referer: `${baseUrl}/consultaAvancada.do`,
-          ...(cookie ? { Cookie: cookie } : {}),
-        },
-        body,
-        signal: AbortSignal.timeout(20000),
-      });
-      if (!res.ok) return 0;
-      const html = await res.text();
-      itens = parseHtmlResultados(html, baseUrl);
-      console.log(
-        `[DjeEsaj/${oab.estado}] ${itens.length} itens via fallback local`
-      );
-    } catch (err) {
-      console.error(`[DjeEsaj/${oab.estado}] Erro na busca local:`, err);
-      return 0;
+
+    // Tenta múltiplos formatos: "14381/AL", "14.381/AL", só número
+    const numeroSemZeros = oab.numero.replace(/^0+/, "");
+    const formatosBusca = [
+      `"${oab.numero}/${oab.estado}"`,
+      `"${numeroSemZeros}/${oab.estado}"`,
+      `"${oab.numero.replace(/(\d+)/, (n) =>
+        n.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+      )}/${oab.estado}"`,
+      oab.numero,
+    ];
+
+    itens = [];
+    for (const termo of formatosBusca) {
+      try {
+        const body = new URLSearchParams({
+          "dadosConsulta.pesquisaLivre": termo,
+          "dadosConsulta.dtInicio": fmtData(inicio),
+          "dadosConsulta.dtFim": fmtData(hoje),
+          "dadosConsulta.cdCaderno": "-11",
+        }).toString();
+        const res = await fetch(`${baseUrl}/consultaAvancada.do`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 LiderAdv/1.0",
+            Referer: `${baseUrl}/consultaAvancada.do`,
+            ...(cookie ? { Cookie: cookie } : {}),
+          },
+          body,
+          signal: AbortSignal.timeout(20000),
+        });
+        if (!res.ok) continue;
+        const html = await res.text();
+        const encontrados = parseHtmlResultados(html, baseUrl);
+        console.log(
+          `[DjeEsaj/${oab.estado}] termo="${termo}" → ${encontrados.length} itens`
+        );
+        if (encontrados.length > 0) {
+          itens = encontrados;
+          break;
+        }
+      } catch (err) {
+        console.error(
+          `[DjeEsaj/${oab.estado}] Erro na busca local (termo=${termo}):`,
+          err instanceof Error ? err.message : String(err)
+        );
+      }
     }
+    console.log(
+      `[DjeEsaj/${oab.estado}] Total via fallback local: ${itens.length} itens`
+    );
   }
 
   let inseridos = 0;

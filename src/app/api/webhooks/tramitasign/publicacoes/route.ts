@@ -74,17 +74,29 @@ function extrairTribunal(link?: string): string {
 
 function extrairProcessoDoTexto(texto?: string): string {
   if (!texto) return "";
-  // Formato CNJ: NNNNNNN-DD.AAAA.J.TT.OOOO
-  const match = texto.match(
-    /PROCESSO:\s*(\d{5,7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})/i
-  );
-  return match?.[1] ?? "";
+  // Remove quebras de linha para não partir o número entre linhas
+  const joined = texto.replace(/[\r\n]+/g, " ");
+  // Aceita vários formatos: "PROCESSO: ...", "Proc. nº ...", número CNJ solto
+  const patterns = [
+    /PROCESSO\s*:?\s*N?[Oº°]?\s*\.?\s*(\d{5,7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})/i,
+    /proc(?:esso)?\s*(?:n[oº°]|nº|\.?)?\s*[:\-]?\s*(\d{5,7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})/i,
+    /(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})/,
+    /(\d{5,7}\/\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})/,
+  ];
+  for (const p of patterns) {
+    const m = joined.match(p);
+    if (m?.[1]) return m[1].replace(/\//g, "-");
+  }
+  return "";
 }
 
 function normalizarV2(pub: PublicacaoTramitaV2): PubNormalizada | null {
-  const processo = extrairProcessoDoTexto(pub.texto);
-  const disponibilizacao = pub.created_at ? pub.created_at.slice(0, 10) : null;
-  if (!processo || !disponibilizacao) return null;
+  const processo =
+    extrairProcessoDoTexto(pub.texto) ||
+    `tramita-${pub.uuid ?? pub.id ?? Date.now()}`;
+  const disponibilizacao =
+    (pub.created_at ? pub.created_at.slice(0, 10) : null) ??
+    new Date().toISOString().slice(0, 10);
   return {
     processo,
     tipo: pub.nomeClasse ?? "Publicação",

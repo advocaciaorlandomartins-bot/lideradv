@@ -106,16 +106,34 @@ function maskCEP(v: string) {
   return d.replace(/(\d{5})(\d{1,3})$/, "$1-$2");
 }
 
-function maskPhone(v: string) {
+function maskPhone(v: string): string {
   const d = v.replace(/\D/g, "").slice(0, 11);
-  if (d.length <= 10) {
-    return d
-      .replace(/(\d{2})(\d)/, "($1) $2")
-      .replace(/(\d{4})(\d{1,4})$/, "$1-$2");
-  }
-  return d
-    .replace(/(\d{2})(\d)/, "($1) $2")
-    .replace(/(\d{5})(\d{1,4})$/, "$1-$2");
+  if (!d) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10)
+    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  // Celular: (DDD) 9 XXXX-XXXX
+  return `(${d.slice(0, 2)}) ${d.slice(2, 3)} ${d.slice(3, 7)}-${d.slice(7)}`;
+}
+
+function applyPhoneMask(
+  e: React.ChangeEvent<HTMLInputElement>,
+  setter: (v: string) => void,
+  ref: React.RefObject<HTMLInputElement | null>
+) {
+  const el = e.target;
+  const cursor = el.selectionStart ?? el.value.length;
+  const prevLen = el.value.length;
+  const masked = maskPhone(el.value);
+  setter(masked);
+  const delta = masked.length - prevLen;
+  requestAnimationFrame(() => {
+    if (ref.current) {
+      const pos = Math.max(0, cursor + delta);
+      ref.current.setSelectionRange(pos, pos);
+    }
+  });
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -218,6 +236,8 @@ export default function AiDocumentImport({
   const [respNome, setRespNome] = useState("");
   const [respCpf, setRespCpf] = useState("");
   const [respTelefone, setRespTelefone] = useState("");
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const respTelefoneRef = useRef<HTMLInputElement>(null);
   const [respImporting, setRespImporting] = useState(false);
   const respFileRef = useRef<HTMLInputElement>(null);
 
@@ -783,8 +803,9 @@ export default function AiDocumentImport({
               <Field label="Telefone">
                 <input
                   type="tel"
+                  ref={phoneInputRef}
                   value={phone}
-                  onChange={(e) => setPhone(maskPhone(e.target.value))}
+                  onChange={(e) => applyPhoneMask(e, setPhone, phoneInputRef)}
                   className={inputCls}
                   placeholder="(82) 9 0000-0000"
                   inputMode="numeric"
@@ -946,8 +967,11 @@ export default function AiDocumentImport({
               </Field>
               <Field label="Telefone do responsável">
                 <input
+                  ref={respTelefoneRef}
                   value={respTelefone}
-                  onChange={(e) => setRespTelefone(maskPhone(e.target.value))}
+                  onChange={(e) =>
+                    applyPhoneMask(e, setRespTelefone, respTelefoneRef)
+                  }
                   className={inputCls}
                   placeholder="(82) 9 0000-0000"
                   type="tel"

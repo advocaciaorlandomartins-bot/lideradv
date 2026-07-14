@@ -43,7 +43,10 @@ export async function GET() {
       message: "Tabela lembretes_agendados criada.",
     });
   } catch (err) {
-    console.error("[migrate-lembretes]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(
+      "[migrate-lembretes]",
+      err instanceof Error ? err.message : String(err)
+    );
+    return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }

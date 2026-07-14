@@ -159,7 +159,10 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (err) {
-    console.error("prevbot webhook POST error:", err);
+    console.error(
+      "prevbot webhook POST error:",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json(
       { error: "Erro interno ao criar lead." },
       { status: 500 }
@@ -230,7 +233,10 @@ export async function PATCH(request: Request) {
       processo_id: processoId,
     });
   } catch (err) {
-    console.error("prevbot webhook PATCH error:", err);
+    console.error(
+      "prevbot webhook PATCH error:",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json(
       { error: "Erro interno ao atualizar lead." },
       { status: 500 }
@@ -241,10 +247,7 @@ export async function PATCH(request: Request) {
 // GET /api/integracoes/prevbot?telefone=11999999999 — busca lead por telefone
 export async function GET(request: Request) {
   if (!authOk(request)) {
-    return NextResponse.json(
-      { status: "ok", authenticated: false },
-      { status: 200 }
-    );
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -278,7 +281,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ found: false });
   } catch (err) {
-    console.error("prevbot webhook GET error:", err);
+    console.error(
+      "prevbot webhook GET error:",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json({ found: false });
   }
 }

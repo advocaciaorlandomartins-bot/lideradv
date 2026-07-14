@@ -225,7 +225,10 @@ export async function POST(req: Request) {
       dadosExtraidos: dadosExtraidos ?? null,
     });
   } catch (err) {
-    console.error("[/api/ia/analisar]", err);
+    console.error(
+      "[/api/ia/analisar]",
+      err instanceof Error ? err.message : String(err)
+    );
     const raw = err instanceof Error ? err.message : String(err);
     let msg = "Erro ao analisar o documento.";
     if (

@@ -270,7 +270,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: extracted });
   } catch (err: unknown) {
-    console.error("Anthropic extraction error:", err);
+    console.error(
+      "Anthropic extraction error:",
+      err instanceof Error ? err.message : String(err)
+    );
     const msg = err instanceof Error ? err.message : "Erro desconhecido.";
     return NextResponse.json(
       { error: `Erro ao processar: ${msg}` },

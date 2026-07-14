@@ -92,11 +92,11 @@ export async function GET() {
       total_geral: clientes.length + leads.length + disc.length,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json(
-      { error: "Erro interno", detalhe: msg },
-      { status: 500 }
+    console.error(
+      "[/api/admin/cleanup GET]",
+      err instanceof Error ? err.message : String(err)
     );
+    return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }
 

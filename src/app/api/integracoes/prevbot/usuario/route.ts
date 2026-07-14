@@ -391,7 +391,10 @@ export async function POST(req: NextRequest) {
         "Pode enviar texto, áudio ou foto de comprovante/nota fiscal.",
     });
   } catch (err) {
-    console.error("[prevbot/usuario]", err);
+    console.error(
+      "[prevbot/usuario]",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json(
       { error: "Erro interno ao processar mensagem." },
       { status: 500 }

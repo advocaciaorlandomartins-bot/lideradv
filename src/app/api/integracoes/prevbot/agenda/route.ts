@@ -292,7 +292,10 @@ export async function POST(req: NextRequest) {
       notificacoes_agendadas: dataEvento > new Date(),
     });
   } catch (err) {
-    console.error("[prevbot/agenda]", err);
+    console.error(
+      "[prevbot/agenda]",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json(
       { error: "Erro interno ao criar compromisso." },
       { status: 500 }

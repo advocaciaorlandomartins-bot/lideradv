@@ -73,7 +73,10 @@ export async function GET(req: Request) {
       erros,
     });
   } catch (err) {
-    console.error("[cron/lembretes]", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(
+      "[cron/lembretes]",
+      err instanceof Error ? err.message : String(err)
+    );
+    return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }

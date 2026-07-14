@@ -22,24 +22,23 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   }
 
-  // Verifica que o documento pertence a um processo ou cliente acessível
+  // Verifica que o documento existe e pertence a uma entidade ativa do sistema
   const rows = await sql`
     SELECT d.url, d.nome
     FROM documentos d
     WHERE d.id = ${id}::uuid
       AND (
-        -- documento de processo
+        -- documento de processo ativo
         (d.entity_type = 'processo' AND EXISTS (
-          SELECT 1 FROM processos p WHERE p.id = d.entity_id
+          SELECT 1 FROM processos p
+          WHERE p.id = d.entity_id AND p.deleted_at IS NULL
         ))
         OR
-        -- documento de cliente
+        -- documento de cliente ativo
         (d.entity_type = 'cliente' AND EXISTS (
-          SELECT 1 FROM clients c WHERE c.id = d.entity_id
+          SELECT 1 FROM clients c
+          WHERE c.id = d.entity_id AND c.deleted_at IS NULL
         ))
-        OR
-        -- documento sem vínculo de entidade (legado)
-        (d.entity_type IS NULL)
       )
     LIMIT 1
   `;

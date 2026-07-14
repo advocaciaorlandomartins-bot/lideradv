@@ -91,7 +91,10 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ resultado });
   } catch (err) {
-    console.error("[/api/ia/corrigir]", err);
+    console.error(
+      "[/api/ia/corrigir]",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json(
       { error: "Erro ao aplicar correções." },
       { status: 500 }

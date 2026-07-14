@@ -285,8 +285,11 @@ export default function IaPeticaoModal({
 
   const textoAtual = aba === "corrigido" ? textoCorrigido : texto;
 
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
   const renderMarkdown = (t: string) =>
-    t
+    escapeHtml(t)
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(
         /^(#+)\s(.+)/gm,

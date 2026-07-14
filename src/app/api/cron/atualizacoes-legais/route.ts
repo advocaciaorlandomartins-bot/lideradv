@@ -16,7 +16,10 @@ import { getSession } from "@/lib/session";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+if (!process.env.ANTHROPIC_API_KEY) {
+  throw new Error("ANTHROPIC_API_KEY não configurada");
+}
+const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── DOU via InLabs (requer chave) ───────────────────────────────────────────
 

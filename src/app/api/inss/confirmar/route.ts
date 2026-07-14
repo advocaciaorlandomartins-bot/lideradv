@@ -290,7 +290,10 @@ export async function POST(req: NextRequest) {
         : "Documento registrado nos controles com sucesso.",
     });
   } catch (err) {
-    console.error("[inss/confirmar]", err);
+    console.error(
+      "[inss/confirmar]",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json(
       { error: "Erro ao confirmar agendamento." },
       { status: 500 }

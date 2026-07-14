@@ -343,8 +343,11 @@ export default function IaAnalisarModal({
     }
   };
 
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
   const renderMarkdown = (text: string) =>
-    text
+    escapeHtml(text)
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(
         /^#{1,3}\s(.+)/gm,

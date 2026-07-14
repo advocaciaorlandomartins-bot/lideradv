@@ -537,84 +537,130 @@ export async function updateLancamentoAction(
   ).trim();
   const observacoes =
     ((formData.get("observacoes") as string | null) ?? "").trim() || null;
+  const aplicarGrupo = formData.get("aplicar_grupo") === "true";
 
   if (!valorStr || isNaN(valor) || valor <= 0)
     return { error: "Informe um valor válido." };
 
+  let isBulk = false;
+
   try {
     const current = await sql`
-      SELECT status, remuneracao_id FROM lancamentos WHERE id = ${id}::uuid
+      SELECT status, remuneracao_id, grupo_parcelas,
+             to_char(data_vencimento, 'YYYY-MM-DD') AS data_vencimento_iso
+      FROM lancamentos WHERE id = ${id}::uuid
     `;
     if (current.length === 0) return { error: "Lançamento não encontrado." };
     const oldStatus = current[0].status as string;
     const remuneracaoId = current[0].remuneracao_id as string | null;
+    const grupoParcelas = current[0].grupo_parcelas as string | null;
+    const oldDataISO =
+      (current[0].data_vencimento_iso as string | null) ?? todayBR();
 
     const hoje = todayBR();
-    // Quando aguardando resultado, mantém a data sentinela 9999-12-31
     const dataVencFinal =
       status === "aguardando_resultado"
         ? "9999-12-31"
         : dataVencimento || todayBR();
-    if (status === "pago" && oldStatus !== "pago") {
+
+    // ── Edição em lote: todas as parcelas do grupo ────────────────────────────
+    if (aplicarGrupo && grupoParcelas) {
+      isBulk = true;
+      // O delta em dias é calculado diretamente no SQL (date - date = integer).
+      // Parcelas já pagas ou canceladas mantêm status e data de pagamento.
+      // Parcelas pendentes têm as datas deslocadas proporcionalmente.
       await sql`
         UPDATE lancamentos SET
-          tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
-          valor = ${valor},
-          client_id = ${clientId ? clientId : null}::uuid,
+          tipo        = ${tipo},
+          categoria   = ${categoria},
+          descricao   = ${descricao},
+          valor       = ${valor},
+          client_id   = ${clientId ? clientId : null}::uuid,
           processo_id = ${processoId ? processoId : null}::uuid,
-          status = ${status}, data_vencimento = ${dataVencFinal}::date,
-          data_pagamento = ${hoje}::date, observacoes = ${observacoes}
-        WHERE id = ${id}::uuid
-      `;
-      if (tipo === "entrada") {
-        await notificarPrevBot({
-          evento: "honorario_pago",
-          processoId: processoId || null,
-          clientId: clientId || null,
-          dados: { valor_honorario: valor },
-        });
-      }
-    } else if (status !== "pago") {
-      await sql`
-        UPDATE lancamentos SET
-          tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
-          valor = ${valor},
-          client_id = ${clientId ? clientId : null}::uuid,
-          processo_id = ${processoId ? processoId : null}::uuid,
-          status = ${status}, data_vencimento = ${dataVencFinal}::date,
-          data_pagamento = NULL, observacoes = ${observacoes}
-        WHERE id = ${id}::uuid
+          observacoes = ${observacoes},
+          data_vencimento = CASE
+            WHEN ${status} = 'aguardando_resultado'   THEN '9999-12-31'::date
+            WHEN status IN ('pago', 'cancelado')       THEN data_vencimento
+            ELSE data_vencimento
+                 + (${dataVencFinal}::date - ${oldDataISO}::date)
+          END,
+          status = CASE
+            WHEN status IN ('pago', 'cancelado') THEN status
+            ELSE ${status}
+          END,
+          data_pagamento = CASE
+            WHEN status = 'pago'                              THEN data_pagamento
+            WHEN ${status} = 'pago' AND status = 'pendente'  THEN ${hoje}::date
+            ELSE NULL
+          END
+        WHERE grupo_parcelas = ${grupoParcelas}::uuid
       `;
     } else {
-      await sql`
-        UPDATE lancamentos SET
-          tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
-          valor = ${valor},
-          client_id = ${clientId ? clientId : null}::uuid,
-          processo_id = ${processoId ? processoId : null}::uuid,
-          status = ${status}, data_vencimento = ${dataVencFinal}::date,
-          observacoes = ${observacoes}
-        WHERE id = ${id}::uuid
-      `;
-    }
-
-    if (remuneracaoId && status !== oldStatus) {
-      if (status === "pago") {
+      // ── Edição individual: comportamento original ─────────────────────────
+      if (status === "pago" && oldStatus !== "pago") {
         await sql`
-          UPDATE remuneracoes SET
-            status = ${status}, data_pagamento = ${hoje}::date, updated_at = NOW()
-          WHERE id = ${remuneracaoId}::uuid
+          UPDATE lancamentos SET
+            tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
+            valor = ${valor},
+            client_id = ${clientId ? clientId : null}::uuid,
+            processo_id = ${processoId ? processoId : null}::uuid,
+            status = ${status}, data_vencimento = ${dataVencFinal}::date,
+            data_pagamento = ${hoje}::date, observacoes = ${observacoes}
+          WHERE id = ${id}::uuid
+        `;
+        if (tipo === "entrada") {
+          await notificarPrevBot({
+            evento: "honorario_pago",
+            processoId: processoId || null,
+            clientId: clientId || null,
+            dados: { valor_honorario: valor },
+          });
+        }
+      } else if (status !== "pago") {
+        await sql`
+          UPDATE lancamentos SET
+            tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
+            valor = ${valor},
+            client_id = ${clientId ? clientId : null}::uuid,
+            processo_id = ${processoId ? processoId : null}::uuid,
+            status = ${status}, data_vencimento = ${dataVencFinal}::date,
+            data_pagamento = NULL, observacoes = ${observacoes}
+          WHERE id = ${id}::uuid
         `;
       } else {
         await sql`
-          UPDATE remuneracoes SET
-            status = ${status}, data_pagamento = NULL, updated_at = NOW()
-          WHERE id = ${remuneracaoId}::uuid
+          UPDATE lancamentos SET
+            tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
+            valor = ${valor},
+            client_id = ${clientId ? clientId : null}::uuid,
+            processo_id = ${processoId ? processoId : null}::uuid,
+            status = ${status}, data_vencimento = ${dataVencFinal}::date,
+            observacoes = ${observacoes}
+          WHERE id = ${id}::uuid
         `;
+      }
+
+      if (remuneracaoId && status !== oldStatus) {
+        if (status === "pago") {
+          await sql`
+            UPDATE remuneracoes SET
+              status = ${status}, data_pagamento = ${hoje}::date, updated_at = NOW()
+            WHERE id = ${remuneracaoId}::uuid
+          `;
+        } else {
+          await sql`
+            UPDATE remuneracoes SET
+              status = ${status}, data_pagamento = NULL, updated_at = NOW()
+            WHERE id = ${remuneracaoId}::uuid
+          `;
+        }
       }
     }
   } catch (err) {
-    console.error("updateLancamentoAction DB error:", err);
+    console.error(
+      "updateLancamentoAction DB error:",
+      err instanceof Error ? err.message : String(err)
+    );
     return { error: "Erro ao atualizar lançamento. Tente novamente." };
   }
 
@@ -622,8 +668,10 @@ export async function updateLancamentoAction(
     acao: "editar",
     entidade: "lancamento",
     entidadeId: id,
-    descricao: `Editou lançamento — ${descricao}`,
-    detalhes: { valor, status },
+    descricao: isBulk
+      ? `Editou grupo de parcelas — ${descricao}`
+      : `Editou lançamento — ${descricao}`,
+    detalhes: { valor, status, aplicar_grupo: isBulk },
   });
 
   redirect("/dashboard/financeiro");

@@ -226,6 +226,12 @@ export default function EditLancamentoForm({
   );
 
   const isPessoal = lancamento.remuneracao_id !== null;
+  const [aplicarGrupo, setAplicarGrupo] = useState(false);
+
+  const parcelaLabel =
+    lancamento.parcela_atual === 0
+      ? "Entrada"
+      : `Parcela ${lancamento.parcela_atual}/${lancamento.total_parcelas}`;
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
@@ -233,6 +239,11 @@ export default function EditLancamentoForm({
       <input type="hidden" name="valor" value={parseMoney(valor)} />
       <input type="hidden" name="categoria" value={finalCategoria} />
       <input type="hidden" name="client_id" value={selectedClient?.id ?? ""} />
+      <input
+        type="hidden"
+        name="aplicar_grupo"
+        value={aplicarGrupo ? "true" : "false"}
+      />
 
       {state?.error && (
         <div
@@ -243,24 +254,47 @@ export default function EditLancamentoForm({
         </div>
       )}
 
-      {/* Aviso de parcelamento */}
+      {/* Seletor de escopo: esta parcela ou todas do grupo */}
       {lancamento.grupo_parcelas && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
-          <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-amber-400 font-body text-[11px] font-bold text-white">
-            !
-          </span>
-          <div>
-            <p className="font-body text-sm font-semibold text-amber-800">
-              Lançamento parcelado —{" "}
-              {lancamento.parcela_atual === 0
-                ? "Entrada"
-                : `Parcela ${lancamento.parcela_atual}/${lancamento.total_parcelas}`}
-            </p>
-            <p className="font-body text-xs text-amber-700 mt-0.5">
-              Apenas esta parcela será alterada. Para editar todas, exclua o
-              grupo e crie novamente.
-            </p>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <p className="font-body text-sm font-semibold text-fg">
+            Lançamento parcelado —{" "}
+            <span className="font-normal text-muted">{parcelaLabel}</span>
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setAplicarGrupo(false)}
+              className={`rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors cursor-pointer ${
+                !aplicarGrupo
+                  ? "border-primary bg-blue-50 text-primary"
+                  : "border-border bg-white text-muted hover:border-slate-300 hover:text-fg"
+              }`}
+            >
+              Apenas esta parcela
+            </button>
+            <button
+              type="button"
+              onClick={() => setAplicarGrupo(true)}
+              className={`rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors cursor-pointer ${
+                aplicarGrupo
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                  : "border-border bg-white text-muted hover:border-slate-300 hover:text-fg"
+              }`}
+            >
+              Todas as {lancamento.total_parcelas} parcelas
+            </button>
           </div>
+          {aplicarGrupo ? (
+            <p className="font-body text-xs text-emerald-700">
+              As datas serão deslocadas proporcionalmente. Parcelas já pagas ou
+              canceladas mantêm o status atual.
+            </p>
+          ) : (
+            <p className="font-body text-xs text-muted">
+              Apenas {parcelaLabel.toLowerCase()} será alterada.
+            </p>
+          )}
         </div>
       )}
 

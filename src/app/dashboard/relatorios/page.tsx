@@ -4,7 +4,6 @@ import {
   getRelatorioResumo,
   getRelatorioRemuneracoes,
   getFluxoMensal,
-  getClientesParaRelatorio,
   getColaboradoresParaRelatorio,
   getClientesParaRecibo,
   getRelatorioJuridico,
@@ -26,7 +25,6 @@ export default async function RelatoriosPage() {
     resumo,
     remuneracoes,
     fluxo,
-    clientes,
     colaboradores,
     escritorio,
     clientesComDados,
@@ -36,7 +34,6 @@ export default async function RelatoriosPage() {
     getRelatorioResumo({}),
     getRelatorioRemuneracoes({}),
     getFluxoMensal(12),
-    getClientesParaRelatorio(),
     getColaboradoresParaRelatorio(),
     getEscritorioConfig(),
     getClientesParaRecibo(),
@@ -58,7 +55,6 @@ export default async function RelatoriosPage() {
         resumo={resumo}
         remuneracoes={remuneracoes}
         fluxo={fluxo}
-        clientes={clientes}
         colaboradores={colaboradores}
         escritorio={escritorio}
         clientesComDados={clientesComDados}

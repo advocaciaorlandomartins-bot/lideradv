@@ -6,7 +6,6 @@ import type {
   RelatorioResumo,
   RelatorioRemuneracao,
   FluxoMensal,
-  ClienteOption,
   ColaboradorOption,
   ClienteParaRecibo,
   RelatorioJuridico,
@@ -178,7 +177,6 @@ interface Props {
   resumo: RelatorioResumo;
   remuneracoes: RelatorioRemuneracao[];
   fluxo: FluxoMensal[];
-  clientes: ClienteOption[];
   colaboradores: ColaboradorOption[];
   escritorio: EscritorioConfig;
   clientesComDados: ClienteParaRecibo[];
@@ -642,10 +640,10 @@ function ExtratoTab({ lancamentos }: { lancamentos: RelatorioLancamento[] }) {
 // ── Por Cliente ───────────────────────────────────────────────────────────────
 function ClientesTab({
   lancamentos,
-  clientes,
+  clientesComDados,
 }: {
   lancamentos: RelatorioLancamento[];
-  clientes: ClienteOption[];
+  clientesComDados: ClienteParaRecibo[];
 }) {
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
@@ -656,7 +654,9 @@ function ClientesTab({
     const [d, m, y] = br.split("/");
     return new Date(`${y}-${m}-${d}T12:00:00`);
   }, []);
-  const clienteSelecionado = clientes.find((c) => c.id === filtroCliente);
+  const clienteSelecionado = clientesComDados.find(
+    (c) => c.id === filtroCliente
+  );
   const filtered = useMemo(() => {
     if (!filtroCliente) return [];
     return lancamentos.filter((r) => {
@@ -684,19 +684,17 @@ function ClientesTab({
   return (
     <div className="space-y-5">
       <FilterBar>
-        <FilterField label="Cliente">
-          <select
+        <FilterField label="Buscar cliente (nome ou CPF/CNPJ)">
+          <ClienteBusca
+            clientes={clientesComDados}
             value={filtroCliente}
-            onChange={(e) => setFiltroCliente(e.target.value)}
-            className={`${selectClass} w-64`}
-          >
-            <option value="">— Selecione um cliente —</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={(id) => {
+              setFiltroCliente(id);
+              setFiltroStatus("");
+              setFiltroInicio("");
+              setFiltroFim("");
+            }}
+          />
         </FilterField>
         {filtroCliente && (
           <>
@@ -2304,7 +2302,6 @@ export default function RelatoriosContent({
   resumo,
   remuneracoes,
   fluxo,
-  clientes,
   colaboradores,
   escritorio,
   clientesComDados,
@@ -2388,7 +2385,10 @@ export default function RelatoriosContent({
           )}
           {activeTab === "extrato" && <ExtratoTab lancamentos={lancamentos} />}
           {activeTab === "clientes" && (
-            <ClientesTab lancamentos={lancamentos} clientes={clientes} />
+            <ClientesTab
+              lancamentos={lancamentos}
+              clientesComDados={clientesComDados}
+            />
           )}
           {activeTab === "folha" && (
             <FolhaTab

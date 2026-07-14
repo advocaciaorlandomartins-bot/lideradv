@@ -26,6 +26,7 @@ import {
   ChevronDownIcon,
   BanknotesIcon,
   BuildingOfficeIcon,
+  CalendarIcon,
   CurrencyIcon,
   TrendUpIcon,
   TrendDownIcon,
@@ -312,6 +313,42 @@ export default function MeuFinanceiroContent({
     });
   }, [lancamentos]);
 
+  const projecaoMeses = useMemo(() => {
+    const [anoStr, mesStr] = mesHojeISO.split("-");
+    const anoHoje = parseInt(anoStr, 10);
+    const mesHoje = parseInt(mesStr, 10) - 1;
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(anoHoje, mesHoje + i, 1);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const aReceberPessoal = lancamentos
+        .filter(
+          (l) =>
+            l.tipo === "receita" &&
+            l.status === "a_receber" &&
+            l.data.startsWith(iso)
+        )
+        .reduce((s, l) => s + l.valor, 0);
+      const aReceberEscritorio =
+        fluxoEscritorio.find((f) => f.mesISO === iso)?.entradas ?? 0;
+      const aPagar = lancamentos
+        .filter(
+          (l) =>
+            l.tipo === "despesa" &&
+            l.status === "pendente" &&
+            l.data.startsWith(iso)
+        )
+        .reduce((s, l) => s + l.valor, 0);
+      const aReceber = aReceberPessoal + aReceberEscritorio;
+      return {
+        label: `${MESES_CURTO[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`,
+        isAtual: i === 0,
+        aReceber,
+        aPagar,
+        saldo: aReceber - aPagar,
+      };
+    });
+  }, [lancamentos, fluxoEscritorio, mesHojeISO]);
+
   const categoriasData = useMemo(() => {
     const map = new Map<string, number>();
     doMes
@@ -563,6 +600,66 @@ export default function MeuFinanceiroContent({
           color="amber"
           icon={CheckCircleIcon}
         />
+      </div>
+
+      {/* ── Projeção 6 meses ─────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          <CalendarIcon className="h-4 w-4 text-muted" />
+          <span className="font-heading text-sm font-semibold text-fg">
+            Projeção — Próximos 6 Meses
+          </span>
+          <span className="ml-auto font-body text-xs text-muted">
+            Pessoal + Escritório
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-6">
+          {projecaoMeses.map((m) => (
+            <div
+              key={m.label}
+              className={`rounded-lg border p-3 ${m.isAtual ? "border-blue-200 bg-blue-50/60" : "border-border bg-surface"}`}
+            >
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="font-heading text-xs font-semibold text-fg">
+                  {m.label}
+                </span>
+                {m.isAtual && (
+                  <span className="rounded-full bg-blue-100 px-1.5 py-px font-body text-[9px] font-bold uppercase tracking-wide text-blue-600">
+                    Atual
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-body text-[10px] text-muted">
+                    Receber
+                  </span>
+                  <span className="font-body text-[10px] font-semibold text-emerald-600 tabular-nums">
+                    {fmt(m.aReceber)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-body text-[10px] text-muted">
+                    Pagar
+                  </span>
+                  <span className="font-body text-[10px] font-semibold text-red-500 tabular-nums">
+                    {fmt(m.aPagar)}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-1 border-t border-border/50 pt-1">
+                  <span className="font-body text-[10px] font-semibold text-muted">
+                    Saldo
+                  </span>
+                  <span
+                    className={`font-body text-[10px] font-bold tabular-nums ${m.saldo >= 0 ? "text-emerald-700" : "text-red-600"}`}
+                  >
+                    {fmt(Math.abs(m.saldo))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── Escritório — Honorários ── */}

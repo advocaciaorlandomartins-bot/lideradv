@@ -943,6 +943,35 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     return firstWithData === -1 ? all.slice(-6) : all.slice(firstWithData);
   }, [lancamentos]);
 
+  const projecaoMeses = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const yy = d.getFullYear();
+      const mm = d.getMonth();
+      let aReceber = 0;
+      let aPagar = 0;
+      for (const l of lancamentos) {
+        if (l.status !== "pendente") continue;
+        const ld = parseDMY(l.data_vencimento);
+        if (ld.getFullYear() === yy && ld.getMonth() === mm) {
+          if (l.tipo === "entrada") aReceber += l.valor;
+          else if (l.tipo === "saida") aPagar += l.valor;
+        }
+      }
+      return {
+        label: d
+          .toLocaleDateString("pt-BR", { month: "short", year: "2-digit" })
+          .replace(". ", "/")
+          .replace(".", ""),
+        isAtual: i === 0,
+        aReceber,
+        aPagar,
+        saldo: aReceber - aPagar,
+      };
+    });
+  }, [lancamentos]);
+
   const dateRange = useMemo(() => {
     if (datePreset === "custom") {
       return {
@@ -1232,6 +1261,66 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
             {fmt(saldo)}
           </p>
           <p className="mt-0.5 font-body text-xs text-muted">Recebido − Pago</p>
+        </div>
+      </div>
+
+      {/* ── Projeção 6 meses ─────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          <CalendarIcon className="h-4 w-4 text-muted" />
+          <span className="font-heading text-sm font-semibold text-fg">
+            Projeção — Próximos 6 Meses
+          </span>
+          <span className="ml-auto font-body text-xs text-muted">
+            Lançamentos pendentes
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-6">
+          {projecaoMeses.map((m) => (
+            <div
+              key={m.label}
+              className={`rounded-lg border p-3 ${m.isAtual ? "border-blue-200 bg-blue-50/60" : "border-border bg-surface"}`}
+            >
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="font-heading text-xs font-semibold text-fg">
+                  {m.label}
+                </span>
+                {m.isAtual && (
+                  <span className="rounded-full bg-blue-100 px-1.5 py-px font-body text-[9px] font-bold uppercase tracking-wide text-blue-600">
+                    Atual
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-body text-[10px] text-muted">
+                    Receber
+                  </span>
+                  <span className="font-body text-[10px] font-semibold text-emerald-600 tabular-nums">
+                    {fmt(m.aReceber)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-body text-[10px] text-muted">
+                    Pagar
+                  </span>
+                  <span className="font-body text-[10px] font-semibold text-red-500 tabular-nums">
+                    {fmt(m.aPagar)}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-1 border-t border-border/50 pt-1">
+                  <span className="font-body text-[10px] font-semibold text-muted">
+                    Saldo
+                  </span>
+                  <span
+                    className={`font-body text-[10px] font-bold tabular-nums ${m.saldo >= 0 ? "text-emerald-700" : "text-red-600"}`}
+                  >
+                    {fmt(Math.abs(m.saldo))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

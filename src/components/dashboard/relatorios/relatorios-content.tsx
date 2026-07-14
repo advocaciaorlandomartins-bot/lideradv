@@ -1391,25 +1391,32 @@ function buildReciboHtml(
       <div style="border-bottom:2px solid #1E3A8A;"></div>`;
       })();
 
-  const rowsHtml = lancamentos
-    .map((r) => {
+  const rowsHtml = [...lancamentos]
+    .sort((a, b) => {
+      const [da, ma, ya] = a.data_vencimento.split("/");
+      const [db, mb, yb] = b.data_vencimento.split("/");
+      return (
+        new Date(`${ya}-${ma}-${da}T12:00:00`).getTime() -
+        new Date(`${yb}-${mb}-${db}T12:00:00`).getTime()
+      );
+    })
+    .map((r, idx) => {
       const isPago = r.status === "pago";
       const isEntrada = r.tipo === "entrada";
-      const valorColor = isEntrada ? "#16a34a" : "#dc2626";
-      const statusColor = isPago ? "#15803d" : "#b45309";
-      const statusBg = isPago ? "#f0fdf4" : "#fffbeb";
+      const valorColor = isEntrada ? "#15803d" : "#dc2626";
+      const rowBg = idx % 2 === 0 ? "transparent" : "#f8fafc";
       return `
-      <tr>
-        <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;color:#475569;white-space:nowrap;">${r.data_vencimento}</td>
-        <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;">
-          <span style="background:${isEntrada ? "#f0fdf4" : "#fef2f2"};color:${isEntrada ? "#15803d" : "#dc2626"};padding:1px 6px;border-radius:3px;font-weight:600;">${isEntrada ? "Honorário" : "Despesa"}</span>
+      <tr style="background:${rowBg};">
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:#0f172a;font-weight:600;white-space:nowrap;">${r.data_vencimento}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;">
+          <span style="background:${isEntrada ? "#dcfce7" : "#fee2e2"};color:${isEntrada ? "#166534" : "#991b1b"};padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:0.3px;">${isEntrada ? "Honorário" : "Despesa"}</span>
         </td>
-        <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;color:#1e293b;max-width:200px;">${r.descricao}${r.processo_tipo ? ` <span style="color:#94a3b8;font-size:9px;">(${r.processo_tipo})</span>` : ""}</td>
-        <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;font-weight:600;text-align:right;white-space:nowrap;color:${valorColor};">${isEntrada ? "" : "- "}${fmt(r.valor)}</td>
-        <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;text-align:center;">
-          <span style="background:${statusBg};color:${statusColor};padding:1px 6px;border-radius:20px;font-weight:600;">${isPago ? "Pago" : "Pendente"}</span>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:#0f172a;font-weight:500;max-width:200px;">${r.descricao}${r.processo_tipo ? ` <span style="color:#64748b;font-size:9px;">(${r.processo_tipo})</span>` : ""}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:700;text-align:right;white-space:nowrap;color:${valorColor};">${isEntrada ? "" : "−"}${fmt(r.valor)}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;text-align:center;">
+          <span style="background:${isPago ? "#dcfce7" : "#fef3c7"};color:${isPago ? "#166534" : "#92400e"};padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;">${isPago ? "Pago" : "Pendente"}</span>
         </td>
-        <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;color:#94a3b8;white-space:nowrap;">${r.data_pagamento ?? "—"}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:${isPago ? "#374151" : "#94a3b8"};font-weight:${isPago ? "600" : "400"};white-space:nowrap;">${r.data_pagamento ?? "—"}</td>
       </tr>`;
     })
     .join("");
@@ -1484,11 +1491,11 @@ function buildReciboHtml(
 
     <div style="display:flex;gap:10px;margin-bottom:10px;">
       <div style="flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:8px 10px;">
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#94a3b8;letter-spacing:1px;margin-bottom:4px;">Dados do Cliente</div>
-        <div style="font-size:12px;font-weight:700;color:#1e293b;">${cliente.name}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:1px;">${cliente.type === "PF" ? "CPF" : "CNPJ"}: ${cliente.doc}</div>
-        ${cliente.phone ? `<div style="font-size:10px;color:#64748b;">${cliente.phone}</div>` : ""}
-        ${cliente.city ? `<div style="font-size:10px;color:#64748b;">${cliente.city}${cliente.state ? `/${cliente.state}` : ""}</div>` : ""}
+        <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:1px;margin-bottom:4px;">Dados do Cliente</div>
+        <div style="font-size:13px;font-weight:700;color:#0f172a;">${cliente.name}</div>
+        <div style="font-size:10px;color:#374151;margin-top:1px;">${cliente.type === "PF" ? "CPF" : "CNPJ"}: ${cliente.doc}</div>
+        ${cliente.phone ? `<div style="font-size:10px;color:#374151;">${cliente.phone}</div>` : ""}
+        ${cliente.city ? `<div style="font-size:10px;color:#374151;">${cliente.city}${cliente.state ? `/${cliente.state}` : ""}</div>` : ""}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;">
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:7px 12px;text-align:center;">
@@ -1516,20 +1523,20 @@ function buildReciboHtml(
       <tbody>${rowsHtml}</tbody>
       <tfoot>
         <tr style="background:#f1f5f9;border-top:2px solid #1E3A8A;">
-          <td colspan="3" style="padding:5px 8px;font-size:10px;font-weight:700;color:#475569;">${lancamentos.length} lançamento${lancamentos.length !== 1 ? "s" : ""}</td>
-          <td style="padding:5px 8px;text-align:right;font-size:11px;font-weight:700;color:#1E3A8A;">${fmt(lancamentos.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.valor, 0))}</td>
+          <td colspan="3" style="padding:5px 8px;font-size:10px;font-weight:700;color:#0f172a;">${lancamentos.length} lançamento${lancamentos.length !== 1 ? "s" : ""}</td>
+          <td style="padding:5px 8px;text-align:right;font-size:12px;font-weight:700;color:#1E3A8A;">${fmt(lancamentos.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.valor, 0))}</td>
           <td colspan="2"></td>
         </tr>
       </tfoot>
     </table>
 
     <div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:5px;padding:8px 12px;">
-      <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#94a3b8;letter-spacing:1px;margin-bottom:5px;">Resumo Financeiro</div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:10px;color:#64748b;">Honorários lançados</span><span style="font-size:10px;font-weight:600;">${fmt(lancamentos.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.valor, 0))}</span></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:10px;color:#16a34a;">Pagamentos recebidos</span><span style="font-size:10px;font-weight:600;color:#16a34a;">${fmt(lancamentos.filter((r) => r.tipo === "entrada" && r.status === "pago").reduce((s, r) => s + r.valor, 0))}</span></div>
-      ${totalDespesas > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:10px;color:#dc2626;">Despesas / Custos</span><span style="font-size:10px;font-weight:600;color:#dc2626;">${fmt(totalDespesas)}</span></div>` : ""}
-      <div style="border-top:1px solid #e2e8f0;margin:5px 0;"></div>
-      <div style="display:flex;justify-content:space-between;"><span style="font-size:11px;font-weight:700;color:#b45309;">Saldo devedor</span><span style="font-size:13px;font-weight:700;color:#92400e;">${fmt(saldoDevedor)}</span></div>
+      <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#475569;letter-spacing:1px;margin-bottom:6px;">Resumo Financeiro</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:10px;color:#374151;font-weight:500;">Honorários lançados</span><span style="font-size:10px;font-weight:700;color:#0f172a;">${fmt(lancamentos.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.valor, 0))}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:10px;color:#166534;font-weight:500;">Pagamentos recebidos</span><span style="font-size:10px;font-weight:700;color:#166534;">${fmt(lancamentos.filter((r) => r.tipo === "entrada" && r.status === "pago").reduce((s, r) => s + r.valor, 0))}</span></div>
+      ${totalDespesas > 0 ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:10px;color:#991b1b;font-weight:500;">Despesas / Custos</span><span style="font-size:10px;font-weight:700;color:#991b1b;">${fmt(totalDespesas)}</span></div>` : ""}
+      <div style="border-top:2px solid #e2e8f0;margin:6px 0;"></div>
+      <div style="display:flex;justify-content:space-between;"><span style="font-size:11px;font-weight:700;color:#92400e;">Saldo devedor</span><span style="font-size:13px;font-weight:800;color:#92400e;">${fmt(saldoDevedor)}</span></div>
     </div>
 
     <div style="margin-top:18px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:flex-end;">

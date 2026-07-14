@@ -3,7 +3,11 @@
 import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { markAsPagoAction } from "@/lib/lancamento-actions";
+import {
+  markAsPagoAction,
+  markMultiplePagoAction,
+  pagamentoParcialAction,
+} from "@/lib/lancamento-actions";
 import { markRemuneracaoPagaAction } from "@/lib/remuneracao-actions";
 import { TIPO_LABELS, TIPO_COLORS } from "@/lib/remuneracoes-types";
 import { CARGO_LABELS } from "@/lib/colaboradores-types";
@@ -21,7 +25,20 @@ function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// Parse "DD/MM/YYYY" → Date
+function fmtInput(v: string): string {
+  const digits = v.replace(/\D/g, "");
+  if (!digits) return "";
+  const cents = parseInt(digits, 10);
+  return (cents / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function parseMoneyInput(v: string): number {
+  return parseFloat(v.replace(/\./g, "").replace(",", ".")) || 0;
+}
+
 function parseVencimento(s: string | null): Date | null {
   if (!s) return null;
   const p = s.split("/");
@@ -29,7 +46,6 @@ function parseVencimento(s: string | null): Date | null {
   return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
 }
 
-// Parse "MM/YYYY" → first day of that month
 function parseCompetencia(s: string | null): Date | null {
   if (!s) return null;
   const p = s.split("/");
@@ -59,6 +75,242 @@ function matchesPeriodo(
   return true;
 }
 
+// ── Partial payment distribution (client-side preview) ───────────────────────
+
+interface DistLine {
+  id: string;
+  descricao: string;
+  valorOriginal: number;
+  valorPago: number;
+  restante: number;
+  status: "pago" | "parcial" | "sem_alteracao";
+}
+
+function calcDistribuicao(
+  pendingItems: ContaClienteItem[],
+  valorPago: number
+): DistLine[] {
+  const sorted = [...pendingItems].sort((a, b) => {
+    const da = parseVencimento(a.data_vencimento);
+    const db = parseVencimento(b.data_vencimento);
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    return da.getTime() - db.getTime();
+  });
+
+  let rem = valorPago;
+  return sorted.map((item) => {
+    if (rem <= 0) {
+      return {
+        id: item.id,
+        descricao: item.descricao,
+        valorOriginal: item.valor,
+        valorPago: 0,
+        restante: item.valor,
+        status: "sem_alteracao",
+      };
+    }
+    if (rem >= item.valor) {
+      const pago = item.valor;
+      rem = Math.round((rem - pago) * 100) / 100;
+      return {
+        id: item.id,
+        descricao: item.descricao,
+        valorOriginal: item.valor,
+        valorPago: pago,
+        restante: 0,
+        status: "pago",
+      };
+    }
+    const pago = Math.round(rem * 100) / 100;
+    const restante = Math.round((item.valor - pago) * 100) / 100;
+    rem = 0;
+    return {
+      id: item.id,
+      descricao: item.descricao,
+      valorOriginal: item.valor,
+      valorPago: pago,
+      restante,
+      status: "parcial",
+    };
+  });
+}
+
+// ── Pagamento Parcial Modal ───────────────────────────────────────────────────
+
+function PagamentoParcialModal({
+  clienteNome,
+  clienteId,
+  pendingItems,
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  clienteNome: string;
+  clienteId: string;
+  pendingItems: ContaClienteItem[];
+  onClose: () => void;
+  onConfirm: (ids: string[], valorPago: number, clienteId: string) => void;
+  isPending: boolean;
+}) {
+  const [rawInput, setRawInput] = useState("");
+  const valorPago = parseMoneyInput(rawInput);
+  const totalPendente = pendingItems.reduce((s, i) => s + i.valor, 0);
+  const valorEfetivo = Math.min(valorPago, totalPendente);
+  const dist = useMemo(
+    () => calcDistribuicao(pendingItems, valorEfetivo),
+    [pendingItems, valorEfetivo]
+  );
+  const saldoAposQuitacao = Math.max(0, totalPendente - valorEfetivo);
+
+  function handleConfirm() {
+    if (valorEfetivo <= 0) return;
+    const affectedIds = dist
+      .filter((d) => d.status !== "sem_alteracao")
+      .map((d) => d.id);
+    onConfirm(affectedIds, valorEfetivo, clienteId);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-border overflow-hidden">
+        {/* Header */}
+        <div className="border-b border-border px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="font-heading text-base font-semibold text-fg">
+              Pagamento Parcial
+            </p>
+            <p className="font-body text-xs text-muted mt-0.5">{clienteNome}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-muted hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          {/* Value input */}
+          <div>
+            <label className="block font-body text-sm font-semibold text-fg mb-1.5">
+              Valor recebido do cliente
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm text-muted">
+                R$
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="0,00"
+                value={rawInput}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "");
+                  setRawInput(digits ? fmtInput(digits) : "");
+                }}
+                className="h-11 w-full rounded-lg border border-border bg-white pl-9 pr-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <p className="mt-1 font-body text-xs text-muted">
+              Total pendente: {fmt(totalPendente)}
+            </p>
+          </div>
+
+          {/* Distribution preview */}
+          {valorEfetivo > 0 && (
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="bg-slate-50 border-b border-border px-4 py-2">
+                <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                  Como será distribuído
+                </p>
+              </div>
+              <div className="divide-y divide-border">
+                {dist.map((d) => (
+                  <div key={d.id} className="px-4 py-3 flex items-start gap-3">
+                    <div className="mt-0.5 flex-shrink-0">
+                      {d.status === "pago" && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                          ✓
+                        </span>
+                      )}
+                      {d.status === "parcial" && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                          ½
+                        </span>
+                      )}
+                      {d.status === "sem_alteracao" && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-slate-400 text-xs">
+                          –
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-body text-sm text-fg truncate">
+                        {d.descricao}
+                      </p>
+                      {d.status === "pago" && (
+                        <p className="font-body text-xs text-emerald-700 mt-0.5">
+                          Pago integralmente — {fmt(d.valorPago)}
+                        </p>
+                      )}
+                      {d.status === "parcial" && (
+                        <p className="font-body text-xs text-amber-700 mt-0.5">
+                          {fmt(d.valorPago)} pago · {fmt(d.restante)} ficam
+                          pendentes
+                        </p>
+                      )}
+                      {d.status === "sem_alteracao" && (
+                        <p className="font-body text-xs text-muted mt-0.5">
+                          Sem alteração — {fmt(d.valorOriginal)} pendentes
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-border bg-slate-50 px-4 py-3 flex items-center justify-between">
+                <span className="font-body text-xs text-muted">
+                  Saldo após confirmação
+                </span>
+                <span
+                  className={`font-body text-sm font-semibold ${saldoAposQuitacao > 0 ? "text-red-600" : "text-emerald-700"}`}
+                >
+                  {saldoAposQuitacao > 0 ? fmt(saldoAposQuitacao) : "Quitado"}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border px-6 py-4 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 font-body text-sm font-semibold text-fg hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={valorEfetivo <= 0 || isPending}
+            onClick={handleConfirm}
+            className="rounded-lg bg-primary px-4 py-2 font-body text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {isPending ? "Processando…" : "Confirmar pagamento"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 interface Props {
   contasReceber: ContaCliente[];
   contasPagar: ContaColaborador[];
@@ -69,6 +321,16 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
   const [subTab, setSubTab] = useState<"receber" | "pagar">("receber");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
+
+  // Selection for bulk pay
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Partial payment modal
+  const [partialModal, setPartialModal] = useState<{
+    clienteId: string;
+    clienteNome: string;
+    pendingItems: ContaClienteItem[];
+  } | null>(null);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -85,9 +347,23 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
     });
   }
 
+  function handleSelect(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
   function handleBaixaLancamento(id: string) {
     startTransition(async () => {
       await markAsPagoAction(id);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       router.refresh();
     });
   }
@@ -95,6 +371,28 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
   function handleBaixaRemuneracao(id: string) {
     startTransition(async () => {
       await markRemuneracaoPagaAction(id);
+      router.refresh();
+    });
+  }
+
+  function handleBaixaMultipla() {
+    const ids = Array.from(selectedIds);
+    startTransition(async () => {
+      await markMultiplePagoAction(ids);
+      setSelectedIds(new Set());
+      router.refresh();
+    });
+  }
+
+  function handlePagamentoParcial(
+    ids: string[],
+    valorPago: number,
+    clienteId: string
+  ) {
+    startTransition(async () => {
+      await pagamentoParcialAction({ ids, valorPago, clientId: clienteId });
+      setPartialModal(null);
+      setSelectedIds(new Set());
       router.refresh();
     });
   }
@@ -246,7 +544,6 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted pointer-events-none" />
           <input
@@ -260,7 +557,6 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
           />
         </div>
 
-        {/* Period filter */}
         <div className="flex gap-1 rounded-lg border border-border bg-white p-1 w-fit shadow-sm">
           {(
             [
@@ -284,7 +580,6 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
           ))}
         </div>
 
-        {/* Custom date pickers */}
         {periodo === "personalizado" && (
           <div className="flex items-center gap-2 flex-wrap">
             <input
@@ -374,6 +669,7 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
               <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-slate-50">
+                    <th className="w-8 px-4 py-3" />
                     <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted w-[35%]">
                       Cliente
                     </th>
@@ -396,7 +692,16 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
                       isExpanded={expanded.has(conta.client_id)}
                       onToggle={() => toggleExpand(conta.client_id)}
                       onBaixa={handleBaixaLancamento}
+                      onSelect={handleSelect}
+                      selectedIds={selectedIds}
                       isPending={isPending}
+                      onOpenParcial={(clienteId, clienteNome, items) =>
+                        setPartialModal({
+                          clienteId,
+                          clienteNome,
+                          pendingItems: items,
+                        })
+                      }
                     />
                   ))}
                 </tbody>
@@ -458,6 +763,46 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
           )}
         </div>
       )}
+
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 rounded-2xl border border-border bg-white px-5 py-3 shadow-xl">
+          <p className="font-body text-sm font-semibold text-fg">
+            {selectedIds.size}{" "}
+            {selectedIds.size === 1 ? "lançamento" : "lançamentos"} selecionado
+            {selectedIds.size > 1 ? "s" : ""}
+          </p>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="font-body text-xs text-muted hover:text-fg transition-colors cursor-pointer"
+          >
+            Limpar
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={handleBaixaMultipla}
+            className="rounded-lg bg-emerald-600 px-4 py-2 font-body text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {isPending
+              ? "Processando…"
+              : `Baixar ${selectedIds.size} selecionado${selectedIds.size > 1 ? "s" : ""}`}
+          </button>
+        </div>
+      )}
+
+      {/* Partial payment modal */}
+      {partialModal && (
+        <PagamentoParcialModal
+          clienteId={partialModal.clienteId}
+          clienteNome={partialModal.clienteNome}
+          pendingItems={partialModal.pendingItems}
+          onClose={() => setPartialModal(null)}
+          onConfirm={handlePagamentoParcial}
+          isPending={isPending}
+        />
+      )}
     </div>
   );
 }
@@ -469,17 +814,30 @@ function ClienteRows({
   isExpanded,
   onToggle,
   onBaixa,
+  onSelect,
+  selectedIds,
   isPending,
+  onOpenParcial,
 }: {
   conta: ContaCliente;
   isExpanded: boolean;
   onToggle: () => void;
   onBaixa: (id: string) => void;
+  onSelect: (id: string, checked: boolean) => void;
+  selectedIds: Set<string>;
   isPending: boolean;
+  onOpenParcial: (
+    clienteId: string,
+    clienteNome: string,
+    items: ContaClienteItem[]
+  ) => void;
 }) {
+  const pendingItems = conta.items.filter((i) => i.status !== "pago");
+
   return (
     <>
       <tr className="border-b border-border hover:bg-slate-50 transition-colors">
+        <td className="px-4 py-3 w-8" />
         <td className="px-4 py-3">
           <p className="font-body font-semibold text-fg">{conta.client_name}</p>
           <p className="font-body text-xs text-muted">{conta.client_doc}</p>
@@ -505,6 +863,22 @@ function ClienteRows({
             >
               {isExpanded ? "Recolher ▲" : `Expandir (${conta.items.length}) ▼`}
             </button>
+            {pendingItems.length >= 2 && (
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() =>
+                  onOpenParcial(
+                    conta.client_id,
+                    conta.client_name,
+                    pendingItems
+                  )
+                }
+                className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 font-body text-xs font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Pgto. Parcial
+              </button>
+            )}
             <Link
               href={`/dashboard/financeiro/novo?tipo=saida&client_id=${conta.client_id}`}
               className="rounded-lg border border-border px-3 py-1.5 font-body text-xs font-semibold text-fg hover:bg-slate-100 transition-colors"
@@ -526,6 +900,8 @@ function ClienteRows({
             key={item.id}
             item={item}
             onBaixa={onBaixa}
+            onSelect={onSelect}
+            isSelected={selectedIds.has(item.id)}
             isPending={isPending}
           />
         ))}
@@ -536,17 +912,31 @@ function ClienteRows({
 function ClienteItemRow({
   item,
   onBaixa,
+  onSelect,
+  isSelected,
   isPending,
 }: {
   item: ContaClienteItem;
   onBaixa: (id: string) => void;
+  onSelect: (id: string, checked: boolean) => void;
+  isSelected: boolean;
   isPending: boolean;
 }) {
   return (
     <tr
-      className={`border-b border-border transition-colors ${item.status === "pago" ? "bg-slate-50/60 opacity-70" : "bg-red-50/30"}`}
+      className={`border-b border-border transition-colors ${item.status === "pago" ? "bg-slate-50/60 opacity-70" : isSelected ? "bg-primary/5" : "bg-red-50/30"}`}
     >
-      <td className="pl-10 pr-4 py-2.5" colSpan={2}>
+      <td className="px-4 py-2.5 w-8">
+        {item.status !== "pago" && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => onSelect(item.id, e.target.checked)}
+            className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+          />
+        )}
+      </td>
+      <td className="pl-6 pr-4 py-2.5" colSpan={2}>
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className={`rounded px-1.5 py-0.5 font-body text-[11px] font-semibold ${item.tipo === "entrada" ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"}`}

@@ -795,6 +795,198 @@ export async function markAsPagoAction(id: string): Promise<void> {
   revalidatePath("/dashboard/financeiro");
 }
 
+// ── Baixa em lote ─────────────────────────────────────────────────────────────
+
+export async function markMultiplePagoAction(ids: string[]): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar")) return;
+  if (ids.length === 0) return;
+
+  try {
+    const rows = await sql`
+      UPDATE lancamentos
+      SET status = 'pago', data_pagamento = ${todayBR()}::date
+      WHERE id = ANY(${ids}::uuid[])
+        AND status != 'pago'
+      RETURNING id::text, client_id::text, tipo, valor, remuneracao_id
+    `;
+
+    for (const lan of rows) {
+      if (lan.remuneracao_id) {
+        await sql`
+          UPDATE remuneracoes
+          SET status = 'pago', data_pagamento = ${todayBR()}::date, updated_at = NOW()
+          WHERE id = ${lan.remuneracao_id}::uuid
+        `;
+      }
+      await cancelarLembretesLancamento(String(lan.id)).catch(() => null);
+    }
+
+    // One confirmation notification per client (total paid)
+    const byClient = new Map<string, number>();
+    for (const lan of rows) {
+      if (lan.client_id && lan.tipo === "entrada") {
+        byClient.set(
+          String(lan.client_id),
+          (byClient.get(String(lan.client_id)) ?? 0) + Number(lan.valor)
+        );
+      }
+    }
+
+    for (const [clientId, totalValor] of byClient) {
+      const cr = await sql`
+        SELECT name, phone, responsavel_nome, responsavel_telefone
+        FROM clients WHERE id = ${clientId}::uuid LIMIT 1
+      `.catch(() => []);
+      if (!cr.length) continue;
+
+      const pr = await sql`
+        SELECT COALESCE(SUM(valor), 0) AS total
+        FROM lancamentos
+        WHERE client_id = ${clientId}::uuid AND tipo = 'entrada' AND status = 'pendente'
+      `.catch(() => []);
+      const saldo = Number(pr[0]?.total ?? 0);
+      const respLegal =
+        cr[0].responsavel_nome && cr[0].responsavel_telefone
+          ? {
+              nome: String(cr[0].responsavel_nome),
+              telefone: String(cr[0].responsavel_telefone),
+            }
+          : null;
+
+      const firstId = rows.find((r) => String(r.client_id) === clientId)?.id;
+      await agendarConfirmacaoPagamento({
+        lancamentoId: String(firstId ?? ids[0]),
+        clienteId: clientId,
+        clienteNome: String(cr[0].name),
+        telefone: cr[0].phone ? String(cr[0].phone) : null,
+        responsavel: respLegal,
+        valorPago: totalValor,
+        dataPagamento: new Date(),
+        saldoRestante: saldo,
+      }).catch(() => null);
+    }
+  } catch (err) {
+    console.error("markMultiplePagoAction DB error:", err);
+  }
+
+  revalidatePath("/dashboard/financeiro");
+}
+
+// ── Pagamento parcial ─────────────────────────────────────────────────────────
+// Distributes `valorPago` across the given pending lancamento IDs (sorted by
+// due date). Fully covered rows are marked paid; the partially covered row is
+// updated to the paid portion and a new pending row is inserted for the
+// remainder.
+
+export async function pagamentoParcialAction(opts: {
+  ids: string[];
+  valorPago: number;
+  clientId: string;
+}): Promise<void> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar")) return;
+  if (opts.ids.length === 0 || opts.valorPago <= 0) return;
+
+  try {
+    const rows = await sql`
+      SELECT id::text, valor, descricao, categoria, tipo,
+             processo_id::text, data_vencimento::text, grupo_parcelas::text
+      FROM lancamentos
+      WHERE id = ANY(${opts.ids}::uuid[])
+        AND status != 'pago'
+      ORDER BY data_vencimento ASC NULLS LAST
+    `;
+
+    let remaining = opts.valorPago;
+    const paidIds: string[] = [];
+
+    for (const row of rows) {
+      if (remaining <= 0) break;
+      const itemValor = Number(row.valor);
+
+      if (remaining >= itemValor) {
+        await sql`
+          UPDATE lancamentos
+          SET status = 'pago', data_pagamento = ${todayBR()}::date
+          WHERE id = ${row.id}::uuid
+        `;
+        paidIds.push(String(row.id));
+        remaining = Math.round((remaining - itemValor) * 100) / 100;
+      } else {
+        // Partial: update existing to paid portion; insert remainder as new row
+        const paidPortion = Math.round(remaining * 100) / 100;
+        const restante = Math.round((itemValor - paidPortion) * 100) / 100;
+
+        await sql`
+          UPDATE lancamentos
+          SET valor = ${paidPortion}, status = 'pago', data_pagamento = ${todayBR()}::date
+          WHERE id = ${row.id}::uuid
+        `;
+        paidIds.push(String(row.id));
+
+        await sql`
+          INSERT INTO lancamentos
+            (tipo, categoria, descricao, valor, client_id, processo_id,
+             status, data_vencimento, grupo_parcelas, observacoes)
+          VALUES
+            (${row.tipo}, ${row.categoria ?? null},
+             ${String(row.descricao) + " — saldo restante"},
+             ${restante},
+             ${opts.clientId}::uuid,
+             ${row.processo_id ? row.processo_id : null}::uuid,
+             'pendente',
+             ${row.data_vencimento ?? todayBR()}::date,
+             ${row.grupo_parcelas ? row.grupo_parcelas : null}::uuid,
+             'Gerado automaticamente por pagamento parcial')
+        `;
+
+        remaining = 0;
+      }
+    }
+
+    for (const pid of paidIds) {
+      await cancelarLembretesLancamento(pid).catch(() => null);
+    }
+
+    const cr = await sql`
+      SELECT name, phone, responsavel_nome, responsavel_telefone
+      FROM clients WHERE id = ${opts.clientId}::uuid LIMIT 1
+    `.catch(() => []);
+
+    if (cr.length > 0) {
+      const pr = await sql`
+        SELECT COALESCE(SUM(valor), 0) AS total
+        FROM lancamentos
+        WHERE client_id = ${opts.clientId}::uuid AND tipo = 'entrada' AND status = 'pendente'
+      `.catch(() => []);
+      const saldo = Number(pr[0]?.total ?? 0);
+      const respLegal =
+        cr[0].responsavel_nome && cr[0].responsavel_telefone
+          ? {
+              nome: String(cr[0].responsavel_nome),
+              telefone: String(cr[0].responsavel_telefone),
+            }
+          : null;
+
+      await agendarConfirmacaoPagamento({
+        lancamentoId: paidIds[0] ?? opts.ids[0],
+        clienteId: opts.clientId,
+        clienteNome: String(cr[0].name),
+        telefone: cr[0].phone ? String(cr[0].phone) : null,
+        responsavel: respLegal,
+        valorPago: opts.valorPago,
+        dataPagamento: new Date(),
+        saldoRestante: saldo,
+      }).catch(() => null);
+    }
+  } catch (err) {
+    console.error("pagamentoParcialAction DB error:", err);
+  }
+
+  revalidatePath("/dashboard/financeiro");
+}
+
 export async function deleteLancamentoAction(id: string): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "financeiro", "excluir")) return;

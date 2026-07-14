@@ -421,11 +421,26 @@ export async function createLancamentoAction(
     if (tipo === "entrada" && clientId && status === "pendente") {
       try {
         const clienteRows = await sql`
-          SELECT name, phone FROM clients WHERE id = ${clientId}::uuid LIMIT 1
+          SELECT name, phone, responsavel_nome, responsavel_telefone
+          FROM clients WHERE id = ${clientId}::uuid LIMIT 1
         `;
-        if (clienteRows.length > 0 && clienteRows[0].phone) {
+        if (
+          clienteRows.length > 0 &&
+          (clienteRows[0].phone || clienteRows[0].responsavel_telefone)
+        ) {
           const clienteNome = String(clienteRows[0].name);
-          const telefone = String(clienteRows[0].phone);
+          const telefone = clienteRows[0].phone
+            ? String(clienteRows[0].phone)
+            : null;
+          // Responsável legal tem prioridade (menor/incapaz)
+          const responsavel =
+            clienteRows[0].responsavel_nome &&
+            clienteRows[0].responsavel_telefone
+              ? {
+                  nome: String(clienteRows[0].responsavel_nome),
+                  telefone: String(clienteRows[0].responsavel_telefone),
+                }
+              : null;
 
           const toSchedule: Array<{
             id: string;
@@ -471,6 +486,7 @@ export async function createLancamentoAction(
               clienteId: clientId,
               clienteNome,
               telefone,
+              responsavel,
               valor: item.val,
               dataVencimento: new Date(`${item.dataStr}T12:00:00`),
               descricao,
@@ -734,7 +750,8 @@ export async function markAsPagoAction(id: string): Promise<void> {
     if (lan?.client_id && lan.tipo === "entrada") {
       await cancelarLembretesLancamento(id).catch(() => null);
       const clienteRows = await sql`
-        SELECT name, phone FROM clients WHERE id = ${lan.client_id}::uuid LIMIT 1
+        SELECT name, phone, responsavel_nome, responsavel_telefone
+        FROM clients WHERE id = ${lan.client_id}::uuid LIMIT 1
       `.catch(() => []);
       if (clienteRows.length > 0) {
         const pendentesRows = await sql`
@@ -745,11 +762,19 @@ export async function markAsPagoAction(id: string): Promise<void> {
             AND status = 'pendente'
         `.catch(() => []);
         const saldo = Number(pendentesRows[0]?.total ?? 0);
+        const respLegal =
+          clienteRows[0].responsavel_nome && clienteRows[0].responsavel_telefone
+            ? {
+                nome: String(clienteRows[0].responsavel_nome),
+                telefone: String(clienteRows[0].responsavel_telefone),
+              }
+            : null;
         await agendarConfirmacaoPagamento({
           lancamentoId: id,
           clienteId: lan.client_id,
           clienteNome: String(clienteRows[0].name),
-          telefone: String(clienteRows[0].phone ?? ""),
+          telefone: clienteRows[0].phone ? String(clienteRows[0].phone) : null,
+          responsavel: respLegal,
           valorPago: lan.valor,
           dataPagamento: new Date(),
           saldoRestante: saldo,

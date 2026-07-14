@@ -203,8 +203,10 @@ export async function agendarLembretesInss(opts: {
   clienteId: string;
   clienteNome: string;
   telefoneCliente: string | null;
-  telefoneResponsavel: string | null;
+  telefoneResponsavel: string | null; // colaborador/staff responsável
   nomeResponsavel: string | null;
+  // Responsável legal do cliente (menor/incapaz) — substitui contato do cliente
+  guardian?: { nome: string; telefone: string } | null;
   dataEvento: Date;
   horaEvento: string;
   tipoServico: string;
@@ -214,20 +216,36 @@ export async function agendarLembretesInss(opts: {
 }): Promise<void> {
   const cfg = await getMensagensConfig();
 
-  const destinos: Array<{ tipo: string; telefone: string; nome: string }> = [];
+  const destinos: Array<{
+    tipo: string;
+    telefone: string;
+    nome: string;
+    prefixo: string;
+  }> = [];
 
-  if (opts.telefoneCliente) {
+  if (opts.guardian?.telefone) {
+    // Guardião legal: notifica o responsável legal em vez do cliente (menor)
+    destinos.push({
+      tipo: "responsavel",
+      telefone: opts.guardian.telefone,
+      nome: opts.guardian.nome,
+      prefixo: `*Agendamento de: ${opts.clienteNome}*\n\n`,
+    });
+  } else if (opts.telefoneCliente) {
     destinos.push({
       tipo: "cliente",
       telefone: opts.telefoneCliente,
       nome: opts.clienteNome,
+      prefixo: "",
     });
   }
+  // Staff responsável sempre notificado (independente do guardião)
   if (opts.telefoneResponsavel && opts.nomeResponsavel) {
     destinos.push({
       tipo: "responsavel",
       telefone: opts.telefoneResponsavel,
       nome: opts.nomeResponsavel,
+      prefixo: "",
     });
   }
 
@@ -282,7 +300,7 @@ export async function agendarLembretesInss(opts: {
         local: opts.local,
       };
 
-      const mensagem = renderMensagem(lembrete.template, vars);
+      const mensagem = dest.prefixo + renderMensagem(lembrete.template, vars);
 
       await sql`
         INSERT INTO lembretes_agendados
@@ -306,12 +324,19 @@ export async function agendarLembretesHonorario(opts: {
   clienteId: string;
   clienteNome: string;
   telefone: string | null;
+  // Quando o cliente é menor/incapaz, mensagens vão ao responsável legal
+  responsavel?: { nome: string; telefone: string } | null;
   valor: number;
   dataVencimento: Date;
   descricao?: string;
   escritorio?: string;
 }): Promise<void> {
-  if (!opts.telefone) return;
+  // Determina o destinatário efetivo: responsável legal tem prioridade sobre o cliente
+  const destTelefone = opts.responsavel?.telefone ?? opts.telefone;
+  const destNome = opts.responsavel?.nome ?? opts.clienteNome;
+  const destTipo = opts.responsavel ? "responsavel" : "cliente";
+
+  if (!destTelefone) return;
 
   const cfg = await getMensagensConfig();
 
@@ -349,19 +374,24 @@ export async function agendarLembretesHonorario(opts: {
     },
   ];
 
-  const nome = primeiroNome(opts.clienteNome);
   const escritorio = opts.escritorio ?? "nosso escritório";
   const valor = formatarMoeda(opts.valor);
+  // Quando responsável: prefixo identifica de quem é o honorário
+  const prefixo = opts.responsavel
+    ? `*Honorário referente a: ${opts.clienteNome}*\n\n`
+    : "";
 
   for (const lembrete of tiposLembrete) {
     if (lembrete.enviarEm <= new Date()) continue;
 
-    const mensagem = renderMensagem(lembrete.template, {
-      nome,
-      escritorio,
-      valor,
-      data: formatarData(opts.dataVencimento),
-    });
+    const mensagem =
+      prefixo +
+      renderMensagem(lembrete.template, {
+        nome: primeiroNome(destNome),
+        escritorio,
+        valor,
+        data: formatarData(opts.dataVencimento),
+      });
 
     await sql`
       INSERT INTO lembretes_agendados
@@ -371,7 +401,7 @@ export async function agendarLembretesHonorario(opts: {
       VALUES
         (${lembrete.tipo}, 'lancamento', ${opts.lancamentoId}::uuid,
          ${opts.clienteId}::uuid, ${opts.clienteNome},
-         'cliente', ${opts.telefone}, ${opts.clienteNome},
+         ${destTipo}, ${destTelefone}, ${destNome},
          ${mensagem}, ${lembrete.enviarEm.toISOString()})
     `;
   }
@@ -383,13 +413,15 @@ export async function agendarVideochamadaWhatsApp(opts: {
   compromissoId: string;
   clienteId: string;
   clienteNome: string;
-  telefone: string;
+  telefone: string | null;
   dataEvento: Date;
   horaEvento: string;
   link?: string;
   tipoReuniao?: "meet" | "whatsapp";
   escritorio?: string;
-  responsavel?: { telefone: string; nome: string };
+  responsavel?: { telefone: string; nome: string }; // colaborador/staff
+  // Responsável legal do cliente (menor/incapaz) — substitui contato do cliente
+  clienteResponsavel?: { nome: string; telefone: string } | null;
 }): Promise<void> {
   const cfg = await getMensagensConfig();
   const isMeet = (opts.tipoReuniao ?? "meet") === "meet";
@@ -414,30 +446,41 @@ export async function agendarVideochamadaWhatsApp(opts: {
     },
   ];
 
-  // Notifica o cliente
-  const varsCliente = {
-    nome: primeiroNome(opts.clienteNome),
-    escritorio: opts.escritorio ?? "nosso escritório",
-    diaSemana: formatarDiaSemana(opts.dataEvento),
-    data: formatarData(opts.dataEvento),
-    hora: opts.horaEvento,
-    link: opts.link ?? "",
-  };
+  // Notifica o cliente — ou o responsável legal quando cliente é menor/incapaz
+  const destClienteTelefone =
+    opts.clienteResponsavel?.telefone ?? opts.telefone;
+  const destClienteNome = opts.clienteResponsavel?.nome ?? opts.clienteNome;
+  const destClienteTipo = opts.clienteResponsavel ? "responsavel" : "cliente";
+  const prefixoCliente = opts.clienteResponsavel
+    ? `*Reunião de: ${opts.clienteNome}*\n\n`
+    : "";
 
-  for (const lembrete of lembretes) {
-    if (lembrete.enviarEm <= agora) continue;
-    const mensagem = renderMensagem(lembrete.template, varsCliente);
-    await sql`
-      INSERT INTO lembretes_agendados
-        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
-         destinatario_tipo, destinatario_telefone, destinatario_nome,
-         mensagem, enviar_em)
-      VALUES
-        (${lembrete.tipo}, 'compromisso', ${opts.compromissoId}::uuid,
-         ${opts.clienteId}::uuid, ${opts.clienteNome},
-         'cliente', ${opts.telefone}, ${opts.clienteNome},
-         ${mensagem}, ${lembrete.enviarEm.toISOString()})
-    `;
+  if (destClienteTelefone) {
+    const varsCliente = {
+      nome: primeiroNome(destClienteNome),
+      escritorio: opts.escritorio ?? "nosso escritório",
+      diaSemana: formatarDiaSemana(opts.dataEvento),
+      data: formatarData(opts.dataEvento),
+      hora: opts.horaEvento,
+      link: opts.link ?? "",
+    };
+
+    for (const lembrete of lembretes) {
+      if (lembrete.enviarEm <= agora) continue;
+      const mensagem =
+        prefixoCliente + renderMensagem(lembrete.template, varsCliente);
+      await sql`
+        INSERT INTO lembretes_agendados
+          (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+           destinatario_tipo, destinatario_telefone, destinatario_nome,
+           mensagem, enviar_em)
+        VALUES
+          (${lembrete.tipo}, 'compromisso', ${opts.compromissoId}::uuid,
+           ${opts.clienteId}::uuid, ${opts.clienteNome},
+           ${destClienteTipo}, ${destClienteTelefone}, ${destClienteNome},
+           ${mensagem}, ${lembrete.enviarEm.toISOString()})
+      `;
+    }
   }
 
   // Notifica o responsável (colaborador) com lembretes D-1 e no dia
@@ -584,6 +627,8 @@ export async function agendarNotificacoesCompromisso(opts: {
   link: string | null;
   colaborador: { telefone: string; nome: string } | null;
   cliente: { id: string; telefone: string; nome: string } | null;
+  // Quando o cliente é menor/incapaz, mensagens vão ao responsável legal
+  clienteResponsavel?: { nome: string; telefone: string } | null;
 }): Promise<void> {
   const agora = new Date();
   const diaSemana = formatarDiaSemana(opts.dataEvento);
@@ -698,11 +743,20 @@ export async function agendarNotificacoesCompromisso(opts: {
     });
   }
 
-  // ── Notificações para o CLIENTE ──
-  if (opts.cliente?.telefone) {
-    const primeiroNomeCliente = primeiroNome(opts.cliente.nome);
+  // ── Notificações para o CLIENTE (ou responsável legal se for menor/incapaz) ──
+  if (opts.cliente?.telefone || opts.clienteResponsavel?.telefone) {
+    // Responsável legal tem prioridade — mensagem não vai para o menor
+    const resp = opts.clienteResponsavel;
+    const destTelefone = resp?.telefone ?? opts.cliente!.telefone;
+    const destNome = resp?.nome ?? opts.cliente!.nome;
+    const destTipo = resp ? "responsavel" : "cliente";
+    const primeiroNomeDest = primeiroNome(destNome);
+    // Prefixo identifica de quem é o compromisso quando endereçado ao responsável
+    const prefixoCliente = resp
+      ? `*Compromisso de: ${opts.cliente!.nome}*\n\n`
+      : "";
 
-    // Confirmação imediata para o cliente — todos os tipos, com pedido de confirmação
+    // Confirmação imediata — com pedido de confirmação
     {
       const localOuLink = opts.link
         ? `\n🔗 ${opts.link}`
@@ -713,15 +767,16 @@ export async function agendarNotificacoesCompromisso(opts: {
         tipo: "compromisso_convite",
         enviarEm: new Date(agora.getTime() + 60_000),
         mensagem:
-          `${icon} Olá, ${primeiroNomeCliente}! Gostaríamos de confirmar o seu *${label}* com o *Orlando Martins Advocacia*:\n\n` +
+          prefixoCliente +
+          `${icon} Olá, ${primeiroNomeDest}! Gostaríamos de confirmar o *${label}* com o *Orlando Martins Advocacia*:\n\n` +
           `📌 *${opts.titulo}*\n` +
           `🗓️ ${diaSemana}, ${data}${horaStr}${localOuLink}\n\n` +
-          `Por favor, *confirme respondendo SIM* se esse horário está bom para você. Se precisar remarcar, é só nos chamar! 😊`,
-        destinatarioTipo: "cliente",
-        destinatarioTelefone: opts.cliente.telefone,
-        destinatarioNome: opts.cliente.nome,
-        clienteId: opts.cliente.id,
-        clienteNome: opts.cliente.nome,
+          `Por favor, *confirme respondendo SIM* se esse horário está bom. Se precisar remarcar, é só nos chamar! 😊`,
+        destinatarioTipo: destTipo,
+        destinatarioTelefone: destTelefone,
+        destinatarioNome: destNome,
+        clienteId: opts.cliente?.id ?? null,
+        clienteNome: opts.cliente?.nome ?? destNome,
       });
     }
 
@@ -730,15 +785,16 @@ export async function agendarNotificacoesCompromisso(opts: {
       tipo: "compromisso_1d",
       enviarEm: diasAntes(opts.dataEvento, 1, 8),
       mensagem:
+        prefixoCliente +
         `📅 *Lembrete para amanhã!*\n\n` +
-        `${icon} Olá, ${primeiroNomeCliente}! Você tem um *${label}* com nosso escritório amanhã:\n\n` +
+        `${icon} Olá, ${primeiroNomeDest}! Há um *${label}* com nosso escritório amanhã:\n\n` +
         `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}${linkStr}\n\n` +
         `_Qualquer imprevisto, nos avise com antecedência._`,
-      destinatarioTipo: "cliente",
-      destinatarioTelefone: opts.cliente.telefone,
-      destinatarioNome: opts.cliente.nome,
-      clienteId: opts.cliente.id,
-      clienteNome: opts.cliente.nome,
+      destinatarioTipo: destTipo,
+      destinatarioTelefone: destTelefone,
+      destinatarioNome: destNome,
+      clienteId: opts.cliente?.id ?? null,
+      clienteNome: opts.cliente?.nome ?? destNome,
     });
 
     // No dia às 7h
@@ -746,15 +802,16 @@ export async function agendarNotificacoesCompromisso(opts: {
       tipo: "compromisso_dia",
       enviarEm: mesmoDia(opts.dataEvento, 7),
       mensagem:
+        prefixoCliente +
         `⏰ *${label} hoje!*\n\n` +
-        `${icon} Olá, ${primeiroNomeCliente}! Lembrando que você tem um *${label}* com nosso escritório *hoje*:\n\n` +
+        `${icon} Olá, ${primeiroNomeDest}! Lembrando que há um *${label}* com nosso escritório *hoje*:\n\n` +
         `🗓️ ${data}${horaStr}${localStr}${linkStr}\n\n` +
         `_Até logo! 😊_`,
-      destinatarioTipo: "cliente",
-      destinatarioTelefone: opts.cliente.telefone,
-      destinatarioNome: opts.cliente.nome,
-      clienteId: opts.cliente.id,
-      clienteNome: opts.cliente.nome,
+      destinatarioTipo: destTipo,
+      destinatarioTelefone: destTelefone,
+      destinatarioNome: destNome,
+      clienteId: opts.cliente?.id ?? null,
+      clienteNome: opts.cliente?.nome ?? destNome,
     });
   }
 }
@@ -817,26 +874,37 @@ export async function agendarConfirmacaoPagamento(opts: {
   clienteId: string;
   clienteNome: string;
   telefone: string | null;
+  // Quando o cliente é menor/incapaz, confirmação vai ao responsável legal
+  responsavel?: { nome: string; telefone: string } | null;
   valorPago: number;
   dataPagamento: Date;
   saldoRestante: number;
 }): Promise<void> {
-  if (!opts.telefone) return;
+  const destTelefone = opts.responsavel?.telefone ?? opts.telefone;
+  const destNome = opts.responsavel?.nome ?? opts.clienteNome;
+  const destTipo = opts.responsavel ? "responsavel" : "cliente";
+
+  if (!destTelefone) return;
 
   const cfg = await getMensagensConfig();
-  const nome = primeiroNome(opts.clienteNome);
+  const nome = primeiroNome(destNome);
   const valor = formatarMoeda(opts.valorPago);
   const data = formatarData(opts.dataPagamento);
 
+  const prefixo = opts.responsavel
+    ? `*Pagamento referente a: ${opts.clienteNome}*\n\n`
+    : "";
+
   const mensagem =
-    opts.saldoRestante <= 0
+    prefixo +
+    (opts.saldoRestante <= 0
       ? renderMensagem(cfg.honorario_pagamento_quitado, { nome, valor, data })
       : renderMensagem(cfg.honorario_pagamento_parcial, {
           nome,
           valor,
           data,
           saldo: formatarMoeda(opts.saldoRestante),
-        });
+        }));
 
   // Envia imediatamente (1 minuto no futuro para dar tempo ao DB commit)
   const enviarEm = new Date(Date.now() + 60_000);
@@ -849,7 +917,7 @@ export async function agendarConfirmacaoPagamento(opts: {
     VALUES
       ('honorario_pago_confirmacao', 'lancamento', ${opts.lancamentoId}::uuid,
        ${opts.clienteId}::uuid, ${opts.clienteNome},
-       'cliente', ${opts.telefone}, ${opts.clienteNome},
+       ${destTipo}, ${destTelefone}, ${destNome},
        ${mensagem}, ${enviarEm.toISOString()})
   `;
 }

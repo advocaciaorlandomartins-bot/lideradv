@@ -97,31 +97,34 @@ export async function POST(req: NextRequest) {
     let telefoneClienteEfetivo = telefoneCliente ?? null;
     let telefoneResponsavelEfetivo = telefoneResponsavel ?? null;
     let nomeResponsavelEfetivo = nomeResponsavel ?? null;
+    // Responsável legal do cliente (menor/incapaz) — substitui contato do cliente
+    let guardianTelefone: string | null = null;
+    let guardianNome: string | null = null;
 
-    if (!telefoneClienteEfetivo || !telefoneResponsavelEfetivo) {
-      const [dbRows] = await Promise.all([
-        sql`
-          SELECT
-            cl.phone            AS cliente_telefone,
-            col.telefone        AS resp_telefone,
-            col.nome            AS resp_nome
-          FROM clients cl
-          LEFT JOIN LATERAL (
-            SELECT p.responsavel_id
-            FROM processos p
-            WHERE p.client_id = cl.id
-              AND p.deleted_at IS NULL
-              AND p.responsavel_id IS NOT NULL
-            ORDER BY p.created_at DESC
-            LIMIT 1
-          ) lp ON true
-          LEFT JOIN colaboradores col ON col.id = lp.responsavel_id AND col.status = 'ativo'
-          WHERE cl.id = ${clienteId}::uuid
+    {
+      const dbRows = await sql`
+        SELECT
+          cl.phone                AS cliente_telefone,
+          cl.responsavel_telefone AS guardian_telefone,
+          cl.responsavel_nome     AS guardian_nome,
+          col.telefone            AS resp_telefone,
+          col.nome                AS resp_nome
+        FROM clients cl
+        LEFT JOIN LATERAL (
+          SELECT p.responsavel_id
+          FROM processos p
+          WHERE p.client_id = cl.id
+            AND p.deleted_at IS NULL
+            AND p.responsavel_id IS NOT NULL
+          ORDER BY p.created_at DESC
           LIMIT 1
-        `.catch(() => [] as Record<string, unknown>[]),
-      ]);
+        ) lp ON true
+        LEFT JOIN colaboradores col ON col.id = lp.responsavel_id AND col.status = 'ativo'
+        WHERE cl.id = ${clienteId}::uuid
+        LIMIT 1
+      `.catch(() => [] as Record<string, unknown>[]);
 
-      const row = Array.isArray(dbRows) ? dbRows[0] : dbRows;
+      const row = dbRows[0];
       if (row) {
         if (!telefoneClienteEfetivo && row.cliente_telefone)
           telefoneClienteEfetivo = String(row.cliente_telefone);
@@ -129,6 +132,13 @@ export async function POST(req: NextRequest) {
           telefoneResponsavelEfetivo = String(row.resp_telefone);
         if (!nomeResponsavelEfetivo && row.resp_nome)
           nomeResponsavelEfetivo = String(row.resp_nome);
+        // Guardião legal: substitui o telefone do cliente nos lembretes
+        if (row.guardian_telefone) {
+          guardianTelefone = String(row.guardian_telefone);
+          guardianNome = row.guardian_nome ? String(row.guardian_nome) : null;
+          // Não enviar para o menor — usar o guardião como destinatário do cliente
+          telefoneClienteEfetivo = null;
+        }
       }
     }
 
@@ -273,6 +283,11 @@ export async function POST(req: NextRequest) {
         telefoneCliente: telefoneClienteEfetivo,
         telefoneResponsavel: telefoneResponsavelEfetivo,
         nomeResponsavel: nomeResponsavelEfetivo,
+        // Guardião legal substitui o contato do cliente (menor/incapaz)
+        guardian:
+          guardianTelefone && guardianNome
+            ? { nome: guardianNome, telefone: guardianTelefone }
+            : null,
         dataEvento: dataEventoDate,
         horaEvento: hora,
         tipoServico,

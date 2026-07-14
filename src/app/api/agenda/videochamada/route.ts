@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
 
   // Read client info
   const clientRows = await sql`
-    SELECT name, phone FROM clients WHERE id = ${clienteId}::uuid LIMIT 1
+    SELECT name, phone, responsavel_nome, responsavel_telefone
+    FROM clients WHERE id = ${clienteId}::uuid LIMIT 1
   `;
   if (!clientRows.length) {
     return NextResponse.json(
@@ -47,10 +48,19 @@ export async function POST(req: NextRequest) {
       { status: 404 }
     );
   }
-  const { name: clienteNome, phone: telefone } = clientRows[0] as {
+  const cr = clientRows[0] as {
     name: string;
-    phone: string;
+    phone: string | null;
+    responsavel_nome: string | null;
+    responsavel_telefone: string | null;
   };
+  const clienteNome = cr.name;
+  const telefone = cr.phone ?? null;
+  // Responsável legal (menor/incapaz) — mensagens vão a ele
+  const clienteResponsavelLegal =
+    cr.responsavel_nome && cr.responsavel_telefone
+      ? { nome: cr.responsavel_nome, telefone: cr.responsavel_telefone }
+      : null;
 
   const escritorioConfig = await getEscritorioConfig();
 
@@ -88,8 +98,8 @@ export async function POST(req: NextRequest) {
     };
   }
 
-  // Schedule WhatsApp messages
-  if (telefone) {
+  // Schedule WhatsApp messages (para cliente, responsável legal ou staff)
+  if (telefone || clienteResponsavelLegal) {
     const [year, month, day] = data.split("-").map(Number);
     const dataEvento = new Date(year, month - 1, day);
 
@@ -104,6 +114,7 @@ export async function POST(req: NextRequest) {
       tipoReuniao: isMeet ? "meet" : "whatsapp",
       escritorio: escritorioConfig.nome,
       responsavel,
+      clienteResponsavel: clienteResponsavelLegal,
     });
   }
 

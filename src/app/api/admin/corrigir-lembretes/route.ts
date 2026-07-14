@@ -44,10 +44,12 @@ export async function POST() {
       c.hora_inicio,
       c.local_link,
       c.cliente_id::text,
-      cl.name           AS cliente_nome,
-      cl.phone          AS cliente_telefone,
-      col.nome          AS responsavel_nome,
-      col.telefone      AS responsavel_telefone
+      cl.name                   AS cliente_nome,
+      cl.phone                  AS cliente_telefone,
+      cl.responsavel_nome       AS guardian_nome,
+      cl.responsavel_telefone   AS guardian_telefone,
+      col.nome                  AS responsavel_nome,
+      col.telefone              AS responsavel_telefone
     FROM compromissos c
     LEFT JOIN clients cl ON cl.id = c.cliente_id
     LEFT JOIN LATERAL (
@@ -103,6 +105,13 @@ export async function POST() {
                 id: String(r.cliente_id),
                 nome: String(r.cliente_nome),
                 telefone: String(r.cliente_telefone),
+              }
+            : null,
+        clienteResponsavel:
+          r.guardian_nome && r.guardian_telefone
+            ? {
+                nome: String(r.guardian_nome),
+                telefone: String(r.guardian_telefone),
               }
             : null,
       });

@@ -57,8 +57,8 @@ export async function criarCompromissoAction(
         `.catch(() => [] as Record<string, unknown>[]),
         data.clienteId
           ? sql`
-              SELECT id::text, name, phone FROM clients
-              WHERE id = ${data.clienteId}::uuid LIMIT 1
+              SELECT id::text, name, phone, responsavel_nome, responsavel_telefone
+              FROM clients WHERE id = ${data.clienteId}::uuid LIMIT 1
             `.catch(() => [] as Record<string, unknown>[])
           : Promise.resolve([] as Record<string, unknown>[]),
         sql`
@@ -74,19 +74,28 @@ export async function criarCompromissoAction(
             }
           : null;
 
+      const clienteRow = clienteRows.length > 0 ? clienteRows[0] : null;
       const cliente =
-        clienteRows.length > 0 && clienteRows[0].phone
+        clienteRow && clienteRow.phone
           ? {
-              id: String(clienteRows[0].id),
-              nome: String(clienteRows[0].name),
-              telefone: String(clienteRows[0].phone),
+              id: String(clienteRow.id),
+              nome: String(clienteRow.name),
+              telefone: String(clienteRow.phone),
+            }
+          : null;
+      // Responsável legal do cliente (menor/incapaz) — mensagens vão a ele
+      const clienteResponsavel =
+        clienteRow?.responsavel_nome && clienteRow?.responsavel_telefone
+          ? {
+              nome: String(clienteRow.responsavel_nome),
+              telefone: String(clienteRow.responsavel_telefone),
             }
           : null;
 
       // Detecta link de videochamada no campo localLink
       const link = data.localLink?.startsWith("http") ? data.localLink : null;
 
-      // Agenda notificações WhatsApp (colaborador + cliente)
+      // Agenda notificações WhatsApp (colaborador + cliente/responsável)
       await agendarNotificacoesCompromisso({
         compromissoId: id,
         titulo: data.titulo,
@@ -97,6 +106,7 @@ export async function criarCompromissoAction(
         link,
         colaborador,
         cliente,
+        clienteResponsavel,
       }).catch(() => null);
 
       // Cria entrada em controles → aparece em Minhas Tarefas do colaborador

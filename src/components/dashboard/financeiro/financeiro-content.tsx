@@ -279,10 +279,12 @@ function RowActions({
   lancamento,
   canEdit: _canEdit,
   singleDeleteOnly = false,
+  hidePayActions = false,
 }: {
   lancamento: Lancamento;
   canEdit: boolean;
   singleDeleteOnly?: boolean;
+  hidePayActions?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -382,7 +384,7 @@ function RowActions({
           Desfazer
         </button>
       )}
-      {lancamento.status === "pendente" && (
+      {lancamento.status === "pendente" && !hidePayActions && (
         <>
           <button
             onClick={handlePago}
@@ -467,7 +469,7 @@ function RowActions({
 
       {menuOpen && (
         <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl">
-          {lancamento.status === "pendente" && (
+          {lancamento.status === "pendente" && !hidePayActions && (
             <button
               onClick={handlePago}
               className="flex w-full items-center gap-2.5 px-4 py-2.5 font-body text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
@@ -476,7 +478,7 @@ function RowActions({
               {lancamento.tipo === "entrada" ? "Recebi" : "Paguei"}
             </button>
           )}
-          {lancamento.status === "pendente" && (
+          {lancamento.status === "pendente" && !hidePayActions && (
             <button
               onClick={() => {
                 setMenuOpen(false);
@@ -587,12 +589,14 @@ function LancamentoRow({
   singleDeleteOnly = false,
   showPagoEm = false,
   highlightOverdue = false,
+  hidePayActions = false,
 }: {
   l: Lancamento;
   canEdit: boolean;
   singleDeleteOnly?: boolean;
   showPagoEm?: boolean;
   highlightOverdue?: boolean;
+  hidePayActions?: boolean;
 }) {
   const isPessoal = l.remuneracao_id !== null;
   const today = new Date();
@@ -658,6 +662,7 @@ function LancamentoRow({
           lancamento={l}
           canEdit={canEdit}
           singleDeleteOnly={singleDeleteOnly}
+          hidePayActions={hidePayActions}
         />
       </td>
     </tr>
@@ -1504,6 +1509,15 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
 
           {/* Right: busca + ação */}
           <div className="flex items-center gap-2">
+            <span className="hidden sm:inline font-body text-[11px] text-muted italic">
+              Para dar baixa use{" "}
+              <a
+                href="/dashboard/financeiro?tab=receber"
+                className="text-primary underline underline-offset-2 hover:no-underline not-italic font-semibold"
+              >
+                A Receber
+              </a>
+            </span>
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
               <input
@@ -1620,6 +1634,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
                       singleDeleteOnly={mainTab === "concluidas"}
                       showPagoEm={mainTab === "concluidas"}
                       highlightOverdue={mainTab === "atrasados"}
+                      hidePayActions={true}
                     />
                   ))}
                 </tbody>

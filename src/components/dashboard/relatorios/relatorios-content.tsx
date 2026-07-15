@@ -1326,8 +1326,9 @@ function buildReciboHtml(
   const hasFundo =
     !!escritorio.fundo_timbrado &&
     !escritorio.fundo_timbrado.startsWith("data:application/pdf");
+  // height:100vh (não 100%) evita que o Chrome gere uma página em branco extra
   const fundoBgEl = hasFundo
-    ? `<img src="${escritorio.fundo_timbrado}" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;object-fit:cover;" alt="" />`
+    ? `<img src="${escritorio.fundo_timbrado}" style="position:fixed;top:0;left:0;width:100%;height:100vh;z-index:-1;object-fit:cover;pointer-events:none;" alt="" />`
     : "";
 
   // Margens configuradas (mm)
@@ -1436,6 +1437,13 @@ function buildReciboHtml(
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Times New Roman', Times, serif; color: #1e293b; }
 
+    /* Cabeçalho da tabela repete em cada página impressa */
+    thead { display: table-header-group; }
+    /* Evita quebra de linha no meio de uma linha da tabela */
+    tbody tr { page-break-inside: avoid; break-inside: avoid; }
+    /* Evita quebrar o resumo/rodapé no meio */
+    .no-break { page-break-inside: avoid; break-inside: avoid; }
+
     /* Visualização na tela: simula folha A4 com sombra */
     @media screen {
       body { background: #94a3b8; padding: 24px 0 48px; }
@@ -1458,10 +1466,10 @@ function buildReciboHtml(
       ${
         hasFundo
           ? /* Com timbrado: @page sem margem para a imagem cobrir a folha inteira;
-           o padding do .page posiciona o conteúdo dentro da área do timbrado */
+               height:100vh evita página em branco extra que height:100% causa no Chrome */
             `.page { width: 100%; padding: ${mt}mm ${mr}mm ${mb}mm ${ml}mm; background: transparent; }
       @page { margin: 0; size: A4; }`
-          : /* Sem timbrado: @page cuida das margens, sem padding duplo */
+          : /* Sem timbrado: @page cuida das margens */
             `.page { width: 100%; padding: 0; background: transparent; }
       @page { margin: ${mt}mm ${mr}mm ${mb}mm ${ml}mm; size: A4; }`
       }
@@ -1530,7 +1538,7 @@ function buildReciboHtml(
       </tfoot>
     </table>
 
-    <div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:5px;padding:8px 12px;">
+    <div class="no-break" style="margin-top:10px;border:1px solid #e2e8f0;border-radius:5px;padding:8px 12px;">
       <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#475569;letter-spacing:1px;margin-bottom:6px;">Resumo Financeiro</div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:10px;color:#374151;font-weight:500;">Honorários lançados</span><span style="font-size:10px;font-weight:700;color:#0f172a;">${fmt(lancamentos.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.valor, 0))}</span></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:10px;color:#166534;font-weight:500;">Pagamentos recebidos</span><span style="font-size:10px;font-weight:700;color:#166534;">${fmt(lancamentos.filter((r) => r.tipo === "entrada" && r.status === "pago").reduce((s, r) => s + r.valor, 0))}</span></div>
@@ -1539,7 +1547,7 @@ function buildReciboHtml(
       <div style="display:flex;justify-content:space-between;"><span style="font-size:11px;font-weight:700;color:#92400e;">Saldo devedor</span><span style="font-size:13px;font-weight:800;color:#92400e;">${fmt(saldoDevedor)}</span></div>
     </div>
 
-    <div style="margin-top:18px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:flex-end;">
+    <div class="no-break" style="margin-top:18px;padding-top:12px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:flex-end;">
       <div style="font-size:8px;color:#94a3b8;line-height:1.6;">
         Documento gerado em ${today}<br/>
         Este demonstrativo é meramente informativo.

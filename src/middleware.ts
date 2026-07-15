@@ -10,11 +10,19 @@ export function middleware(req: NextRequest) {
   }
 
   try {
+    // Cookie format: <base64url-payload>.<hmac-sig>
+    // Full HMAC verification happens in getSession() in each route handler.
+    // Here we only do a lightweight sanity + expiry check at the Edge.
     const dot = token.lastIndexOf(".");
     if (dot === -1) throw new Error("malformed");
     const payload = token.slice(0, dot);
-    // base64url → standard base64 → JSON
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+
+    // base64url → standard base64 (add padding so atob works)
+    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const rem = b64.length % 4;
+    const padded = rem ? b64 + "=".repeat(4 - rem) : b64;
+    const json = atob(padded);
+
     const data = JSON.parse(json) as { exp?: number };
     if (!data.exp || data.exp < Math.floor(Date.now() / 1000)) {
       throw new Error("expired");

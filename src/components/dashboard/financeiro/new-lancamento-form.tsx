@@ -311,8 +311,22 @@ export default function NewLancamentoForm({
     const entrada = parseFloat(parseMoney(valorEntradaMensalidade)) || 0;
     if (!total || !mens || mens <= 0) return null;
     const valorParcelar = entrada > 0 ? Math.max(total - entrada, 0) : total;
-    const numParcelas = valorParcelar > 0 ? Math.ceil(valorParcelar / mens) : 0;
-    return { total, mens, numParcelas, entrada };
+    const numParcelas =
+      valorParcelar > 0 ? Math.max(1, Math.floor(valorParcelar / mens)) : 0;
+    const valorUltimaParcela =
+      numParcelas > 0
+        ? Math.round((valorParcelar - (numParcelas - 1) * mens) * 100) / 100
+        : 0;
+    const ultimaDifere =
+      numParcelas > 1 && Math.abs(valorUltimaParcela - mens) >= 0.01;
+    return {
+      total,
+      mens,
+      numParcelas,
+      entrada,
+      valorUltimaParcela,
+      ultimaDifere,
+    };
   }, [paymentMode, effectiveValor, valorMensalidade, valorEntradaMensalidade]);
 
   // ── Preview Parcelado (inclui modo retroativo) ─────────────
@@ -1630,11 +1644,21 @@ export default function NewLancamentoForm({
                             {mensalidadeCalc.numParcelas} parcelas
                           </strong>{" "}
                           de <strong>{fmt(mensalidadeCalc.mens)}</strong>
+                          {mensalidadeCalc.ultimaDifere && (
+                            <>
+                              {" "}
+                              (última:{" "}
+                              <strong>
+                                {fmt(mensalidadeCalc.valorUltimaParcela)}
+                              </strong>
+                              )
+                            </>
+                          )}
                         </p>
                         <p className="font-body text-xs text-amber-700 mt-0.5">
                           {mensalidadeCalc.entrada > 0
-                            ? `Entrada de ${fmt(mensalidadeCalc.entrada)} + ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada`
-                            : `Serão criados ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada`}
+                            ? `Entrada de ${fmt(mensalidadeCalc.entrada)} + ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada${mensalidadeCalc.ultimaDifere ? ` (última: ${fmt(mensalidadeCalc.valorUltimaParcela)})` : ""}`
+                            : `Serão criados ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada${mensalidadeCalc.ultimaDifere ? ` (última: ${fmt(mensalidadeCalc.valorUltimaParcela)})` : ""}`}
                         </p>
                       </div>
                     </div>

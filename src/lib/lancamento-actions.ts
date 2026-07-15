@@ -193,7 +193,9 @@ export async function createLancamentoAction(
       const valorParcelar =
         valorEntrada > 0 ? Math.max(valor - valorEntrada, 0) : valor;
       const numParcelas =
-        valorParcelar > 0 ? Math.ceil(valorParcelar / valorMensalidade) : 0;
+        valorParcelar > 0
+          ? Math.max(1, Math.floor(valorParcelar / valorMensalidade))
+          : 0;
       const baseDate = new Date(`${baseDateStr}T12:00:00`);
 
       if (valorEntrada > 0) {
@@ -220,13 +222,20 @@ export async function createLancamentoAction(
         parcDate.setMonth(parcDate.getMonth() + i);
         const parcDateStr = parcDate.toISOString().split("T")[0];
         const descParcela = `${descricao} — Parcela ${i}/${numParcelas}`;
+        // Última parcela absorve os centavos restantes para o total fechar exato
+        const valorParcela =
+          i === numParcelas
+            ? Math.round(
+                (valorParcelar - (numParcelas - 1) * valorMensalidade) * 100
+              ) / 100
+            : valorMensalidade;
         const rows = await sql`
           INSERT INTO lancamentos
             (tipo, categoria, descricao, valor, client_id, processo_id,
              status, data_vencimento, parcela_atual, total_parcelas,
              grupo_parcelas, observacoes)
           VALUES
-            (${tipo}, ${categoria}, ${descParcela}, ${valorMensalidade},
+            (${tipo}, ${categoria}, ${descParcela}, ${valorParcela},
              ${clientId ? clientId : null}::uuid,
              ${processoId ? processoId : null}::uuid,
              'pendente', ${parcDateStr}::date, ${i}, ${numParcelas},
@@ -257,7 +266,7 @@ export async function createLancamentoAction(
     } else {
       const grupoParcelas = crypto.randomUUID();
       const valorRestante = valor - valorEntrada;
-      const valorParcela =
+      const valorParcelaBase =
         totalParcelas > 0
           ? Math.round((valorRestante / totalParcelas) * 100) / 100
           : valorRestante;
@@ -281,13 +290,19 @@ export async function createLancamentoAction(
         entradaLancamentoId = rows[0].id as string;
       }
 
-      // Parcelas mensais
+      // Parcelas mensais — última parcela absorve centavos para o total fechar exato
       const baseDate = new Date(`${baseDateStr}T12:00:00`);
       for (let i = 1; i <= totalParcelas; i++) {
         const parcDate = new Date(baseDate);
         parcDate.setMonth(parcDate.getMonth() + i);
         const parcDateStr = parcDate.toISOString().split("T")[0];
         const descParcela = `${descricao} — Parcela ${i}/${totalParcelas}`;
+        const valorParcela =
+          i === totalParcelas
+            ? Math.round(
+                (valorRestante - (totalParcelas - 1) * valorParcelaBase) * 100
+              ) / 100
+            : valorParcelaBase;
         const rows = await sql`
           INSERT INTO lancamentos
             (tipo, categoria, descricao, valor, client_id, processo_id,

@@ -118,17 +118,23 @@ export interface LancamentoKpis {
   pago: number;
   folhaPendente: number;
   folhaPaga: number;
+  atrasados: number;
 }
 
 export async function getLancamentoKpis(): Promise<LancamentoKpis> {
   const rows = await sql`
     SELECT
-      COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada' AND status = 'pendente'), 0)                              AS a_receber,
-      COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada' AND status = 'pago'),     0)                              AS recebido,
-      COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'   AND status = 'pendente'), 0)                              AS a_pagar,
-      COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'   AND status = 'pago'),     0)                              AS pago,
-      COALESCE(SUM(valor) FILTER (WHERE remuneracao_id IS NOT NULL AND status = 'pendente'), 0)                    AS folha_pendente,
-      COALESCE(SUM(valor) FILTER (WHERE remuneracao_id IS NOT NULL AND status = 'pago'),     0)                    AS folha_paga
+      COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada' AND status = 'pendente'), 0) AS a_receber,
+      COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada' AND status = 'pago'),     0) AS recebido,
+      COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'   AND status = 'pendente'), 0) AS a_pagar,
+      COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'   AND status = 'pago'),     0) AS pago,
+      COALESCE(SUM(valor) FILTER (WHERE remuneracao_id IS NOT NULL AND status = 'pendente'), 0) AS folha_pendente,
+      COALESCE(SUM(valor) FILTER (WHERE remuneracao_id IS NOT NULL AND status = 'pago'),     0) AS folha_paga,
+      COALESCE(COUNT(*)   FILTER (
+        WHERE tipo = 'entrada' AND status = 'pendente'
+          AND data_vencimento < CURRENT_DATE
+          AND data_vencimento < '9998-01-01'
+      ), 0)::int AS atrasados
     FROM lancamentos
     WHERE status != 'cancelado'
   `;
@@ -140,7 +146,35 @@ export async function getLancamentoKpis(): Promise<LancamentoKpis> {
     pago: Number(r.pago),
     folhaPendente: Number(r.folha_pendente),
     folhaPaga: Number(r.folha_paga),
+    atrasados: Number(r.atrasados),
   };
+}
+
+export interface MonthlyChartPoint {
+  monthKey: string; // "YYYY-MM"
+  receitas: number;
+  despesas: number;
+}
+
+export async function getMonthlyChart(): Promise<MonthlyChartPoint[]> {
+  const rows = await sql`
+    SELECT
+      to_char(date_trunc('month', data_vencimento), 'YYYY-MM') AS month_key,
+      COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada'), 0)::numeric AS receitas,
+      COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'),   0)::numeric AS despesas
+    FROM lancamentos
+    WHERE data_vencimento >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'
+      AND data_vencimento < '9998-01-01'::date
+      AND status != 'cancelado'
+      AND status != 'aguardando_resultado'
+    GROUP BY date_trunc('month', data_vencimento)
+    ORDER BY date_trunc('month', data_vencimento) ASC
+  `;
+  return rows.map((r) => ({
+    monthKey: String(r.month_key),
+    receitas: Number(r.receitas),
+    despesas: Number(r.despesas),
+  }));
 }
 
 export interface ClientSaidaItem {

@@ -143,7 +143,7 @@ export default function ResumoContent({
         <NavCard
           href="/dashboard/financeiro?tab=pagar"
           title="A Pagar"
-          desc="Baixar remunerações e pagar colaboradores"
+          desc="Registrar e baixar despesas do escritório"
           accent="border-amber-200 hover:border-amber-400"
         />
         <NavCard

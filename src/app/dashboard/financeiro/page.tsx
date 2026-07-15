@@ -116,10 +116,10 @@ export default async function FinanceiroPage({
           </p>
         </div>
 
-        {/* Botões de ação contextuais */}
+        {/* Botões de ação — um por aba, sem duplicatas */}
         {canEdit && (
           <div className="flex items-center gap-2 flex-wrap">
-            {(tab === "resumo" || tab === "receber") && (
+            {tab === "receber" && (
               <Link
                 href="/dashboard/financeiro/novo?tipo=entrada"
                 className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
@@ -128,7 +128,7 @@ export default async function FinanceiroPage({
                 Nova Receita
               </Link>
             )}
-            {(tab === "resumo" || tab === "pagar") && (
+            {tab === "pagar" && (
               <Link
                 href="/dashboard/financeiro/novo?tipo=saida"
                 className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"

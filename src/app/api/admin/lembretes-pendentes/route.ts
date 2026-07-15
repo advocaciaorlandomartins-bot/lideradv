@@ -12,6 +12,11 @@ export async function GET(req: Request) {
   const session = await getSession();
   if (!session)
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (session.categoria !== "Administrador(a)")
+    return NextResponse.json(
+      { error: "Acesso restrito a administradores." },
+      { status: 403 }
+    );
 
   const url = new URL(req.url);
   const dias = Math.min(parseInt(url.searchParams.get("dias") ?? "7"), 30);

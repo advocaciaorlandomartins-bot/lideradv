@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,8 @@ export async function GET(request: Request) {
   const session = await getSession();
   if (!session)
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!hasPermission(session, "processos", "ver"))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
   const entityType = searchParams.get("entityType") as

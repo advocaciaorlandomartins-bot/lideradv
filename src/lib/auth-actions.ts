@@ -178,12 +178,7 @@ export async function registerAction(
   }
 
   const login = email.toLowerCase();
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto
-    .createHash("sha256")
-    .update(password + salt)
-    .digest("hex");
-  const senhaHash = `sha256:${salt}:${hash}`;
+  const senhaHash = hashPassword(password);
 
   try {
     const rows = await sql`
@@ -287,12 +282,7 @@ export async function resetPasswordAction(
     return { error: "Link expirado. Solicite um novo." };
 
   const userId = String(tokenRow.usuario_id);
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto
-    .createHash("sha256")
-    .update(senha + salt)
-    .digest("hex");
-  const senhaHash = `sha256:${salt}:${hash}`;
+  const senhaHash = hashPassword(senha);
 
   await sql`UPDATE usuarios SET senha_hash = ${senhaHash} WHERE id = ${userId}::uuid`;
   await sql`UPDATE password_reset_tokens SET used = TRUE WHERE token = ${token}`;

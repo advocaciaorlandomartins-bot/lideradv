@@ -11,15 +11,23 @@ export const dynamic = "force-dynamic";
  * Útil quando o evento foi criado sem telefone do cliente / sem o fix.
  * Body: { compromissoId: string }
  */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session)
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (session.categoria !== "Administrador(a)")
+    return NextResponse.json(
+      { error: "Acesso restrito a administradores." },
+      { status: 403 }
+    );
 
   const { compromissoId } = (await req.json()) as { compromissoId?: string };
-  if (!compromissoId)
+  if (!compromissoId || !UUID_RE.test(compromissoId))
     return NextResponse.json(
-      { error: "compromissoId obrigatório." },
+      { error: "compromissoId inválido." },
       { status: 400 }
     );
 

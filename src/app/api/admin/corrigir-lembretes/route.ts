@@ -16,6 +16,11 @@ export async function POST() {
   const session = await getSession();
   if (!session)
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (session.categoria !== "Administrador(a)")
+    return NextResponse.json(
+      { error: "Acesso restrito a administradores." },
+      { status: 403 }
+    );
 
   // ── 1. Corrige textos antigos nos lembretes INSS ainda não enviados ──────────
   // Remove "Seu " e "seu " dos textos armazenados (problema de gênero: avaliação é feminino).

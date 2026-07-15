@@ -248,9 +248,12 @@ export async function GET(request: Request) {
       totalItens: items.length,
     });
   } catch (err) {
-    console.error("[cron/prazos] erro:", err);
+    console.error(
+      "[cron/prazos] erro:",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.json(
-      { ok: false, error: String(err) },
+      { ok: false, error: "Erro interno." },
       { status: 500 }
     );
   }

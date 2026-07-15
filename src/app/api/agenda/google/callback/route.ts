@@ -54,7 +54,10 @@ export async function GET(req: NextRequest) {
       new URL("/dashboard/agenda?google_connected=1", req.url)
     );
   } catch (err) {
-    console.error("Google OAuth callback error:", err);
+    console.error(
+      "Google OAuth callback error:",
+      err instanceof Error ? err.message : String(err)
+    );
     return NextResponse.redirect(
       new URL("/dashboard/agenda?google_error=token_exchange", req.url)
     );

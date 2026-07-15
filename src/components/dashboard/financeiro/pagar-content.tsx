@@ -253,7 +253,7 @@ export default function PagarContent({ despesas, canEdit }: Props) {
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4">
         <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
           <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
             Despesas Pendentes
@@ -276,20 +276,6 @@ export default function PagarContent({ despesas, canEdit }: Props) {
           </p>
           <p className="mt-0.5 font-body text-xs text-muted">no período</p>
         </div>
-        {canEdit && (
-          <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
-            <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted mb-3">
-              Nova despesa
-            </p>
-            <Link
-              href="/dashboard/financeiro/novo?tipo=saida"
-              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-body text-sm font-semibold text-white hover:bg-red-700 transition-colors w-fit"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Nova Despesa
-            </Link>
-          </div>
-        )}
       </div>
 
       {/* Toolbar */}

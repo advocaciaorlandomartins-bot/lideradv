@@ -111,6 +111,40 @@ export async function getAllLancamentos(): Promise<Lancamento[]> {
   return rows.map(mapRow);
 }
 
+export async function getLancamentosSaida(): Promise<Lancamento[]> {
+  const rows = await sql`
+    SELECT
+      l.id::text,
+      l.tipo,
+      l.categoria,
+      l.descricao,
+      l.valor,
+      l.client_id::text,
+      c.name  AS client_name,
+      l.processo_id::text,
+      p.tipo_acao AS processo_tipo,
+      l.remuneracao_id::text,
+      l.status,
+      to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
+      to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento,
+      l.parcela_atual,
+      l.total_parcelas,
+      l.grupo_parcelas::text,
+      l.observacoes,
+      l.created_at
+    FROM lancamentos l
+    LEFT JOIN clients   c ON c.id = l.client_id
+    LEFT JOIN processos p ON p.id = l.processo_id
+    WHERE l.tipo = 'saida'
+      AND l.status NOT IN ('cancelado', 'aguardando_resultado')
+    ORDER BY
+      CASE WHEN l.status = 'pendente' THEN 0 ELSE 1 END,
+      l.data_vencimento ASC NULLS LAST,
+      l.created_at DESC
+  `;
+  return rows.map(mapRow);
+}
+
 export interface LancamentoKpis {
   aReceber: number;
   recebido: number;

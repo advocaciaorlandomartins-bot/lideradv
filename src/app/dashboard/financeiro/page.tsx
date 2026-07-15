@@ -4,12 +4,9 @@ import {
   getLancamentoKpis,
   getContasAReceber,
   getMonthlyChart,
+  getLancamentosSaida,
 } from "@/lib/lancamentos-db";
-import {
-  getAllRemuneracoes,
-  getRemuneracaoKpis,
-  getContasAPagar,
-} from "@/lib/remuneracoes-db";
+import { getAllRemuneracoes, getRemuneracaoKpis } from "@/lib/remuneracoes-db";
 import FinanceiroContent from "@/components/dashboard/financeiro/financeiro-content";
 import RemuneracoesContent from "@/components/dashboard/remuneracoes/remuneracoes-content";
 import ResumoContent from "@/components/dashboard/financeiro/resumo-content";
@@ -20,6 +17,8 @@ import {
   CurrencyIcon,
   ClipboardListIcon,
   PlusIcon,
+  TrendUpIcon,
+  TrendDownIcon,
 } from "@/components/icons";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
@@ -54,16 +53,15 @@ export default async function FinanceiroPage({
   const session = await getSession();
   const canEdit = !!session && hasPermission(session, "financeiro", "editar");
 
-  // Load data based on active tab (avoid unnecessary DB calls)
-  const [lancamentos, lancamentoKpis, remuneracaoKpis, chartData] =
+  // Carrega apenas os dados necessários para cada aba
+  const [lancamentoKpis, remuneracaoKpis, chartData] =
     tab === "resumo"
       ? await Promise.all([
-          Promise.resolve([] as Awaited<ReturnType<typeof getAllLancamentos>>),
           getLancamentoKpis(),
           getRemuneracaoKpis(),
           getMonthlyChart(),
         ])
-      : [[], null, null, []];
+      : [null, null, []];
 
   const [remuneracoes, remKpis] =
     tab === "remuneracoes"
@@ -76,8 +74,7 @@ export default async function FinanceiroPage({
       : [null, null];
 
   const contasReceber = tab === "receber" ? await getContasAReceber() : null;
-
-  const contasPagar = tab === "pagar" ? await getContasAPagar() : null;
+  const despesas = tab === "pagar" ? await getLancamentosSaida() : null;
 
   const tabDef: { key: Tab; label: string; icon: React.ReactNode }[] = [
     {
@@ -88,12 +85,12 @@ export default async function FinanceiroPage({
     {
       key: "receber",
       label: "A Receber",
-      icon: <span className="h-2 w-2 rounded-full bg-current flex-shrink-0" />,
+      icon: <TrendUpIcon className="h-4 w-4 flex-shrink-0" />,
     },
     {
       key: "pagar",
       label: "A Pagar",
-      icon: <span className="h-2 w-2 rounded-full bg-current flex-shrink-0" />,
+      icon: <TrendDownIcon className="h-4 w-4 flex-shrink-0" />,
     },
     {
       key: "remuneracoes",
@@ -109,58 +106,90 @@ export default async function FinanceiroPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-3xl font-semibold text-fg">
-          Financeiro
-        </h1>
-        <p className="mt-1 font-body text-sm text-muted">
-          Gestão de receitas, despesas e folha de pagamento
-        </p>
-      </div>
-
-      {/* Tabs + action buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="overflow-x-auto scrollbar-none min-w-0">
-          <div className="flex gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm">
-            {tabDef.map(({ key, label, icon }) => (
-              <Link
-                key={key}
-                href={
-                  key === "resumo"
-                    ? "/dashboard/financeiro"
-                    : `/dashboard/financeiro?tab=${key}`
-                }
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-semibold transition-colors duration-150 sm:gap-2 sm:px-4 sm:py-2 whitespace-nowrap ${
-                  tab === key
-                    ? "bg-primary text-white shadow-sm"
-                    : "text-muted hover:text-fg"
-                }`}
-              >
-                {icon}
-                {label}
-              </Link>
-            ))}
-          </div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-3xl font-semibold text-fg">
+            Financeiro
+          </h1>
+          <p className="mt-1 font-body text-sm text-muted">
+            Gestão de receitas, despesas e folha de pagamento
+          </p>
         </div>
 
-        {canEdit && tab === "historico" && (
-          <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard/financeiro/novo?tipo=entrada"
-              className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Nova Receita
-            </Link>
-            <Link
-              href="/dashboard/financeiro/novo?tipo=saida"
-              className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Nova Despesa
-            </Link>
+        {/* Botões de ação contextuais */}
+        {canEdit && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {(tab === "resumo" || tab === "receber") && (
+              <Link
+                href="/dashboard/financeiro/novo?tipo=entrada"
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Nova Receita
+              </Link>
+            )}
+            {(tab === "resumo" || tab === "pagar") && (
+              <Link
+                href="/dashboard/financeiro/novo?tipo=saida"
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Nova Despesa
+              </Link>
+            )}
+            {tab === "remuneracoes" && (
+              <Link
+                href="/dashboard/remuneracoes/nova"
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-purple-700 whitespace-nowrap"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Nova Remuneração
+              </Link>
+            )}
+            {tab === "historico" && (
+              <>
+                <Link
+                  href="/dashboard/financeiro/novo?tipo=entrada"
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Nova Receita
+                </Link>
+                <Link
+                  href="/dashboard/financeiro/novo?tipo=saida"
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Nova Despesa
+                </Link>
+              </>
+            )}
           </div>
         )}
+      </div>
+
+      {/* Tabs */}
+      <div className="overflow-x-auto scrollbar-none">
+        <div className="flex gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm">
+          {tabDef.map(({ key, label, icon }) => (
+            <Link
+              key={key}
+              href={
+                key === "resumo"
+                  ? "/dashboard/financeiro"
+                  : `/dashboard/financeiro?tab=${key}`
+              }
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-semibold transition-colors duration-150 sm:gap-2 sm:px-4 sm:py-2 whitespace-nowrap ${
+                tab === key
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              {icon}
+              {label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
@@ -172,7 +201,9 @@ export default async function FinanceiroPage({
         />
       )}
       {tab === "receber" && <ReceberContent contasReceber={contasReceber!} />}
-      {tab === "pagar" && <PagarContent contasPagar={contasPagar!} />}
+      {tab === "pagar" && (
+        <PagarContent despesas={despesas!} canEdit={canEdit} />
+      )}
       {tab === "remuneracoes" && (
         <RemuneracoesContent remuneracoes={remuneracoes!} kpis={remKpis!} />
       )}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { createElement, type ReactElement } from "react";
 import { getModeloById } from "@/lib/modelos-db";
@@ -13,8 +14,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const session = await getSession();
-  if (!session)
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || !hasPermission(session, "clientes", "ver"))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
   const modeloId = searchParams.get("modeloId");

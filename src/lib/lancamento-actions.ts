@@ -128,6 +128,11 @@ export async function createLancamentoAction(
     const redirectTo = rawRedirect.startsWith("/")
       ? rawRedirect
       : "/dashboard/financeiro";
+    await logAction({
+      acao: "criar",
+      entidade: "lancamento",
+      descricao: `Criou lançamento aguardando resultado: ${descricao} (${tipo})`,
+    });
     revalidatePath("/dashboard/financeiro");
     redirect(redirectTo);
   }
@@ -322,10 +327,14 @@ export async function createLancamentoAction(
     }
 
     // Cancela o lançamento "aguardando resultado" que deu origem a este
-    if (cancelAguardando) {
+    const UUID_RE_CA =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (cancelAguardando && UUID_RE_CA.test(cancelAguardando)) {
       await sql`
         DELETE FROM lancamentos
-        WHERE id = ${cancelAguardando}::uuid AND status = 'aguardando_resultado'
+        WHERE id = ${cancelAguardando}::uuid
+          AND status = 'aguardando_resultado'
+          AND client_id IS NOT DISTINCT FROM ${clientId ? clientId : null}::uuid
       `;
     }
 
@@ -1121,6 +1130,9 @@ export async function cancelarParcelasAction(
 export async function deleteGrupoAction(grupoParcelas: string): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "financeiro", "excluir")) return;
+  const UUID_RE_DG =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE_DG.test(grupoParcelas)) return;
   try {
     await sql`
       DELETE FROM lancamentos

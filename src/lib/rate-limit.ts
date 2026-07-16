@@ -10,14 +10,6 @@ const IA_LIMIT_POR_HORA = 60;
  */
 export async function iaRateLimitExcedido(userLogin: string): Promise<boolean> {
   try {
-    await sql`
-      CREATE TABLE IF NOT EXISTS ia_usage_log (
-        id         BIGSERIAL PRIMARY KEY,
-        user_login VARCHAR(100) NOT NULL,
-        criado_em  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      )
-    `;
-
     const [row] = await sql`
       SELECT COUNT(*)::int AS total
       FROM ia_usage_log

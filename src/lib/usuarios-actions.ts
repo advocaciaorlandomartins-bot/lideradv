@@ -50,8 +50,8 @@ export async function createUsuarioAction(
   if (!login) return { error: "O login é obrigatório." };
   if (!nome) return { error: "O nome é obrigatório." };
   if (!senha) return { error: "A senha é obrigatória." };
-  if (senha.length < 6)
-    return { error: "A senha deve ter pelo menos 6 caracteres." };
+  if (senha.length < 8)
+    return { error: "A senha deve ter pelo menos 8 caracteres." };
   if (senha !== senhaConf) return { error: "As senhas não coincidem." };
   if (!categoria) return { error: "Selecione uma categoria." };
 
@@ -109,7 +109,9 @@ export async function updateUsuarioAction(
   const colaboradorId =
     ((formData.get("colaborador_id") as string) ?? "").trim() || null;
 
-  if (!id) return { error: "ID inválido." };
+  const UUID_RE_USR =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!id || !UUID_RE_USR.test(id)) return { error: "ID inválido." };
   if (!login) return { error: "O login é obrigatório." };
   if (!nome) return { error: "O nome é obrigatório." };
   if (senha && senha.length < 6)

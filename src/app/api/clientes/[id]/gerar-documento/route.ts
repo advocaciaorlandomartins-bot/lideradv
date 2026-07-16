@@ -6,6 +6,7 @@ import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
 import { applyFundoTimbrado } from "@/lib/pdf-fundo";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getClientPendingEntradas } from "@/lib/lancamentos-db";
 import {
   ProcuracaoDoc,
@@ -43,8 +44,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session)
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!session || !hasPermission(session, "clientes", "ver"))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const { id } = await params;
 

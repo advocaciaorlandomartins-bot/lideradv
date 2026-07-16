@@ -45,9 +45,9 @@ function resolveTab(raw: string | undefined): Tab {
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; cliente?: string }>;
 }) {
-  const { tab: rawTab } = await searchParams;
+  const { tab: rawTab, cliente: defaultCliente } = await searchParams;
   const tab = resolveTab(rawTab);
 
   const session = await getSession();
@@ -200,7 +200,12 @@ export default async function FinanceiroPage({
           chartData={chartData}
         />
       )}
-      {tab === "receber" && <ReceberContent contasReceber={contasReceber!} />}
+      {tab === "receber" && (
+        <ReceberContent
+          contasReceber={contasReceber!}
+          defaultCliente={defaultCliente}
+        />
+      )}
       {tab === "pagar" && (
         <PagarContent despesas={despesas!} canEdit={canEdit} />
       )}

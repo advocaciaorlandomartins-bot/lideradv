@@ -718,9 +718,13 @@ function ClienteRows({
 
 interface Props {
   contasReceber: ContaCliente[];
+  defaultCliente?: string;
 }
 
-export default function ReceberContent({ contasReceber }: Props) {
+export default function ReceberContent({
+  contasReceber,
+  defaultCliente,
+}: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -739,7 +743,7 @@ export default function ReceberContent({ contasReceber }: Props) {
   } | null>(null);
 
   // Filters
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(defaultCliente ?? "");
   const [periodo, setPeriodo] = useState<Periodo>("todos");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");

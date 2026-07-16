@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   markAsPagoAction,
   revertParaPendenteAction,
+  cancelarParcelasAction,
 } from "@/lib/lancamento-actions";
 import type { Lancamento } from "@/lib/lancamentos-db";
 import { MagnifyingGlassIcon, PlusIcon } from "@/components/icons";
@@ -75,11 +76,13 @@ function DespesaRow({
   item,
   onBaixa,
   onDesfazer,
+  onCancelar,
   isPending,
 }: {
   item: Lancamento;
   onBaixa: (id: string) => void;
   onDesfazer: (id: string) => void;
+  onCancelar: (id: string) => void;
   isPending: boolean;
 }) {
   const hoje = new Date();
@@ -138,14 +141,24 @@ function DespesaRow({
         <div className="flex items-center justify-end gap-2 flex-wrap">
           <StatusBadge status={item.status} atrasado={atrasado} />
           {item.status === "pendente" && (
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => onBaixa(item.id)}
-              className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 font-body text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              Paguei
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => onBaixa(item.id)}
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 font-body text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Paguei
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => onCancelar(item.id)}
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 font-body text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </>
           )}
           {item.status === "pago" && (
             <button
@@ -196,6 +209,17 @@ export default function PagarContent({ despesas, canEdit }: Props) {
   function handleDesfazer(id: string) {
     startTransition(async () => {
       await revertParaPendenteAction(id);
+      router.refresh();
+    });
+  }
+
+  function handleCancelar(id: string) {
+    if (
+      !confirm("Cancelar esta despesa? Ela ficará como cancelada no histórico.")
+    )
+      return;
+    startTransition(async () => {
+      await cancelarParcelasAction([id]);
       router.refresh();
     });
   }
@@ -405,6 +429,7 @@ export default function PagarContent({ despesas, canEdit }: Props) {
                     item={item}
                     onBaixa={handleBaixa}
                     onDesfazer={handleDesfazer}
+                    onCancelar={handleCancelar}
                     isPending={isPending}
                   />
                 ))}

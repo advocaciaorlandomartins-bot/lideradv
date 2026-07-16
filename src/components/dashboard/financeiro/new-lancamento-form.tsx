@@ -886,7 +886,46 @@ export default function NewLancamentoForm({
               </>
             )}
 
-            {/* ── Base salarial (três opções diretas) ── */}
+            {/* ── Recorrente para despesas (Mensalidade Fixa) ── */}
+            {tipo === "saida" && paymentMode === "mensalidade" && (
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Base do valor</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSalarioBase("none");
+                      setValor("");
+                    }}
+                    disabled={isPending}
+                    className={`rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                      salarioBase === "none"
+                        ? "border-slate-400 bg-slate-100 text-slate-800"
+                        : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                    }`}
+                  >
+                    Valor livre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSalarioBase("recorrente");
+                      setValor("");
+                    }}
+                    disabled={isPending}
+                    className={`rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                      salarioBase === "recorrente"
+                        ? "border-violet-500 bg-violet-50 text-violet-800"
+                        : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                    }`}
+                  >
+                    Recorrente
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Base salarial (receitas) ── */}
             {tipo === "entrada" && (
               <div className="sm:col-span-2 space-y-3">
                 <div>
@@ -896,7 +935,7 @@ export default function NewLancamentoForm({
                       : "Base do valor"}
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Opção: sem base salarial */}
+                    {/* 1. Valor livre */}
                     <button
                       type="button"
                       onClick={() => {
@@ -916,38 +955,7 @@ export default function NewLancamentoForm({
                         : "Valor livre"}
                     </button>
 
-                    {/* Opção: salário mínimo */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSalarioBase("minimo");
-                        setSalarioCustomInput("");
-                      }}
-                      disabled={isPending}
-                      className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
-                        salarioBase === "minimo"
-                          ? "border-emerald-400 bg-emerald-50 text-emerald-800"
-                          : "border-border text-muted hover:border-slate-300 hover:text-fg"
-                      }`}
-                    >
-                      SM vigente — {fmt(salarioMinimo)}
-                    </button>
-
-                    {/* Opção: salário do cliente */}
-                    <button
-                      type="button"
-                      onClick={() => setSalarioBase("custom")}
-                      disabled={isPending}
-                      className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
-                        salarioBase === "custom"
-                          ? "border-primary bg-blue-50 text-primary"
-                          : "border-border text-muted hover:border-slate-300 hover:text-fg"
-                      }`}
-                    >
-                      Salário do cliente
-                    </button>
-
-                    {/* Opção: recorrente — só no modo Mensalidade Fixa */}
+                    {/* 2. Recorrente — Mensalidade Fixa (receita OU despesa) */}
                     {paymentMode === "mensalidade" && (
                       <button
                         type="button"
@@ -966,6 +974,37 @@ export default function NewLancamentoForm({
                         Recorrente
                       </button>
                     )}
+
+                    {/* 3. SM vigente */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSalarioBase("minimo");
+                        setSalarioCustomInput("");
+                      }}
+                      disabled={isPending}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                        salarioBase === "minimo"
+                          ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                          : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                      }`}
+                    >
+                      SM vigente — {fmt(salarioMinimo)}
+                    </button>
+
+                    {/* 4. Salário do cliente */}
+                    <button
+                      type="button"
+                      onClick={() => setSalarioBase("custom")}
+                      disabled={isPending}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                        salarioBase === "custom"
+                          ? "border-primary bg-blue-50 text-primary"
+                          : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                      }`}
+                    >
+                      Salário do cliente
+                    </button>
 
                     {/* Campo de salário personalizado */}
                     {salarioBase === "custom" && (

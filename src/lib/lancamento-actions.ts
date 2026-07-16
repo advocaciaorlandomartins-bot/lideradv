@@ -1092,6 +1092,31 @@ export async function ativarLancamentoAction(
   return { ok: true };
 }
 
+const UUID_RE_ACT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function cancelarParcelasAction(
+  ids: string[]
+): Promise<{ ok: boolean; cancelados: number; error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { ok: false, cancelados: 0, error: "Sem permissão." };
+
+  const validIds = ids.filter((id) => UUID_RE_ACT.test(id));
+  if (validIds.length === 0) return { ok: true, cancelados: 0 };
+
+  const rows = await sql`
+    UPDATE lancamentos
+    SET status = 'cancelado', updated_at = now()
+    WHERE id = ANY(${validIds}::uuid[])
+      AND created_by = ${session.id}::uuid
+      AND status = 'pendente'
+    RETURNING id
+  `;
+  revalidatePath("/dashboard/financeiro");
+  return { ok: true, cancelados: rows.length };
+}
+
 export async function deleteGrupoAction(grupoParcelas: string): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "financeiro", "excluir")) return;

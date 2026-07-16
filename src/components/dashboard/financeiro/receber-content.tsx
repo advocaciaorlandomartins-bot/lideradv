@@ -7,6 +7,7 @@ import {
   markAsPagoAction,
   markMultiplePagoAction,
   pagamentoParcialAction,
+  cancelarParcelasAction,
 } from "@/lib/lancamento-actions";
 import type { ContaCliente, ContaClienteItem } from "@/lib/lancamentos-db";
 import { MagnifyingGlassIcon } from "@/components/icons";
@@ -594,6 +595,167 @@ function ClienteItemRow({
   );
 }
 
+// ── CancelarParcelasModal ─────────────────────────────────────────────────────
+
+function CancelarParcelasModal({
+  clienteNome,
+  pendingItems,
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  clienteNome: string;
+  pendingItems: ContaClienteItem[];
+  onClose: () => void;
+  onConfirm: (ids: string[]) => void;
+  isPending: boolean;
+}) {
+  const sorted = useMemo(
+    () =>
+      [...pendingItems].sort((a, b) => {
+        const parse = (s: string | null) => {
+          if (!s) return new Date(9999, 0);
+          const [d, m, y] = s.split("/");
+          return new Date(Number(y), Number(m) - 1, Number(d));
+        };
+        return (
+          parse(a.data_vencimento).getTime() -
+          parse(b.data_vencimento).getTime()
+        );
+      }),
+    [pendingItems]
+  );
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set(sorted.map((i) => i.id))
+  );
+  const total = sorted
+    .filter((i) => selected.has(i.id))
+    .reduce((s, i) => s + i.valor, 0);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-border overflow-hidden">
+        <div className="border-b border-border px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="font-heading text-base font-semibold text-fg">
+              Cancelar parcelas pendentes
+            </p>
+            <p className="font-body text-xs text-muted mt-0.5">
+              {clienteNome} · {sorted.length} parcela
+              {sorted.length !== 1 ? "s" : ""} pendente
+              {sorted.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-muted hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="px-6 py-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-body text-xs text-muted">
+              Selecione as parcelas a cancelar:
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                setSelected(
+                  selected.size === sorted.length
+                    ? new Set()
+                    : new Set(sorted.map((i) => i.id))
+                )
+              }
+              className="font-body text-xs font-semibold text-primary hover:underline cursor-pointer"
+            >
+              {selected.size === sorted.length
+                ? "Desmarcar todas"
+                : "Selecionar todas"}
+            </button>
+          </div>
+          <div className="max-h-60 overflow-y-auto divide-y divide-border rounded-xl border border-border">
+            {sorted.map((item) => (
+              <label
+                key={item.id}
+                className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(item.id)}
+                  onChange={() => toggle(item.id)}
+                  className="h-4 w-4 rounded border-border accent-red-500 cursor-pointer"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-body text-sm text-fg truncate">
+                    {item.descricao}
+                  </p>
+                  <p className="font-body text-xs text-muted">
+                    Vence {item.data_vencimento}
+                  </p>
+                </div>
+                <span className="font-body text-sm font-semibold text-red-600 tabular-nums flex-shrink-0">
+                  {item.valor.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </span>
+              </label>
+            ))}
+          </div>
+          {selected.size > 0 && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5">
+              <p className="font-body text-sm font-semibold text-red-800">
+                {selected.size} parcela{selected.size !== 1 ? "s" : ""} serão
+                canceladas —{" "}
+                {total.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </p>
+              <p className="font-body text-xs text-red-600 mt-0.5">
+                O histórico é mantido com status &quot;Cancelado&quot;. Esta
+                ação não pode ser desfeita.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-border px-6 py-4 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 font-body text-sm font-semibold text-fg hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            disabled={selected.size === 0 || isPending}
+            onClick={() => onConfirm(Array.from(selected))}
+            className="rounded-lg bg-red-600 px-4 py-2 font-body text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {isPending
+              ? "Cancelando…"
+              : `Cancelar ${selected.size} parcela${selected.size !== 1 ? "s" : ""}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ClienteRows ───────────────────────────────────────────────────────────────
 
 function ClienteRows({
@@ -606,6 +768,7 @@ function ClienteRows({
   isPending,
   onOpenAdiantar,
   onOpenParcial,
+  onOpenCancelar,
 }: {
   conta: ContaCliente & { totalPendente: number; totalPago: number };
   isExpanded: boolean;
@@ -624,6 +787,7 @@ function ClienteRows({
     clienteNome: string,
     items: ContaClienteItem[]
   ) => void;
+  onOpenCancelar: (clienteNome: string, items: ContaClienteItem[]) => void;
 }) {
   const pendingItems = conta.items.filter((i) => i.status !== "pago");
 
@@ -690,6 +854,16 @@ function ClienteRows({
                 Pgto. por Valor
               </button>
             )}
+            {pendingItems.length >= 1 && (
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => onOpenCancelar(conta.client_name, pendingItems)}
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 font-body text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancelar parcelas
+              </button>
+            )}
             <Link
               href={`/dashboard/clientes/${conta.client_id}`}
               className="rounded-lg border border-border px-3 py-1.5 font-body text-xs font-semibold text-fg hover:bg-slate-100 transition-colors"
@@ -738,6 +912,10 @@ export default function ReceberContent({
   } | null>(null);
   const [parcialModal, setParcialModal] = useState<{
     clienteId: string;
+    clienteNome: string;
+    pendingItems: ContaClienteItem[];
+  } | null>(null);
+  const [cancelarModal, setCancelarModal] = useState<{
     clienteNome: string;
     pendingItems: ContaClienteItem[];
   } | null>(null);
@@ -806,6 +984,14 @@ export default function ReceberContent({
       await pagamentoParcialAction({ ids, valorPago, clientId: clienteId });
       setParcialModal(null);
       setSelectedIds(new Set());
+      router.refresh();
+    });
+  }
+
+  function handleCancelarParcelas(ids: string[]) {
+    startTransition(async () => {
+      await cancelarParcelasAction(ids);
+      setCancelarModal(null);
       router.refresh();
     });
   }
@@ -1014,6 +1200,12 @@ export default function ReceberContent({
                         pendingItems: items,
                       })
                     }
+                    onOpenCancelar={(nome, items) =>
+                      setCancelarModal({
+                        clienteNome: nome,
+                        pendingItems: items,
+                      })
+                    }
                   />
                 ))}
               </tbody>
@@ -1068,6 +1260,15 @@ export default function ReceberContent({
           pendingItems={parcialModal.pendingItems}
           onClose={() => setParcialModal(null)}
           onConfirm={handlePagamentoPorValor}
+          isPending={isPending}
+        />
+      )}
+      {cancelarModal && (
+        <CancelarParcelasModal
+          clienteNome={cancelarModal.clienteNome}
+          pendingItems={cancelarModal.pendingItems}
+          onClose={() => setCancelarModal(null)}
+          onConfirm={handleCancelarParcelas}
           isPending={isPending}
         />
       )}

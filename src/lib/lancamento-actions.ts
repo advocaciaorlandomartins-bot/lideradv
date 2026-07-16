@@ -1109,7 +1109,6 @@ export async function cancelarParcelasAction(
     UPDATE lancamentos
     SET status = 'cancelado'
     WHERE id = ANY(${validIds}::uuid[])
-      AND created_by = ${session.id}::uuid
       AND status = 'pendente'
     RETURNING id
   `;

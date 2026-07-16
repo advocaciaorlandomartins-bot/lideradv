@@ -219,7 +219,7 @@ export async function createLancamentoAction(
 
       for (let i = 1; i <= numParcelas; i++) {
         const parcDate = new Date(baseDate);
-        parcDate.setMonth(parcDate.getMonth() + i);
+        parcDate.setMonth(parcDate.getMonth() + (valorEntrada > 0 ? i : i - 1));
         const parcDateStr = parcDate.toISOString().split("T")[0];
         const descParcela = `${descricao} — Parcela ${i}/${numParcelas}`;
         // Última parcela absorve os centavos restantes para o total fechar exato
@@ -294,7 +294,7 @@ export async function createLancamentoAction(
       const baseDate = new Date(`${baseDateStr}T12:00:00`);
       for (let i = 1; i <= totalParcelas; i++) {
         const parcDate = new Date(baseDate);
-        parcDate.setMonth(parcDate.getMonth() + i);
+        parcDate.setMonth(parcDate.getMonth() + (valorEntrada > 0 ? i : i - 1));
         const parcDateStr = parcDate.toISOString().split("T")[0];
         const descParcela = `${descricao} — Parcela ${i}/${totalParcelas}`;
         const valorParcela =
@@ -480,7 +480,9 @@ export async function createLancamentoAction(
                 ) / 100;
             for (let i = 0; i < parcelaLancamentoIds.length; i++) {
               const parcDate = new Date(baseDate);
-              parcDate.setMonth(parcDate.getMonth() + (i + 1));
+              parcDate.setMonth(
+                parcDate.getMonth() + (entradaLancamentoId ? i + 1 : i)
+              );
               toSchedule.push({
                 id: parcelaLancamentoIds[i],
                 dataStr: parcDate.toISOString().split("T")[0],

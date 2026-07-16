@@ -242,6 +242,10 @@ export default function NewLancamentoForm({
   const [valorMensalidade, setValorMensalidade] = useState("");
   const [percentualSalario, setPercentualSalario] = useState("");
 
+  // ── Mensalidade recorrente (sem prazo definido) ─────────────
+  const [recorrenteSemPrazo, setRecorrenteSemPrazo] = useState(false);
+  const [mesesGerar, setMesesGerar] = useState("12");
+
   // ── Salário base ───────────────────────────────────────────
   const salarioMode = salarioBase !== "none";
 
@@ -291,17 +295,27 @@ export default function NewLancamentoForm({
   ]);
 
   // ── Valor efetivo (base para cálculos) ─────────────────────
-  const effectiveValor =
-    paymentMode === "retroativo" && retroativoCalc != null
-      ? retroativoCalc.total > 0
+  const effectiveValor = (() => {
+    if (paymentMode === "mensalidade" && recorrenteSemPrazo) {
+      const mens = parseFloat(parseMoney(valorMensalidade)) || 0;
+      const meses = Math.max(1, parseInt(mesesGerar) || 12);
+      const total = Math.round(meses * mens * 100) / 100;
+      return total > 0
+        ? total.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        : "";
+    }
+    if (paymentMode === "retroativo" && retroativoCalc != null)
+      return retroativoCalc.total > 0
         ? retroativoCalc.total.toLocaleString("pt-BR", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })
-        : valor // sem retroativo calculado, usa valor manual
-      : salarioMode
-        ? (salarioValor ?? "")
         : valor;
+    return salarioMode ? (salarioValor ?? "") : valor;
+  })();
 
   // ── Cálculo Mensalidade fixa ───────────────────────────────
   const mensalidadeCalc = useMemo(() => {
@@ -1332,40 +1346,41 @@ export default function NewLancamentoForm({
                 </div>
               )}
 
-            {/* ── Valor total (oculto no modo retroativo quando percValor calculado) ── */}
+            {/* ── Valor total (oculto no retroativo calculado e no mensalidade recorrente) ── */}
             {(paymentMode !== "retroativo" ||
               !retroativoCalc ||
-              retroativoCalc.percValor === 0) && (
-              <Field
-                label={
-                  paymentMode === "mensalidade"
-                    ? "Valor total cobrado"
-                    : "Valor total"
-                }
-              >
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
-                    R$
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    value={effectiveValor}
-                    onChange={(e) => {
-                      if (!salarioMode)
-                        setValor(formatMoneyInput(e.target.value));
-                    }}
-                    onBlur={() => {
-                      if (!salarioMode) setValor(normalizeMoneyBlur(valor));
-                    }}
-                    readOnly={salarioMode}
-                    disabled={isPending}
-                    className={`${inputClass} pl-10 ${salarioMode ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold" : ""}`}
-                  />
-                </div>
-              </Field>
-            )}
+              retroativoCalc.percValor === 0) &&
+              !(paymentMode === "mensalidade" && recorrenteSemPrazo) && (
+                <Field
+                  label={
+                    paymentMode === "mensalidade"
+                      ? "Valor total cobrado"
+                      : "Valor total"
+                  }
+                >
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                      R$
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={effectiveValor}
+                      onChange={(e) => {
+                        if (!salarioMode)
+                          setValor(formatMoneyInput(e.target.value));
+                      }}
+                      onBlur={() => {
+                        if (!salarioMode) setValor(normalizeMoneyBlur(valor));
+                      }}
+                      readOnly={salarioMode}
+                      disabled={isPending}
+                      className={`${inputClass} pl-10 ${salarioMode ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold" : ""}`}
+                    />
+                  </div>
+                </Field>
+              )}
 
             {/* ── Campos do modo PARCELADO (entrada + parcelas) ── */}
             {paymentMode === "parcelado" && (
@@ -1529,6 +1544,28 @@ export default function NewLancamentoForm({
             {/* ── Campos do modo MENSALIDADE FIXA ── */}
             {paymentMode === "mensalidade" && (
               <>
+                {/* Toggle recorrente */}
+                <div className="sm:col-span-2">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-slate-50 px-4 py-3 transition-colors hover:bg-slate-100">
+                    <input
+                      type="checkbox"
+                      checked={recorrenteSemPrazo}
+                      onChange={(e) => setRecorrenteSemPrazo(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 cursor-pointer rounded border-border accent-primary"
+                    />
+                    <div>
+                      <p className="font-body text-sm font-semibold text-fg">
+                        Contrato recorrente (sem prazo definido)
+                      </p>
+                      <p className="mt-0.5 font-body text-xs text-muted">
+                        Use quando não há data de término — ex: INSS com
+                        prorrogação automática. Gere os meses que precisar agora
+                        e adicione mais depois.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
                 <Field
                   label="Mensalidade do cliente (valor fixo da parcela)"
                   required
@@ -1556,31 +1593,67 @@ export default function NewLancamentoForm({
                   </div>
                 </Field>
 
-                <Field label="Valor de entrada (opcional)">
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
-                      R$
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      value={valorEntradaMensalidade}
-                      onChange={(e) =>
-                        setValorEntradaMensalidade(
-                          formatMoneyInput(e.target.value)
-                        )
-                      }
-                      onBlur={() =>
-                        setValorEntradaMensalidade(
-                          normalizeMoneyBlur(valorEntradaMensalidade)
-                        )
-                      }
-                      disabled={isPending}
-                      className={`${inputClass} pl-10`}
-                    />
-                  </div>
-                </Field>
+                {recorrenteSemPrazo ? (
+                  <Field label="Gerar quantos meses agora?" required>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={mesesGerar}
+                        onChange={(e) => setMesesGerar(e.target.value)}
+                        disabled={isPending}
+                        className={`${inputClass} max-w-[120px]`}
+                      />
+                      <span className="font-body text-sm text-muted">
+                        meses
+                      </span>
+                      {parseFloat(parseMoney(valorMensalidade)) > 0 && (
+                        <span className="font-body text-sm font-semibold text-emerald-700">
+                          ={" "}
+                          {(
+                            Math.max(1, parseInt(mesesGerar) || 12) *
+                            (parseFloat(parseMoney(valorMensalidade)) || 0)
+                          ).toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}{" "}
+                          total
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 font-body text-xs text-primary">
+                      Você pode criar mais meses depois — basta lançar novamente
+                      para o mesmo cliente.
+                    </p>
+                  </Field>
+                ) : (
+                  <Field label="Valor de entrada (opcional)">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">
+                        R$
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        value={valorEntradaMensalidade}
+                        onChange={(e) =>
+                          setValorEntradaMensalidade(
+                            formatMoneyInput(e.target.value)
+                          )
+                        }
+                        onBlur={() =>
+                          setValorEntradaMensalidade(
+                            normalizeMoneyBlur(valorEntradaMensalidade)
+                          )
+                        }
+                        disabled={isPending}
+                        className={`${inputClass} pl-10`}
+                      />
+                    </div>
+                  </Field>
+                )}
 
                 {mensalidadeCalc && (
                   <div className="sm:col-span-2">
@@ -1633,32 +1706,48 @@ export default function NewLancamentoForm({
                       </div>
                       <div className="mt-3 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2">
                         <p className="font-body text-sm font-semibold text-amber-900">
-                          {mensalidadeCalc.entrada > 0 && (
+                          {recorrenteSemPrazo ? (
                             <>
-                              Entrada de{" "}
-                              <strong>{fmt(mensalidadeCalc.entrada)}</strong>{" "}
-                              +{" "}
-                            </>
-                          )}
-                          <strong>
-                            {mensalidadeCalc.numParcelas} parcelas
-                          </strong>{" "}
-                          de <strong>{fmt(mensalidadeCalc.mens)}</strong>
-                          {mensalidadeCalc.ultimaDifere && (
-                            <>
-                              {" "}
-                              (última:{" "}
                               <strong>
-                                {fmt(mensalidadeCalc.valorUltimaParcela)}
-                              </strong>
-                              )
+                                {mensalidadeCalc.numParcelas} mensalidades
+                              </strong>{" "}
+                              de <strong>{fmt(mensalidadeCalc.mens)}</strong> —
+                              contrato aberto
+                            </>
+                          ) : (
+                            <>
+                              {mensalidadeCalc.entrada > 0 && (
+                                <>
+                                  Entrada de{" "}
+                                  <strong>
+                                    {fmt(mensalidadeCalc.entrada)}
+                                  </strong>{" "}
+                                  +{" "}
+                                </>
+                              )}
+                              <strong>
+                                {mensalidadeCalc.numParcelas} parcelas
+                              </strong>{" "}
+                              de <strong>{fmt(mensalidadeCalc.mens)}</strong>
+                              {mensalidadeCalc.ultimaDifere && (
+                                <>
+                                  {" "}
+                                  (última:{" "}
+                                  <strong>
+                                    {fmt(mensalidadeCalc.valorUltimaParcela)}
+                                  </strong>
+                                  )
+                                </>
+                              )}
                             </>
                           )}
                         </p>
                         <p className="font-body text-xs text-amber-700 mt-0.5">
-                          {mensalidadeCalc.entrada > 0
-                            ? `Entrada de ${fmt(mensalidadeCalc.entrada)} + ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada${mensalidadeCalc.ultimaDifere ? ` (última: ${fmt(mensalidadeCalc.valorUltimaParcela)})` : ""}`
-                            : `Serão criados ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada${mensalidadeCalc.ultimaDifere ? ` (última: ${fmt(mensalidadeCalc.valorUltimaParcela)})` : ""}`}
+                          {recorrenteSemPrazo
+                            ? `Serão criados ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada. Adicione mais meses quando necessário.`
+                            : mensalidadeCalc.entrada > 0
+                              ? `Entrada de ${fmt(mensalidadeCalc.entrada)} + ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada${mensalidadeCalc.ultimaDifere ? ` (última: ${fmt(mensalidadeCalc.valorUltimaParcela)})` : ""}`
+                              : `Serão criados ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada${mensalidadeCalc.ultimaDifere ? ` (última: ${fmt(mensalidadeCalc.valorUltimaParcela)})` : ""}`}
                         </p>
                       </div>
                     </div>

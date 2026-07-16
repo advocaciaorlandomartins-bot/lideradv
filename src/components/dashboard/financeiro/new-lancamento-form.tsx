@@ -214,7 +214,9 @@ export default function NewLancamentoForm({
   }, [finalCategoria, selectedClient, tipo]);
 
   // ── Valores ────────────────────────────────────────────────
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>("retroativo");
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>(
+    defaultTipo === "saida" ? "avista" : "retroativo"
+  );
   const [valor, setValor] = useState(() => {
     if (!valorInicial) return "";
     const n = parseFloat(valorInicial);
@@ -570,6 +572,13 @@ export default function NewLancamentoForm({
                   setSalarioBase("none");
                   setSalarioCustomInput("");
                   setJaRecebida(false);
+                  setPaymentMode(t === "saida" ? "avista" : "retroativo");
+                  setValor("");
+                  setValorEntrada("");
+                  setTotalParcelas("1");
+                  setValorMensalidade("");
+                  setValorEntradaMensalidade("");
+                  setMesesGerar("12");
                 }}
                 className={
                   t === "entrada" ? "accent-emerald-600" : "accent-red-500"
@@ -786,54 +795,104 @@ export default function NewLancamentoForm({
       <div className="space-y-4">
         <SectionTitle>Valores e pagamento</SectionTitle>
         <div className="mt-4 space-y-4">
-          {/* ── Modo de pagamento — linha 1: modos padrão ── */}
+          {/* ── Modo de pagamento ── */}
           <div>
             <label className={labelClass}>Modo de pagamento</label>
 
-            {/* ── Linha 1: modos principais ── */}
-            <div className="flex gap-2">
-              {(
-                [
-                  {
-                    key: "retroativo",
-                    label: "Avista, Retroativo+Parcelado",
-                    desc: "% s/ retroativo + mensal opcional",
-                  },
-                  {
-                    key: "mensalidade",
-                    label: "Mensalidade Fixa",
-                    desc: "total em salários ÷ parcela fixa",
-                  },
-                ] as { key: PaymentMode; label: string; desc: string }[]
-              ).map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  onClick={() => {
-                    setPaymentMode(m.key);
-                    setValor("");
-                    setSalarioBase("none");
-                    setSalarioCustomInput("");
-                    setValorEntradaMensalidade("");
-                    setComissaoModoPag("auto");
-                    setComissaoValorCustomInput("");
-                  }}
-                  disabled={isPending}
-                  className={`flex-1 rounded-lg border-2 px-3 py-2 font-body transition-colors duration-150 ${
-                    paymentMode === m.key
-                      ? "border-violet-500 bg-violet-50 text-violet-700"
-                      : "border-border text-muted hover:border-slate-300 hover:text-fg"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{m.label}</p>
-                  <p
-                    className={`text-[11px] font-normal ${paymentMode === m.key ? "text-violet-500" : "text-slate-400"}`}
+            {tipo === "entrada" ? (
+              /* ── RECEITA: modos originais ── */
+              <div className="flex gap-2">
+                {(
+                  [
+                    {
+                      key: "retroativo",
+                      label: "Avista, Retroativo+Parcelado",
+                      desc: "% s/ retroativo + mensal opcional",
+                    },
+                    {
+                      key: "mensalidade",
+                      label: "Mensalidade Fixa",
+                      desc: "total em salários ÷ parcela fixa",
+                    },
+                  ] as { key: PaymentMode; label: string; desc: string }[]
+                ).map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => {
+                      setPaymentMode(m.key);
+                      setValor("");
+                      setSalarioBase("none");
+                      setSalarioCustomInput("");
+                      setValorEntradaMensalidade("");
+                      setComissaoModoPag("auto");
+                      setComissaoValorCustomInput("");
+                    }}
+                    disabled={isPending}
+                    className={`flex-1 rounded-lg border-2 px-3 py-2 font-body transition-colors duration-150 ${
+                      paymentMode === m.key
+                        ? "border-violet-500 bg-violet-50 text-violet-700"
+                        : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                    }`}
                   >
-                    {m.desc}
-                  </p>
-                </button>
-              ))}
-            </div>
+                    <p className="text-sm font-semibold">{m.label}</p>
+                    <p
+                      className={`text-[11px] font-normal ${paymentMode === m.key ? "text-violet-500" : "text-slate-400"}`}
+                    >
+                      {m.desc}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              /* ── DESPESA: modos simples ── */
+              <div className="flex gap-2">
+                {(
+                  [
+                    {
+                      key: "avista",
+                      label: "À vista",
+                      desc: "pagamento único",
+                    },
+                    {
+                      key: "parcelado",
+                      label: "Parcelado",
+                      desc: "valor total ÷ parcelas",
+                    },
+                    {
+                      key: "mensalidade",
+                      label: "Mensalidade Fixa",
+                      desc: "despesa mensal recorrente",
+                    },
+                  ] as { key: PaymentMode; label: string; desc: string }[]
+                ).map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => {
+                      setPaymentMode(m.key);
+                      setValor("");
+                      setSalarioBase("none");
+                      setValorEntradaMensalidade("");
+                      setValorEntrada("");
+                    }}
+                    disabled={isPending}
+                    className={`flex-1 rounded-lg border-2 px-3 py-2 font-body transition-colors duration-150 ${
+                      paymentMode === m.key
+                        ? "border-red-400 bg-red-50 text-red-700"
+                        : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">{m.label}</p>
+                    <p
+                      className={`text-[11px] font-normal ${paymentMode === m.key ? "text-red-400" : "text-slate-400"}`}
+                    >
+                      {m.desc}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── Grid de campos ── */}
@@ -1605,7 +1664,11 @@ export default function NewLancamentoForm({
             {paymentMode === "mensalidade" && (
               <>
                 <Field
-                  label="Mensalidade do cliente (valor fixo da parcela)"
+                  label={
+                    tipo === "saida"
+                      ? "Valor mensal da despesa"
+                      : "Mensalidade do cliente (valor fixo da parcela)"
+                  }
                   required
                 >
                   <div className="relative">

@@ -225,9 +225,9 @@ export default function NewLancamentoForm({
   const [totalParcelas, setTotalParcelas] = useState("1");
   const [valorEntradaMensalidade, setValorEntradaMensalidade] = useState("");
   const [numSalarios, setNumSalarios] = useState("1");
-  const [salarioBase, setSalarioBase] = useState<"none" | "minimo" | "custom">(
-    "none"
-  );
+  const [salarioBase, setSalarioBase] = useState<
+    "none" | "minimo" | "custom" | "recorrente"
+  >("none");
   const [salarioCustomInput, setSalarioCustomInput] = useState("");
   const [jaRecebida, setJaRecebida] = useState(false);
   const [aguardandoResultado, setAguardandoResultado] = useState(false);
@@ -242,12 +242,11 @@ export default function NewLancamentoForm({
   const [valorMensalidade, setValorMensalidade] = useState("");
   const [percentualSalario, setPercentualSalario] = useState("");
 
-  // ── Mensalidade recorrente (sem prazo definido) ─────────────
-  const [recorrenteSemPrazo, setRecorrenteSemPrazo] = useState(false);
+  // ── Meses a gerar (modo recorrente) ────────────────────────
   const [mesesGerar, setMesesGerar] = useState("12");
 
   // ── Salário base ───────────────────────────────────────────
-  const salarioMode = salarioBase !== "none";
+  const salarioMode = salarioBase === "minimo" || salarioBase === "custom";
 
   const salarioBaseValor = useMemo(() => {
     if (salarioBase === "custom") {
@@ -296,7 +295,7 @@ export default function NewLancamentoForm({
 
   // ── Valor efetivo (base para cálculos) ─────────────────────
   const effectiveValor = (() => {
-    if (paymentMode === "mensalidade" && recorrenteSemPrazo) {
+    if (paymentMode === "mensalidade" && salarioBase === "recorrente") {
       const mens = parseFloat(parseMoney(valorMensalidade)) || 0;
       const meses = Math.max(1, parseInt(mesesGerar) || 12);
       const total = Math.round(meses * mens * 100) / 100;
@@ -948,6 +947,26 @@ export default function NewLancamentoForm({
                       Salário do cliente
                     </button>
 
+                    {/* Opção: recorrente — só no modo Mensalidade Fixa */}
+                    {paymentMode === "mensalidade" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSalarioBase("recorrente");
+                          setSalarioCustomInput("");
+                          setValor("");
+                        }}
+                        disabled={isPending}
+                        className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2.5 font-body text-sm font-semibold transition-colors duration-150 ${
+                          salarioBase === "recorrente"
+                            ? "border-violet-500 bg-violet-50 text-violet-800"
+                            : "border-border text-muted hover:border-slate-300 hover:text-fg"
+                        }`}
+                      >
+                        Recorrente
+                      </button>
+                    )}
+
                     {/* Campo de salário personalizado */}
                     {salarioBase === "custom" && (
                       <div className="relative">
@@ -1350,7 +1369,9 @@ export default function NewLancamentoForm({
             {(paymentMode !== "retroativo" ||
               !retroativoCalc ||
               retroativoCalc.percValor === 0) &&
-              !(paymentMode === "mensalidade" && recorrenteSemPrazo) && (
+              !(
+                paymentMode === "mensalidade" && salarioBase === "recorrente"
+              ) && (
                 <Field
                   label={
                     paymentMode === "mensalidade"
@@ -1544,28 +1565,6 @@ export default function NewLancamentoForm({
             {/* ── Campos do modo MENSALIDADE FIXA ── */}
             {paymentMode === "mensalidade" && (
               <>
-                {/* Toggle recorrente */}
-                <div className="sm:col-span-2">
-                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-slate-50 px-4 py-3 transition-colors hover:bg-slate-100">
-                    <input
-                      type="checkbox"
-                      checked={recorrenteSemPrazo}
-                      onChange={(e) => setRecorrenteSemPrazo(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 cursor-pointer rounded border-border accent-primary"
-                    />
-                    <div>
-                      <p className="font-body text-sm font-semibold text-fg">
-                        Contrato recorrente (sem prazo definido)
-                      </p>
-                      <p className="mt-0.5 font-body text-xs text-muted">
-                        Use quando não há data de término — ex: INSS com
-                        prorrogação automática. Gere os meses que precisar agora
-                        e adicione mais depois.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-
                 <Field
                   label="Mensalidade do cliente (valor fixo da parcela)"
                   required
@@ -1593,7 +1592,7 @@ export default function NewLancamentoForm({
                   </div>
                 </Field>
 
-                {recorrenteSemPrazo ? (
+                {salarioBase === "recorrente" ? (
                   <Field label="Gerar quantos meses agora?" required>
                     <div className="flex flex-wrap items-center gap-3">
                       <input
@@ -1706,7 +1705,7 @@ export default function NewLancamentoForm({
                       </div>
                       <div className="mt-3 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2">
                         <p className="font-body text-sm font-semibold text-amber-900">
-                          {recorrenteSemPrazo ? (
+                          {salarioBase === "recorrente" ? (
                             <>
                               <strong>
                                 {mensalidadeCalc.numParcelas} mensalidades
@@ -1743,7 +1742,7 @@ export default function NewLancamentoForm({
                           )}
                         </p>
                         <p className="font-body text-xs text-amber-700 mt-0.5">
-                          {recorrenteSemPrazo
+                          {salarioBase === "recorrente"
                             ? `Serão criados ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada. Adicione mais meses quando necessário.`
                             : mensalidadeCalc.entrada > 0
                               ? `Entrada de ${fmt(mensalidadeCalc.entrada)} + ${mensalidadeCalc.numParcelas} lançamentos mensais de ${fmt(mensalidadeCalc.mens)} cada${mensalidadeCalc.ultimaDifere ? ` (última: ${fmt(mensalidadeCalc.valorUltimaParcela)})` : ""}`

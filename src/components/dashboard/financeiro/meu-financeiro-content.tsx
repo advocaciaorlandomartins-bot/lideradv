@@ -155,6 +155,7 @@ function formInicial(tipo: "receita" | "despesa", mesAtivo: string) {
     status: tipo === "receita" ? "a_receber" : "pendente",
     recorrente: false,
     periodicidade: "mensal",
+    vezesGerar: 1,
   };
 }
 
@@ -413,6 +414,7 @@ export default function MeuFinanceiroContent({
         status: item.status,
         recorrente: item.recorrente,
         periodicidade: item.periodicidade ?? "mensal",
+        vezesGerar: 1,
       });
     } else {
       setEditando(null);
@@ -461,40 +463,62 @@ export default function MeuFinanceiroContent({
     setSalvando(true);
     setErro("");
     try {
-      const body = {
+      const baseBody = {
         tipo: form.tipo,
         categoria: catFinal,
         descricao: form.descricao.trim(),
         valor: parsed,
-        data: form.data,
         status: form.status,
         recorrente: form.recorrente,
         periodicidade: form.recorrente ? form.periodicidade : null,
       };
 
-      let resp: Response;
       if (editando) {
-        resp = await fetch(`/api/meu-financeiro/lancamentos/${editando.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
+        const resp = await fetch(
+          `/api/meu-financeiro/lancamentos/${editando.id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...baseBody, data: form.data }),
+          }
+        );
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error ?? "Erro ao salvar");
+        setLancamentos((prev) =>
+          prev.map((l) => (l.id === editando.id ? data : l))
+        );
       } else {
-        resp = await fetch("/api/meu-financeiro/lancamentos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
+        const n = form.recorrente ? Math.max(1, form.vezesGerar || 1) : 1;
+        const criados: LancamentoPessoal[] = [];
+
+        for (let i = 0; i < n; i++) {
+          const base = new Date(form.data + "T12:00:00");
+          let d: Date;
+          if (form.periodicidade === "semanal") {
+            d = new Date(base.getTime() + i * 7 * 86400000);
+          } else if (form.periodicidade === "quinzenal") {
+            d = new Date(base.getTime() + i * 14 * 86400000);
+          } else if (form.periodicidade === "anual") {
+            d = new Date(base);
+            d.setFullYear(d.getFullYear() + i);
+          } else {
+            d = new Date(base);
+            d.setMonth(d.getMonth() + i);
+          }
+          const dataISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          const resp = await fetch("/api/meu-financeiro/lancamentos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...baseBody, data: dataISO }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error ?? "Erro ao salvar");
+          criados.push(data);
+        }
+
+        setLancamentos((prev) => [...criados, ...prev]);
       }
 
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error ?? "Erro ao salvar");
-
-      setLancamentos((prev) =>
-        editando
-          ? prev.map((l) => (l.id === editando.id ? data : l))
-          : [data, ...prev]
-      );
       fecharModal();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao salvar");
@@ -1360,23 +1384,76 @@ export default function MeuFinanceiroContent({
                 </label>
 
                 {form.recorrente && (
-                  <div>
-                    <label className="mb-1 block font-body text-xs font-semibold text-muted">
-                      Periodicidade
-                    </label>
-                    <select
-                      value={form.periodicidade}
-                      onChange={(e) =>
-                        setField("periodicidade", e.target.value)
-                      }
-                      className="h-9 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg focus:outline-none focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="semanal">Semanal</option>
-                      <option value="quinzenal">Quinzenal</option>
-                      <option value="mensal">Mensal</option>
-                      <option value="anual">Anual</option>
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className="mb-1 block font-body text-xs font-semibold text-muted">
+                        Periodicidade
+                      </label>
+                      <select
+                        value={form.periodicidade}
+                        onChange={(e) =>
+                          setField("periodicidade", e.target.value)
+                        }
+                        className="h-9 w-full rounded-lg border border-border bg-white px-3 font-body text-sm text-fg focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="semanal">Semanal</option>
+                        <option value="quinzenal">Quinzenal</option>
+                        <option value="mensal">Mensal</option>
+                        <option value="anual">Anual</option>
+                      </select>
+                    </div>
+                    {!editando && (
+                      <div>
+                        <label className="mb-1 block font-body text-xs font-semibold text-muted">
+                          Quantas vezes gerar
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            min={1}
+                            max={60}
+                            value={form.vezesGerar}
+                            onChange={(e) =>
+                              setField(
+                                "vezesGerar",
+                                Math.max(
+                                  1,
+                                  Math.min(60, Number(e.target.value) || 1)
+                                )
+                              )
+                            }
+                            className="h-9 w-24 rounded-lg border border-border bg-white px-3 font-body text-sm text-fg focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <span className="font-body text-xs text-muted">
+                            {form.vezesGerar <= 1
+                              ? "lançamento (somente este)"
+                              : `lançamentos — um por ${
+                                  form.periodicidade === "mensal"
+                                    ? "mês"
+                                    : form.periodicidade === "semanal"
+                                      ? "semana"
+                                      : form.periodicidade === "quinzenal"
+                                        ? "quinzena"
+                                        : "ano"
+                                }`}
+                          </span>
+                        </div>
+                        {form.vezesGerar > 1 && (
+                          <p className="mt-1 font-body text-[11px] text-blue-600">
+                            Serão criados {form.vezesGerar} lançamentos a partir
+                            de{" "}
+                            {new Date(
+                              form.data + "T12:00:00"
+                            ).toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {erro && (

@@ -1669,7 +1669,6 @@ export default function NewLancamentoForm({
                       ? "Valor mensal da despesa"
                       : "Mensalidade do cliente (valor fixo da parcela)"
                   }
-                  required
                 >
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted select-none">

@@ -103,8 +103,6 @@ export async function createLancamentoAction(
     : null;
 
   if (valorStr && isNaN(valor)) return { error: "Informe um valor válido." };
-  if (mensalidade && (isNaN(valorMensalidade) || valorMensalidade <= 0))
-    return { error: "Informe o valor da mensalidade." };
 
   // ── Caminho especial: aguardando resultado ────────────────────────────────
   // Ignora modo de pagamento e cria sempre uma entrada única com data sentinela.
@@ -193,9 +191,11 @@ export async function createLancamentoAction(
       const valorParcelar =
         valorEntrada > 0 ? Math.max(valor - valorEntrada, 0) : valor;
       const numParcelas =
-        valorParcelar > 0
+        valorParcelar > 0 && valorMensalidade > 0
           ? Math.max(1, Math.floor(valorParcelar / valorMensalidade))
-          : 0;
+          : valorParcelar > 0
+            ? 1
+            : 0;
       const baseDate = new Date(`${baseDateStr}T12:00:00`);
 
       if (valorEntrada > 0) {

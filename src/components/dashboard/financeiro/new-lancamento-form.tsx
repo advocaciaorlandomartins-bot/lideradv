@@ -1036,7 +1036,7 @@ export default function NewLancamentoForm({
                 </div>
 
                 {/* Percentual + quantidade (só quando uma base está ativa) */}
-                {salarioBase !== "none" && (
+                {salarioMode && (
                   <div className="space-y-3">
                     {/* % sobre salário (opcional) */}
                     <div>

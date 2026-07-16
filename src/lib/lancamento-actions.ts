@@ -1107,7 +1107,7 @@ export async function cancelarParcelasAction(
 
   const rows = await sql`
     UPDATE lancamentos
-    SET status = 'cancelado', updated_at = now()
+    SET status = 'cancelado'
     WHERE id = ANY(${validIds}::uuid[])
       AND created_by = ${session.id}::uuid
       AND status = 'pendente'

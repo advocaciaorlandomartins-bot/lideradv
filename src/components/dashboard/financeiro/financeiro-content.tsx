@@ -906,6 +906,8 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [pageConcluidas, setPageConcluidas] = useState(1);
   const [pageSizeConcluidas, setPageSizeConcluidas] = useState(10);
   const [categoryFilter, setCategoryFilter] = useState<string>("todas");
+  const [saldoAtualStr, setSaldoAtualStr] = useState("");
+  const [fluxoCaixaOpen, setFluxoCaixaOpen] = useState(false);
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
@@ -1104,6 +1106,32 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     }
     return { receitas, despesas, total: receitas - despesas };
   }, [concluidas]);
+
+  const fluxoCaixa = useMemo(() => {
+    const saldoBase =
+      parseFloat(saldoAtualStr.replace(/\./g, "").replace(",", ".")) || 0;
+    const todos = lancamentos
+      .filter((l) => l.status === "pendente")
+      .sort(
+        (a, b) =>
+          parseDMY(a.data_vencimento).getTime() -
+          parseDMY(b.data_vencimento).getTime()
+      );
+    type FluxoItem = Lancamento & { saldoAcumulado: number; atrasado: boolean };
+    return todos.reduce<FluxoItem[]>((acc, l) => {
+      const prev =
+        acc.length > 0 ? acc[acc.length - 1].saldoAcumulado : saldoBase;
+      const saldoAcumulado = prev + (l.tipo === "entrada" ? l.valor : -l.valor);
+      return [
+        ...acc,
+        {
+          ...l,
+          saldoAcumulado,
+          atrasado: parseDMY(l.data_vencimento) <= today,
+        },
+      ];
+    }, []);
+  }, [lancamentos, saldoAtualStr, today]);
 
   const paginatedPendentes = pendentesNaoVencidos.slice(
     (pagePendentes - 1) * pageSizePendentes,
@@ -1337,6 +1365,117 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
           fmt={fmt}
         />
       )}
+
+      {/* ── Fluxo de Caixa ───────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+        <button
+          onClick={() => setFluxoCaixaOpen((o) => !o)}
+          className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-slate-50/60"
+        >
+          <BanknotesIcon className="h-4 w-4 text-muted" />
+          <span className="font-heading text-sm font-semibold text-fg">
+            Fluxo de Caixa
+          </span>
+          <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 font-body text-[11px] font-semibold text-blue-600">
+            {fluxoCaixa.length} movimentos pendentes
+          </span>
+          <ChevronDownIcon
+            className={`ml-auto h-4 w-4 text-muted transition-transform duration-200 ${fluxoCaixaOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {fluxoCaixaOpen && (
+          <div className="border-t border-border">
+            {/* Saldo atual input */}
+            <div className="flex flex-wrap items-center gap-3 bg-slate-50/60 px-4 py-3">
+              <label className="font-body text-xs font-semibold text-muted">
+                Saldo atual em conta:
+              </label>
+              <input
+                type="text"
+                value={saldoAtualStr}
+                onChange={(e) => setSaldoAtualStr(e.target.value)}
+                placeholder="0,00"
+                className="w-36 rounded-lg border border-border bg-white px-3 py-1.5 font-body text-sm tabular-nums text-fg placeholder-muted focus:border-primary focus:outline-none"
+              />
+              <span className="font-body text-xs text-muted">
+                Informe o saldo para ver a projeção acumulada abaixo
+              </span>
+            </div>
+
+            {fluxoCaixa.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                <BanknotesIcon className="h-8 w-8 text-slate-300" />
+                <p className="font-body text-sm text-muted">
+                  Nenhum lançamento pendente
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[580px]">
+                  <thead>
+                    <tr className="border-b border-border bg-slate-50/50">
+                      <th className="px-4 py-2.5 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Vencimento
+                      </th>
+                      <th className="px-4 py-2.5 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Descrição
+                      </th>
+                      <th className="px-4 py-2.5 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Valor
+                      </th>
+                      <th className="px-4 py-2.5 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Saldo acumulado
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {fluxoCaixa.map((l) => (
+                      <tr
+                        key={l.id}
+                        className={`${l.atrasado ? "bg-red-50/30" : "bg-white"} hover:bg-slate-50/40`}
+                      >
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-body text-xs tabular-nums text-fg">
+                              {l.data_vencimento}
+                            </span>
+                            {l.atrasado && (
+                              <span className="rounded-full bg-red-100 px-1.5 py-px font-body text-[10px] font-bold text-red-600">
+                                Atrasado
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <p className="max-w-[240px] truncate font-body text-xs text-fg">
+                            {l.descricao}
+                          </p>
+                          {l.client_name && (
+                            <p className="truncate font-body text-[11px] text-muted">
+                              {l.client_name}
+                            </p>
+                          )}
+                        </td>
+                        <td
+                          className={`px-4 py-2.5 text-right font-body text-xs font-semibold tabular-nums ${l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                        >
+                          {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                        </td>
+                        <td
+                          className={`px-4 py-2.5 text-right font-body text-xs font-bold tabular-nums ${l.saldoAcumulado >= 0 ? "text-emerald-700" : "text-red-600"}`}
+                        >
+                          {fmt(l.saldoAcumulado)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── Barra de controles unificada ────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">

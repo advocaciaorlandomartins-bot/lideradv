@@ -77,6 +77,7 @@ export interface ClientFull {
   profissao: string | null;
   nacionalidade: string | null;
   senha_cliente: string | null;
+  senha_inss: string | null;
   parceria: string | null;
   origem_tipo: string | null;
   origem_texto: string | null;
@@ -146,6 +147,7 @@ function mapClientFull(r: any, hasOrigemCols: boolean): ClientFull {
     profissao: r.profissao ?? null,
     nacionalidade: r.nacionalidade ?? null,
     senha_cliente: r.senha_cliente ?? null,
+    senha_inss: r.senha_inss ?? null,
     parceria: r.parceria ?? null,
     origem_tipo: hasOrigemCols ? (r.origem_tipo ?? null) : null,
     origem_texto: hasOrigemCols ? (r.origem_texto ?? null) : null,
@@ -220,7 +222,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         to_char(c.birth_date, 'YYYY-MM-DD') AS birth_date,
         c.email, c.phone,
         c.rg, c.rg_orgao, c.estado_civil, c.genero, c.profissao,
-        c.nacionalidade, c.senha_cliente, c.parceria,
+        c.nacionalidade, c.senha_cliente, c.senha_inss, c.parceria,
         c.menor_incapaz,
         c.responsavel_nome, c.responsavel_cpf, c.responsavel_rg,
         c.responsavel_rg_orgao, c.responsavel_telefone,
@@ -265,7 +267,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       to_char(c.birth_date, 'YYYY-MM-DD') AS birth_date,
       c.email, c.phone,
       c.rg, c.rg_orgao, c.estado_civil, c.genero, c.profissao,
-      c.nacionalidade, c.senha_cliente, c.parceria,
+      c.nacionalidade, c.senha_cliente, c.senha_inss, c.parceria,
       c.menor_incapaz,
       c.responsavel_nome, c.responsavel_cpf, c.responsavel_rg,
       c.responsavel_rg_orgao, c.responsavel_telefone,

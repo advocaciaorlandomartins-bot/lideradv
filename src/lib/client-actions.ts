@@ -49,6 +49,8 @@ export async function createClientAction(
     ((formData.get("nacionalidade") as string | null) ?? "").trim() || null;
   const senhaCliente =
     ((formData.get("senha_cliente") as string | null) ?? "").trim() || null;
+  const senhaInss =
+    ((formData.get("senha_inss") as string | null) ?? "").trim() || null;
   const origemTipo =
     ((formData.get("origem_tipo") as string | null) ?? "").trim() || null;
   const origemTexto =
@@ -173,7 +175,7 @@ export async function createClientAction(
       INSERT INTO clients
         (type, name, doc, trade_name, birth_date, email, phone,
          rg, rg_orgao, estado_civil, genero, profissao, nacionalidade,
-         senha_cliente,
+         senha_cliente, senha_inss,
          origem_tipo, origem_texto, indicador_id, indicador_tipo_trabalho,
          comissao_tipo, comissao_valor,
          menor_incapaz, responsavel_nome, responsavel_cpf, responsavel_rg,
@@ -191,7 +193,7 @@ export async function createClientAction(
          ${birthDate ? birthDate : null}::date,
          ${email}, ${phone},
          ${rg}, ${rgOrgao}, ${estadoCivil}, ${genero}, ${profissao},
-         ${nacionalidade}, ${senhaCliente},
+         ${nacionalidade}, ${senhaCliente}, ${senhaInss},
          ${origemTipo}, ${origemTexto}, ${indicadorId}::uuid,
          ${indicadorTipoTrabalho}, ${comissaoTipo}, ${comissaoValor},
          ${menorIncapaz}, ${responsavelNome}, ${responsavelCpf}, ${responsavelRg},
@@ -216,7 +218,7 @@ export async function createClientAction(
           INSERT INTO clients
             (type, name, doc, trade_name, birth_date, email, phone,
              rg, rg_orgao, estado_civil, genero, profissao, nacionalidade,
-             senha_cliente, parceria,
+             senha_cliente, senha_inss, parceria,
              menor_incapaz, responsavel_nome, responsavel_cpf, responsavel_rg,
              responsavel_rg_orgao, responsavel_telefone, responsavel_email,
              responsavel_parentesco,
@@ -227,7 +229,7 @@ export async function createClientAction(
              ${birthDate ? birthDate : null}::date,
              ${email}, ${phone},
              ${rg}, ${rgOrgao}, ${estadoCivil}, ${genero}, ${profissao},
-             ${nacionalidade}, ${senhaCliente}, ${origemTipo},
+             ${nacionalidade}, ${senhaCliente}, ${senhaInss}, ${origemTipo},
              ${menorIncapaz}, ${responsavelNome}, ${responsavelCpf}, ${responsavelRg},
              ${responsavelRgOrgao}, ${responsavelTelefone}, ${responsavelEmail},
              ${responsavelParentesco},
@@ -296,6 +298,8 @@ export async function updateClientAction(
     ((formData.get("nacionalidade") as string | null) ?? "").trim() || null;
   const senhaCliente =
     ((formData.get("senha_cliente") as string | null) ?? "").trim() || null;
+  const senhaInss =
+    ((formData.get("senha_inss") as string | null) ?? "").trim() || null;
   const origemTipo =
     ((formData.get("origem_tipo") as string | null) ?? "").trim() || null;
   const origemTexto =
@@ -439,6 +443,7 @@ export async function updateClientAction(
         profissao               = ${profissao},
         nacionalidade           = ${nacionalidade},
         senha_cliente           = ${senhaCliente},
+        senha_inss              = ${senhaInss},
         origem_tipo             = ${origemTipo},
         origem_texto            = ${origemTexto},
         indicador_id            = ${indicadorId}::uuid,
@@ -503,6 +508,7 @@ export async function updateClientAction(
             profissao              = ${profissao},
             nacionalidade          = ${nacionalidade},
             senha_cliente          = ${senhaCliente},
+            senha_inss             = ${senhaInss},
             parceria               = ${origemTipo},
             menor_incapaz          = ${menorIncapaz},
             responsavel_nome       = ${responsavelNome},

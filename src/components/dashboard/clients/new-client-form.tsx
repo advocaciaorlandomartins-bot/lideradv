@@ -1016,6 +1016,18 @@ export default function NewClientForm({
             />
           </Field>
 
+          <Field label="Senha INSS">
+            <input
+              name="senha_inss"
+              type="text"
+              placeholder="Senha de acesso ao INSS"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Origem / Parceria">
             <select
               value={origemTipo}

@@ -417,6 +417,9 @@ export default function ClienteDetailTabs({
               {client.nacionalidade && (
                 <InfoRow label="Nacionalidade" value={client.nacionalidade} />
               )}
+              {client.senha_inss && (
+                <InfoRow label="Senha INSS" value={client.senha_inss} />
+              )}
               {/* Quick actions */}
               <div className="flex flex-col gap-2 pt-2 border-t border-border">
                 <a

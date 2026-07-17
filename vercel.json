@@ -2,7 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/publicacoes",
-      "schedule": "0 8 * * 1-5"
+      "schedule": "0 8 * * 1-6"
+    },
+    {
+      "path": "/api/cron/publicacoes",
+      "schedule": "0 12 * * 1-6"
+    },
+    {
+      "path": "/api/cron/publicacoes",
+      "schedule": "0 17 * * 1-6"
     },
     {
       "path": "/api/cron/prazos",

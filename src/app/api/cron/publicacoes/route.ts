@@ -5,10 +5,7 @@ import {
   buscarMovimentosPorProcesso,
 } from "@/lib/datajud";
 import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
-import {
-  sincronizarTramitaSign,
-  tramitaSyncAtivo,
-} from "@/lib/tramitasign-sync";
+import { sincronizarTramitaSign } from "@/lib/tramitasign-sync";
 import { enviarEmailNovaPublicacao } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
@@ -106,14 +103,17 @@ export async function GET(request: Request) {
     }
   }
 
-  // TramitaSign: sincronização via login (se credenciais configuradas)
-  let tramitaResult: { inseridos: number; pulados: number; erro?: string } = {
+  // TramitaSign: API REST (preferido) → scraping (fallback)
+  let tramitaResult: {
+    inseridos: number;
+    pulados: number;
+    metodo?: string;
+    erro?: string;
+  } = {
     inseridos: 0,
     pulados: 0,
   };
-  if (tramitaSyncAtivo()) {
-    tramitaResult = await sincronizarTramitaSign();
-  }
+  tramitaResult = await sincronizarTramitaSign(diasAtras);
 
   const totalNovas =
     totalInseridos + processoInseridos + tramitaResult.inseridos;
@@ -173,18 +173,12 @@ export async function GET(request: Request) {
       por_oab: resultados,
       por_processo: processosResultados,
       processos_monitorados: processos.length,
-      tramitasign: tramitaSyncAtivo()
-        ? {
-            modo: "login_sync",
-            inseridos: tramitaResult.inseridos,
-            pulados: tramitaResult.pulados,
-            erro: tramitaResult.erro,
-          }
-        : {
-            modo: "webhook",
-            url: "https://lideradv.vercel.app/api/webhooks/tramitasign/publicacoes",
-            nota: "Configure TRAMITASIGN_LOGIN_EMAIL e TRAMITASIGN_LOGIN_PASSWORD no Vercel para sincronização automática",
-          },
+      tramitasign: {
+        metodo: tramitaResult.metodo ?? "nenhum",
+        inseridos: tramitaResult.inseridos,
+        pulados: tramitaResult.pulados,
+        erro: tramitaResult.erro,
+      },
       dje_esaj: {
         estados_suportados: [
           "AL",

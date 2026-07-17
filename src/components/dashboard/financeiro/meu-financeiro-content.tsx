@@ -318,7 +318,7 @@ export default function MeuFinanceiroContent({
     const [anoStr, mesStr] = mesHojeISO.split("-");
     const anoHoje = parseInt(anoStr, 10);
     const mesHoje = parseInt(mesStr, 10) - 1;
-    return Array.from({ length: 6 }, (_, i) => {
+    return Array.from({ length: 12 }, (_, i) => {
       const d = new Date(anoHoje, mesHoje + i, 1);
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const aReceberPessoal = lancamentos
@@ -631,7 +631,7 @@ export default function MeuFinanceiroContent({
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <CalendarIcon className="h-4 w-4 text-muted" />
           <span className="font-heading text-sm font-semibold text-fg">
-            Projeção — Próximos 6 Meses
+            Projeção — Próximos 12 Meses
           </span>
           <span className="ml-auto font-body text-xs text-muted">
             Pessoal + Escritório

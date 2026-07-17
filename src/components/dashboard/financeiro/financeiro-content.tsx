@@ -952,7 +952,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
 
   const projecaoMeses = useMemo(() => {
     const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
+    return Array.from({ length: 12 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const yy = d.getFullYear();
       const mm = d.getMonth();
@@ -1302,7 +1302,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <CalendarIcon className="h-4 w-4 text-muted" />
           <span className="font-heading text-sm font-semibold text-fg">
-            Projeção — Próximos 6 Meses
+            Projeção — Próximos 12 Meses
           </span>
           <span className="ml-auto font-body text-xs text-muted">
             Lançamentos pendentes

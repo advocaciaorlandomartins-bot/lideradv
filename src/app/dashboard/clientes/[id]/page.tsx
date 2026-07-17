@@ -6,7 +6,7 @@ export const metadata = { title: "Cliente — LiderAdv" };
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { getProcessosByClientId } from "@/lib/processos-db";
-import { getDocumentosByEntityId } from "@/lib/documents-db";
+import { getDocumentosAllByClientId } from "@/lib/documents-db";
 import { getClientDebito } from "@/lib/lancamentos-db";
 import {
   getAddressByClientId,
@@ -70,7 +70,7 @@ export default async function ClienteDetailPage({
     await Promise.all([
       getClientFull(id),
       getProcessosByClientId(id),
-      getDocumentosByEntityId("cliente", id),
+      getDocumentosAllByClientId(id),
       getClientDebito(id),
       getAddressByClientId(id).catch(() => null),
     ]);

@@ -8,6 +8,8 @@ interface Props {
   clienteId: string;
   clienteNome: string;
   telefoneCliente?: string | null;
+  responsavelNome?: string | null;
+  responsavelTelefone?: string | null;
   processos?: Processo[];
   onClose: () => void;
   onSuccess?: () => void;
@@ -77,6 +79,8 @@ export default function InssProcessarModal({
   clienteId,
   clienteNome,
   telefoneCliente,
+  responsavelNome,
+  responsavelTelefone,
   processos = [],
   onClose,
   onSuccess,
@@ -126,6 +130,8 @@ export default function InssProcessarModal({
         ...r,
         arquivo_nome: arquivos[i]?.name ?? `Arquivo ${i + 1}`,
         confirmar: ehProcessavel(r.tipo_documento),
+        nomeResponsavel: responsavelNome ?? clienteNome,
+        telefoneResponsavel: responsavelTelefone ?? telefoneCliente ?? "",
       }));
       setDocs(revisao);
       setEtapa("revisao");

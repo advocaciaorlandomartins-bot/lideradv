@@ -974,6 +974,8 @@ export default function ClienteDetailTabs({
           clienteId={client.id}
           clienteNome={client.name}
           telefoneCliente={client.phone ?? null}
+          responsavelNome={client.responsavel_nome ?? null}
+          responsavelTelefone={client.responsavel_telefone ?? null}
           processos={processes}
           onClose={() => setInssModalAberto(false)}
         />

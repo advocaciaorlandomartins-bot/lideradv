@@ -12,6 +12,42 @@ export interface Documento {
   created_at_formatted: string;
 }
 
+export async function getDocumentosAllByClientId(
+  clientId: string
+): Promise<Documento[]> {
+  const rows = await sql`
+    SELECT
+      id::text,
+      entity_type,
+      entity_id::text,
+      nome,
+      tipo,
+      tamanho,
+      caminho,
+      url,
+      created_at
+    FROM documentos
+    WHERE
+      (entity_type = 'cliente' AND entity_id = ${clientId}::uuid)
+      OR (entity_type = 'processo' AND entity_id IN (
+        SELECT id FROM processos WHERE client_id = ${clientId}::uuid
+      ))
+    ORDER BY created_at DESC
+  `;
+
+  return rows.map((r) => ({
+    id: r.id,
+    entity_type: r.entity_type as "processo" | "cliente" | "pericia",
+    entity_id: r.entity_id,
+    nome: r.nome,
+    tipo: r.tipo ?? null,
+    tamanho: r.tamanho ? Number(r.tamanho) : null,
+    caminho: r.caminho,
+    url: r.url,
+    created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
+  }));
+}
+
 export async function getDocumentosByEntityId(
   entityType: "processo" | "cliente" | "pericia",
   entityId: string

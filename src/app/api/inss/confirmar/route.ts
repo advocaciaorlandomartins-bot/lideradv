@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import sql from "@/lib/db";
 import { agendarLembretesInss } from "@/lib/lembretes";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
+import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
 
 export const dynamic = "force-dynamic";
 
@@ -295,6 +296,37 @@ export async function POST(req: NextRequest) {
         protocolo: protocolo ?? undefined,
         escritorio: nomeEscritorio,
       });
+
+      // Mensagem de confirmação imediata (enviada no ato do cadastro)
+      const [dRef, mRef, yRef] = (() => {
+        const parts = dataRef.split("-");
+        return [parts[2] ?? "", parts[1] ?? "", parts[0] ?? ""];
+      })();
+      const dataFormatada = `${dRef}/${mRef}/${yRef}`;
+
+      // Determina o destinatário: guardião (menor/incapaz) ou cliente
+      const destTelefone = guardianTelefone ?? telefoneClienteEfetivo;
+      const destPrimeiroNome =
+        (guardianNome ?? clienteNome).split(" ")[0] ?? "";
+
+      if (destTelefone) {
+        const prefixo = guardianTelefone
+          ? `*Agendamento de: ${clienteNome}*\n\n`
+          : "";
+        const linhaProtocolo = protocolo ? `\n🔢 Protocolo: ${protocolo}` : "";
+        const mensagem =
+          `${prefixo}Olá ${destPrimeiroNome}! 👋 O ${nomeEscritorio} acabou de registrar um agendamento no INSS.\n\n` +
+          `*${tipoServico}*\n\n` +
+          `📅 Data: ${dataFormatada}\n` +
+          `🕐 Hora: ${hora}\n` +
+          `📍 Local: ${localCompleto}` +
+          `${linhaProtocolo}\n\n` +
+          `Você receberá lembretes conforme a data se aproximar. Qualquer dúvida, entre em contato conosco! 😊`;
+
+        enviarMensagemDireta({ telefone: destTelefone, mensagem }).catch((e) =>
+          console.error("[inss/confirmar] confirmação imediata:", e)
+        );
+      }
     }
 
     return NextResponse.json({

@@ -2,11 +2,13 @@
 
 import crypto from "crypto";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import sql from "./db";
 import { createSession, destroySession, getSession } from "./session";
 import { resolvePermissoes } from "./permissoes";
 import { logAction } from "./audit";
 import { enviarEmailResetSenha } from "./email";
+import { registroRateLimitExcedido } from "./rate-limit";
 
 export type LoginState = { error: string } | null;
 
@@ -135,6 +137,18 @@ export async function registerAction(
   _prevState: RegisterState,
   formData: FormData
 ): Promise<RegisterState> {
+  // Rate limit por IP: máx 5 cadastros por IP em 24h
+  const hdrs = await headers();
+  const ip =
+    hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    hdrs.get("x-real-ip") ||
+    "unknown";
+  if (await registroRateLimitExcedido(ip)) {
+    return {
+      error: "Muitas tentativas de cadastro. Tente novamente em 24 horas.",
+    };
+  }
+
   const name = ((formData.get("name") as string | null) ?? "").trim();
   const email = ((formData.get("email") as string | null) ?? "").trim();
   const oabEstado = (formData.get("oab_estado") as string | null) ?? "";

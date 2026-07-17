@@ -907,7 +907,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [pageSizeConcluidas, setPageSizeConcluidas] = useState(10);
   const [categoryFilter, setCategoryFilter] = useState<string>("todas");
   const [saldoAtualStr, setSaldoAtualStr] = useState("");
-  const [fluxoCaixaOpen, setFluxoCaixaOpen] = useState(false);
+  const [fluxoCaixaOpen, setFluxoCaixaOpen] = useState(true);
 
   const categorias = useMemo(() => {
     const set = new Set<string>();

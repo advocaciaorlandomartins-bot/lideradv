@@ -44,11 +44,11 @@ export async function getMinhasTarefas(login: string): Promise<{
         p.id::text AS processo_id, p.numero AS processo_numero,
         p.estagio_producao
       FROM controles c
-      JOIN usuarios u ON u.id = c.responsavel_id
+      LEFT JOIN usuarios u ON u.id = c.responsavel_id
       LEFT JOIN clients cl ON cl.id = c.cliente_id
       LEFT JOIN processos p ON p.id = c.processo_id
-      WHERE u.login = ${login}
-        AND (c.status IS NULL OR c.status IN ('em_andamento', 'concluido'))
+      WHERE (u.login = ${login} OR c.responsavel_id IS NULL)
+        AND (c.status IS NULL OR c.status IN ('pendente', 'em_andamento', 'concluido'))
       ORDER BY c.data_evento ASC NULLS LAST
     `,
     sql`
@@ -128,8 +128,9 @@ export async function countMinhasPendentes(login: string): Promise<number> {
   const [c, t] = await Promise.all([
     sql`
       SELECT COUNT(*)::int AS n FROM controles c
-      JOIN usuarios u ON u.id = c.responsavel_id
-      WHERE u.login = ${login} AND c.status IS NULL
+      LEFT JOIN usuarios u ON u.id = c.responsavel_id
+      WHERE (u.login = ${login} OR c.responsavel_id IS NULL)
+        AND (c.status IS NULL OR c.status = 'pendente')
     `,
     sql`
       SELECT COUNT(*)::int AS n FROM tarefas_processo

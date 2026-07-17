@@ -187,13 +187,14 @@ export async function POST(req: NextRequest) {
 
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade)
+          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda, prioridade)
         VALUES
           ('pericias',
            ${dataRef}::date,
            ${tipoServico},
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
+           ${session.id}::uuid,
            ${tipoServico},
            'alta')
       `.catch(() => null);
@@ -211,13 +212,14 @@ export async function POST(req: NextRequest) {
 
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade, dados)
+          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda, prioridade, dados)
         VALUES
           ('alvaras',
            ${dataRef}::date,
            ${descricao},
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
+           ${session.id}::uuid,
            ${tipoServico},
            'alta',
            ${valor ? JSON.stringify({ valor }) : null}::jsonb)
@@ -236,13 +238,14 @@ export async function POST(req: NextRequest) {
 
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade, dados)
+          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda, prioridade, dados)
         VALUES
           ('implantados',
            ${dataRef}::date,
            ${descricao},
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
+           ${session.id}::uuid,
            ${tipoServico},
            'alta',
            ${valor ? JSON.stringify({ valor }) : null}::jsonb)
@@ -253,13 +256,14 @@ export async function POST(req: NextRequest) {
     if (tipoDocumento === "resultado_pericia") {
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda, prioridade)
+          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda, prioridade)
         VALUES
           ('pericias',
            ${dataRef}::date,
            ${tipoServico},
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
+           ${session.id}::uuid,
            ${tipoServico},
            'alta')
       `.catch(() => null);

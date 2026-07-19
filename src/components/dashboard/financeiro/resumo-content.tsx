@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BarChart,
@@ -12,7 +12,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import type { LancamentoKpis, MonthlyChartPoint } from "@/lib/lancamentos-db";
+import type {
+  LancamentoKpis,
+  MonthlyChartPoint,
+  Lancamento,
+} from "@/lib/lancamentos-db";
 import type { RemuneracaoKpis } from "@/lib/remuneracoes-db";
 
 function fmt(v: number) {
@@ -28,16 +32,24 @@ function fmtMonthKey(key: string): string {
     .replace(".", "");
 }
 
+function parseDMY(s: string): Date {
+  const [d, m, y] = s.split("/");
+  if (d && m && y) return new Date(Number(y), Number(m) - 1, Number(d));
+  return new Date(s);
+}
+
 interface Props {
   lancamentoKpis: LancamentoKpis;
   remuneracaoKpis: RemuneracaoKpis;
   chartData: MonthlyChartPoint[];
+  lancamentos: Lancamento[];
 }
 
 export default function ResumoContent({
   lancamentoKpis,
   remuneracaoKpis,
   chartData,
+  lancamentos,
 }: Props) {
   const {
     aReceber,
@@ -50,6 +62,39 @@ export default function ResumoContent({
   } = lancamentoKpis;
   const totalAPagar = aPagar + remuneracaoKpis.aPagar;
   const saldo = aReceber - totalAPagar;
+
+  const [saldoAtualStr, setSaldoAtualStr] = useState("0,00");
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  type FluxoItem = Lancamento & { saldoAcumulado: number; atrasado: boolean };
+  const fluxoCaixa = useMemo((): FluxoItem[] => {
+    const saldoBase =
+      parseFloat(saldoAtualStr.replace(/\./g, "").replace(",", ".")) || 0;
+    const pendentes = lancamentos
+      .filter((l) => l.status === "pendente")
+      .sort(
+        (a, b) =>
+          parseDMY(a.data_vencimento).getTime() -
+          parseDMY(b.data_vencimento).getTime()
+      );
+    return pendentes.reduce<FluxoItem[]>((acc, l) => {
+      const prev =
+        acc.length > 0 ? acc[acc.length - 1].saldoAcumulado : saldoBase;
+      const saldoAcumulado = prev + (l.tipo === "entrada" ? l.valor : -l.valor);
+      return [
+        ...acc,
+        {
+          ...l,
+          saldoAcumulado,
+          atrasado: parseDMY(l.data_vencimento) <= today,
+        },
+      ];
+    }, []);
+  }, [lancamentos, saldoAtualStr, today]);
 
   const formattedChart = useMemo(
     () =>
@@ -158,6 +203,100 @@ export default function ResumoContent({
           desc="Buscar, editar e excluir lançamentos"
           accent="border-slate-200 hover:border-slate-400"
         />
+      </div>
+
+      {/* Fluxo de Caixa */}
+      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          <span className="font-heading text-sm font-semibold text-fg">
+            Fluxo de Caixa
+          </span>
+          <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 font-body text-[11px] font-semibold text-blue-600">
+            {fluxoCaixa.length} pendentes
+          </span>
+        </div>
+        <div className="border-b border-border px-4 py-3 flex items-center gap-3">
+          <span className="font-body text-xs text-muted whitespace-nowrap">
+            Saldo atual (R$):
+          </span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={saldoAtualStr}
+            onChange={(e) => setSaldoAtualStr(e.target.value)}
+            className="w-36 rounded-lg border border-border px-2 py-1 font-body text-sm text-right focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        {fluxoCaixa.length === 0 ? (
+          <p className="py-8 text-center font-body text-sm text-muted">
+            Nenhum lançamento pendente.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-border bg-slate-50/60">
+                  <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Vencimento
+                  </th>
+                  <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Descrição
+                  </th>
+                  <th className="px-4 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Valor
+                  </th>
+                  <th className="px-4 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Saldo Acumulado
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {fluxoCaixa.map((l) => (
+                  <tr
+                    key={l.id}
+                    className={`border-b border-border/60 last:border-0 ${l.atrasado ? "bg-red-50/40" : ""}`}
+                  >
+                    <td className="px-4 py-2 font-body text-xs whitespace-nowrap">
+                      <span
+                        className={
+                          l.atrasado
+                            ? "font-semibold text-red-600"
+                            : "text-muted"
+                        }
+                      >
+                        {l.data_vencimento}
+                        {l.atrasado && (
+                          <span className="ml-1 text-[10px]">⚠</span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 font-body text-xs text-fg">
+                      {l.descricao}
+                      {l.client_name && (
+                        <span className="ml-1 text-muted">
+                          · {l.client_name}
+                        </span>
+                      )}
+                    </td>
+                    <td
+                      className={`px-4 py-2 text-right font-body text-xs font-semibold tabular-nums whitespace-nowrap ${l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                    >
+                      {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                    </td>
+                    <td
+                      className={`px-4 py-2 text-right font-body text-xs font-bold tabular-nums whitespace-nowrap ${l.saldoAcumulado >= 0 ? "text-emerald-700" : "text-red-600"}`}
+                    >
+                      {fmt(Math.abs(l.saldoAcumulado))}
+                      {l.saldoAcumulado < 0 && (
+                        <span className="text-muted font-normal"> neg</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Bar chart */}

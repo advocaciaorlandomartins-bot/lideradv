@@ -54,14 +54,15 @@ export default async function FinanceiroPage({
   const canEdit = !!session && hasPermission(session, "financeiro", "editar");
 
   // Carrega apenas os dados necessários para cada aba
-  const [lancamentoKpis, remuneracaoKpis, chartData] =
+  const [lancamentoKpis, remuneracaoKpis, chartData, resumoLancamentos] =
     tab === "resumo"
       ? await Promise.all([
           getLancamentoKpis(),
           getRemuneracaoKpis(),
           getMonthlyChart(),
+          getAllLancamentos(),
         ])
-      : [null, null, []];
+      : [null, null, [], []];
 
   const [remuneracoes, remKpis] =
     tab === "remuneracoes"
@@ -198,6 +199,7 @@ export default async function FinanceiroPage({
           lancamentoKpis={lancamentoKpis!}
           remuneracaoKpis={remuneracaoKpis!}
           chartData={chartData}
+          lancamentos={resumoLancamentos}
         />
       )}
       {tab === "receber" && (

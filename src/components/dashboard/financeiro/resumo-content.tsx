@@ -316,7 +316,7 @@ export default function ResumoContent({
                   </table>
                 </div>
 
-                {/* Paginação */}
+                {/* Paginação numerada */}
                 {totalPag > 1 && (
                   <div className="flex items-center justify-between border-t border-border px-4 py-2">
                     <span className="font-body text-xs text-muted">
@@ -325,27 +325,48 @@ export default function ResumoContent({
                         (pagAtual + 1) * FLUXO_POR_PAG,
                         fluxoCaixa.length
                       )}{" "}
-                      de {fluxoCaixa.length} lançamentos
+                      de {fluxoCaixa.length}
                     </span>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() =>
-                          setFluxoPagina((p) => Math.max(0, p - 1))
+                    <div className="flex items-center gap-1">
+                      {(() => {
+                        const pages: (number | "...")[] = [];
+                        if (totalPag <= 7) {
+                          for (let i = 0; i < totalPag; i++) pages.push(i);
+                        } else {
+                          pages.push(0);
+                          if (pagAtual > 2) pages.push("...");
+                          for (
+                            let i = Math.max(1, pagAtual - 1);
+                            i <= Math.min(totalPag - 2, pagAtual + 1);
+                            i++
+                          )
+                            pages.push(i);
+                          if (pagAtual < totalPag - 3) pages.push("...");
+                          pages.push(totalPag - 1);
                         }
-                        disabled={pagAtual === 0}
-                        className="rounded-lg border border-border px-3 py-1 font-body text-xs font-semibold text-fg transition-colors hover:bg-slate-50 disabled:opacity-40"
-                      >
-                        ← Anterior
-                      </button>
-                      <button
-                        onClick={() =>
-                          setFluxoPagina((p) => Math.min(totalPag - 1, p + 1))
-                        }
-                        disabled={pagAtual >= totalPag - 1}
-                        className="rounded-lg border border-border px-3 py-1 font-body text-xs font-semibold text-fg transition-colors hover:bg-slate-50 disabled:opacity-40"
-                      >
-                        Próxima →
-                      </button>
+                        return pages.map((p, i) =>
+                          p === "..." ? (
+                            <span
+                              key={`dots-${i}`}
+                              className="px-1 font-body text-xs text-muted"
+                            >
+                              …
+                            </span>
+                          ) : (
+                            <button
+                              key={p}
+                              onClick={() => setFluxoPagina(p)}
+                              className={`min-w-[28px] rounded-lg border px-2 py-1 font-body text-xs font-semibold transition-colors ${
+                                p === pagAtual
+                                  ? "border-primary bg-primary text-white"
+                                  : "border-border text-fg hover:bg-slate-50"
+                              }`}
+                            >
+                              {p + 1}
+                            </button>
+                          )
+                        );
+                      })()}
                     </div>
                   </div>
                 )}

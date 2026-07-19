@@ -64,6 +64,8 @@ export default function ResumoContent({
   const saldo = aReceber - totalAPagar;
 
   const [saldoAtualStr, setSaldoAtualStr] = useState("0,00");
+  const [fluxoPagina, setFluxoPagina] = useState(0);
+  const FLUXO_POR_PAG = 10;
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -206,98 +208,152 @@ export default function ResumoContent({
       </div>
 
       {/* Fluxo de Caixa */}
-      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <span className="font-heading text-sm font-semibold text-fg">
-            Fluxo de Caixa
-          </span>
-          <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 font-body text-[11px] font-semibold text-blue-600">
-            {fluxoCaixa.length} pendentes
-          </span>
-        </div>
-        <div className="border-b border-border px-4 py-3 flex items-center gap-3">
-          <span className="font-body text-xs text-muted whitespace-nowrap">
-            Saldo atual (R$):
-          </span>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={saldoAtualStr}
-            onChange={(e) => setSaldoAtualStr(e.target.value)}
-            className="w-36 rounded-lg border border-border px-2 py-1 font-body text-sm text-right focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        {fluxoCaixa.length === 0 ? (
-          <p className="py-8 text-center font-body text-sm text-muted">
-            Nenhum lançamento pendente.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-border bg-slate-50/60">
-                  <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Vencimento
-                  </th>
-                  <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Descrição
-                  </th>
-                  <th className="px-4 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Valor
-                  </th>
-                  <th className="px-4 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Saldo Acumulado
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {fluxoCaixa.map((l) => (
-                  <tr
-                    key={l.id}
-                    className={`border-b border-border/60 last:border-0 ${l.atrasado ? "bg-red-50/40" : ""}`}
-                  >
-                    <td className="px-4 py-2 font-body text-xs whitespace-nowrap">
-                      <span
-                        className={
-                          l.atrasado
-                            ? "font-semibold text-red-600"
-                            : "text-muted"
+      {(() => {
+        const totalPag = Math.ceil(fluxoCaixa.length / FLUXO_POR_PAG);
+        const pagAtual = Math.min(fluxoPagina, Math.max(0, totalPag - 1));
+        const pagItens = fluxoCaixa.slice(
+          pagAtual * FLUXO_POR_PAG,
+          pagAtual * FLUXO_POR_PAG + FLUXO_POR_PAG
+        );
+        return (
+          <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+            {/* Cabeçalho + campo saldo */}
+            <div className="flex flex-wrap items-center gap-3 border-b border-border bg-slate-50/50 px-4 py-3">
+              <div>
+                <p className="font-heading text-sm font-semibold text-fg">
+                  Fluxo de Caixa
+                </p>
+                <p className="font-body text-[11px] text-muted">
+                  Projeção dos lançamentos pendentes sobre seu saldo
+                </p>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <label className="font-body text-xs font-semibold text-muted whitespace-nowrap">
+                  Saldo atual na conta:
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={saldoAtualStr}
+                  onChange={(e) => {
+                    setSaldoAtualStr(e.target.value);
+                    setFluxoPagina(0);
+                  }}
+                  placeholder="0,00"
+                  className="w-36 rounded-lg border border-primary/40 bg-white px-3 py-1.5 font-body text-sm font-semibold text-right text-fg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+
+            {fluxoCaixa.length === 0 ? (
+              <p className="py-10 text-center font-body text-sm text-muted">
+                Nenhum lançamento pendente.
+              </p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-border bg-slate-50/60">
+                        <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                          Vencimento
+                        </th>
+                        <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                          Descrição
+                        </th>
+                        <th className="px-4 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                          Valor
+                        </th>
+                        <th className="px-4 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                          Saldo após
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagItens.map((l) => (
+                        <tr
+                          key={l.id}
+                          className={`border-b border-border/60 last:border-0 ${l.atrasado ? "bg-red-50/40" : ""}`}
+                        >
+                          <td className="px-4 py-2.5 font-body text-xs whitespace-nowrap">
+                            <span
+                              className={
+                                l.atrasado
+                                  ? "font-semibold text-red-600"
+                                  : "text-muted"
+                              }
+                            >
+                              {l.data_vencimento}
+                              {l.atrasado && (
+                                <span className="ml-1 rounded bg-red-100 px-1 text-[9px] font-bold text-red-600">
+                                  ATRASADO
+                                </span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 font-body text-xs text-fg">
+                            {l.descricao}
+                            {l.client_name && (
+                              <span className="ml-1 text-muted">
+                                · {l.client_name}
+                              </span>
+                            )}
+                          </td>
+                          <td
+                            className={`px-4 py-2.5 text-right font-body text-xs font-semibold tabular-nums whitespace-nowrap ${l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
+                          >
+                            {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
+                          </td>
+                          <td
+                            className={`px-4 py-2.5 text-right font-body text-xs font-bold tabular-nums whitespace-nowrap ${l.saldoAcumulado >= 0 ? "text-emerald-700" : "text-red-600"}`}
+                          >
+                            {l.saldoAcumulado < 0 ? "−" : ""}{" "}
+                            {fmt(Math.abs(l.saldoAcumulado))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Paginação */}
+                {totalPag > 1 && (
+                  <div className="flex items-center justify-between border-t border-border px-4 py-2">
+                    <span className="font-body text-xs text-muted">
+                      {pagAtual * FLUXO_POR_PAG + 1}–
+                      {Math.min(
+                        (pagAtual + 1) * FLUXO_POR_PAG,
+                        fluxoCaixa.length
+                      )}{" "}
+                      de {fluxoCaixa.length} lançamentos
+                    </span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() =>
+                          setFluxoPagina((p) => Math.max(0, p - 1))
                         }
+                        disabled={pagAtual === 0}
+                        className="rounded-lg border border-border px-3 py-1 font-body text-xs font-semibold text-fg transition-colors hover:bg-slate-50 disabled:opacity-40"
                       >
-                        {l.data_vencimento}
-                        {l.atrasado && (
-                          <span className="ml-1 text-[10px]">⚠</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 font-body text-xs text-fg">
-                      {l.descricao}
-                      {l.client_name && (
-                        <span className="ml-1 text-muted">
-                          · {l.client_name}
-                        </span>
-                      )}
-                    </td>
-                    <td
-                      className={`px-4 py-2 text-right font-body text-xs font-semibold tabular-nums whitespace-nowrap ${l.tipo === "entrada" ? "text-emerald-700" : "text-red-600"}`}
-                    >
-                      {l.tipo === "entrada" ? "+" : "−"} {fmt(l.valor)}
-                    </td>
-                    <td
-                      className={`px-4 py-2 text-right font-body text-xs font-bold tabular-nums whitespace-nowrap ${l.saldoAcumulado >= 0 ? "text-emerald-700" : "text-red-600"}`}
-                    >
-                      {fmt(Math.abs(l.saldoAcumulado))}
-                      {l.saldoAcumulado < 0 && (
-                        <span className="text-muted font-normal"> neg</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        ← Anterior
+                      </button>
+                      <button
+                        onClick={() =>
+                          setFluxoPagina((p) => Math.min(totalPag - 1, p + 1))
+                        }
+                        disabled={pagAtual >= totalPag - 1}
+                        className="rounded-lg border border-border px-3 py-1 font-body text-xs font-semibold text-fg transition-colors hover:bg-slate-50 disabled:opacity-40"
+                      >
+                        Próxima →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Bar chart */}
       <div className="rounded-xl border border-border bg-white p-5 shadow-sm">

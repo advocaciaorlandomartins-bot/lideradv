@@ -12,62 +12,73 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const webhookKey = process.env.PREVBOT_API_KEY;
+  const webhookKey =
+    process.env.PREVBOT_WEBHOOK_KEY ?? process.env.PREVBOT_API_KEY;
   if (!webhookKey) {
     return NextResponse.json({
       ok: true,
-      skipped: "PREVBOT_API_KEY não configurada",
+      skipped: "PREVBOT_WEBHOOK_KEY não configurada",
     });
   }
 
-  // Busca entradas pendentes com menos de 3 tentativas
-  const pendentes = await sql`
-    SELECT id::text, payload, tentativas
-    FROM prevbot_webhook_log
-    WHERE status     = 'pendente'
-      AND tentativas < 3
-    ORDER BY created_at ASC
-    LIMIT 20
-  `;
-
   let enviados = 0;
   let falhos = 0;
+  let processados = 0;
 
-  for (const row of pendentes) {
-    const logId = String((row as { id: string }).id);
-    const tentativas = Number((row as { tentativas: number }).tentativas);
-    const payload = (row as { payload: Record<string, unknown> }).payload;
+  try {
+    const pendentes = await sql`
+      SELECT id::text, payload, tentativas
+      FROM prevbot_webhook_log
+      WHERE status     = 'pendente'
+        AND tentativas < 3
+      ORDER BY created_at ASC
+      LIMIT 20
+    `;
 
-    const resultado = await _enviarWebhook(webhookKey, payload);
-    const novasTentativas = tentativas + 1;
+    processados = pendentes.length;
 
-    if (resultado.ok) {
-      await sql`
-        UPDATE prevbot_webhook_log
-        SET status = 'enviado', tentativas = ${novasTentativas}, enviado_em = NOW()
-        WHERE id = ${logId}::uuid
-      `;
-      enviados++;
-    } else {
-      const novoStatus = novasTentativas >= 3 ? "falhou" : "pendente";
-      await sql`
-        UPDATE prevbot_webhook_log
-        SET tentativas = ${novasTentativas},
-            status     = ${novoStatus},
-            ultimo_erro = ${resultado.error ?? null}
-        WHERE id = ${logId}::uuid
-      `;
-      falhos++;
-      console.warn(
-        `[prevbot-retries] Tentativa ${novasTentativas}/3 falhou (${logId}):`,
-        resultado.error
-      );
+    for (const row of pendentes) {
+      const logId = String((row as { id: string }).id);
+      const tentativas = Number((row as { tentativas: number }).tentativas);
+      const payload = (row as { payload: Record<string, unknown> }).payload;
+
+      const resultado = await _enviarWebhook(webhookKey, payload);
+      const novasTentativas = tentativas + 1;
+
+      if (resultado.ok) {
+        await sql`
+          UPDATE prevbot_webhook_log
+          SET status = 'enviado', tentativas = ${novasTentativas}, enviado_em = NOW()
+          WHERE id = ${logId}::uuid
+        `;
+        enviados++;
+      } else {
+        const novoStatus = novasTentativas >= 3 ? "falhou" : "pendente";
+        await sql`
+          UPDATE prevbot_webhook_log
+          SET tentativas  = ${novasTentativas},
+              status      = ${novoStatus},
+              ultimo_erro = ${resultado.error ?? null}
+          WHERE id = ${logId}::uuid
+        `;
+        falhos++;
+        console.warn(
+          `[prevbot-retries] Tentativa ${novasTentativas}/3 falhou (${logId}):`,
+          resultado.error
+        );
+      }
     }
+  } catch (err) {
+    console.error("[prevbot-retries] Erro:", err);
+    return NextResponse.json(
+      { ok: false, error: String(err) },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({
     ok: true,
-    processados: pendentes.length,
+    processados,
     enviados,
     falhos,
   });

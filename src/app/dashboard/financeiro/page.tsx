@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   getAllLancamentos,
   getLancamentoKpis,
@@ -51,7 +52,8 @@ export default async function FinanceiroPage({
   const tab = resolveTab(rawTab);
 
   const session = await getSession();
-  const canEdit = !!session && hasPermission(session, "financeiro", "editar");
+  if (!session) redirect("/login");
+  const canEdit = hasPermission(session, "financeiro", "editar");
 
   // Carrega apenas os dados necessários para cada aba
   const [lancamentoKpis, remuneracaoKpis, chartData, resumoLancamentos] =

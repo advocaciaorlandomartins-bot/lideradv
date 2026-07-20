@@ -1,8 +1,6 @@
 import sql from "./db";
 
-const PREVBOT_WEBHOOK_URL =
-  process.env.PREVBOT_WEBHOOK_URL ??
-  "https://prevbot-production.up.railway.app/webhook/lideradv";
+const PREVBOT_WEBHOOK_URL = process.env.PREVBOT_WEBHOOK_URL ?? "";
 
 export type PrevBotEvento =
   | "honorario_pago"
@@ -72,6 +70,8 @@ export async function _enviarWebhook(
   key: string,
   payload: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!PREVBOT_WEBHOOK_URL)
+    return { ok: false, error: "PREVBOT_WEBHOOK_URL não configurada" };
   try {
     const res = await fetch(PREVBOT_WEBHOOK_URL, {
       method: "POST",

@@ -16,10 +16,15 @@ import { getSession } from "@/lib/session";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error("ANTHROPIC_API_KEY não configurada");
+let claude: Anthropic | null = null;
+function getClaude(): Anthropic {
+  if (!claude) {
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) throw new Error("ANTHROPIC_API_KEY não configurada");
+    claude = new Anthropic({ apiKey: key });
+  }
+  return claude;
 }
-const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── DOU via InLabs (requer chave) ───────────────────────────────────────────
 
@@ -159,7 +164,7 @@ async function analisarComIA(
     .join("\n");
 
   try {
-    const msg = await claude.messages.create({
+    const msg = await getClaude().messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 700,
       messages: [

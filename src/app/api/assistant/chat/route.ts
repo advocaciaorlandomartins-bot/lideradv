@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 

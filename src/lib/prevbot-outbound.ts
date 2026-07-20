@@ -104,7 +104,14 @@ export async function enviarMensagemDireta(opts: {
   const telefone = opts.telefone.replace(/\D/g, "");
   if (!telefone) return { ok: false, error: "Telefone inválido" };
 
+  // tenant_id extraído do final da URL (ex: /webhook/lideradv → "lideradv")
+  const tenantId =
+    process.env.PREVBOT_TENANT_ID ??
+    PREVBOT_WEBHOOK_URL.split("/").pop() ??
+    "lideradv";
+
   return _enviarWebhook(key, {
+    tenant_id: tenantId,
     evento: "mensagem_direta",
     telefone,
     dados: { texto: opts.mensagem },

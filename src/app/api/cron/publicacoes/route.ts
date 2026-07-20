@@ -7,6 +7,7 @@ import {
 import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
 import { sincronizarTramitaSign } from "@/lib/tramitasign-sync";
 import { enviarEmailNovaPublicacao } from "@/lib/email";
+import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -118,50 +119,75 @@ export async function GET(request: Request) {
   const totalNovas =
     totalInseridos + processoInseridos + tramitaResult.inseridos;
 
-  // Envia email de resumo se o cron encontrou publicações novas
+  // Envia notificações se encontrou publicações novas
   if (totalNovas > 0) {
     try {
-      const configRows = await sql`SELECT email FROM escritorio_config LIMIT 1`;
-      const emailDestino = (
-        (configRows[0] as { email?: string } | undefined)?.email ?? ""
-      ).trim();
-      if (emailDestino) {
-        // Busca as publicações recém-inseridas (última hora)
-        const recentes = await sql`
-          SELECT tipo, processo, tribunal, orgao,
-                 to_char(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
-                 resumo_ia
-          FROM publicacoes
-          WHERE created_at >= NOW() - INTERVAL '1 hour'
-            AND status = 'nao_lida'
-          ORDER BY created_at DESC
-          LIMIT 50
-        `;
-        if (recentes.length > 0) {
-          await enviarEmailNovaPublicacao({
-            para: emailDestino,
-            publicacoes: recentes.map((r) => {
-              const ri = r.resumo_ia as {
-                texto?: string;
-                prazo_dias?: number;
-                acao_necessaria?: string;
-              } | null;
-              return {
-                tipo: String(r.tipo),
-                processo: String(r.processo),
-                tribunal: String(r.tribunal ?? ""),
-                orgao: String(r.orgao ?? "—"),
-                disponibilizacao: String(r.disponibilizacao),
-                resumo: ri?.texto ?? null,
-                prazo_dias: ri?.prazo_dias ?? null,
-                acao_necessaria: ri?.acao_necessaria ?? null,
-              };
-            }),
-          });
-        }
+      const configRows =
+        await sql`SELECT email, telefone FROM escritorio_config LIMIT 1`;
+      const cfg = configRows[0] as
+        | { email?: string; telefone?: string }
+        | undefined;
+      const emailDestino = (cfg?.email ?? "").trim();
+      const telefoneEscritorio = (cfg?.telefone ?? "").trim();
+
+      // Busca as publicações recém-inseridas (última hora)
+      const recentes = await sql`
+        SELECT tipo, processo, tribunal, orgao,
+               to_char(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
+               resumo_ia
+        FROM publicacoes
+        WHERE created_at >= NOW() - INTERVAL '1 hour'
+          AND status = 'nao_lida'
+        ORDER BY created_at DESC
+        LIMIT 50
+      `;
+
+      // WhatsApp para o escritório (canal principal)
+      if (telefoneEscritorio && recentes.length > 0) {
+        const linhas = recentes.slice(0, 5).map((r) => {
+          const ri = r.resumo_ia as { texto?: string } | null;
+          const proc = r.processo ? `Proc: ${r.processo}` : "";
+          const resumo = ri?.texto ? `\n   ${ri.texto.slice(0, 120)}` : "";
+          return `• ${r.tipo} — ${r.tribunal ?? r.orgao ?? ""}${proc ? "\n   " + proc : ""}${resumo}`;
+        });
+        const resto =
+          recentes.length > 5 ? `\n+${recentes.length - 5} mais...` : "";
+        const msg =
+          `*${totalNovas} nova(s) publicação(ões) no DJe!*\n\n` +
+          linhas.join("\n\n") +
+          resto +
+          `\n\nAcesse LiderAdv para ver todas.`;
+        await enviarMensagemDireta({
+          telefone: telefoneEscritorio,
+          mensagem: msg,
+        });
+      }
+
+      // E-mail (canal secundário — requer RESEND_API_KEY)
+      if (emailDestino && recentes.length > 0) {
+        await enviarEmailNovaPublicacao({
+          para: emailDestino,
+          publicacoes: recentes.map((r) => {
+            const ri = r.resumo_ia as {
+              texto?: string;
+              prazo_dias?: number;
+              acao_necessaria?: string;
+            } | null;
+            return {
+              tipo: String(r.tipo),
+              processo: String(r.processo),
+              tribunal: String(r.tribunal ?? ""),
+              orgao: String(r.orgao ?? "—"),
+              disponibilizacao: String(r.disponibilizacao),
+              resumo: ri?.texto ?? null,
+              prazo_dias: ri?.prazo_dias ?? null,
+              acao_necessaria: ri?.acao_necessaria ?? null,
+            };
+          }),
+        });
       }
     } catch (err) {
-      console.error("[cron/publicacoes] erro ao enviar email:", err);
+      console.error("[cron/publicacoes] erro ao notificar:", err);
     }
   }
 

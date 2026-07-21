@@ -8,6 +8,7 @@ import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
 import { sincronizarTramitaSign } from "@/lib/tramitasign-sync";
 import { enviarEmailNovaPublicacao } from "@/lib/email";
 import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
+import { sincronizarDJEN } from "@/lib/djen";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -116,8 +117,17 @@ export async function GET(request: Request) {
   };
   tramitaResult = await sincronizarTramitaSign(diasAtras);
 
+  // DJEN: busca intimações TRF5 por número de processo (cobre federal)
+  const djenInseridos = await sincronizarDJEN(diasAtras).catch((e) => {
+    console.error("[cron/publicacoes] Erro DJEN:", e);
+    return 0;
+  });
+
   const totalNovas =
-    totalInseridos + processoInseridos + tramitaResult.inseridos;
+    totalInseridos +
+    processoInseridos +
+    tramitaResult.inseridos +
+    djenInseridos;
 
   // Envia notificações se encontrou publicações novas
   if (totalNovas > 0) {
@@ -199,6 +209,7 @@ export async function GET(request: Request) {
       por_oab: resultados,
       por_processo: processosResultados,
       processos_monitorados: processos.length,
+      djen: { inseridos: djenInseridos },
       tramitasign: {
         metodo: tramitaResult.metodo ?? "nenhum",
         inseridos: tramitaResult.inseridos,

@@ -1090,18 +1090,26 @@ function BotaoVerificar() {
                     : "sem API Key"}
                 </span>
               </div>
-              <div className="col-span-2 flex items-center justify-between rounded bg-white px-2 py-1 border border-border">
+              <div className="flex items-center justify-between rounded bg-white px-2 py-1 border border-border">
                 <span className="text-muted">TramitaSign</span>
                 <span
                   className={`font-semibold ${!d.tramitasign_ativo ? "text-amber-500" : d.tramitasign > 0 ? "text-emerald-600" : "text-slate-400"}`}
                 >
                   {!d.tramitasign_ativo
-                    ? "credenciais não configuradas"
+                    ? "sem credenciais"
                     : d.tramitasign_erro
-                      ? `erro: ${d.tramitasign_erro.slice(0, 40)}`
+                      ? `erro: ${d.tramitasign_erro.slice(0, 30)}`
                       : d.tramitasign > 0
                         ? `+${d.tramitasign}`
                         : "0 novas"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded bg-white px-2 py-1 border border-border">
+                <span className="text-muted">DJEN / TRF5</span>
+                <span
+                  className={`font-semibold ${d.djen > 0 ? "text-emerald-600" : "text-slate-400"}`}
+                >
+                  {d.djen > 0 ? `+${d.djen}` : "0 novas"}
                 </span>
               </div>
             </div>

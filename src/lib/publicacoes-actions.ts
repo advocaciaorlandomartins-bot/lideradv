@@ -195,6 +195,7 @@ export async function verificarPublicacoesAction(): Promise<{
     processos_monitorados: number;
     oabs_ativas: number;
     datajud_disponivel: boolean;
+    djen: number;
   };
 }> {
   const session = await getSession();
@@ -211,6 +212,7 @@ export async function verificarPublicacoesAction(): Promise<{
         processos_monitorados: 0,
         oabs_ativas: 0,
         datajud_disponivel: false,
+        djen: 0,
       },
     };
   }
@@ -303,7 +305,16 @@ export async function verificarPublicacoesAction(): Promise<{
     }
   }
 
-  const total = djeFonte + datajudProcesso + tramitasignFonte;
+  // 5. DJEN — intimações TRF5 por número de processo
+  let djenFonte = 0;
+  try {
+    const { sincronizarDJEN } = await import("./djen");
+    djenFonte = await sincronizarDJEN(30);
+  } catch (e) {
+    console.error("[verificarPublicacoes] DJEN error:", e);
+  }
+
+  const total = djeFonte + datajudProcesso + tramitasignFonte + djenFonte;
   revalidatePath("/dashboard/publicacoes");
 
   let mensagem: string;
@@ -315,6 +326,7 @@ export async function verificarPublicacoesAction(): Promise<{
     if (processos.length > 0)
       fontes.push(`DataJud (${processos.length} processos)`);
     if (tramitaAtivo) fontes.push("TramitaSign");
+    fontes.push("DJEN/TRF5");
     mensagem =
       fontes.length > 0
         ? `Nenhuma novidade encontrada via ${fontes.join(", ")}.`
@@ -334,6 +346,7 @@ export async function verificarPublicacoesAction(): Promise<{
       processos_monitorados: processos.length,
       oabs_ativas: rows.length,
       datajud_disponivel: !!apiKey,
+      djen: djenFonte,
     },
   };
 }

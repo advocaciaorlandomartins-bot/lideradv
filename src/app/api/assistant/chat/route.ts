@@ -103,9 +103,30 @@ A seção abre com sub-navegação no topo: "Controles" e "Perícias"
 - Criação automática ao processar documento de agendamento com o botão "Processar INSS"
 
 ## PUBLICAÇÕES (menu: Jurídico → Publicações)
-- Lista de publicações do Diário Oficial vinculadas ao OAB cadastrado
-- Captura automática via API (sem criação manual)
-- Cada publicação pode ser marcada como lida e vinculada a um processo
+Monitoramento automático de publicações e intimações judiciais. 4 abas:
+
+1. **Automática** — publicações capturadas pelas fontes:
+   - DJe / eSAJ (TJAL e outros tribunais estaduais): busca por OAB cadastrada
+   - DJEN / PJe federal (TRF5): busca automática por número de processo
+   - TramitaSign: sincronização diária via credenciais
+   - DataJud: busca por número CNJ (requer DATAJUD_API_KEY)
+   - Cron automático diário + botão "Verificar agora" para busca manual imediata
+   - Cada card exibe: tipo (Intimação/Despacho/etc.), tribunal, processo, data, prazo em dias úteis (Lei 11.419/2006), ação necessária, resumo IA
+   - Prazo colorido: VENCIDO (vermelho escuro), ≤3 dias (vermelho), ≤7 dias (âmbar), >7 dias (verde)
+   - Status: "Não lida" → "Tratada"; botão "Marcar tratada" / "Desfazer"
+
+2. **Manual** — registrar intimação manualmente (formulário: processo, tipo, destinatário, órgão, tribunal, data, conteúdo)
+
+3. **OABs** — adicionar/remover OABs monitoradas; botão "Verificar agora" busca todas as fontes na hora
+
+4. **Status** — KPIs (total / não lidas / tratadas / OABs ativas), diagnóstico de configuração das fontes, botão "Verificar configuração"
+
+- Clique em qualquer publicação → página de detalhe com:
+  • Resumo Inteligente (IA): prazo, ação necessária, data de audiência
+  • Timeline de prazos (disponibilização → publicação → início do prazo → prazo final)
+  • Texto integral da publicação
+  • Botão "Gerar Resumo IA" se ainda não analisado
+- Notificação automática por WhatsApp ao número do escritório quando há novas publicações
 
 ## LEIS & DOU (menu: Jurídico → Leis & DOU)
 - Monitoramento automático do Diário Oficial — INSS, Previdência Social e legislação previdenciária

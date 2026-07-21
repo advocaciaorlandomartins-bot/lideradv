@@ -70,7 +70,10 @@ export async function POST(request: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[documentos/upload] Vercel Blob error:", msg);
-    return NextResponse.json({ error: `Blob: ${msg}` }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erro ao fazer upload do arquivo. Tente novamente." },
+      { status: 500 }
+    );
   }
 
   try {

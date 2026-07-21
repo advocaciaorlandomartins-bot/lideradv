@@ -47,8 +47,14 @@ export async function POST(req: NextRequest) {
   try {
     prepared = await prepararAnalise(processo_id);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error(
+      "[cerebro/analisar] prepararAnalise:",
+      e instanceof Error ? e.message : String(e)
+    );
+    return NextResponse.json(
+      { error: "Erro ao preparar análise. Tente novamente." },
+      { status: 500 }
+    );
   }
 
   const encoder = new TextEncoder();

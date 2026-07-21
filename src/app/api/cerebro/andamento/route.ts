@@ -31,8 +31,13 @@ export async function POST(req: NextRequest) {
     const result = await interpretarAndamento(andamento_id, processo_id);
     return NextResponse.json({ ok: true, ...result });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[cerebro/andamento]", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error(
+      "[cerebro/andamento]",
+      e instanceof Error ? e.message : String(e)
+    );
+    return NextResponse.json(
+      { error: "Erro ao interpretar andamento. Tente novamente." },
+      { status: 500 }
+    );
   }
 }

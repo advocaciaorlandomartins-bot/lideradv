@@ -28,8 +28,13 @@ export async function POST(req: NextRequest) {
         : "Nada a aprender (processo não concluído ou já processado)",
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[cerebro/aprender]", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error(
+      "[cerebro/aprender]",
+      e instanceof Error ? e.message : String(e)
+    );
+    return NextResponse.json(
+      { error: "Erro ao registrar aprendizado. Tente novamente." },
+      { status: 500 }
+    );
   }
 }

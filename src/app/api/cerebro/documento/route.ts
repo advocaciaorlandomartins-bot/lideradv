@@ -41,8 +41,13 @@ export async function POST(req: NextRequest) {
     const analise = await analisarDocumento(documento_id, processo_id);
     return NextResponse.json({ ok: true, analise });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[cerebro/documento]", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error(
+      "[cerebro/documento]",
+      e instanceof Error ? e.message : String(e)
+    );
+    return NextResponse.json(
+      { error: "Erro ao analisar documento. Tente novamente." },
+      { status: 500 }
+    );
   }
 }

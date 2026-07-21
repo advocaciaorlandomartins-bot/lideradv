@@ -277,9 +277,8 @@ export async function POST(request: Request) {
       "Anthropic extraction error:",
       err instanceof Error ? err.message : String(err)
     );
-    const msg = err instanceof Error ? err.message : "Erro desconhecido.";
     return NextResponse.json(
-      { error: `Erro ao processar: ${msg}` },
+      { error: "Erro ao processar documento. Tente novamente." },
       { status: 500 }
     );
   }

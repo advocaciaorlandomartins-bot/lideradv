@@ -11,7 +11,13 @@ export async function GET() {
     const result = await sql`SELECT NOW() as time`;
     return NextResponse.json({ connected: true, time: result[0].time });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ connected: false, error: msg }, { status: 503 });
+    console.error(
+      "[db-test]",
+      err instanceof Error ? err.message : String(err)
+    );
+    return NextResponse.json(
+      { connected: false, error: "Falha na conexão com o banco de dados." },
+      { status: 503 }
+    );
   }
 }

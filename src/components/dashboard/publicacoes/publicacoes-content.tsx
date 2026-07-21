@@ -3,6 +3,7 @@
 import { useState, useTransition, useMemo } from "react";
 import Link from "next/link";
 import type { Publicacao, OabMonitorada } from "@/lib/publicacoes-db";
+import { calcularPrazos } from "@/lib/publicacoes-datas";
 import {
   marcarComoTratadaAction,
   marcarComoNaoLidaAction,
@@ -26,6 +27,22 @@ import {
 type Tab = "automatica" | "manual" | "oabs" | "status_sys";
 type StatusFilter = "nao_lida" | "tratada";
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function calcDiasRestantes(
+  disponibilizacao: string,
+  prazoDias: number | null
+): number | null {
+  if (prazoDias == null) return null;
+  const prazos = calcularPrazos(disponibilizacao, prazoDias);
+  if (!prazos?.prazo_final) return null;
+  const [dd, mm, yyyy] = prazos.prazo_final.split("/").map(Number);
+  const prazoFinal = new Date(yyyy, mm - 1, dd);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return Math.ceil((prazoFinal.getTime() - hoje.getTime()) / 86400000);
+}
+
 // ── Status badge ──────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: Publicacao["status"] }) {
@@ -42,12 +59,51 @@ function StatusBadge({ status }: { status: Publicacao["status"] }) {
   );
 }
 
-// ── Row de publicação ─────────────────────────────────────────────────────────
+// ── Prazo badge ───────────────────────────────────────────────────────────────
 
-function PublicacaoRow({ pub }: { pub: Publicacao }) {
+function PrazoBadge({ dias }: { dias: number }) {
+  if (dias <= 0)
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-100 px-2.5 py-0.5 font-body text-[11px] font-bold text-red-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+        VENCIDO
+      </span>
+    );
+  if (dias <= 3)
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 font-body text-[11px] font-bold text-red-600">
+        <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+        {dias}d restante{dias !== 1 ? "s" : ""}
+      </span>
+    );
+  if (dias <= 7)
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 font-body text-[11px] font-semibold text-amber-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        {dias}d restantes
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 font-body text-[11px] font-semibold text-emerald-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      Prazo: {dias}d
+    </span>
+  );
+}
+
+// ── Card de publicação ────────────────────────────────────────────────────────
+
+function PublicacaoCard({ pub }: { pub: Publicacao }) {
   const [isPending, startTransition] = useTransition();
   const [action, setAction] = useState<string | null>(null);
   const loading = isPending && action !== null;
+
+  const ri = pub.resumo_ia;
+  const diasRestantes =
+    ri?.prazo_dias != null
+      ? calcDiasRestantes(pub.disponibilizacao, ri.prazo_dias)
+      : null;
+  const snippet = ri?.texto ?? pub.conteudo?.slice(0, 200) ?? null;
 
   function handleTratar() {
     setAction("tratar");
@@ -65,101 +121,136 @@ function PublicacaoRow({ pub }: { pub: Publicacao }) {
   }
 
   return (
-    <tr
-      className={`transition-colors ${pub.status === "nao_lida" ? "bg-amber-50/30 hover:bg-amber-50/60" : "hover:bg-primary/5"}`}
+    <div
+      className={`rounded-xl border p-4 transition-colors ${
+        pub.status === "nao_lida"
+          ? "border-amber-200 bg-amber-50/20 hover:bg-amber-50/40"
+          : "border-border bg-white hover:bg-slate-50/60"
+      }`}
     >
-      <td className="px-4 py-3">
-        <Link
-          href={`/dashboard/publicacoes/${pub.id}`}
-          className="font-mono text-[13px] text-primary hover:underline"
-        >
-          {pub.processo}
-        </Link>
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-400" />
-          <span className="font-body text-sm text-fg">{pub.destinatario}</span>
-        </div>
-      </td>
-      <td className="px-4 py-3">
-        {pub.advogados.map((adv, i) => (
-          <span
-            key={i}
-            className={`block font-body text-[13px] ${i === 0 ? "font-semibold text-cta" : "text-muted"}`}
-          >
-            {adv}
+      {/* Header row: tipo, tribunal, data, status, prazo */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 font-body text-[11px] font-semibold text-blue-700">
+            {pub.tipo}
           </span>
-        ))}
-      </td>
-      <td className="px-4 py-3">
-        <div className="font-body text-[13px] text-fg">{pub.orgao}</div>
-        <div className="font-body text-[11px] text-muted">{pub.tribunal}</div>
-      </td>
-      <td className="whitespace-nowrap px-4 py-3">
-        <StatusBadge status={pub.status} />
-        <div className="mt-1 font-body text-[11px] text-muted">
-          {pub.disponibilizacao}
-        </div>
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex flex-col items-center gap-2">
+          {pub.tribunal && (
+            <span className="font-body text-[11px] font-semibold text-muted">
+              {pub.tribunal}
+            </span>
+          )}
           <span className="font-body text-[11px] text-muted">
-            #{pub.id} · {pub.tipo}
+            {pub.disponibilizacao}
           </span>
-          <div className="flex flex-wrap justify-center gap-1">
-            <Link
-              href={`/dashboard/publicacoes/${pub.id}`}
-              className="rounded-lg border border-border bg-white px-2.5 py-1 font-body text-xs font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary"
-            >
-              Abrir
-            </Link>
-            {pub.status === "nao_lida" ? (
-              <button
-                onClick={handleTratar}
-                disabled={loading}
-                className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-body text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
-              >
-                {loading && action === "tratar" ? (
-                  <SpinnerIcon className="h-3 w-3" />
-                ) : null}
-                Tratada
-              </button>
-            ) : (
-              <button
-                onClick={handleDesfazer}
-                disabled={loading}
-                className="flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 font-body text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
-              >
-                {loading && action === "desfazer" ? (
-                  <SpinnerIcon className="h-3 w-3" />
-                ) : null}
-                Desfazer
-              </button>
-            )}
-            <Link
-              href="/dashboard/controles/novo"
-              className="rounded-lg border border-border bg-white px-2.5 py-1 font-body text-xs font-semibold text-muted transition-colors hover:border-primary/40 hover:text-primary"
-            >
-              + Atividade
-            </Link>
-          </div>
         </div>
-      </td>
-    </tr>
+        <div className="flex items-center gap-2">
+          {diasRestantes !== null && pub.status === "nao_lida" && (
+            <PrazoBadge dias={diasRestantes} />
+          )}
+          <StatusBadge status={pub.status} />
+        </div>
+      </div>
+
+      {/* Processo */}
+      <Link
+        href={`/dashboard/publicacoes/${pub.id}`}
+        className="mt-2 block font-mono text-sm font-semibold text-primary hover:underline"
+      >
+        {pub.processo}
+      </Link>
+
+      {/* Ação necessária */}
+      {ri?.acao_necessaria && (
+        <p className="mt-1.5 flex items-center gap-1.5 font-body text-xs font-semibold text-amber-700">
+          <svg
+            className="h-3.5 w-3.5 shrink-0 text-amber-500"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {ri.acao_necessaria}
+        </p>
+      )}
+
+      {/* Resumo snippet */}
+      {snippet && (
+        <p className="mt-1.5 line-clamp-2 font-body text-sm leading-relaxed text-muted">
+          {snippet}
+        </p>
+      )}
+
+      {/* Footer: destinatário + órgão + ações */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+        <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+          {pub.destinatario && (
+            <span className="font-body">
+              <span className="font-semibold text-fg/70">Dest:</span>{" "}
+              {pub.destinatario}
+            </span>
+          )}
+          {pub.orgao && <span className="font-body">· {pub.orgao}</span>}
+          {pub.advogados.length > 0 && (
+            <span className="font-body font-semibold text-cta/80">
+              · {pub.advogados[0]}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Link
+            href={`/dashboard/publicacoes/${pub.id}`}
+            className="cursor-pointer rounded-lg border border-border bg-white px-2.5 py-1 font-body text-xs font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            Ver detalhes
+          </Link>
+          {pub.status === "nao_lida" ? (
+            <button
+              onClick={handleTratar}
+              disabled={loading}
+              className="flex cursor-pointer items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-body text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
+            >
+              {loading && action === "tratar" ? (
+                <SpinnerIcon className="h-3 w-3" />
+              ) : null}
+              Marcar tratada
+            </button>
+          ) : (
+            <button
+              onClick={handleDesfazer}
+              disabled={loading}
+              className="flex cursor-pointer items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 font-body text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+            >
+              {loading && action === "desfazer" ? (
+                <SpinnerIcon className="h-3 w-3" />
+              ) : null}
+              Desfazer
+            </button>
+          )}
+          <Link
+            href="/dashboard/controles/novo"
+            className="cursor-pointer rounded-lg border border-border bg-white px-2.5 py-1 font-body text-xs font-semibold text-muted transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            + Atividade
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
 
-// ── Tabela de publicações ─────────────────────────────────────────────────────
+// ── Lista de publicações ──────────────────────────────────────────────────────
 
-function TabelaPublicacoes({
+function ListaPublicacoes({
   publicacoes,
   emptyMsg,
 }: {
   publicacoes: Publicacao[];
   emptyMsg: string;
 }) {
-  const [copied, setCopied] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -176,51 +267,10 @@ function TabelaPublicacoes({
     else if (pages[pages.length - 1] !== "…") pages.push("…");
   }
 
-  function copiar() {
-    const header = [
-      "#",
-      "Processo",
-      "Tipo",
-      "Destinatário",
-      "Advogados",
-      "Órgão",
-      "Tribunal",
-      "Disponibilização",
-      "Status",
-    ];
-    const rows = publicacoes.map((p) => [
-      String(p.id),
-      p.processo,
-      p.tipo,
-      p.destinatario,
-      p.advogados.join(" / "),
-      p.orgao,
-      p.tribunal,
-      p.disponibilizacao,
-      p.status === "nao_lida" ? "Não lida" : "Tratada",
-    ]);
-    navigator.clipboard
-      .writeText([header, ...rows].map((r) => r.join("\t")).join("\n"))
-      .catch(() => null);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <span className="font-heading text-sm font-semibold text-fg">
-          Publicações
-        </span>
-        <button
-          onClick={copiar}
-          className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-1.5 font-body text-xs font-semibold text-muted transition-colors hover:border-primary/40 hover:text-primary"
-        >
-          {copied ? "✓ Copiado!" : "📋 Copiar tabela"}
-        </button>
-      </div>
+    <div className="space-y-2">
       {publicacoes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
           <span className="text-4xl">📭</span>
           <p className="font-body text-sm font-semibold text-muted">
             {emptyMsg}
@@ -228,96 +278,77 @@ function TabelaPublicacoes({
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-slate-50/60">
-                  {[
-                    "Processo",
-                    "Destinatário",
-                    "Advogados",
-                    "Órgão",
-                    "Disponibilização",
-                    "Status / Ações",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-2.5 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-muted"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {slice.map((pub) => (
-                  <PublicacaoRow key={pub.id} pub={pub} />
+          <div className="space-y-2">
+            {slice.map((pub) => (
+              <PublicacaoCard key={pub.id} pub={pub} />
+            ))}
+          </div>
+          {(totalPages > 1 || publicacoes.length > 10) && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-white px-5 py-3">
+              <div className="flex items-center gap-1">
+                <span className="mr-1 font-body text-xs text-muted">
+                  Exibir:
+                </span>
+                {[10, 20, 50].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setPageSize(s);
+                      setPage(1);
+                    }}
+                    className={`h-7 min-w-[2rem] cursor-pointer rounded px-1.5 font-body text-xs transition-colors ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
+                  >
+                    {s}
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
-            <div className="flex items-center gap-1">
-              <span className="mr-1 font-body text-xs text-muted">Exibir:</span>
-              {[10, 20, 50].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setPageSize(s);
-                    setPage(1);
-                  }}
-                  className={`h-7 min-w-[2rem] rounded px-1.5 font-body text-xs transition-colors cursor-pointer ${pageSize === s ? "bg-primary font-semibold text-white" : "text-muted hover:text-fg"}`}
-                >
-                  {s}
-                </button>
-              ))}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <p className="mr-1 font-body text-xs text-muted">
+                  {(safePage - 1) * pageSize + 1}–
+                  {Math.min(safePage * pageSize, publicacoes.length)} de{" "}
+                  {publicacoes.length}
+                </p>
+                {totalPages > 1 && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                      disabled={safePage === 1}
+                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      ‹
+                    </button>
+                    {pages.map((n, i) =>
+                      n === "…" ? (
+                        <span
+                          key={`e-${i}`}
+                          className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={n}
+                          onClick={() => setPage(n as number)}
+                          className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg font-body text-sm transition-colors ${n === safePage ? "bg-primary font-semibold text-white" : "border border-border text-muted hover:border-primary hover:text-primary"}`}
+                        >
+                          {n}
+                        </button>
+                      )
+                    )}
+                    <button
+                      onClick={() =>
+                        setPage((prev) => Math.min(totalPages, prev + 1))
+                      }
+                      disabled={safePage === totalPages}
+                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      ›
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <p className="mr-1 font-body text-xs text-muted">
-                {(safePage - 1) * pageSize + 1}–
-                {Math.min(safePage * pageSize, publicacoes.length)} de{" "}
-                {publicacoes.length}
-              </p>
-              {totalPages > 1 && (
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                    disabled={safePage === 1}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
-                  >
-                    ‹
-                  </button>
-                  {pages.map((n, i) =>
-                    n === "…" ? (
-                      <span
-                        key={`e-${i}`}
-                        className="flex h-8 w-8 items-center justify-center font-body text-sm text-muted"
-                      >
-                        …
-                      </span>
-                    ) : (
-                      <button
-                        key={n}
-                        onClick={() => setPage(n as number)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg font-body text-sm transition-colors ${n === safePage ? "bg-primary font-semibold text-white" : "border border-border text-muted hover:border-primary hover:text-primary"}`}
-                      >
-                        {n}
-                      </button>
-                    )
-                  )}
-                  <button
-                    onClick={() =>
-                      setPage((prev) => Math.min(totalPages, prev + 1))
-                    }
-                    disabled={safePage === totalPages}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:pointer-events-none disabled:opacity-40"
-                  >
-                    ›
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </>
       )}
     </div>
@@ -433,7 +464,7 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
         {exibindo.length > 0 ? `1 a ${exibindo.length}` : "0"}
       </p>
 
-      <TabelaPublicacoes
+      <ListaPublicacoes
         publicacoes={exibindo}
         emptyMsg={
           statusFilter === "nao_lida"
@@ -714,7 +745,7 @@ function TabManual({ publicacoes }: { publicacoes: Publicacao[] }) {
             {resultados.length} resultado{resultados.length !== 1 ? "s" : ""}{" "}
             para &quot;{search}&quot;
           </p>
-          <TabelaPublicacoes
+          <ListaPublicacoes
             publicacoes={resultados}
             emptyMsg={`Nenhuma publicação encontrada para "${search}".`}
           />

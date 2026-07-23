@@ -34,7 +34,13 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "reenviar_mensagens_falhadas",
     description:
-      "Reenvia mensagens WhatsApp que estão na fila de pendentes ou que falharam. Use quando mensagens não chegaram ao cliente.",
+      "Reenvia eventos CRM (honorário pago, processo deferido etc.) que estão na fila de pendentes. Use para reenviar notificações de status de processo.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "reenviar_lembretes",
+    description:
+      "Reenvia os lembretes WhatsApp pendentes de agenda, honorários e pagamentos que ainda não foram enviados. Use quando clientes não receberam mensagens de lembrete.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
@@ -381,15 +387,88 @@ async function executarFerramenta(
     }
 
     case "ver_erros": {
-      const [resumo, recentes] = await Promise.all([
-        sql`SELECT status, COUNT(*) as total FROM prevbot_webhook_log GROUP BY status ORDER BY total DESC`,
-        sql`
-          SELECT payload->>'evento' as evento, status, ultimo_erro, tentativas, created_at::text
-          FROM prevbot_webhook_log WHERE status IN ('pendente', 'falhou')
-          ORDER BY created_at DESC LIMIT 10
-        `,
-      ]);
-      return JSON.stringify({ resumo_fila: resumo, erros_recentes: recentes });
+      const [resumoCRM, errosCRM, resumoLembretes, errosLembretes] =
+        await Promise.all([
+          sql`SELECT status, COUNT(*) as total FROM prevbot_webhook_log GROUP BY status ORDER BY total DESC`,
+          sql`
+            SELECT payload->>'evento' as evento, status, ultimo_erro, tentativas, created_at::text
+            FROM prevbot_webhook_log WHERE status IN ('pendente', 'falhou')
+            ORDER BY created_at DESC LIMIT 5
+          `,
+          sql`
+            SELECT enviado, COUNT(*) as total,
+                   SUM(CASE WHEN tentativas >= 3 AND NOT enviado THEN 1 ELSE 0 END)::int as bloqueados
+            FROM lembretes_agendados
+            GROUP BY enviado
+          `,
+          sql`
+            SELECT tipo, destinatario_nome, destinatario_telefone, erro,
+                   tentativas, enviar_em::text, enviado
+            FROM lembretes_agendados
+            WHERE (NOT enviado AND enviar_em <= NOW()) OR erro IS NOT NULL
+            ORDER BY enviar_em DESC LIMIT 10
+          `,
+        ]);
+      return JSON.stringify({
+        crm_webhook: { resumo: resumoCRM, erros_recentes: errosCRM },
+        lembretes_whatsapp: {
+          resumo: resumoLembretes,
+          pendentes_com_erro: errosLembretes,
+        },
+      });
+    }
+
+    case "reenviar_lembretes": {
+      const pendentes = await sql`
+        SELECT id::text, destinatario_telefone, mensagem, tipo, tentativas
+        FROM lembretes_agendados
+        WHERE NOT enviado
+          AND enviar_em <= NOW()
+          AND tentativas < 3
+        ORDER BY enviar_em ASC
+        LIMIT 30
+      `;
+
+      if (pendentes.length === 0)
+        return JSON.stringify({
+          ok: true,
+          mensagem: "Nenhuma mensagem pendente no momento.",
+        });
+
+      let enviados = 0;
+      let falhos = 0;
+      const erros: string[] = [];
+
+      for (const lembrete of pendentes) {
+        const id = String(lembrete.id);
+        const telefone = String(lembrete.destinatario_telefone ?? "");
+        const mensagem = String(lembrete.mensagem ?? "");
+
+        if (!telefone || !mensagem) {
+          await sql`UPDATE lembretes_agendados SET enviado = TRUE, enviado_em = NOW(), erro = 'telefone ou mensagem vazio' WHERE id = ${id}::uuid`;
+          continue;
+        }
+
+        const resultado = await enviarMensagemDireta({ telefone, mensagem });
+        const novasTentativas = Number(lembrete.tentativas) + 1;
+
+        if (resultado.ok) {
+          await sql`UPDATE lembretes_agendados SET enviado = TRUE, enviado_em = NOW(), tentativas = ${novasTentativas} WHERE id = ${id}::uuid`;
+          enviados++;
+        } else {
+          await sql`UPDATE lembretes_agendados SET tentativas = ${novasTentativas}, erro = ${resultado.error ?? "erro desconhecido"} WHERE id = ${id}::uuid`;
+          falhos++;
+          if (erros.length < 3)
+            erros.push(`${lembrete.tipo}: ${resultado.error}`);
+        }
+      }
+
+      return JSON.stringify({
+        processados: pendentes.length,
+        enviados,
+        falhos,
+        erros_amostra: erros,
+      });
     }
 
     default:
@@ -404,13 +483,14 @@ const SYSTEM = `Você é o Agente do Sistema LiderAdv — um assistente com pode
 Suas capacidades:
 - Verificar saúde do sistema e detectar problemas
 - Sincronizar publicações/intimações
-- Reenviar mensagens WhatsApp que falharam
+- Reenviar lembretes WhatsApp pendentes (agenda, honorários, pagamentos) via reenviar_lembretes
+- Reenviar eventos CRM WhatsApp falhados via reenviar_mensagens_falhadas
 - Gerenciar OABs monitoradas (listar, adicionar, remover)
 - Atualizar dados do escritório (telefone, e-mail, endereço, etc.)
 - Testar integração WhatsApp
-- Ver logs de erros
+- Ver logs de erros (inclui erros de lembretes E eventos CRM)
 
-Quando o usuário pedir algo, USE as ferramentas disponíveis — não apenas descreva o que poderia fazer.
+Quando o usuário relatar que mensagens não chegaram, use SEMPRE: 1) ver_erros para diagnosticar, 2) reenviar_lembretes para reenviar.
 Após executar, reporte claramente o resultado com emojis: ✅ sucesso, ❌ erro, ⚠️ atenção.
 Seja conciso e direto. Confirme o que foi feito.`;
 

@@ -24,14 +24,17 @@ const ATALHOS = [
     label: "Diagnóstico completo",
     msg: "Faça um diagnóstico completo do sistema",
   },
-  { label: "Ver estatísticas", msg: "Mostre as estatísticas do sistema" },
-  { label: "Sincronizar publicações", msg: "Sincronize as publicações agora" },
   {
-    label: "Reenviar WhatsApp",
-    msg: "Reenvie as mensagens WhatsApp que falharam",
+    label: "Reenviar lembretes",
+    msg: "Verifique os erros e reenvie os lembretes de WhatsApp pendentes de agenda e pagamentos",
   },
+  {
+    label: "Ver erros",
+    msg: "Mostre os erros recentes do sistema — lembretes e mensagens falhadas",
+  },
+  { label: "Sincronizar publicações", msg: "Sincronize as publicações agora" },
   { label: "Listar OABs", msg: "Liste as OABs monitoradas" },
-  { label: "Ver erros", msg: "Mostre os erros recentes do sistema" },
+  { label: "Ver estatísticas", msg: "Mostre as estatísticas do sistema" },
 ];
 
 export default function SistemaAgenteContent() {

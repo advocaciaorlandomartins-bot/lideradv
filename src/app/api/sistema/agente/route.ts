@@ -44,6 +44,12 @@ const TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "cancelar_lembretes_atrasados",
+    description:
+      "Cancela (sem enviar) todos os lembretes que já passaram da data — mensagens de agenda e honorários antigos que não fazem mais sentido enviar. Use quando o usuário não quer reenviar mensagens antigas.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
     name: "listar_oabs",
     description: "Lista todas as OABs monitoradas pelo sistema com status.",
     input_schema: { type: "object", properties: {}, required: [] },
@@ -384,6 +390,24 @@ async function executarFerramenta(
       const { telefone, mensagem } = input;
       const resultado = await enviarMensagemDireta({ telefone, mensagem });
       return JSON.stringify(resultado);
+    }
+
+    case "cancelar_lembretes_atrasados": {
+      const resultado = await sql`
+        UPDATE lembretes_agendados
+        SET enviado = TRUE, enviado_em = NOW(), erro = 'cancelado_manualmente'
+        WHERE NOT enviado
+          AND enviar_em <= NOW()
+      `;
+      const total = resultado.count ?? 0;
+      return JSON.stringify({
+        ok: true,
+        cancelados: total,
+        mensagem:
+          total > 0
+            ? `${total} lembrete${Number(total) !== 1 ? "s" : ""} antigo${Number(total) !== 1 ? "s" : ""} cancelado${Number(total) !== 1 ? "s" : ""} sem envio.`
+            : "Nenhum lembrete atrasado encontrado.",
+      });
     }
 
     case "ver_erros": {

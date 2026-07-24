@@ -33,8 +33,11 @@ const ATALHOS = [
     msg: "Mostre os erros recentes do sistema — lembretes e mensagens falhadas",
   },
   { label: "Sincronizar publicações", msg: "Sincronize as publicações agora" },
+  {
+    label: "Limpar fila antiga",
+    msg: "Cancele todos os lembretes atrasados que já passaram da data sem enviá-los",
+  },
   { label: "Listar OABs", msg: "Liste as OABs monitoradas" },
-  { label: "Ver estatísticas", msg: "Mostre as estatísticas do sistema" },
 ];
 
 export default function SistemaAgenteContent() {

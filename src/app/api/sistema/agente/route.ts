@@ -393,13 +393,17 @@ async function executarFerramenta(
     }
 
     case "cancelar_lembretes_atrasados": {
-      const resultado = await sql`
+      const [{ total }] = await sql`
+        SELECT COUNT(*)::int AS total
+        FROM lembretes_agendados
+        WHERE NOT enviado AND enviar_em <= NOW()
+      `;
+      await sql`
         UPDATE lembretes_agendados
         SET enviado = TRUE, enviado_em = NOW(), erro = 'cancelado_manualmente'
         WHERE NOT enviado
           AND enviar_em <= NOW()
       `;
-      const total = resultado.count ?? 0;
       return JSON.stringify({
         ok: true,
         cancelados: total,

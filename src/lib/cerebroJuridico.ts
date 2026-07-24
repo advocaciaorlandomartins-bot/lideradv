@@ -1639,6 +1639,41 @@ export interface PreparedAnalise {
   alertas: AlertaJuridico[];
 }
 
+/** Calcula completude ao vivo (sem IA) — usa dados atuais do banco + metadados dos documentos */
+export async function calcularCompletudeLive(processoId: string): Promise<{
+  pct: number;
+  faltantes: DadoFaltante[];
+}> {
+  const [processo] = await sql`
+    SELECT p.*,
+           c.nis,
+           c.cid_principal,
+           c.tipo_incapacidade,
+           c.data_afastamento,
+           c.num_contribuicoes,
+           c.categoria_contribuinte,
+           c.atividade_anterior,
+           c.carencia_atingida
+    FROM processos p
+    JOIN clients c ON p.client_id = c.id
+    WHERE p.id = ${processoId}::uuid AND p.deleted_at IS NULL
+    LIMIT 1
+  `;
+  if (!processo) return { pct: 0, faltantes: [] };
+
+  const docAnalises = await sql`
+    SELECT analise, metadata FROM cerebro_analises
+    WHERE processo_id = ${processoId}::uuid AND tipo = 'documento'
+    ORDER BY created_at DESC LIMIT 5
+  `.catch(() => [] as { analise: unknown; metadata?: unknown }[]);
+
+  const aug = augmentProcessFromDocs(
+    processo as Record<string, unknown>,
+    docAnalises
+  );
+  return calcularCompletude(aug);
+}
+
 export async function prepararAnalise(
   processoId: string
 ): Promise<PreparedAnalise> {
@@ -2535,10 +2570,20 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
       const n = Number(v);
       return !isNaN(n) ? n : null;
     };
+    // Normalize dates: accept DD/MM/YYYY or DD-MM-YYYY and convert to YYYY-MM-DD
+    const normDate = (v: unknown): string | null => {
+      const s = strOrNull(v);
+      if (!s) return null;
+      const brMatch = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+      if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+      const isoMatch = s.match(/^\d{4}-\d{2}-\d{2}$/);
+      if (isoMatch) return s;
+      return null;
+    };
 
     const cidVal = strOrNull(extracted.cid);
     const nisVal = strOrNull(extracted.nis);
-    const afastamentoVal = strOrNull(extracted.afastamento);
+    const afastamentoVal = normDate(extracted.afastamento);
     const contribuicoesVal = numOrNull(extracted.contribuicoes);
 
     // clients: campos texto e numérico
@@ -2556,7 +2601,7 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
         () => null
       );
     if (afastamentoVal)
-      await sql`UPDATE clients SET data_afastamento = ${afastamentoVal}::date WHERE id = ${clientId}::uuid AND data_afastamento IS NULL`.catch(
+      await sql`UPDATE clients SET data_afastamento = ${afastamentoVal} WHERE id = ${clientId}::uuid AND data_afastamento IS NULL`.catch(
         () => null
       );
     if (contribuicoesVal !== null)
@@ -2565,23 +2610,23 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
       );
 
     // processos: datas e textos
-    const derVal = strOrNull(extracted.der);
-    const dibVal = strOrNull(extracted.dib);
-    const dcbVal = strOrNull(extracted.dcb);
+    const derVal = normDate(extracted.der);
+    const dibVal = normDate(extracted.dib);
+    const dcbVal = normDate(extracted.dcb);
     const protocoloVal = strOrNull(extracted.protocolo);
     const resultadoVal = strOrNull(extracted.resultado);
     const motivoVal = strOrNull(extracted.motivo);
 
     if (derVal)
-      await sql`UPDATE processos SET der = ${derVal}::date, updated_at = NOW() WHERE id = ${processoId}::uuid AND der IS NULL AND deleted_at IS NULL`.catch(
+      await sql`UPDATE processos SET der = ${derVal}, updated_at = NOW() WHERE id = ${processoId}::uuid AND der IS NULL AND deleted_at IS NULL`.catch(
         () => null
       );
     if (dibVal)
-      await sql`UPDATE processos SET dib = ${dibVal}::date, updated_at = NOW() WHERE id = ${processoId}::uuid AND dib IS NULL AND deleted_at IS NULL`.catch(
+      await sql`UPDATE processos SET dib = ${dibVal}, updated_at = NOW() WHERE id = ${processoId}::uuid AND dib IS NULL AND deleted_at IS NULL`.catch(
         () => null
       );
     if (dcbVal)
-      await sql`UPDATE processos SET dcb = ${dcbVal}::date, updated_at = NOW() WHERE id = ${processoId}::uuid AND dcb IS NULL AND deleted_at IS NULL`.catch(
+      await sql`UPDATE processos SET dcb = ${dcbVal}, updated_at = NOW() WHERE id = ${processoId}::uuid AND dcb IS NULL AND deleted_at IS NULL`.catch(
         () => null
       );
     if (protocoloVal)

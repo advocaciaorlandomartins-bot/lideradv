@@ -1408,16 +1408,16 @@ function buildReciboHtml(
       const rowBg = idx % 2 === 0 ? "transparent" : "#f8fafc";
       return `
       <tr style="background:${rowBg};">
-        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:#0f172a;font-weight:600;white-space:nowrap;">${r.data_vencimento}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:#0f172a;font-weight:600;overflow:hidden;text-overflow:ellipsis;">${r.data_vencimento}</td>
         <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;">
           <span style="background:${isEntrada ? "#dcfce7" : "#fee2e2"};color:${isEntrada ? "#166534" : "#991b1b"};padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:0.3px;">${isEntrada ? "Honorário" : "Despesa"}</span>
         </td>
-        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:#0f172a;font-weight:500;max-width:200px;">${r.descricao}${r.processo_tipo ? ` <span style="color:#64748b;font-size:9px;">(${r.processo_tipo})</span>` : ""}</td>
-        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:700;text-align:right;white-space:nowrap;color:${valorColor};">${isEntrada ? "" : "−"}${fmt(r.valor)}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:#0f172a;font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.descricao}${r.processo_tipo ? ` <span style="color:#64748b;font-size:9px;">(${r.processo_tipo})</span>` : ""}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:700;text-align:right;overflow:hidden;text-overflow:ellipsis;color:${valorColor};">${isEntrada ? "" : "−"}${fmt(r.valor)}</td>
         <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;text-align:center;">
           <span style="background:${isPago ? "#dcfce7" : "#fef3c7"};color:${isPago ? "#166534" : "#92400e"};padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;">${isPago ? "Pago" : "Pendente"}</span>
         </td>
-        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:${isPago ? "#374151" : "#94a3b8"};font-weight:${isPago ? "600" : "400"};white-space:nowrap;">${r.data_pagamento ?? "—"}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:${isPago ? "#374151" : "#94a3b8"};font-weight:${isPago ? "600" : "400"};overflow:hidden;text-overflow:ellipsis;">${r.data_pagamento ?? "—"}</td>
       </tr>`;
     })
     .join("");
@@ -1480,7 +1480,13 @@ function buildReciboHtml(
       padding: 10px 28px; border-radius: 6px; font-size: 14px;
       cursor: pointer; font-family: Arial, sans-serif;
     }
-    table { border-collapse: collapse; width: 100%; }
+    table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    col.col-data    { width: 56px; }
+    col.col-tipo    { width: 64px; }
+    col.col-desc    { width: auto; }
+    col.col-valor   { width: 70px; }
+    col.col-status  { width: 56px; }
+    col.col-pgto    { width: 62px; }
   </style>
 </head>
 <body>
@@ -1518,14 +1524,18 @@ function buildReciboHtml(
     </div>
 
     <table>
+      <colgroup>
+        <col class="col-data" /><col class="col-tipo" /><col class="col-desc" />
+        <col class="col-valor" /><col class="col-status" /><col class="col-pgto" />
+      </colgroup>
       <thead>
         <tr style="background:#1E3A8A;color:white;">
-          <th style="padding:5px 8px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.5px;white-space:nowrap;">Vencimento</th>
+          <th style="padding:5px 8px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.5px;">Vencimento</th>
           <th style="padding:5px 8px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.5px;">Tipo</th>
           <th style="padding:5px 8px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.5px;">Descrição</th>
           <th style="padding:5px 8px;text-align:right;font-size:9px;font-weight:600;letter-spacing:0.5px;">Valor</th>
           <th style="padding:5px 8px;text-align:center;font-size:9px;font-weight:600;letter-spacing:0.5px;">Status</th>
-          <th style="padding:5px 8px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.5px;white-space:nowrap;">Pagamento</th>
+          <th style="padding:5px 8px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.5px;">Pagamento</th>
         </tr>
       </thead>
       <tbody>${rowsHtml}</tbody>

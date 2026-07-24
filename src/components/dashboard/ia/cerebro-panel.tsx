@@ -44,6 +44,10 @@ const TIPO_ICON: Record<string, string> = {
 
 export default function CerebroPanel({ processoId, processoStatus }: Props) {
   const [analises, setAnalises] = useState<Analise[]>([]);
+  const [completudeAtual, setCompletude] = useState<{
+    pct: number;
+    faltantes: import("@/lib/cerebroJuridico").DadoFaltante[];
+  } | null>(null);
   const [analisando, setAnalisando] = useState(false);
   const [expandido, setExpandido] = useState(false);
   const [idExpandida, setIdExpandida] = useState<string | null>(null);
@@ -58,6 +62,7 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
       if (r.ok) {
         const data = await r.json();
         setAnalises(data.analises || []);
+        if (data.completude_atual) setCompletude(data.completude_atual);
       }
     } catch {
       // silencioso
@@ -153,10 +158,20 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
     meta?.alertas?.filter((a) => a.nivel === "critico") ?? [];
   const alertasAtencao =
     meta?.alertas?.filter((a) => a.nivel === "atencao") ?? [];
-  const faltantesCriticos =
-    meta?.dados_faltantes?.filter((f) => f.prioridade === "alta") ?? [];
-  const faltantesMedia =
-    meta?.dados_faltantes?.filter((f) => f.prioridade === "media") ?? [];
+
+  // Usa dados ao vivo (completudeAtual) se disponível; fallback para análise armazenada
+  const faltantesVivos =
+    completudeAtual?.faltantes ?? meta?.dados_faltantes ?? [];
+  const pctVivo = completudeAtual?.pct ?? meta?.completude_pct;
+  const dadosMelhoraram =
+    meta?.completude_pct !== undefined &&
+    completudeAtual !== null &&
+    completudeAtual.pct > meta.completude_pct;
+
+  const faltantesCriticos = faltantesVivos.filter(
+    (f) => f.prioridade === "alta"
+  );
+  const faltantesMedia = faltantesVivos.filter((f) => f.prioridade === "media");
 
   const renderAnalise = (texto: string) =>
     texto.split("\n").map((line, i) => {
@@ -200,17 +215,22 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
                   {meta.modo_especializado}
                 </span>
               )}
-              {meta?.completude_pct !== undefined && (
+              {pctVivo !== undefined && (
                 <span
                   className={`rounded-full border px-2 py-0.5 font-body text-[10px] font-semibold ${
-                    meta.completude_pct >= 80
+                    pctVivo >= 80
                       ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                      : meta.completude_pct >= 55
+                      : pctVivo >= 55
                         ? "bg-amber-50 border-amber-200 text-amber-700"
                         : "bg-red-50 border-red-200 text-red-700"
                   }`}
                 >
-                  Dados: {meta.completude_pct}%
+                  Dados: {pctVivo}%
+                </span>
+              )}
+              {dadosMelhoraram && (
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 font-body text-[10px] font-semibold text-blue-700">
+                  ↑ Dados atualizados — clique Reanalisar
                 </span>
               )}
             </div>

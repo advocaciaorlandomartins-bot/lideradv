@@ -1593,9 +1593,9 @@ function ClienteBusca({
     return clientes
       .filter((c) => {
         const nomeMatch = c.name.toLowerCase().includes(busca.toLowerCase());
-        const docMatch = c.doc
-          .replace(/\D/g, "")
-          .includes(busca.replace(/\D/g, ""));
+        const digitos = busca.replace(/\D/g, "");
+        const docMatch =
+          digitos.length > 0 && c.doc.replace(/\D/g, "").includes(digitos);
         return nomeMatch || docMatch;
       })
       .slice(0, 10);

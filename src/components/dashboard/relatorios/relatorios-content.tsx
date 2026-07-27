@@ -1463,16 +1463,8 @@ function buildReciboHtml(
     @media print {
       body { background: transparent; padding: 0; }
       .no-print { display: none !important; }
-      ${
-        hasFundo
-          ? /* Com timbrado: @page sem margem para a imagem cobrir a folha inteira;
-               height:100vh evita página em branco extra que height:100% causa no Chrome */
-            `.page { width: 100%; padding: ${mt}mm ${mr}mm ${mb}mm ${ml}mm; background: transparent; }
-      @page { margin: 0; size: A4; }`
-          : /* Sem timbrado: @page cuida das margens */
-            `.page { width: 100%; padding: 0; background: transparent; }
-      @page { margin: ${mt}mm ${mr}mm ${mb}mm ${ml}mm; size: A4; }`
-      }
+      .page { width: 100%; padding: 0; background: transparent; }
+      @page { margin: ${mt}mm ${mr}mm ${mb}mm ${ml}mm; size: A4; }
     }
 
     .btn {

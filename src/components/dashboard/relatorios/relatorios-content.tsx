@@ -1322,13 +1322,13 @@ function buildReciboHtml(
     .filter(Boolean)
     .join(", ");
 
-  // Fundo timbrado: imagem de fundo que repete em todas as páginas via position:fixed no print
   const hasFundo =
     !!escritorio.fundo_timbrado &&
     !escritorio.fundo_timbrado.startsWith("data:application/pdf");
-  // height:100vh (não 100%) evita que o Chrome gere uma página em branco extra
+  // Na tela: position:fixed cobre a folha inteira como preview
+  // No print: o CSS injeta o timbrado como background-image do body (repete por página)
   const fundoBgEl = hasFundo
-    ? `<img src="${escritorio.fundo_timbrado}" style="position:fixed;top:0;left:0;width:100%;height:100vh;z-index:-1;object-fit:cover;pointer-events:none;" alt="" />`
+    ? `<img src="${escritorio.fundo_timbrado}" class="fundo-timbrado-screen" style="position:fixed;top:0;left:0;width:100%;height:100vh;z-index:-1;object-fit:cover;pointer-events:none;" alt="" />`
     : "";
 
   // Margens configuradas (mm)
@@ -1461,11 +1461,15 @@ function buildReciboHtml(
 
     /* Impressão */
     @media print {
-      body { background: transparent; padding: 0; margin: 0; }
+      /* O img de preview da tela é ocultado; o timbrado é aplicado como
+         background-image do body para aparecer em TODAS as páginas impressas */
+      .fundo-timbrado-screen { display: none !important; }
       .no-print { display: none !important; }
-      /* background:white mascara o timbrado na área de conteúdo;
-         o timbrado (position:fixed z-index:-1) aparece nas margens do @page */
-      .page { width: 100%; padding: 0; background: white; }
+      body {
+        margin: 0; padding: 0;
+        ${hasFundo ? `background-image: url("${escritorio.fundo_timbrado}"); background-size: cover; background-repeat: no-repeat; background-attachment: fixed; -webkit-print-color-adjust: exact; print-color-adjust: exact;` : "background: transparent;"}
+      }
+      .page { width: 100%; padding: 0; background: transparent; }
       @page { margin: ${mt}mm ${mr}mm ${mb}mm ${ml}mm; size: A4; }
     }
 

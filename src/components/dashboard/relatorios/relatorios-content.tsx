@@ -1461,9 +1461,11 @@ function buildReciboHtml(
 
     /* Impressão */
     @media print {
-      body { background: transparent; padding: 0; }
+      body { background: transparent; padding: 0; margin: 0; }
       .no-print { display: none !important; }
-      .page { width: 100%; padding: 0; background: transparent; }
+      /* background:white mascara o timbrado na área de conteúdo;
+         o timbrado (position:fixed z-index:-1) aparece nas margens do @page */
+      .page { width: 100%; padding: 0; background: white; }
       @page { margin: ${mt}mm ${mr}mm ${mb}mm ${ml}mm; size: A4; }
     }
 

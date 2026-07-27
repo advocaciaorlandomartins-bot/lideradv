@@ -1,11 +1,30 @@
 "use client";
 
-import { useState, useRef, useEffect, useTransition } from "react";
+import { useState, useRef, useEffect, useTransition, useCallback } from "react";
 import { SpinnerIcon } from "@/components/icons";
 
 interface Msg {
   role: "user" | "assistant";
   content: string;
+}
+
+interface LembreteItem {
+  tipo: string;
+  nome: string;
+  telefone: string;
+  enviar_em: string;
+  tentativas: number;
+  erro: string | null;
+}
+
+interface StatusSistema {
+  lembretes: {
+    pendentes: number;
+    bloqueados: number;
+    agendados: number;
+    lista: LembreteItem[];
+  };
+  crm_pendentes: number;
 }
 
 const BOAS_VINDAS =
@@ -40,14 +59,39 @@ const ATALHOS = [
   { label: "Listar OABs", msg: "Liste as OABs monitoradas" },
 ];
 
+const TIPO_LABEL: Record<string, string> = {
+  agenda: "📅 Agenda",
+  honorario: "💰 Honorário",
+  pagamento: "💳 Pagamento",
+  aniversario: "🎂 Aniversário",
+};
+
 export default function SistemaAgenteContent() {
   const [messages, setMessages] = useState<Msg[]>([
     { role: "assistant", content: BOAS_VINDAS },
   ]);
   const [input, setInput] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [status, setStatus] = useState<StatusSistema | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [listaAberta, setListaAberta] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const carregarStatus = useCallback(() => {
+    fetch("/api/sistema/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setStatus(data as StatusSistema);
+        setStatusLoading(false);
+      })
+      .catch(() => setStatusLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(carregarStatus, 0);
+    return () => clearTimeout(t);
+  }, [carregarStatus]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -86,6 +130,8 @@ export default function SistemaAgenteContent() {
             content: data.reply ?? data.error ?? "Erro ao processar.",
           },
         ]);
+        // Atualiza o status após ação do agente
+        carregarStatus();
       } catch {
         setMessages((prev) => [
           ...prev,
@@ -100,15 +146,181 @@ export default function SistemaAgenteContent() {
   }
 
   const showAtalhos = messages.length <= 1 && !isPending;
+  const totalProblemas =
+    (status?.lembretes.pendentes ?? 0) +
+    (status?.lembretes.bloqueados ?? 0) +
+    (status?.crm_pendentes ?? 0);
 
   return (
     <div
-      className="flex flex-col"
-      style={{ height: "calc(100vh - 200px)", minHeight: "520px" }}
+      className="flex flex-col gap-3"
+      style={{ height: "calc(100vh - 200px)", minHeight: "560px" }}
     >
-      {/* Atalhos */}
+      {/* ── Painel de status automático ── */}
+      <div
+        className={`rounded-xl border px-4 py-3 ${
+          statusLoading
+            ? "border-border bg-white"
+            : totalProblemas > 0
+              ? "border-amber-200 bg-amber-50"
+              : "border-emerald-200 bg-emerald-50"
+        }`}
+      >
+        {statusLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <SpinnerIcon className="h-3.5 w-3.5 animate-spin" />
+            Verificando mensagens pendentes...
+          </div>
+        ) : totalProblemas === 0 ? (
+          <div className="flex items-center justify-between">
+            <span className="font-body text-xs font-semibold text-emerald-700">
+              ✅ Nenhuma mensagem pendente — sistema ok
+            </span>
+            <button
+              onClick={carregarStatus}
+              className="cursor-pointer font-body text-[11px] text-emerald-600 underline-offset-2 hover:underline"
+            >
+              Atualizar
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {/* Resumo */}
+            <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                {(status?.lembretes.pendentes ?? 0) > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-body text-[11px] font-bold text-amber-800">
+                    📨 {status!.lembretes.pendentes} lembrete
+                    {status!.lembretes.pendentes !== 1 ? "s" : ""} pendente
+                    {status!.lembretes.pendentes !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {(status?.lembretes.bloqueados ?? 0) > 0 && (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 font-body text-[11px] font-bold text-red-800">
+                    🚫 {status!.lembretes.bloqueados} bloqueado
+                    {status!.lembretes.bloqueados !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {(status?.crm_pendentes ?? 0) > 0 && (
+                  <span className="rounded-full bg-orange-100 px-2 py-0.5 font-body text-[11px] font-bold text-orange-800">
+                    ⚠️ {status!.crm_pendentes} CRM pendente
+                    {status!.crm_pendentes !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {(status?.lembretes.agendados ?? 0) > 0 && (
+                  <span className="font-body text-[11px] text-amber-700">
+                    · {status!.lembretes.agendados} agendado
+                    {status!.lembretes.agendados !== 1 ? "s" : ""} para envio
+                    futuro
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={carregarStatus}
+                  className="cursor-pointer font-body text-[11px] text-amber-700 underline-offset-2 hover:underline"
+                >
+                  Atualizar
+                </button>
+                {status!.lembretes.lista.length > 0 && (
+                  <button
+                    onClick={() => setListaAberta((v) => !v)}
+                    className="cursor-pointer font-body text-[11px] font-semibold text-amber-800 underline-offset-2 hover:underline"
+                  >
+                    {listaAberta ? "Ocultar lista ▲" : "Ver lista ▼"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Lista expandível */}
+            {listaAberta && status!.lembretes.lista.length > 0 && (
+              <div className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-amber-200 bg-white">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="border-b border-amber-100 bg-amber-50">
+                      <th className="px-3 py-1.5 text-left font-semibold text-amber-800">
+                        Tipo
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-amber-800">
+                        Cliente
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-amber-800">
+                        Previsto para
+                      </th>
+                      <th className="px-3 py-1.5 text-left font-semibold text-amber-800">
+                        Tentativas
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {status!.lembretes.lista.map((l, i) => (
+                      <tr
+                        key={i}
+                        className="border-b border-amber-50 last:border-0"
+                      >
+                        <td className="px-3 py-1.5 text-amber-900">
+                          {TIPO_LABEL[l.tipo] ?? l.tipo}
+                        </td>
+                        <td className="px-3 py-1.5 text-slate-700">
+                          {l.nome || l.telefone}
+                        </td>
+                        <td className="px-3 py-1.5 text-slate-600">
+                          {l.enviar_em}
+                        </td>
+                        <td className="px-3 py-1.5 text-slate-500">
+                          {l.tentativas}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Ações rápidas */}
+            <div className="flex flex-wrap gap-2">
+              {(status?.lembretes.pendentes ?? 0) > 0 && (
+                <button
+                  onClick={() =>
+                    enviar(
+                      "Reenvie agora todos os lembretes de WhatsApp pendentes"
+                    )
+                  }
+                  disabled={isPending}
+                  className="cursor-pointer rounded-lg bg-amber-600 px-3 py-1 font-body text-[11px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  📤 Reenviar agora
+                </button>
+              )}
+              <button
+                onClick={() =>
+                  enviar(
+                    "Cancele todos os lembretes atrasados que já passaram da data sem enviá-los"
+                  )
+                }
+                disabled={isPending}
+                className="cursor-pointer rounded-lg border border-amber-300 bg-white px-3 py-1 font-body text-[11px] font-semibold text-amber-800 transition-colors hover:bg-amber-50 disabled:opacity-50"
+              >
+                🗑 Cancelar atrasados
+              </button>
+              <button
+                onClick={() =>
+                  enviar("Faça um diagnóstico completo do sistema")
+                }
+                disabled={isPending}
+                className="cursor-pointer rounded-lg border border-amber-300 bg-white px-3 py-1 font-body text-[11px] font-semibold text-amber-800 transition-colors hover:bg-amber-50 disabled:opacity-50"
+              >
+                🔍 Diagnóstico completo
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Atalhos iniciais ── */}
       {showAtalhos && (
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {ATALHOS.map((a) => (
             <button
               key={a.label}
@@ -122,20 +334,20 @@ export default function SistemaAgenteContent() {
         </div>
       )}
 
-      {/* Barra de ações do chat */}
+      {/* ── Botão limpar (só aparece quando há conversa) ── */}
       {messages.length > 1 && (
-        <div className="mb-1 flex justify-end">
+        <div className="flex justify-end">
           <button
             onClick={limpar}
             disabled={isPending}
-            className="cursor-pointer rounded-lg border border-border bg-white px-3 py-1.5 font-body text-xs text-muted transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-50"
+            className="cursor-pointer rounded-lg border border-border bg-white px-3 py-1 font-body text-xs text-muted transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-50"
           >
             🗑 Limpar conversa
           </button>
         </div>
       )}
 
-      {/* Chat */}
+      {/* ── Chat ── */}
       <div className="flex-1 overflow-y-auto rounded-xl border border-border bg-white p-4 space-y-4">
         {messages.map((m, i) => (
           <div
@@ -181,9 +393,9 @@ export default function SistemaAgenteContent() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Atalhos flutuantes após primeira mensagem */}
+      {/* ── Atalhos flutuantes após primeira mensagem ── */}
       {!showAtalhos && messages.length > 1 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {ATALHOS.slice(0, 3).map((a) => (
             <button
               key={a.label}
@@ -197,8 +409,8 @@ export default function SistemaAgenteContent() {
         </div>
       )}
 
-      {/* Input */}
-      <div className="mt-2 flex gap-2">
+      {/* ── Input ── */}
+      <div className="flex gap-2">
         <input
           ref={inputRef}
           type="text"

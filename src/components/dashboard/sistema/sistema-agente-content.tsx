@@ -53,6 +53,11 @@ export default function SistemaAgenteContent() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isPending]);
 
+  function limpar() {
+    setMessages([{ role: "assistant", content: BOAS_VINDAS }]);
+    setInput("");
+  }
+
   async function enviar(texto?: string) {
     const msg = (texto ?? input).trim();
     if (!msg || isPending) return;
@@ -114,6 +119,19 @@ export default function SistemaAgenteContent() {
               {a.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Barra de ações do chat */}
+      {messages.length > 1 && (
+        <div className="mb-1 flex justify-end">
+          <button
+            onClick={limpar}
+            disabled={isPending}
+            className="cursor-pointer rounded-lg border border-border bg-white px-3 py-1.5 font-body text-xs text-muted transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-50"
+          >
+            🗑 Limpar conversa
+          </button>
         </div>
       )}
 

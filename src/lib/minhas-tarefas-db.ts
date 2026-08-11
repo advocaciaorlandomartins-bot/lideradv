@@ -30,7 +30,10 @@ export interface MinhaTarefa {
 
 export type MinhaItem = MinhaControle | MinhaTarefa;
 
-export async function getMinhasTarefas(login: string): Promise<{
+export async function getMinhasTarefas(
+  login: string,
+  nome: string
+): Promise<{
   pendentes: MinhaItem[];
   emAndamento: MinhaItem[];
   concluidas: MinhaItem[];
@@ -62,7 +65,7 @@ export async function getMinhasTarefas(login: string): Promise<{
       FROM tarefas_processo t
       JOIN processos p ON p.id = t.processo_id
       LEFT JOIN clients cl ON cl.id = p.client_id
-      WHERE t.responsavel = ${login}
+      WHERE t.responsavel = ${nome}
         AND t.status != 'Cancelada'
       ORDER BY
         CASE t.prioridade WHEN 'Alta' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,
@@ -124,7 +127,10 @@ export async function getMinhasTarefas(login: string): Promise<{
   };
 }
 
-export async function countMinhasPendentes(login: string): Promise<number> {
+export async function countMinhasPendentes(
+  login: string,
+  nome: string
+): Promise<number> {
   const [c, t] = await Promise.all([
     sql`
       SELECT COUNT(*)::int AS n FROM controles c
@@ -134,7 +140,7 @@ export async function countMinhasPendentes(login: string): Promise<number> {
     `,
     sql`
       SELECT COUNT(*)::int AS n FROM tarefas_processo
-      WHERE responsavel = ${login} AND status = 'Pendente'
+      WHERE responsavel = ${nome} AND status = 'Pendente'
     `,
   ]);
   return Number(c[0]?.n ?? 0) + Number(t[0]?.n ?? 0);

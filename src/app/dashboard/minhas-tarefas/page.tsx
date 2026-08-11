@@ -11,7 +11,8 @@ export default async function MinhasTarefasPage() {
   if (!session) notFound();
 
   const { pendentes, emAndamento, concluidas } = await getMinhasTarefas(
-    session.login
+    session.login,
+    session.nome
   );
 
   return (

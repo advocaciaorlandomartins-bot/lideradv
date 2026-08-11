@@ -82,6 +82,12 @@ export async function getMeuFinanceiroInitial(
   const agora = new Date();
   const anoMes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
 
+  // Busca colaborador_id do usuário — pode ser NULL para administradores sem vínculo
+  const [userRow] = await sql`
+    SELECT colaborador_id::text FROM usuarios WHERE id = ${userId}::uuid
+  `;
+  const colaboradorId = userRow?.colaborador_id ?? null;
+
   const [lancamentosRows, processosRows, remuneracaoKpiRows, fluxoRows] =
     await Promise.all([
       // Lançamentos pessoais do usuário
@@ -92,62 +98,89 @@ export async function getMeuFinanceiroInitial(
         WHERE usuario_id = ${userId}::uuid
         ORDER BY data DESC, created_at DESC
       `,
-      // Processos onde este usuário é responsável e têm honorários definidos
-      sql`
-        SELECT
-          p.id::text,
-          p.tipo_acao,
-          c.name AS client_name,
-          p.status,
-          p.modelo_honorario,
-          p.valor_honorario,
-          p.percentual_honorario,
-          p.valor_causa
-        FROM processos p
-        LEFT JOIN clients c ON c.id = p.client_id
-        JOIN usuarios u ON u.colaborador_id = p.responsavel_id
-        WHERE u.id = ${userId}::uuid
-          AND p.status IN ('ativo', 'em_andamento')
-          AND (
-            p.valor_honorario IS NOT NULL
-            OR (p.percentual_honorario IS NOT NULL AND p.valor_causa IS NOT NULL)
-          )
-        ORDER BY
-          COALESCE(p.valor_honorario, p.valor_causa * p.percentual_honorario / 100) DESC NULLS LAST
-        LIMIT 50
-      `,
-      // Remunerações deste usuário (comissões, salário, bonificações)
-      sql`
-        SELECT
-          COALESCE(SUM(r.valor) FILTER (
-            WHERE r.status = 'pago'
-              AND to_char(r.data_pagamento, 'YYYY-MM') = ${anoMes}
-          ), 0) AS recebido_mes,
-          COALESCE(SUM(r.valor) FILTER (
-            WHERE r.status = 'pendente'
-              AND to_char(r.competencia, 'YYYY-MM') = ${anoMes}
-          ), 0) AS a_receber_mes,
-          COALESCE(SUM(r.valor) FILTER (
-            WHERE r.status = 'pendente'
-          ), 0) AS total_pendente
-        FROM remuneracoes r
-        JOIN usuarios u ON u.colaborador_id = r.colaborador_id
-        WHERE u.id = ${userId}::uuid
-      `,
-      // Previsão de remunerações — próximos 6 meses
-      sql`
-        SELECT
-          to_char(date_trunc('month', r.competencia), 'YYYY-MM') AS mes_iso,
-          COALESCE(SUM(r.valor), 0) AS entradas
-        FROM remuneracoes r
-        JOIN usuarios u ON u.colaborador_id = r.colaborador_id
-        WHERE u.id = ${userId}::uuid
-          AND r.status = 'pendente'
-          AND r.competencia >= date_trunc('month', CURRENT_DATE)
-          AND r.competencia <  date_trunc('month', CURRENT_DATE) + INTERVAL '6 months'
-        GROUP BY 1
-        ORDER BY 1
-      `,
+      // Processos com honorários:
+      // • se tem colaborador_id: apenas processos onde é responsável
+      // • se não tem (admin solo): todos os processos ativos com honorário
+      colaboradorId
+        ? sql`
+            SELECT
+              p.id::text,
+              p.tipo_acao,
+              c.name AS client_name,
+              p.status,
+              p.modelo_honorario,
+              p.valor_honorario,
+              p.percentual_honorario,
+              p.valor_causa
+            FROM processos p
+            LEFT JOIN clients c ON c.id = p.client_id
+            WHERE p.responsavel_id = ${colaboradorId}::uuid
+              AND p.status IN ('ativo', 'em_andamento')
+              AND p.deleted_at IS NULL
+              AND (
+                p.valor_honorario IS NOT NULL
+                OR (p.percentual_honorario IS NOT NULL AND p.valor_causa IS NOT NULL)
+              )
+            ORDER BY
+              COALESCE(p.valor_honorario, p.valor_causa * p.percentual_honorario / 100) DESC NULLS LAST
+            LIMIT 50
+          `
+        : sql`
+            SELECT
+              p.id::text,
+              p.tipo_acao,
+              c.name AS client_name,
+              p.status,
+              p.modelo_honorario,
+              p.valor_honorario,
+              p.percentual_honorario,
+              p.valor_causa
+            FROM processos p
+            LEFT JOIN clients c ON c.id = p.client_id
+            WHERE p.status IN ('ativo', 'em_andamento')
+              AND p.deleted_at IS NULL
+              AND (
+                p.valor_honorario IS NOT NULL
+                OR (p.percentual_honorario IS NOT NULL AND p.valor_causa IS NOT NULL)
+              )
+            ORDER BY
+              COALESCE(p.valor_honorario, p.valor_causa * p.percentual_honorario / 100) DESC NULLS LAST
+            LIMIT 50
+          `,
+      // Remunerações: apenas se tiver colaborador_id vinculado
+      colaboradorId
+        ? sql`
+            SELECT
+              COALESCE(SUM(r.valor) FILTER (
+                WHERE r.status = 'pago'
+                  AND to_char(r.data_pagamento, 'YYYY-MM') = ${anoMes}
+              ), 0) AS recebido_mes,
+              COALESCE(SUM(r.valor) FILTER (
+                WHERE r.status = 'pendente'
+                  AND to_char(r.competencia, 'YYYY-MM') = ${anoMes}
+              ), 0) AS a_receber_mes,
+              COALESCE(SUM(r.valor) FILTER (
+                WHERE r.status = 'pendente'
+              ), 0) AS total_pendente
+            FROM remuneracoes r
+            WHERE r.colaborador_id = ${colaboradorId}::uuid
+          `
+        : sql`SELECT 0 AS recebido_mes, 0 AS a_receber_mes, 0 AS total_pendente`,
+      // Previsão de remunerações — apenas se tiver colaborador_id
+      colaboradorId
+        ? sql`
+            SELECT
+              to_char(date_trunc('month', r.competencia), 'YYYY-MM') AS mes_iso,
+              COALESCE(SUM(r.valor), 0) AS entradas
+            FROM remuneracoes r
+            WHERE r.colaborador_id = ${colaboradorId}::uuid
+              AND r.status = 'pendente'
+              AND r.competencia >= date_trunc('month', CURRENT_DATE)
+              AND r.competencia <  date_trunc('month', CURRENT_DATE) + INTERVAL '6 months'
+            GROUP BY 1
+            ORDER BY 1
+          `
+        : sql`SELECT NULL AS mes_iso, 0 AS entradas WHERE false`,
     ]);
 
   // Processos com honorário estimado (apenas do responsável)

@@ -202,7 +202,7 @@ export default async function DashboardPage() {
       ? getAllRecentEmails(20).catch(() => [])
       : Promise.resolve([]),
     perm.clientes ? countUnreadEmails().catch(() => 0) : Promise.resolve(0),
-    countMinhasPendentes(session.login).catch(() => 0),
+    countMinhasPendentes(session.login, session.nome).catch(() => 0),
     perm.processos
       ? getAlertasPrevidenciarios().catch(() => [])
       : Promise.resolve([]),

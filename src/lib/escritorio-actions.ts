@@ -26,6 +26,7 @@ export async function saveEscritorioConfigAction(
   const estado = ((formData.get("estado") as string) ?? "").trim() || null;
   const cep = ((formData.get("cep") as string) ?? "").trim() || null;
   const logoUrl = ((formData.get("logo_url") as string) ?? "").trim() || null;
+  const logoAtivo = formData.get("logo_ativo") !== "false";
 
   // Typography & layout
   const fontPadrao = (
@@ -46,8 +47,10 @@ export async function saveEscritorioConfigAction(
   const modeloTimbrado =
     ((formData.get("modelo_timbrado") as string) ?? "classico").trim() ||
     "classico";
+  const modeloTimbradoAtivo = formData.get("modelo_timbrado_ativo") !== "false";
   const fundoTimbrado =
     ((formData.get("fundo_timbrado") as string) ?? "").trim() || null;
+  const fundoTimbradoAtivo = formData.get("fundo_timbrado_ativo") !== "false";
   const salarioMinimo =
     parseFloat(
       ((formData.get("salario_minimo") as string) ?? "")
@@ -65,12 +68,14 @@ export async function saveEscritorioConfigAction(
           nome = ${nome}, oab = ${oab}, cnpj = ${cnpj},
           telefone = ${telefone}, email = ${email}, site = ${site},
           endereco = ${endereco}, cidade = ${cidade}, estado = ${estado},
-          cep = ${cep}, logo_url = ${logoUrl},
+          cep = ${cep}, logo_url = ${logoUrl}, logo_ativo = ${logoAtivo},
           font_padrao = ${fontPadrao}, tamanho_padrao = ${tamanhoPadrao},
           line_height = ${lineHeight}, margem_topo = ${margemTopo},
           margem_direita = ${margemDireita}, margem_inferior = ${margemInferior},
           margem_esquerda = ${margemEsquerda}, modelo_timbrado = ${modeloTimbrado},
+          modelo_timbrado_ativo = ${modeloTimbradoAtivo},
           fundo_timbrado = ${fundoTimbrado},
+          fundo_timbrado_ativo = ${fundoTimbradoAtivo},
           salario_minimo = ${salarioMinimo},
           updated_at = NOW()
         WHERE id = ${existing[0].id}::uuid
@@ -79,15 +84,17 @@ export async function saveEscritorioConfigAction(
       await sql`
         INSERT INTO escritorio_config
           (nome, oab, cnpj, telefone, email, site, endereco, cidade, estado, cep,
-           logo_url, font_padrao, tamanho_padrao, line_height,
+           logo_url, logo_ativo, font_padrao, tamanho_padrao, line_height,
            margem_topo, margem_direita, margem_inferior, margem_esquerda,
-           modelo_timbrado, fundo_timbrado, salario_minimo)
+           modelo_timbrado, modelo_timbrado_ativo,
+           fundo_timbrado, fundo_timbrado_ativo, salario_minimo)
         VALUES
           (${nome}, ${oab}, ${cnpj}, ${telefone}, ${email}, ${site},
-           ${endereco}, ${cidade}, ${estado}, ${cep}, ${logoUrl},
+           ${endereco}, ${cidade}, ${estado}, ${cep}, ${logoUrl}, ${logoAtivo},
            ${fontPadrao}, ${tamanhoPadrao}, ${lineHeight},
            ${margemTopo}, ${margemDireita}, ${margemInferior}, ${margemEsquerda},
-           ${modeloTimbrado}, ${fundoTimbrado}, ${salarioMinimo})
+           ${modeloTimbrado}, ${modeloTimbradoAtivo},
+           ${fundoTimbrado}, ${fundoTimbradoAtivo}, ${salarioMinimo})
       `;
     }
   } catch (err) {

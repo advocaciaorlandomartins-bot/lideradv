@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAllModelos } from "@/lib/modelos-db";
+import { flattenBlocksToText } from "@/lib/modelo-blocks";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import DeleteModeloButton from "@/components/dashboard/modelos/delete-modelo-button";
@@ -134,8 +135,13 @@ export default async function ModelosPage() {
                       </p>
                     )}
                     <p className="mt-2 font-body text-[11px] text-slate-400">
-                      {m.conteudo.length} caracteres · atualizado{" "}
-                      {m.updated_at_formatted}
+                      {
+                        (m.conteudo_blocks
+                          ? flattenBlocksToText(m.conteudo_blocks)
+                          : m.conteudo
+                        ).length
+                      }{" "}
+                      caracteres · atualizado {m.updated_at_formatted}
                     </p>
                   </div>
 

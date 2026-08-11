@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
+import {
+  extractPdfContent,
+  isSupportedImage,
+  type ContentPart,
+} from "@/lib/pdf-extract";
 
 export const dynamic = "force-dynamic";
 
@@ -52,100 +57,6 @@ export interface AiExtractedData {
   city: string | null;
   state: string | null;
   document_type: string | null;
-}
-
-type SupportedImageMime =
-  | "image/jpeg"
-  | "image/png"
-  | "image/gif"
-  | "image/webp";
-
-function isSupportedImage(t: string): t is SupportedImageMime {
-  return ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(t);
-}
-
-type ImageBlock = {
-  type: "image";
-  source: { type: "base64"; media_type: SupportedImageMime; data: string };
-};
-type TextBlock = { type: "text"; text: string };
-type ContentPart = TextBlock | ImageBlock;
-
-async function processPdf(buffer: Buffer): Promise<ContentPart[]> {
-  type PDFParseClass = new (opts: Record<string, unknown>) => {
-    load: () => Promise<unknown>;
-    getText: () => Promise<{ pages: { text: string }[] }>;
-    getScreenshot: (opts: {
-      pageNumbers?: number[];
-      imageDataUrl?: boolean;
-      imageBuffer?: boolean;
-      scale?: number;
-    }) => Promise<{ pages: { dataUrl?: string }[] }>;
-  };
-  type PdfParseModule = {
-    PDFParse: PDFParseClass & { setWorker: (src: string) => void };
-  };
-  type WorkerModule = {
-    getPath: () => string;
-    CanvasFactory: new () => unknown;
-  };
-
-  const { PDFParse } = (await import("pdf-parse")) as unknown as PdfParseModule;
-  const { getPath, CanvasFactory } =
-    (await import("pdf-parse/worker")) as unknown as WorkerModule;
-
-  PDFParse.setWorker(getPath());
-
-  const textParser = new PDFParse({ data: buffer });
-  await textParser.load();
-  const textResult = await textParser.getText();
-  const fullText = textResult.pages
-    .map((p) => p.text)
-    .join("\n")
-    .trim();
-
-  if (fullText.length > 80) {
-    return [
-      {
-        type: "text",
-        text: `Texto extraído do documento PDF:\n\n${fullText}\n\n${EXTRACTION_PROMPT}`,
-      },
-    ];
-  }
-
-  // Scanned PDF — render pages as PNG images
-  const screenshotParser = new PDFParse({
-    data: buffer,
-    canvasFactory: new CanvasFactory(),
-  });
-  await screenshotParser.load();
-  const screenshots = await screenshotParser.getScreenshot({
-    imageDataUrl: true,
-    imageBuffer: false,
-    scale: 1.5,
-  });
-
-  // Claude API limit: 10 MB per image (base64 bytes)
-  const MAX_IMG_BYTES = 9 * 1024 * 1024;
-
-  const parts: ContentPart[] = [{ type: "text", text: EXTRACTION_PROMPT }];
-  for (const pg of screenshots.pages.slice(0, 2)) {
-    if (pg.dataUrl) {
-      const [, b64] = pg.dataUrl.split(",");
-      if (b64 && b64.length <= MAX_IMG_BYTES) {
-        parts.push({
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: b64 },
-        });
-      }
-    }
-  }
-
-  if (parts.length < 2) {
-    throw new Error("PDF sem conteúdo extraível.");
-  }
-
-  return parts;
 }
 
 function parseJson(raw: string): AiExtractedData | null {
@@ -232,7 +143,7 @@ export async function POST(request: Request) {
     } else if (fileType === "application/pdf") {
       let pdfContent: ContentPart[];
       try {
-        pdfContent = await processPdf(buffer);
+        pdfContent = await extractPdfContent(buffer, EXTRACTION_PROMPT);
       } catch (e) {
         console.error("PDF processing error:", e);
         return NextResponse.json(

@@ -2,10 +2,13 @@ import { Document, Page, Text, View } from "@react-pdf/renderer";
 import type { EscritorioConfig } from "./escritorio-db";
 import { TimbradoHeader, TimbradoFooter } from "./pdf-timbrado";
 import { getPdfConfig, buildStyles } from "./pdf-config";
+import { renderBlocks } from "./modelo-pdf-blocks";
+import type { Block } from "./modelo-blocks";
 
 interface Props {
   titulo: string;
   conteudo: string;
+  blocks?: Block[] | null;
   date: string;
   clientName: string;
   config?: EscritorioConfig | null;
@@ -16,13 +19,15 @@ interface Props {
 export function ModeloPdfDoc({
   titulo,
   conteudo,
+  blocks,
   date,
   clientName,
   config,
   logoData,
   usarTimbrado,
 }: Props) {
-  const withLetterhead = (usarTimbrado ?? false) && !!config;
+  const withLetterhead =
+    (usarTimbrado ?? false) && !!config && config.modelo_timbrado_ativo;
   const pdfCfg = getPdfConfig(config, withLetterhead);
   const s = buildStyles(pdfCfg);
 
@@ -53,11 +58,13 @@ export function ModeloPdfDoc({
 
         <Text style={s.docTitle}>{titulo.toUpperCase()}</Text>
 
-        {paragraphs.map((para, i) => (
-          <Text key={i} style={[s.body, { marginBottom: 12 }]}>
-            {para}
-          </Text>
-        ))}
+        {blocks && blocks.length > 0
+          ? renderBlocks(blocks, s, pdfCfg)
+          : paragraphs.map((para, i) => (
+              <Text key={i} style={[s.body, { marginBottom: 12 }]}>
+                {para}
+              </Text>
+            ))}
 
         {withLetterhead ? (
           <TimbradoFooter config={config!} date={date} />

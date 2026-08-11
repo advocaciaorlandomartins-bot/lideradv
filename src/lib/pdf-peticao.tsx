@@ -44,7 +44,7 @@ export function PeticaoIaDoc({
   logoData,
   date,
 }: PeticaoIaDocProps) {
-  const comTimbrado = !!config;
+  const comTimbrado = !!config && config.modelo_timbrado_ativo;
   const cfg = getPdfConfig(config, comTimbrado);
   const s = buildStyles(cfg);
 

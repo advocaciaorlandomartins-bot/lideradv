@@ -5,8 +5,25 @@ import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import {
+  isValidBlocks,
+  flattenBlocksToText,
+  type Block,
+} from "./modelo-blocks";
 
 export type ModeloFormState = { error: string } | null;
+
+/** Lê e valida o campo hidden "conteudo_blocks" (JSON) do formulário. */
+function parseBlocksField(formData: FormData): Block[] | null {
+  const raw = (formData.get("conteudo_blocks") as string) ?? "";
+  if (!raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return isValidBlocks(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function createModeloAction(
   _prev: ModeloFormState,
@@ -21,16 +38,19 @@ export async function createModeloAction(
     ((formData.get("categoria") as string) ?? "").trim() || null;
   const descricao =
     ((formData.get("descricao") as string) ?? "").trim() || null;
-  const conteudo = ((formData.get("conteudo") as string) ?? "").trim();
   const usarTimbrado = formData.get("usar_timbrado") === "true";
+  const blocks = parseBlocksField(formData);
+  const conteudo = blocks
+    ? flattenBlocksToText(blocks)
+    : ((formData.get("conteudo") as string) ?? "").trim();
 
   if (!titulo) return { error: "O título é obrigatório." };
   if (!conteudo) return { error: "O conteúdo do modelo é obrigatório." };
 
   try {
     await sql`
-      INSERT INTO modelos_documento (titulo, categoria, descricao, conteudo, usar_timbrado)
-      VALUES (${titulo}, ${categoria}, ${descricao}, ${conteudo}, ${usarTimbrado})
+      INSERT INTO modelos_documento (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado)
+      VALUES (${titulo}, ${categoria}, ${descricao}, ${conteudo}, ${blocks ? JSON.stringify(blocks) : null}, ${usarTimbrado})
     `;
   } catch (err) {
     console.error("createModeloAction error:", err);
@@ -54,9 +74,12 @@ export async function updateModeloAction(
     ((formData.get("categoria") as string) ?? "").trim() || null;
   const descricao =
     ((formData.get("descricao") as string) ?? "").trim() || null;
-  const conteudo = ((formData.get("conteudo") as string) ?? "").trim();
   const ativo = formData.get("ativo") === "true";
   const usarTimbrado = formData.get("usar_timbrado") === "true";
+  const blocks = parseBlocksField(formData);
+  const conteudo = blocks
+    ? flattenBlocksToText(blocks)
+    : ((formData.get("conteudo") as string) ?? "").trim();
 
   if (!titulo) return { error: "O título é obrigatório." };
   if (!conteudo) return { error: "O conteúdo do modelo é obrigatório." };
@@ -64,13 +87,14 @@ export async function updateModeloAction(
   try {
     await sql`
       UPDATE modelos_documento SET
-        titulo         = ${titulo},
-        categoria      = ${categoria},
-        descricao      = ${descricao},
-        conteudo       = ${conteudo},
-        ativo          = ${ativo},
-        usar_timbrado  = ${usarTimbrado},
-        updated_at     = NOW()
+        titulo          = ${titulo},
+        categoria       = ${categoria},
+        descricao       = ${descricao},
+        conteudo        = ${conteudo},
+        conteudo_blocks = ${blocks ? JSON.stringify(blocks) : null},
+        ativo           = ${ativo},
+        usar_timbrado   = ${usarTimbrado},
+        updated_at      = NOW()
       WHERE id = ${id}::uuid
     `;
   } catch (err) {

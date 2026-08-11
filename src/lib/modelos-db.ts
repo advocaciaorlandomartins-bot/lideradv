@@ -1,4 +1,5 @@
 import sql from "./db";
+import { isValidBlocks, type Block } from "./modelo-blocks";
 
 export interface ModeloDocumento {
   id: string;
@@ -6,6 +7,7 @@ export interface ModeloDocumento {
   categoria: string | null;
   descricao: string | null;
   conteudo: string;
+  conteudo_blocks: Block[] | null;
   ativo: boolean;
   usar_timbrado: boolean;
   created_at_formatted: string;
@@ -14,12 +16,14 @@ export interface ModeloDocumento {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapRow(r: any): ModeloDocumento {
+  const blocks = isValidBlocks(r.conteudo_blocks) ? r.conteudo_blocks : null;
   return {
     id: r.id,
     titulo: r.titulo,
     categoria: r.categoria ?? null,
     descricao: r.descricao ?? null,
     conteudo: r.conteudo,
+    conteudo_blocks: blocks,
     ativo: r.ativo,
     usar_timbrado: r.usar_timbrado ?? true,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
@@ -29,7 +33,8 @@ function mapRow(r: any): ModeloDocumento {
 
 export async function getAllModelos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
-    SELECT id::text, titulo, categoria, descricao, conteudo, ativo, usar_timbrado, created_at, updated_at
+    SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
+           ativo, usar_timbrado, created_at, updated_at
     FROM modelos_documento
     ORDER BY categoria NULLS LAST, titulo
   `;
@@ -38,7 +43,8 @@ export async function getAllModelos(): Promise<ModeloDocumento[]> {
 
 export async function getModelosAtivos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
-    SELECT id::text, titulo, categoria, descricao, conteudo, ativo, usar_timbrado, created_at, updated_at
+    SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
+           ativo, usar_timbrado, created_at, updated_at
     FROM modelos_documento
     WHERE ativo = TRUE
     ORDER BY categoria NULLS LAST, titulo
@@ -50,7 +56,8 @@ export async function getModeloById(
   id: string
 ): Promise<ModeloDocumento | null> {
   const rows = await sql`
-    SELECT id::text, titulo, categoria, descricao, conteudo, ativo, usar_timbrado, created_at, updated_at
+    SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
+           ativo, usar_timbrado, created_at, updated_at
     FROM modelos_documento
     WHERE id = ${id}::uuid
   `;

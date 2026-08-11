@@ -9,6 +9,7 @@ import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
 import { applyFundoTimbrado } from "@/lib/pdf-fundo";
 import { ModeloPdfDoc } from "@/lib/modelo-pdf";
+import { substituteVariablesInBlocks } from "@/lib/modelo-blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +55,10 @@ export async function GET(request: Request) {
       { status: 404 }
     );
 
-  const logoData = escritorioConfig.logo_url
-    ? await fetchLogoAsDataUri(escritorioConfig.logo_url)
-    : null;
+  const logoData =
+    escritorioConfig.logo_ativo && escritorioConfig.logo_url
+      ? await fetchLogoAsDataUri(escritorioConfig.logo_url)
+      : null;
 
   const date = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -111,10 +113,14 @@ export async function GET(request: Request) {
   for (const [key, value] of Object.entries(vars)) {
     conteudo = conteudo.split(key).join(value);
   }
+  const blocks = modelo.conteudo_blocks
+    ? substituteVariablesInBlocks(modelo.conteudo_blocks, vars)
+    : null;
 
   const doc = createElement(ModeloPdfDoc, {
     titulo: modelo.titulo,
     conteudo,
+    blocks,
     date,
     clientName: client.name,
     config: escritorioConfig,
@@ -122,13 +128,25 @@ export async function GET(request: Request) {
     usarTimbrado: modelo.usar_timbrado,
   }) as ReactElement<DocumentProps>;
 
-  let buffer = await renderToBuffer(doc);
-  if (escritorioConfig.fundo_timbrado) {
-    const withBg = await applyFundoTimbrado(
-      new Uint8Array(buffer),
+  let buffer: Buffer;
+  try {
+    buffer = await renderToBuffer(doc);
+    if (
+      escritorioConfig.fundo_timbrado_ativo &&
       escritorioConfig.fundo_timbrado
+    ) {
+      const withBg = await applyFundoTimbrado(
+        new Uint8Array(buffer),
+        escritorioConfig.fundo_timbrado
+      );
+      buffer = Buffer.from(withBg);
+    }
+  } catch (err) {
+    console.error("gerar-modelo render error:", err);
+    return NextResponse.json(
+      { error: "Erro ao gerar o PDF. Verifique a formatação do modelo." },
+      { status: 500 }
     );
-    buffer = Buffer.from(withBg);
   }
 
   const safeName = client.name

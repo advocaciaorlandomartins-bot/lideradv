@@ -24,9 +24,10 @@ export async function POST(request: Request) {
 
   const config = await getEscritorioConfig();
 
-  const logoData = config.logo_url
-    ? await fetchLogoAsDataUri(config.logo_url).catch(() => null)
-    : null;
+  const logoData =
+    config.logo_ativo && config.logo_url
+      ? await fetchLogoAsDataUri(config.logo_url).catch(() => null)
+      : null;
 
   const date = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
 
   let buffer = await renderToBuffer(doc);
 
-  if (config.fundo_timbrado) {
+  if (config.fundo_timbrado_ativo && config.fundo_timbrado) {
     const withBg = await applyFundoTimbrado(
       new Uint8Array(buffer),
       config.fundo_timbrado

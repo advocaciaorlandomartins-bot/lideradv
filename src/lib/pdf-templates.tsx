@@ -16,7 +16,7 @@ function PageHeader({
   logoData,
   s,
 }: SharedProps & { s: ReturnType<typeof buildStyles> }) {
-  if (config) {
+  if (config && config.modelo_timbrado_ativo) {
     return <TimbradoHeader config={config} logoData={logoData ?? null} />;
   }
   return (
@@ -33,7 +33,7 @@ function PageFooter({
   date,
   s,
 }: SharedProps & { date: string; s: ReturnType<typeof buildStyles> }) {
-  if (config) {
+  if (config && config.modelo_timbrado_ativo) {
     return <TimbradoFooter config={config} date={date} />;
   }
   return (
@@ -99,7 +99,7 @@ export function ProcuracaoDoc({
   config,
   logoData,
 }: { client: ClientFull; date: string } & SharedProps) {
-  const pdfCfg = getPdfConfig(config, !!config);
+  const pdfCfg = getPdfConfig(config, !!config && config.modelo_timbrado_ativo);
   const s = buildStyles(pdfCfg);
   const tipoDoc = client.type === "PF" ? "CPF" : "CNPJ";
   const qualificacao =
@@ -195,7 +195,7 @@ export function ContratoHonorariosDoc({
   config,
   logoData,
 }: { client: ClientFull; date: string } & SharedProps) {
-  const pdfCfg = getPdfConfig(config, !!config);
+  const pdfCfg = getPdfConfig(config, !!config && config.modelo_timbrado_ativo);
   const s = buildStyles(pdfCfg);
   const qualificacao =
     client.type === "PF"
@@ -313,7 +313,7 @@ export function DeclaracaoHipossuficienciaDoc({
   config,
   logoData,
 }: { client: ClientFull; date: string } & SharedProps) {
-  const pdfCfg = getPdfConfig(config, !!config);
+  const pdfCfg = getPdfConfig(config, !!config && config.modelo_timbrado_ativo);
   const s = buildStyles(pdfCfg);
   const tipoDoc = client.type === "PF" ? "CPF" : "CNPJ";
 
@@ -432,7 +432,7 @@ export function ComunicadoHonorariosDoc({
   lancamentos: LancamentoComunicado[];
   date: string;
 } & SharedProps) {
-  const pdfCfg = getPdfConfig(config, !!config);
+  const pdfCfg = getPdfConfig(config, !!config && config.modelo_timbrado_ativo);
   const s = buildStyles(pdfCfg);
   const total = lancamentos.reduce((sum, l) => sum + l.valor, 0);
   const fmt = (v: number) =>
@@ -669,7 +669,7 @@ export function NotificacaoExtrajudicialDoc({
   config,
   logoData,
 }: { client: ClientFull; date: string } & SharedProps) {
-  const pdfCfg = getPdfConfig(config, !!config);
+  const pdfCfg = getPdfConfig(config, !!config && config.modelo_timbrado_ativo);
   const s = buildStyles(pdfCfg);
 
   return (

@@ -75,9 +75,10 @@ export async function GET(
     );
   }
 
-  const logoData = escritorioConfig.logo_url
-    ? await fetchLogoAsDataUri(escritorioConfig.logo_url)
-    : null;
+  const logoData =
+    escritorioConfig.logo_ativo && escritorioConfig.logo_url
+      ? await fetchLogoAsDataUri(escritorioConfig.logo_url)
+      : null;
 
   const date = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -115,7 +116,10 @@ export async function GET(
   }
 
   let buffer = await renderToBuffer(doc);
-  if (escritorioConfig.fundo_timbrado) {
+  if (
+    escritorioConfig.fundo_timbrado_ativo &&
+    escritorioConfig.fundo_timbrado
+  ) {
     const withBg = await applyFundoTimbrado(
       new Uint8Array(buffer),
       escritorioConfig.fundo_timbrado

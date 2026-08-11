@@ -1323,6 +1323,7 @@ function buildReciboHtml(
     .join(", ");
 
   const hasFundo =
+    !!escritorio.fundo_timbrado_ativo &&
     !!escritorio.fundo_timbrado &&
     !escritorio.fundo_timbrado.startsWith("data:application/pdf");
   // Na tela: position:fixed cobre a folha inteira como preview
@@ -1337,9 +1338,10 @@ function buildReciboHtml(
   const mb = escritorio.margem_inferior ?? 28;
   const ml = escritorio.margem_esquerda ?? 25;
 
-  const logoHtml = escritorio.logo_url
-    ? `<img src="${escritorio.logo_url}" alt="Logo" style="max-height:60px;max-width:120px;object-fit:contain;" />`
-    : `<div style="width:50px;height:50px;background:#1E3A8A;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:20px;">${escritorio.nome.charAt(0)}</div>`;
+  const logoHtml =
+    escritorio.logo_ativo && escritorio.logo_url
+      ? `<img src="${escritorio.logo_url}" alt="Logo" style="max-height:60px;max-width:120px;object-fit:contain;" />`
+      : `<div style="width:50px;height:50px;background:#1E3A8A;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:20px;">${escritorio.nome.charAt(0)}</div>`;
 
   // Cabeçalho manual só quando não há fundo timbrado (o fundo já contém o timbrado)
   const headerHtml = hasFundo
@@ -1371,7 +1373,7 @@ function buildReciboHtml(
         if (t === "compacto")
           return `
       <div style="background:#1E3A8A;padding:12px 0;display:flex;align-items:center;gap:14px;margin-bottom:8px;">
-        ${escritorio.logo_url ? `<img src="${escritorio.logo_url}" alt="Logo" style="max-height:36px;filter:brightness(0)invert(1);" />` : ""}
+        ${escritorio.logo_ativo && escritorio.logo_url ? `<img src="${escritorio.logo_url}" alt="Logo" style="max-height:36px;filter:brightness(0)invert(1);" />` : ""}
         <div style="flex:1;">
           <span style="font-size:15px;font-weight:700;color:white;">${escritorio.nome}</span>
           ${escritorio.oab ? `<span style="font-size:10px;color:#93c5fd;margin-left:10px;">OAB: ${escritorio.oab}</span>` : ""}
@@ -1894,7 +1896,8 @@ function ReciboTab({
                   Referência: {periodo} · {filtered.length} lançamento
                   {filtered.length !== 1 ? "s" : ""}
                 </p>
-                {escritorio.fundo_timbrado &&
+                {escritorio.fundo_timbrado_ativo &&
+                  escritorio.fundo_timbrado &&
                   !escritorio.fundo_timbrado.startsWith(
                     "data:application/pdf"
                   ) && (
@@ -1903,14 +1906,15 @@ function ReciboTab({
                       Papel timbrado cadastrado será aplicado na impressão
                     </p>
                   )}
-                {escritorio.fundo_timbrado?.startsWith(
-                  "data:application/pdf"
-                ) && (
-                  <p className="font-body text-xs text-amber-600 mt-1">
-                    Fundo em PDF: será impresso separadamente — use PNG/JPG para
-                    fundo automático.
-                  </p>
-                )}
+                {escritorio.fundo_timbrado_ativo &&
+                  escritorio.fundo_timbrado?.startsWith(
+                    "data:application/pdf"
+                  ) && (
+                    <p className="font-body text-xs text-amber-600 mt-1">
+                      Fundo em PDF: será impresso separadamente — use PNG/JPG
+                      para fundo automático.
+                    </p>
+                  )}
               </div>
               <button
                 onClick={handleImprimir}

@@ -270,6 +270,35 @@ const labelCls = "block font-body text-sm font-semibold text-fg mb-1.5";
 const selectCls =
   "w-full h-10 cursor-pointer rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100";
 
+function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+        checked ? "bg-primary" : "bg-slate-300"
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-6" : "translate-x-1"
+        }`}
+      />
+    </button>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────
 
 interface Props {
@@ -285,6 +314,7 @@ export default function ConfigForm({ config }: Props) {
   // Logo
   const [logoUrl, setLogoUrl] = useState(config.logo_url ?? "");
   const [previewUrl, setPreviewUrl] = useState(config.logo_url ?? "");
+  const [logoAtivo, setLogoAtivo] = useState(config.logo_ativo ?? true);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -293,9 +323,15 @@ export default function ConfigForm({ config }: Props) {
   const [modeloTimbrado, setModeloTimbrado] = useState(
     config.modelo_timbrado ?? "classico"
   );
+  const [modeloTimbradoAtivo, setModeloTimbradoAtivo] = useState(
+    config.modelo_timbrado_ativo ?? true
+  );
 
   // Background letterhead
   const [fundoData, setFundoData] = useState(config.fundo_timbrado ?? "");
+  const [fundoTimbradoAtivo, setFundoTimbradoAtivo] = useState(
+    config.fundo_timbrado_ativo ?? true
+  );
   const [fundoUploading, setFundoUploading] = useState(false);
   const [fundoError, setFundoError] = useState<string | null>(null);
   const fundoFileRef = useRef<HTMLInputElement>(null);
@@ -498,6 +534,23 @@ export default function ConfigForm({ config }: Props) {
       marginTop: 2,
     };
     const nomeTxt = nome || "ADVOCACIA ORLANDO MARTINS";
+    const logoSrc = logoAtivo ? previewUrl : "";
+
+    if (!modeloTimbradoAtivo) {
+      return (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ ...nameSt, textAlign: "center" }}>
+            {nomeTxt.toUpperCase()}
+          </div>
+          {oab && (
+            <div style={{ ...oabSt, textAlign: "center", marginBottom: 10 }}>
+              {oab}
+            </div>
+          )}
+          <div style={{ borderBottom: "1px solid #1E3A8A", marginTop: 4 }} />
+        </div>
+      );
+    }
 
     if (modeloTimbrado === "centralizado") {
       return (
@@ -509,10 +562,10 @@ export default function ConfigForm({ config }: Props) {
             marginBottom: 10,
           }}
         >
-          {previewUrl && (
+          {logoSrc && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={previewUrl}
+              src={logoSrc}
               alt=""
               style={{
                 width: 60,
@@ -548,10 +601,10 @@ export default function ConfigForm({ config }: Props) {
             </div>
             {oab && <div style={oabSt}>{oab}</div>}
           </div>
-          {previewUrl && (
+          {logoSrc && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={previewUrl}
+              src={logoSrc}
               alt=""
               style={{
                 width: 52,
@@ -576,10 +629,10 @@ export default function ConfigForm({ config }: Props) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {previewUrl && (
+            {logoSrc && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={previewUrl}
+                src={logoSrc}
                 alt=""
                 style={{ width: 40, height: 40, objectFit: "contain" }}
               />
@@ -601,10 +654,10 @@ export default function ConfigForm({ config }: Props) {
     // classico (default)
     return (
       <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
-        {previewUrl ? (
+        {logoSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={previewUrl}
+            src={logoSrc}
             alt=""
             style={{
               width: 76,
@@ -639,10 +692,31 @@ export default function ConfigForm({ config }: Props) {
 
       {/* ── Logo e Modelo de Timbrado ── */}
       <div className="rounded-xl border border-border bg-white p-5">
-        <h2 className="font-heading text-sm font-semibold text-fg mb-4">
-          Logo marca
-        </h2>
-        <div className="flex items-start gap-5">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-heading text-sm font-semibold text-fg">
+              Logo marca
+            </h2>
+            <p className="font-body text-xs text-muted mt-0.5">
+              {logoAtivo
+                ? "A logo aparece nos documentos gerados."
+                : "A logo fica salva, mas não é exibida nos documentos."}
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={logoAtivo}
+            onChange={setLogoAtivo}
+            label="Ativar logo marca"
+          />
+          <input
+            type="hidden"
+            name="logo_ativo"
+            value={logoAtivo ? "true" : "false"}
+          />
+        </div>
+        <div
+          className={`flex items-start gap-5 ${!logoAtivo ? "opacity-50" : ""}`}
+        >
           <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border bg-slate-50 overflow-hidden">
             {previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -703,14 +777,32 @@ export default function ConfigForm({ config }: Props) {
 
         {/* ── Modelo do papel timbrado ── */}
         <div className="mt-5 pt-5 border-t border-border">
-          <h3 className="font-heading text-sm font-semibold text-fg mb-1">
-            Modelo do papel timbrado
-          </h3>
-          <p className="font-body text-xs text-muted mb-4">
-            Define como o cabeçalho é organizado em todos os documentos gerados.
-          </p>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h3 className="font-heading text-sm font-semibold text-fg mb-1">
+                Modelo do papel timbrado
+              </h3>
+              <p className="font-body text-xs text-muted">
+                {modeloTimbradoAtivo
+                  ? "Define como o cabeçalho é organizado em todos os documentos gerados."
+                  : "Desativado — os documentos usam um cabeçalho simples, sem o layout abaixo."}
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={modeloTimbradoAtivo}
+              onChange={setModeloTimbradoAtivo}
+              label="Ativar modelo do papel timbrado"
+            />
+            <input
+              type="hidden"
+              name="modelo_timbrado_ativo"
+              value={modeloTimbradoAtivo ? "true" : "false"}
+            />
+          </div>
           <input type="hidden" name="modelo_timbrado" value={modeloTimbrado} />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div
+            className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${!modeloTimbradoAtivo ? "opacity-50" : ""}`}
+          >
             {TEMPLATES.map((t) => (
               <button
                 key={t.id}
@@ -759,14 +851,28 @@ export default function ConfigForm({ config }: Props) {
 
       {/* ── Fundo do documento ── */}
       <div className="rounded-xl border border-border bg-white p-5">
-        <h2 className="font-heading text-sm font-semibold text-fg mb-1">
-          Fundo do papel timbrado
-        </h2>
-        <p className="font-body text-xs text-muted mb-4">
-          Imagem ou PDF aplicado como fundo em cada página de todos os
-          documentos gerados. Suporte: PDF, PNG, JPG e SVG (SVG é convertido
-          para PNG automaticamente).
-        </p>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-heading text-sm font-semibold text-fg mb-1">
+              Fundo do papel timbrado
+            </h2>
+            <p className="font-body text-xs text-muted">
+              {fundoTimbradoAtivo
+                ? "Imagem ou PDF aplicado como fundo em cada página de todos os documentos gerados. Suporte: PDF, PNG, JPG e SVG (SVG é convertido para PNG automaticamente)."
+                : "Desativado — o fundo fica salvo, mas não é aplicado aos documentos gerados."}
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={fundoTimbradoAtivo}
+            onChange={setFundoTimbradoAtivo}
+            label="Ativar fundo do papel timbrado"
+          />
+          <input
+            type="hidden"
+            name="fundo_timbrado_ativo"
+            value={fundoTimbradoAtivo ? "true" : "false"}
+          />
+        </div>
 
         <input type="hidden" name="fundo_timbrado" value={fundoData} />
         <input
@@ -780,7 +886,9 @@ export default function ConfigForm({ config }: Props) {
           }}
         />
 
-        <div className="flex items-start gap-5">
+        <div
+          className={`flex items-start gap-5 ${!fundoTimbradoAtivo ? "opacity-50" : ""}`}
+        >
           {/* Thumbnail / preview */}
           <div className="flex h-28 w-20 flex-shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-border bg-slate-50 overflow-hidden relative">
             {fundoData && !fundoData.startsWith("data:application/pdf") ? (
@@ -1143,7 +1251,9 @@ export default function ConfigForm({ config }: Props) {
                 transformOrigin: "top left",
                 backgroundColor: "white",
                 backgroundImage:
-                  fundoData && !fundoData.startsWith("data:application/pdf")
+                  fundoTimbradoAtivo &&
+                  fundoData &&
+                  !fundoData.startsWith("data:application/pdf")
                     ? `url("${fundoData}")`
                     : undefined,
                 backgroundSize: "cover",
@@ -1157,31 +1267,32 @@ export default function ConfigForm({ config }: Props) {
               {/* ── Letterhead header (matches selected modelo) ── */}
               {renderPreviewHeader()}
 
-              {/* Dividers */}
-              {modeloTimbrado === "compacto" ? (
-                <div
-                  style={{
-                    borderBottom: "2px solid #1E3A8A",
-                    marginBottom: 20,
-                  }}
-                />
-              ) : (
-                <>
+              {/* Dividers (o header simples já inclui o próprio divisor) */}
+              {modeloTimbradoAtivo &&
+                (modeloTimbrado === "compacto" ? (
                   <div
                     style={{
-                      borderBottom: "3px solid #1E3A8A",
-                      marginTop: 10,
-                      marginBottom: 4,
+                      borderBottom: "2px solid #1E3A8A",
+                      marginBottom: 20,
                     }}
                   />
-                  <div
-                    style={{
-                      borderBottom: "0.5px solid #B45309",
-                      marginBottom: 24,
-                    }}
-                  />
-                </>
-              )}
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        borderBottom: "3px solid #1E3A8A",
+                        marginTop: 10,
+                        marginBottom: 4,
+                      }}
+                    />
+                    <div
+                      style={{
+                        borderBottom: "0.5px solid #B45309",
+                        marginBottom: 24,
+                      }}
+                    />
+                  </>
+                ))}
 
               {/* ── Document title ── */}
               <div
@@ -1250,17 +1361,25 @@ export default function ConfigForm({ config }: Props) {
           <span>
             Modelo:{" "}
             <strong>
-              {TEMPLATES.find((t) => t.id === modeloTimbrado)?.label ??
-                modeloTimbrado}
+              {modeloTimbradoAtivo
+                ? (TEMPLATES.find((t) => t.id === modeloTimbrado)?.label ??
+                  modeloTimbrado)
+                : "desativado (cabeçalho simples)"}
             </strong>
           </span>
           {fundoData && (
-            <span className="text-emerald-600">
+            <span
+              className={
+                fundoTimbradoAtivo ? "text-emerald-600" : "text-slate-400"
+              }
+            >
               Fundo:{" "}
               <strong>
-                {fundoData.startsWith("data:application/pdf")
-                  ? "PDF ativo"
-                  : "imagem ativa"}
+                {fundoTimbradoAtivo
+                  ? fundoData.startsWith("data:application/pdf")
+                    ? "PDF ativo"
+                    : "imagem ativa"
+                  : "salvo (desativado)"}
               </strong>
             </span>
           )}

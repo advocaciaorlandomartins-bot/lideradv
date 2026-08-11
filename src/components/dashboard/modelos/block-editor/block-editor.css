@@ -1,0 +1,78 @@
+.modelo-editor-content .ProseMirror {
+  outline: none;
+  min-height: 380px;
+}
+
+.modelo-editor-content p {
+  margin: 0 0 10px;
+  text-align: justify;
+}
+
+.modelo-editor-content h1,
+.modelo-editor-content h2,
+.modelo-editor-content h3 {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.modelo-editor-content h1 {
+  font-size: 1.05rem;
+  text-align: center;
+  text-decoration: underline;
+  letter-spacing: 0.03em;
+  margin: 4px 0 16px;
+}
+
+.modelo-editor-content h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 12px 0 6px;
+}
+
+.modelo-editor-content h3 {
+  font-size: 0.9rem;
+  margin: 12px 0 4px;
+}
+
+.modelo-editor-content ul,
+.modelo-editor-content ol {
+  padding-left: 22px;
+  margin: 0 0 10px;
+}
+
+.modelo-editor-content ul {
+  list-style: disc;
+}
+
+.modelo-editor-content ol {
+  list-style: decimal;
+}
+
+.modelo-editor-content hr {
+  border: none;
+  border-top: 1px solid #1e3a8a;
+  margin: 10px 0 16px;
+}
+
+.modelo-editor-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 14px;
+}
+
+.modelo-editor-content td,
+.modelo-editor-content th {
+  border: 1px solid #d1d5db;
+  padding: 6px 8px;
+  vertical-align: top;
+  min-width: 60px;
+}
+
+.modelo-editor-content .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #94a3b8;
+  pointer-events: none;
+  height: 0;
+}

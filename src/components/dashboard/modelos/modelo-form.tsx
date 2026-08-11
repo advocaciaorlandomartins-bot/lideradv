@@ -2,75 +2,18 @@
 
 import { useRef, useState, useActionState } from "react";
 import Link from "next/link";
-import { SpinnerIcon } from "@/components/icons";
+import { SparklesIcon, SpinnerIcon } from "@/components/icons";
 import type { ModeloDocumento } from "@/lib/modelos-db";
 import type { ModeloFormState } from "@/lib/modelo-actions";
-
-// ── Variable definitions ────────────────────────────────────────
-
-const VARIAVEIS = [
-  {
-    group: "Cliente",
-    vars: [
-      { tag: "{{nome}}", desc: "Nome completo" },
-      { tag: "{{cpf_cnpj}}", desc: "CPF ou CNPJ" },
-      { tag: "{{tipo}}", desc: "PF / PJ" },
-      { tag: "{{email}}", desc: "E-mail" },
-      { tag: "{{telefone}}", desc: "Telefone" },
-      { tag: "{{data_nascimento}}", desc: "Nascimento" },
-      { tag: "{{nome_fantasia}}", desc: "Nome fantasia" },
-      { tag: "{{rg}}", desc: "RG" },
-      { tag: "{{rg_orgao}}", desc: "Órgão expedidor" },
-      { tag: "{{estado_civil}}", desc: "Estado civil" },
-      { tag: "{{genero}}", desc: "Gênero" },
-      { tag: "{{profissao}}", desc: "Profissão" },
-      { tag: "{{nacionalidade}}", desc: "Nacionalidade" },
-      { tag: "{{parceria}}", desc: "Parceria / Origem" },
-    ],
-  },
-  {
-    group: "Responsável",
-    vars: [
-      { tag: "{{responsavel_nome}}", desc: "Nome" },
-      { tag: "{{responsavel_cpf}}", desc: "CPF" },
-      { tag: "{{responsavel_rg}}", desc: "RG" },
-      { tag: "{{responsavel_rg_orgao}}", desc: "Órgão expedidor" },
-      { tag: "{{responsavel_telefone}}", desc: "Telefone" },
-      { tag: "{{responsavel_email}}", desc: "E-mail" },
-      { tag: "{{responsavel_parentesco}}", desc: "Parentesco" },
-    ],
-  },
-  {
-    group: "Endereço",
-    vars: [
-      { tag: "{{endereco}}", desc: "Rua + nº + complemento" },
-      { tag: "{{endereco_completo}}", desc: "Endereço com CEP" },
-      { tag: "{{bairro}}", desc: "Bairro" },
-      { tag: "{{cidade}}", desc: "Cidade" },
-      { tag: "{{estado}}", desc: "Estado (UF)" },
-      { tag: "{{cep}}", desc: "CEP" },
-    ],
-  },
-  {
-    group: "Geral",
-    vars: [
-      { tag: "{{data_hoje}}", desc: "Data por extenso" },
-      { tag: "{{advogado}}", desc: "Nome do advogado" },
-    ],
-  },
-];
-
-const CATEGORIAS = [
-  "Contratos",
-  "Procurações",
-  "Declarações",
-  "Notificações",
-  "Petições",
-  "Previdenciário",
-  "Família",
-  "Trabalhista",
-  "Outro",
-];
+import type { Block } from "@/lib/modelo-blocks";
+import { flattenBlocksToText } from "@/lib/modelo-blocks";
+import { VARIAVEIS, CATEGORIAS } from "@/lib/modelo-variaveis";
+import BlockEditor, {
+  type BlockEditorHandle,
+} from "@/components/dashboard/modelos/block-editor";
+import AiModeloImport, {
+  type AiModeloResult,
+} from "@/components/dashboard/modelos/ai-modelo-import";
 
 // ── Component ───────────────────────────────────────────────────
 
@@ -90,27 +33,29 @@ const labelCls = "block font-body text-sm font-semibold text-fg mb-1.5";
 
 export default function ModeloForm({ action, modelo }: Props) {
   const [state, formAction, pending] = useActionState(action, null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [conteudo, setConteudo] = useState(modelo?.conteudo ?? "");
-  const [activeGroup, setActiveGroup] = useState(VARIAVEIS[0].group);
+  const editorRef = useRef<BlockEditorHandle>(null);
+  const [blocks, setBlocks] = useState<Block[]>(modelo?.conteudo_blocks ?? []);
+  const [editorKey, setEditorKey] = useState(0);
+  const [titulo, setTitulo] = useState(modelo?.titulo ?? "");
+  const [categoria, setCategoria] = useState(modelo?.categoria ?? "");
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<
+    (typeof VARIAVEIS)[number]["group"]
+  >(VARIAVEIS[0].group);
   const [usarTimbrado, setUsarTimbrado] = useState(
     modelo?.usar_timbrado ?? true
   );
 
   function insertVariable(tag: string) {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const before = conteudo.slice(0, start);
-    const after = conteudo.slice(end);
-    const newVal = before + tag + after;
-    setConteudo(newVal);
-    // Restore focus and cursor position after tag
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.setSelectionRange(start + tag.length, start + tag.length);
-    });
+    editorRef.current?.insertVariable(tag);
+  }
+
+  function handleAiGenerated(result: AiModeloResult) {
+    setTitulo(result.titulo);
+    setCategoria(result.categoria ?? "");
+    setBlocks(result.blocks);
+    setEditorKey((k) => k + 1);
+    setShowAiModal(false);
   }
 
   return (
@@ -131,6 +76,36 @@ export default function ModeloForm({ action, modelo }: Props) {
         </div>
       )}
 
+      {/* AI generation */}
+      {!modelo && (
+        <div className="flex items-center justify-between rounded-xl border border-dashed border-primary/40 bg-blue-50/50 px-4 py-3">
+          <div>
+            <p className="font-body text-sm font-semibold text-fg">
+              Começar com um exemplo pronto?
+            </p>
+            <p className="font-body text-xs text-muted mt-0.5">
+              Envie um documento ou cole um texto e a IA monta o modelo com a
+              formatação e as variáveis já inseridas
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAiModal(true)}
+            className="flex h-9 flex-shrink-0 items-center gap-1.5 rounded-lg border border-primary bg-white px-4 font-body text-sm font-semibold text-primary transition-colors hover:bg-blue-50 cursor-pointer"
+          >
+            <SparklesIcon className="h-4 w-4" />
+            Gerar com IA
+          </button>
+        </div>
+      )}
+
+      {showAiModal && (
+        <AiModeloImport
+          onGenerated={handleAiGenerated}
+          onClose={() => setShowAiModal(false)}
+        />
+      )}
+
       {/* Basic fields */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -140,7 +115,8 @@ export default function ModeloForm({ action, modelo }: Props) {
           <input
             type="text"
             name="titulo"
-            defaultValue={modelo?.titulo ?? ""}
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
             required
             placeholder="Ex: Procuração Previdenciária"
             className={inputCls}
@@ -151,7 +127,8 @@ export default function ModeloForm({ action, modelo }: Props) {
           <label className={labelCls}>Categoria</label>
           <select
             name="categoria"
-            defaultValue={modelo?.categoria ?? ""}
+            value={categoria ?? ""}
+            onChange={(e) => setCategoria(e.target.value)}
             className={selectCls}
           >
             <option value="">— Sem categoria —</option>
@@ -209,24 +186,32 @@ export default function ModeloForm({ action, modelo }: Props) {
 
       {/* Editor + Variables panel */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Textarea */}
+        {/* Rich text editor */}
         <div className="lg:col-span-2">
           <label className={labelCls}>
             Conteúdo do modelo <span className="text-red-500">*</span>
           </label>
           <p className="font-body text-xs text-muted mb-2">
-            Use duplo &lt;Enter&gt; para parágrafos. Clique nas variáveis ao
-            lado para inserir no cursor.
+            Use a barra de formatação para negrito, cores, títulos, tabelas e
+            caixas destacadas. Clique nas variáveis ao lado para inserir no
+            cursor.
           </p>
-          {/* Hidden input synced with state */}
-          <input type="hidden" name="conteudo" value={conteudo} />
-          <textarea
-            ref={textareaRef}
-            value={conteudo}
-            onChange={(e) => setConteudo(e.target.value)}
-            rows={22}
-            placeholder={`Digite o conteúdo do documento aqui...\n\nUse variáveis como {{nome}}, {{cpf_cnpj}}, {{cidade}} que serão substituídas automaticamente com os dados do cliente ao gerar o PDF.\n\nExemplo:\n\nEu, {{nome}}, portador(a) do CPF/CNPJ {{cpf_cnpj}}, residente em {{endereco_completo}}, venho pelo presente instrumento...`}
-            className="w-full resize-y rounded-lg border border-border bg-white p-4 font-mono text-sm text-fg placeholder:text-slate-400 placeholder:font-body outline-none focus:border-primary focus:ring-2 focus:ring-blue-100 leading-relaxed"
+          {/* Hidden input synced with editor state */}
+          <input
+            type="hidden"
+            name="conteudo_blocks"
+            value={JSON.stringify(blocks)}
+          />
+          <input
+            type="hidden"
+            name="conteudo"
+            value={flattenBlocksToText(blocks)}
+          />
+          <BlockEditor
+            key={editorKey}
+            ref={editorRef}
+            initialBlocks={blocks.length > 0 ? blocks : null}
+            onChange={setBlocks}
           />
         </div>
 

@@ -161,13 +161,14 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 
 ## MODELOS DE DOCUMENTOS (menu: Documentos → Modelos)
 - Documentos padrão do escritório: procurações, contratos, declarações, petições, etc.
-- Botão "Novo Modelo" → formulário com: título, categoria, descrição, conteúdo (editor com variáveis), toggle "Papel timbrado" (adiciona cabeçalho e rodapé do escritório no PDF)
+- Botão "Novo Modelo" → formulário com: título, categoria, descrição, conteúdo (editor de texto rico com barra de formatação: negrito, itálico, sublinhado, cor do texto, alinhamento, títulos, listas, tabelas e caixas destacadas coloridas), toggle "Papel timbrado" (adiciona cabeçalho e rodapé do escritório no PDF)
 - Categorias: Contratos · Procurações · Declarações · Notificações · Petições · Previdenciário · Família · Trabalhista · Outro
 - Variáveis automáticas disponíveis (clique no painel à direita para inserir no cursor):
   • Cliente: {{nome}}, {{cpf_cnpj}}, {{email}}, {{telefone}}, {{data_nascimento}}, {{rg}}, {{estado_civil}}, {{profissao}}, {{nacionalidade}}
   • Responsável: {{responsavel_nome}}, {{responsavel_cpf}}, {{responsavel_rg}}, {{responsavel_telefone}}, {{responsavel_parentesco}}
   • Endereço: {{endereco}}, {{endereco_completo}}, {{bairro}}, {{cidade}}, {{estado}}, {{cep}}
   • Geral: {{data_hoje}}, {{advogado}}
+- Gerar modelo com IA: na tela "Novo Modelo", botão "Gerar com IA" → envia um arquivo de exemplo (PDF ou imagem) ou cola o texto → a IA reconstrói o documento em blocos formatados e já insere as variáveis do cliente no lugar certo, para revisão antes de salvar (Word ainda não é suportado — nesse caso, orientar a colar o texto)
 - Editar modelo: botão "Editar" no card do modelo
 - Excluir modelo: botão de exclusão no card (com confirmação)
 - Para usar com um cliente: aba Documentos do cliente → botão "Gerar Documento" → escolhe o modelo → variáveis preenchidas automaticamente

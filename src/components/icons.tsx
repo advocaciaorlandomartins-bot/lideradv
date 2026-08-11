@@ -533,6 +533,103 @@ export function ListBulletIcon({ className }: IconProps) {
   );
 }
 
+export function BoldIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <path d="M6 4h8a4 4 0 0 1 0 8H6z" />
+      <path d="M6 12h9a4 4 0 0 1 0 8H6z" />
+    </Icon>
+  );
+}
+
+export function ItalicIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <line x1="19" y1="4" x2="10" y2="4" />
+      <line x1="14" y1="20" x2="5" y2="20" />
+      <line x1="15" y1="4" x2="9" y2="20" />
+    </Icon>
+  );
+}
+
+export function UnderlineIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <path d="M6 4v6a6 6 0 0 0 12 0V4" />
+      <line x1="4" y1="20" x2="20" y2="20" />
+    </Icon>
+  );
+}
+
+export function AlignLeftIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="14" y2="12" />
+      <line x1="4" y1="18" x2="17" y2="18" />
+    </Icon>
+  );
+}
+
+export function AlignCenterIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="7" y1="12" x2="17" y2="12" />
+      <line x1="5.5" y1="18" x2="18.5" y2="18" />
+    </Icon>
+  );
+}
+
+export function AlignRightIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="10" y1="12" x2="20" y2="12" />
+      <line x1="7" y1="18" x2="20" y2="18" />
+    </Icon>
+  );
+}
+
+export function AlignJustifyIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+    </Icon>
+  );
+}
+
+export function TableCellsIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="4" width="18" height="16" rx="1.5" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="3" y1="16" x2="21" y2="16" />
+      <line x1="12" y1="4" x2="12" y2="20" />
+    </Icon>
+  );
+}
+
+export function SquareStackIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <rect x="4" y="4" width="16" height="7" rx="1.2" />
+      <path d="M6 15h12" />
+      <path d="M6 19h8" />
+    </Icon>
+  );
+}
+
+export function MinusIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </Icon>
+  );
+}
+
 export function AdjustmentsHorizontalIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

@@ -21,16 +21,45 @@ function getTimbradoPaddingTop(modelo?: string): number {
 /** Keep exported for backward-compat re-exports in pdf-timbrado.tsx */
 export const TIMBRADO_PADDING_TOP = 158;
 
-const FONT_MAP: Record<string, { regular: string; bold: string }> = {
-  Arial: { regular: "Helvetica", bold: "Helvetica-Bold" },
-  Times: { regular: "Times-Roman", bold: "Times-Bold" },
-  Courier: { regular: "Courier", bold: "Courier-Bold" },
-  Helvetica: { regular: "Helvetica", bold: "Helvetica-Bold" },
+interface FontVariants {
+  regular: string;
+  bold: string;
+  italic: string;
+  boldItalic: string;
+}
+
+const FONT_MAP: Record<string, FontVariants> = {
+  Arial: {
+    regular: "Helvetica",
+    bold: "Helvetica-Bold",
+    italic: "Helvetica-Oblique",
+    boldItalic: "Helvetica-BoldOblique",
+  },
+  Times: {
+    regular: "Times-Roman",
+    bold: "Times-Bold",
+    italic: "Times-Italic",
+    boldItalic: "Times-BoldItalic",
+  },
+  Courier: {
+    regular: "Courier",
+    bold: "Courier-Bold",
+    italic: "Courier-Oblique",
+    boldItalic: "Courier-BoldOblique",
+  },
+  Helvetica: {
+    regular: "Helvetica",
+    bold: "Helvetica-Bold",
+    italic: "Helvetica-Oblique",
+    boldItalic: "Helvetica-BoldOblique",
+  },
 };
 
 export interface PdfPageConfig {
   fontRegular: string;
   fontBold: string;
+  fontItalic: string;
+  fontBoldItalic: string;
   fontSize: number;
   lineHeight: number;
   paddingTop: number;
@@ -62,6 +91,8 @@ export function getPdfConfig(
   return {
     fontRegular: fonts.regular,
     fontBold: fonts.bold,
+    fontItalic: fonts.italic,
+    fontBoldItalic: fonts.boldItalic,
     fontSize,
     lineHeight,
     paddingTop,

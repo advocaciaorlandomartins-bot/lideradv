@@ -17,6 +17,9 @@ import type {
   EscritorioMes,
   FluxoMensalItem,
 } from "@/lib/meu-financeiro-db";
+import type { Lancamento } from "@/lib/lancamentos-db";
+import type { EstagioSnapshot } from "@/lib/producao-db";
+import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
 import {
   PlusIcon,
   XMarkIcon,
@@ -31,6 +34,8 @@ import {
   TrendUpIcon,
   TrendDownIcon,
   CheckCircleIcon,
+  ScalesIcon,
+  ClockIcon,
 } from "@/components/icons";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -220,6 +225,11 @@ interface Props {
   processosHonorarios: ProcessoHonorario[];
   escritorioMes: EscritorioMes;
   fluxoEscritorio: FluxoMensalItem[];
+  aguardandoResultado: Lancamento[];
+  aguardandoResultadoTotal: number;
+  fluxoHonorarios: FluxoMensalItem[];
+  processosAtivosCount: number;
+  estagioSnapshot: EstagioSnapshot;
 }
 
 type FiltroTipo = "todos" | "receita" | "despesa";
@@ -230,6 +240,11 @@ export default function MeuFinanceiroContent({
   processosHonorarios,
   escritorioMes,
   fluxoEscritorio,
+  aguardandoResultado,
+  aguardandoResultadoTotal,
+  fluxoHonorarios,
+  processosAtivosCount,
+  estagioSnapshot,
 }: Props) {
   const hoje = new Date();
   const mesHojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
@@ -331,6 +346,8 @@ export default function MeuFinanceiroContent({
         .reduce((s, l) => s + l.valor, 0);
       const aReceberEscritorio =
         fluxoEscritorio.find((f) => f.mesISO === iso)?.entradas ?? 0;
+      const aReceberHonorarios =
+        fluxoHonorarios.find((f) => f.mesISO === iso)?.entradas ?? 0;
       const aPagar = lancamentos
         .filter(
           (l) =>
@@ -339,7 +356,8 @@ export default function MeuFinanceiroContent({
             l.data.startsWith(iso)
         )
         .reduce((s, l) => s + l.valor, 0);
-      const aReceber = aReceberPessoal + aReceberEscritorio;
+      const aReceber =
+        aReceberPessoal + aReceberEscritorio + aReceberHonorarios;
       return {
         label: `${MESES_CURTO[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`,
         isAtual: i === 0,
@@ -348,7 +366,7 @@ export default function MeuFinanceiroContent({
         saldo: aReceber - aPagar,
       };
     });
-  }, [lancamentos, fluxoEscritorio, mesHojeISO]);
+  }, [lancamentos, fluxoEscritorio, fluxoHonorarios, mesHojeISO]);
 
   const categoriasData = useMemo(() => {
     const map = new Map<string, number>();
@@ -587,7 +605,14 @@ export default function MeuFinanceiroContent({
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <KpiCard
+          label="Processos ativos"
+          sub="Onde sou responsável"
+          value={String(processosAtivosCount)}
+          color="blue"
+          icon={ScalesIcon}
+        />
         <KpiCard
           label="Escritório"
           sub="Honorários estimados"
@@ -831,10 +856,157 @@ export default function MeuFinanceiroContent({
               )}
             </div>
 
+            {/* Aguardando resultado do processo */}
+            <div>
+              <h4 className="mb-3 flex items-center gap-2 font-heading text-xs font-semibold uppercase tracking-wide text-amber-700">
+                <ClockIcon className="h-3.5 w-3.5" />
+                Aguardando resultado do processo
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-body text-[10px] font-semibold text-amber-700">
+                  {aguardandoResultado.length}
+                </span>
+              </h4>
+              <p className="mb-3 font-body text-xs text-muted">
+                Honorários de processos onde você é responsável, ainda sem
+                resultado definido — por isso não têm data de pagamento.
+              </p>
+              {aguardandoResultado.length === 0 ? (
+                <p className="py-4 text-center font-body text-sm text-muted">
+                  Nenhum lançamento aguardando resultado de processo.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {aguardandoResultado.map((l) => (
+                    <div
+                      key={l.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-body text-sm font-semibold text-fg">
+                          {l.descricao}
+                        </p>
+                        <p className="font-body text-xs text-muted">
+                          {l.client_name ?? "—"}
+                          {l.processo_tipo ? ` · ${l.processo_tipo}` : ""}
+                        </p>
+                      </div>
+                      <span className="flex-shrink-0 font-heading text-sm font-bold tabular-nums text-amber-700">
+                        {fmt(l.valor)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between rounded-lg bg-amber-100/60 px-3 py-2">
+                    <span className="font-body text-xs font-semibold text-amber-800">
+                      Total aguardando resultado
+                    </span>
+                    <span className="font-heading text-sm font-bold tabular-nums text-amber-800">
+                      {fmt(aguardandoResultadoTotal)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Honorários de clientes com vencimento previsto */}
+            <div>
+              <h4 className="mb-3 font-heading text-xs font-semibold uppercase tracking-wide text-amber-700">
+                Honorários de clientes previstos — próximos 12 meses
+              </h4>
+              {fluxoHonorarios.every((f) => f.entradas === 0) ? (
+                <p className="py-4 text-center font-body text-sm text-muted">
+                  Nenhum honorário com vencimento definido nos próximos meses.
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {fluxoHonorarios.map((f) => {
+                    const isCurrent =
+                      f.mesISO ===
+                      `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+                    return (
+                      <div
+                        key={f.mesISO}
+                        className={`flex flex-col items-center rounded-lg border px-2 py-3 transition-colors ${
+                          isCurrent
+                            ? "border-amber-300 bg-amber-100/60"
+                            : "border-amber-100 bg-white"
+                        }`}
+                      >
+                        <span
+                          className={`font-body text-[10px] font-semibold uppercase ${isCurrent ? "text-amber-600" : "text-amber-400"}`}
+                        >
+                          {f.mes}
+                          {isCurrent && (
+                            <span className="ml-1 rounded-full bg-amber-500 px-1 py-0.5 text-[9px] text-white">
+                              atual
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={`mt-1 font-heading text-sm font-bold tabular-nums ${f.entradas > 0 ? "text-amber-700" : "text-slate-300"}`}
+                        >
+                          {f.entradas > 0 ? fmt(f.entradas) : "–"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Meus processos por estágio */}
+            <div>
+              <h4 className="mb-3 font-heading text-xs font-semibold uppercase tracking-wide text-blue-700">
+                Meus processos por estágio
+              </h4>
+              {estagioSnapshot.porEstagio.length === 0 ? (
+                <p className="py-4 text-center font-body text-sm text-muted">
+                  Nenhum processo ativo no momento.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {estagioSnapshot.porEstagio.map((e) => {
+                      const meta = ESTAGIO_PRODUCAO_META[e.estagio];
+                      return (
+                        <span
+                          key={e.estagio}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-xs font-semibold ${meta.bg} ${meta.border} ${meta.color}`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${meta.dot}`}
+                          />
+                          {meta.label}: {e.count}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-4 font-body text-xs text-muted">
+                    <span>
+                      Com resultado administrativo:{" "}
+                      <strong className="text-fg">
+                        {estagioSnapshot.comAdministrativo}
+                      </strong>
+                    </span>
+                    <span>
+                      Com resultado judicial:{" "}
+                      <strong className="text-fg">
+                        {estagioSnapshot.comJudicial}
+                      </strong>
+                    </span>
+                    <span>
+                      Com os dois:{" "}
+                      <strong className="text-fg">
+                        {estagioSnapshot.comAmbos}
+                      </strong>
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Previsão mensal de entradas */}
             <div>
               <h4 className="mb-3 font-heading text-xs font-semibold uppercase tracking-wide text-blue-700">
-                Minhas remunerações previstas — próximos 6 meses
+                Minhas remunerações previstas — próximos 12 meses
               </h4>
               {fluxoEscritorio.every((f) => f.entradas === 0) ? (
                 <p className="py-4 text-center font-body text-sm text-muted">

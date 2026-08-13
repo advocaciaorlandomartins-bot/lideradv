@@ -33,6 +33,11 @@ export default async function MeuFinanceiroPage() {
         processosHonorarios={dados.processosHonorarios}
         escritorioMes={dados.escritorioMes}
         fluxoEscritorio={dados.fluxoEscritorio}
+        aguardandoResultado={dados.aguardandoResultado}
+        aguardandoResultadoTotal={dados.aguardandoResultadoTotal}
+        fluxoHonorarios={dados.fluxoHonorarios}
+        processosAtivosCount={dados.processosAtivosCount}
+        estagioSnapshot={dados.estagioSnapshot}
       />
     </div>
   );

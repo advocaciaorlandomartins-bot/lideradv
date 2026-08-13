@@ -105,4 +105,6 @@ export interface ProcessoProducao {
   dias_no_estagio: number;
   created_at_formatted: string;
   tarefas_pendentes: number;
+  responsavel_id: string | null;
+  responsavel_nome: string | null;
 }

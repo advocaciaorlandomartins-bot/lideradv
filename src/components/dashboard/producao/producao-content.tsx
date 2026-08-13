@@ -185,6 +185,9 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
               {processo.numero}
             </p>
           )}
+          <p className="truncate font-body text-[11px] text-muted">
+            Resp.: {processo.responsavel_nome ?? "Sem responsável"}
+          </p>
         </div>
         <DiasBadge dias={processo.dias_no_estagio} />
       </div>
@@ -636,6 +639,20 @@ export default function ProducaoContent({
     null
   );
   const [search, setSearch] = useState("");
+  const [filterResponsavel, setFilterResponsavel] = useState<string | null>(
+    null
+  );
+
+  const responsaveis = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of processos) {
+      if (p.responsavel_id && p.responsavel_nome)
+        map.set(p.responsavel_id, p.responsavel_nome);
+    }
+    return Array.from(map.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [processos]);
 
   function handleStatsFilter(estagio: EstagioProducao) {
     if (estagio === "arquivado") {
@@ -653,14 +670,32 @@ export default function ProducaoContent({
 
   const processosFiltrados = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return processos;
-    return processos.filter(
-      (p) =>
-        p.client_name.toLowerCase().includes(q) ||
-        p.tipo_acao.toLowerCase().includes(q) ||
-        (p.numero ?? "").toLowerCase().includes(q)
-    );
-  }, [processos, search]);
+    return processos.filter((p) => {
+      if (
+        q &&
+        !p.client_name.toLowerCase().includes(q) &&
+        !p.tipo_acao.toLowerCase().includes(q) &&
+        !(p.numero ?? "").toLowerCase().includes(q)
+      )
+        return false;
+      if (filterResponsavel && p.responsavel_id !== filterResponsavel)
+        return false;
+      return true;
+    });
+  }, [processos, search, filterResponsavel]);
+
+  // Contagem por responsável (processos ativos, sem contar arquivados) — usada
+  // na faixa de resumo para o admin ver a carga de cada colaborador de relance.
+  const contagemPorResponsavel = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of processos) {
+      if (!p.responsavel_id || p.estagio_producao === "arquivado") continue;
+      map.set(p.responsavel_id, (map.get(p.responsavel_id) ?? 0) + 1);
+    }
+    return responsaveis
+      .map((r) => ({ ...r, count: map.get(r.id) ?? 0 }))
+      .filter((r) => r.count > 0);
+  }, [processos, responsaveis]);
 
   const byEstagio = Object.fromEntries(
     ESTAGIOS_PRODUCAO.map((e) => [
@@ -694,6 +729,20 @@ export default function ProducaoContent({
             className="h-9 w-full rounded-lg border border-border bg-white pl-9 pr-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
           />
         </div>
+        {responsaveis.length > 0 && (
+          <select
+            value={filterResponsavel ?? ""}
+            onChange={(e) => setFilterResponsavel(e.target.value || null)}
+            className="h-9 cursor-pointer rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none focus:border-primary"
+          >
+            <option value="">Todos os responsáveis</option>
+            {responsaveis.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.nome}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="ml-auto flex items-center gap-2">
           {filterEstagio && (
             <button
@@ -719,6 +768,26 @@ export default function ProducaoContent({
           </button>
         </div>
       </div>
+
+      {!filterResponsavel && contagemPorResponsavel.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+            Por responsável:
+          </span>
+          {contagemPorResponsavel.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => setFilterResponsavel(r.id)}
+              className="flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 font-body text-xs font-semibold text-fg transition-colors hover:border-primary hover:text-primary cursor-pointer"
+            >
+              {r.nome}
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-muted">
+                {r.count}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="overflow-x-auto pb-4">
         <div className="flex gap-3" style={{ minWidth: "max-content" }}>

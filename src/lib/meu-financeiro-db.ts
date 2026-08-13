@@ -1,4 +1,9 @@
 import sql from "./db";
+import { mapRow as mapLancamentoRow, type Lancamento } from "./lancamentos-db";
+import {
+  getEstagioSnapshotByResponsavel,
+  type EstagioSnapshot,
+} from "./producao-db";
 
 export interface LancamentoPessoal {
   id: string;
@@ -43,6 +48,13 @@ export interface MeuFinanceiroInitial {
   processosHonorarios: ProcessoHonorario[];
   escritorioMes: EscritorioMes;
   fluxoEscritorio: FluxoMensalItem[];
+  /** Lançamentos reais (tabela lancamentos) do escritório aguardando resultado do processo — sem data definida. */
+  aguardandoResultado: Lancamento[];
+  aguardandoResultadoTotal: number;
+  /** Lançamentos reais pendentes com vencimento definido, por mês — alimenta a projeção junto com a remuneração. */
+  fluxoHonorarios: FluxoMensalItem[];
+  processosAtivosCount: number;
+  estagioSnapshot: EstagioSnapshot;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,21 +100,29 @@ export async function getMeuFinanceiroInitial(
   `;
   const colaboradorId = userRow?.colaborador_id ?? null;
 
-  const [lancamentosRows, processosRows, remuneracaoKpiRows, fluxoRows] =
-    await Promise.all([
-      // Lançamentos pessoais do usuário
-      sql`
+  const [
+    lancamentosRows,
+    processosRows,
+    remuneracaoKpiRows,
+    fluxoRows,
+    aguardandoResultadoRows,
+    fluxoHonorariosRows,
+    processosAtivosRows,
+    estagioSnapshot,
+  ] = await Promise.all([
+    // Lançamentos pessoais do usuário
+    sql`
         SELECT id::text, tipo, categoria, descricao, valor,
                data::text, status, recorrente, periodicidade, created_at::text
         FROM meu_financeiro_lancamentos
         WHERE usuario_id = ${userId}::uuid
         ORDER BY data DESC, created_at DESC
       `,
-      // Processos com honorários:
-      // • se tem colaborador_id: apenas processos onde é responsável
-      // • se não tem (admin solo): todos os processos ativos com honorário
-      colaboradorId
-        ? sql`
+    // Processos com honorários:
+    // • se tem colaborador_id: apenas processos onde é responsável
+    // • se não tem (admin solo): todos os processos ativos com honorário
+    colaboradorId
+      ? sql`
             SELECT
               p.id::text,
               p.tipo_acao,
@@ -125,7 +145,7 @@ export async function getMeuFinanceiroInitial(
               COALESCE(p.valor_honorario, p.valor_causa * p.percentual_honorario / 100) DESC NULLS LAST
             LIMIT 50
           `
-        : sql`
+      : sql`
             SELECT
               p.id::text,
               p.tipo_acao,
@@ -147,9 +167,9 @@ export async function getMeuFinanceiroInitial(
               COALESCE(p.valor_honorario, p.valor_causa * p.percentual_honorario / 100) DESC NULLS LAST
             LIMIT 50
           `,
-      // Remunerações: apenas se tiver colaborador_id vinculado
-      colaboradorId
-        ? sql`
+    // Remunerações: apenas se tiver colaborador_id vinculado
+    colaboradorId
+      ? sql`
             SELECT
               COALESCE(SUM(r.valor) FILTER (
                 WHERE r.status = 'pago'
@@ -165,10 +185,10 @@ export async function getMeuFinanceiroInitial(
             FROM remuneracoes r
             WHERE r.colaborador_id = ${colaboradorId}::uuid
           `
-        : sql`SELECT 0 AS recebido_mes, 0 AS a_receber_mes, 0 AS total_pendente`,
-      // Previsão de remunerações — apenas se tiver colaborador_id
-      colaboradorId
-        ? sql`
+      : sql`SELECT 0 AS recebido_mes, 0 AS a_receber_mes, 0 AS total_pendente`,
+    // Previsão de remunerações — apenas se tiver colaborador_id
+    colaboradorId
+      ? sql`
             SELECT
               to_char(date_trunc('month', r.competencia), 'YYYY-MM') AS mes_iso,
               COALESCE(SUM(r.valor), 0) AS entradas
@@ -176,12 +196,92 @@ export async function getMeuFinanceiroInitial(
             WHERE r.colaborador_id = ${colaboradorId}::uuid
               AND r.status = 'pendente'
               AND r.competencia >= date_trunc('month', CURRENT_DATE)
-              AND r.competencia <  date_trunc('month', CURRENT_DATE) + INTERVAL '6 months'
+              AND r.competencia <  date_trunc('month', CURRENT_DATE) + INTERVAL '12 months'
             GROUP BY 1
             ORDER BY 1
           `
-        : sql`SELECT NULL AS mes_iso, 0 AS entradas WHERE false`,
-    ]);
+      : sql`SELECT NULL AS mes_iso, 0 AS entradas WHERE false`,
+    // Lançamentos reais aguardando resultado do processo (sem data definida)
+    colaboradorId
+      ? sql`
+            SELECT
+              l.id::text, l.tipo, l.categoria, l.descricao, l.valor,
+              l.client_id::text, c.name AS client_name,
+              l.processo_id::text, p.tipo_acao AS processo_tipo,
+              l.remuneracao_id::text, l.status,
+              to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
+              to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento,
+              l.parcela_atual, l.total_parcelas, l.grupo_parcelas::text,
+              l.observacoes, l.created_at
+            FROM lancamentos l
+            INNER JOIN processos p ON p.id = l.processo_id
+            LEFT JOIN clients c ON c.id = l.client_id
+            WHERE p.responsavel_id = ${colaboradorId}::uuid
+              AND l.status = 'aguardando_resultado'
+            ORDER BY l.valor DESC
+          `
+      : sql`
+            SELECT
+              l.id::text, l.tipo, l.categoria, l.descricao, l.valor,
+              l.client_id::text, c.name AS client_name,
+              l.processo_id::text, p.tipo_acao AS processo_tipo,
+              l.remuneracao_id::text, l.status,
+              to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
+              to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento,
+              l.parcela_atual, l.total_parcelas, l.grupo_parcelas::text,
+              l.observacoes, l.created_at
+            FROM lancamentos l
+            LEFT JOIN processos p ON p.id = l.processo_id
+            LEFT JOIN clients c ON c.id = l.client_id
+            WHERE l.status = 'aguardando_resultado'
+            ORDER BY l.valor DESC
+          `,
+    // Lançamentos reais pendentes com vencimento definido, por mês (12 meses)
+    colaboradorId
+      ? sql`
+            SELECT
+              to_char(date_trunc('month', l.data_vencimento), 'YYYY-MM') AS mes_iso,
+              COALESCE(SUM(l.valor), 0) AS entradas
+            FROM lancamentos l
+            INNER JOIN processos p ON p.id = l.processo_id
+            WHERE p.responsavel_id = ${colaboradorId}::uuid
+              AND l.status = 'pendente'
+              AND l.tipo = 'entrada'
+              AND l.data_vencimento >= date_trunc('month', CURRENT_DATE)
+              AND l.data_vencimento <  date_trunc('month', CURRENT_DATE) + INTERVAL '12 months'
+            GROUP BY 1
+            ORDER BY 1
+          `
+      : sql`
+            SELECT
+              to_char(date_trunc('month', l.data_vencimento), 'YYYY-MM') AS mes_iso,
+              COALESCE(SUM(l.valor), 0) AS entradas
+            FROM lancamentos l
+            WHERE l.status = 'pendente'
+              AND l.tipo = 'entrada'
+              AND l.data_vencimento >= date_trunc('month', CURRENT_DATE)
+              AND l.data_vencimento <  date_trunc('month', CURRENT_DATE) + INTERVAL '12 months'
+            GROUP BY 1
+            ORDER BY 1
+          `,
+    // Contagem de processos ativos como responsável (status ativo/em_andamento)
+    colaboradorId
+      ? sql`
+            SELECT COUNT(*)::int AS total
+            FROM processos
+            WHERE responsavel_id = ${colaboradorId}::uuid
+              AND status IN ('ativo', 'em_andamento')
+              AND deleted_at IS NULL
+          `
+      : sql`
+            SELECT COUNT(*)::int AS total
+            FROM processos
+            WHERE status IN ('ativo', 'em_andamento')
+              AND deleted_at IS NULL
+          `,
+    // Snapshot de processos por estágio (administrativo/judicial/produção/análise)
+    getEstagioSnapshotByResponsavel(colaboradorId),
+  ]);
 
   // Processos com honorário estimado (apenas do responsável)
   const processosHonorarios: ProcessoHonorario[] = processosRows.map((r) => {
@@ -217,27 +317,41 @@ export async function getMeuFinanceiroInitial(
     totalAReceber: Number(kr?.total_pendente ?? 0),
   };
 
-  // Preenche todos os 6 meses mesmo sem remunerações agendadas
-  const fluxoMap = new Map<string, number>();
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(agora.getFullYear(), agora.getMonth() + i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    fluxoMap.set(key, 0);
-  }
-  for (const r of fluxoRows) {
-    const iso = String(r.mes_iso);
-    if (fluxoMap.has(iso)) fluxoMap.set(iso, Number(r.entradas));
-  }
-  const fluxoEscritorio: FluxoMensalItem[] = Array.from(fluxoMap.entries()).map(
-    ([iso, entradas]) => {
+  function buildFluxo(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rows: readonly Record<string, any>[]
+  ): FluxoMensalItem[] {
+    // Preenche todos os 12 meses mesmo sem lançamentos/remunerações agendadas
+    const map = new Map<string, number>();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(agora.getFullYear(), agora.getMonth() + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      map.set(key, 0);
+    }
+    for (const r of rows) {
+      const iso = String(r.mes_iso);
+      if (map.has(iso)) map.set(iso, Number(r.entradas));
+    }
+    return Array.from(map.entries()).map(([iso, entradas]) => {
       const [y, m] = iso.split("-");
       return {
         mesISO: iso,
         mes: `${MESES_CURTO_DB[Number(m) - 1]}/${y.slice(2)}`,
         entradas,
       };
-    }
+    });
+  }
+
+  const fluxoEscritorio = buildFluxo(fluxoRows);
+  const fluxoHonorarios = buildFluxo(fluxoHonorariosRows);
+
+  const aguardandoResultado: Lancamento[] =
+    aguardandoResultadoRows.map(mapLancamentoRow);
+  const aguardandoResultadoTotal = aguardandoResultado.reduce(
+    (s, l) => s + l.valor,
+    0
   );
+  const processosAtivosCount = Number(processosAtivosRows[0]?.total ?? 0);
 
   return {
     lancamentos: lancamentosRows.map(mapLancamento),
@@ -245,6 +359,11 @@ export async function getMeuFinanceiroInitial(
     processosHonorarios,
     escritorioMes,
     fluxoEscritorio,
+    aguardandoResultado,
+    aguardandoResultadoTotal,
+    fluxoHonorarios,
+    processosAtivosCount,
+    estagioSnapshot,
   };
 }
 

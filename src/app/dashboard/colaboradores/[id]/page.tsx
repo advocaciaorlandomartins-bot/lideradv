@@ -10,6 +10,8 @@ import { getColaboradorContaPagar } from "@/lib/remuneracoes-db";
 import { cargoColor, cargoLabel } from "@/lib/colaboradores-types";
 import DeleteColaboradorButton from "@/components/dashboard/colaboradores/delete-colaborador-button";
 import ColaboradorRemuneracoes from "@/components/dashboard/colaboradores/colaborador-remuneracoes";
+import { getEstagioSnapshotByResponsavel } from "@/lib/producao-db";
+import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
 import {
   ChevronRightIcon,
   UserPlusIcon,
@@ -38,9 +40,10 @@ export default async function ColaboradorDetailPage({
   if (!session || !hasPermission(session, "colaboradores", "ver")) notFound();
 
   const { id } = await params;
-  const [colaborador, conta] = await Promise.all([
+  const [colaborador, conta, estagioSnapshot] = await Promise.all([
     getColaboradorFull(id),
     getColaboradorContaPagar(id),
+    getEstagioSnapshotByResponsavel(id),
   ]);
   if (!colaborador) notFound();
 
@@ -179,6 +182,58 @@ export default async function ColaboradorDetailPage({
           </p>
         </div>
       )}
+
+      {/* Processos ativos por estágio */}
+      <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+        <h2 className="font-heading text-base font-semibold text-fg mb-1">
+          Processos ativos por estágio
+        </h2>
+        <p className="mb-4 font-body text-xs text-muted">
+          Onde {colaborador.nome.split(" ")[0]} é responsável — útil na hora de
+          conferir o que já foi feito (administrativo/judicial) e o que está
+          pendente antes de calcular pagamento.
+        </p>
+        {estagioSnapshot.porEstagio.length === 0 ? (
+          <p className="py-4 text-center font-body text-sm text-muted">
+            Nenhum processo ativo no momento.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {estagioSnapshot.porEstagio.map((e) => {
+                const meta = ESTAGIO_PRODUCAO_META[e.estagio];
+                return (
+                  <span
+                    key={e.estagio}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-xs font-semibold ${meta.bg} ${meta.border} ${meta.color}`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+                    {meta.label}: {e.count}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-4 font-body text-xs text-muted">
+              <span>
+                Com resultado administrativo:{" "}
+                <strong className="text-fg">
+                  {estagioSnapshot.comAdministrativo}
+                </strong>
+              </span>
+              <span>
+                Com resultado judicial:{" "}
+                <strong className="text-fg">
+                  {estagioSnapshot.comJudicial}
+                </strong>
+              </span>
+              <span>
+                Com os dois:{" "}
+                <strong className="text-fg">{estagioSnapshot.comAmbos}</strong>
+              </span>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Remunerações */}
       <ColaboradorRemuneracoes colaboradorId={colaborador.id} conta={conta} />

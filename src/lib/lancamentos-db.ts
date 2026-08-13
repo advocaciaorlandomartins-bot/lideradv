@@ -22,7 +22,7 @@ export interface Lancamento {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapRow(r: any): Lancamento {
+export function mapRow(r: any): Lancamento {
   return {
     id: r.id,
     tipo: r.tipo as "entrada" | "saida",

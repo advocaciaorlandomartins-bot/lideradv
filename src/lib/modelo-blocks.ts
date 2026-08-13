@@ -6,12 +6,20 @@
  * (Tiptap), pelo renderer de PDF e pela geração de modelo via IA.
  */
 
+export type FontFamily = "Times" | "Arial" | "Courier";
+
+const FONT_FAMILIES: FontFamily[] = ["Times", "Arial", "Courier"];
+
 export interface TextSpan {
   text: string;
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
   color?: string;
+  /** Cor de destaque atrás do texto (marca-texto). */
+  highlight?: string;
+  /** Família tipográfica do trecho — se ausente, usa a fonte padrão do escritório. */
+  font?: FontFamily;
 }
 
 export type Align = "left" | "center" | "right" | "justify";
@@ -46,6 +54,9 @@ function isTextSpan(v: unknown): v is TextSpan {
   if (s.underline !== undefined && typeof s.underline !== "boolean")
     return false;
   if (s.color !== undefined && !isValidHexColor(s.color)) return false;
+  if (s.highlight !== undefined && !isValidHexColor(s.highlight)) return false;
+  if (s.font !== undefined && !FONT_FAMILIES.includes(s.font as FontFamily))
+    return false;
   return true;
 }
 

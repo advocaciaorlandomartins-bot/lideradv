@@ -21,7 +21,7 @@ function getTimbradoPaddingTop(modelo?: string): number {
 /** Keep exported for backward-compat re-exports in pdf-timbrado.tsx */
 export const TIMBRADO_PADDING_TOP = 158;
 
-interface FontVariants {
+export interface FontVariants {
   regular: string;
   bold: string;
   italic: string;
@@ -54,6 +54,11 @@ const FONT_MAP: Record<string, FontVariants> = {
     boldItalic: "Helvetica-BoldOblique",
   },
 };
+
+/** Nomes de fonte PDFKit para uma família — usado para fontes por trecho (span) nos modelos. */
+export function getFontVariants(fontKey?: string): FontVariants {
+  return FONT_MAP[fontKey ?? "Times"] ?? FONT_MAP.Times;
+}
 
 export interface PdfPageConfig {
   fontRegular: string;

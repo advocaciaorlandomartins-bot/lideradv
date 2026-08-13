@@ -51,7 +51,9 @@ export const Callout = Node.create({
           { style: `font-weight: 700; color: ${color}; margin-bottom: 4px;` },
           title,
         ],
-        0,
+        // O "content hole" (0) precisa ser o único filho do seu pai direto —
+        // por isso fica isolado num wrapper próprio, ao lado do título.
+        ["div", {}, 0],
       ];
     }
     return ["div", wrapper, 0];

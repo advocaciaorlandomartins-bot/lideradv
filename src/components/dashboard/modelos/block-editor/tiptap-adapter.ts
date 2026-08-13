@@ -4,10 +4,11 @@
  * gravado no banco diretamente, só passa por aqui.
  */
 import type { JSONContent } from "@tiptap/core";
-import type { Align, Block, TextSpan } from "@/lib/modelo-blocks";
+import type { Align, Block, FontFamily, TextSpan } from "@/lib/modelo-blocks";
 import { isValidHexColor } from "@/lib/modelo-blocks";
 
 const ALIGNS: Align[] = ["left", "center", "right", "justify"];
+const FONT_FAMILIES: FontFamily[] = ["Times", "Arial", "Courier"];
 
 function alignFromAttrs(attrs?: Record<string, unknown>): Align | undefined {
   const a = attrs?.textAlign;
@@ -30,11 +31,21 @@ function inlineContentToSpans(content?: JSONContent[]): TextSpan[] {
         if (mark.type === "bold") span.bold = true;
         else if (mark.type === "italic") span.italic = true;
         else if (mark.type === "underline") span.underline = true;
-        else if (
-          mark.type === "textStyle" &&
+        else if (mark.type === "textStyle") {
+          if (isValidHexColor(mark.attrs?.color))
+            span.color = mark.attrs!.color as string;
+          const family = mark.attrs?.fontFamily;
+          if (
+            typeof family === "string" &&
+            FONT_FAMILIES.includes(family as FontFamily)
+          )
+            span.font = family as FontFamily;
+        } else if (
+          mark.type === "highlight" &&
           isValidHexColor(mark.attrs?.color)
-        )
-          span.color = mark.attrs!.color as string;
+        ) {
+          span.highlight = mark.attrs!.color as string;
+        }
       }
       spans.push(span);
     } else if (node.type === "hardBreak") {
@@ -44,17 +55,26 @@ function inlineContentToSpans(content?: JSONContent[]): TextSpan[] {
   return spans;
 }
 
-type TiptapMarkOut = NonNullable<JSONContent["marks"]>[number];
-
 function spansToInlineContent(spans: TextSpan[]): JSONContent[] {
   return spans
     .filter((s) => s.text.length > 0)
     .map((s) => {
-      const marks: TiptapMarkOut[] = [];
+      const marks: NonNullable<JSONContent["marks"]> = [];
       if (s.bold) marks.push({ type: "bold" });
       if (s.italic) marks.push({ type: "italic" });
       if (s.underline) marks.push({ type: "underline" });
-      if (s.color) marks.push({ type: "textStyle", attrs: { color: s.color } });
+      if (s.color || s.font) {
+        marks.push({
+          type: "textStyle",
+          attrs: {
+            ...(s.color ? { color: s.color } : {}),
+            ...(s.font ? { fontFamily: s.font } : {}),
+          },
+        });
+      }
+      if (s.highlight) {
+        marks.push({ type: "highlight", attrs: { color: s.highlight } });
+      }
       return {
         type: "text",
         text: s.text,

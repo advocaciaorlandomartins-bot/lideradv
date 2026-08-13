@@ -601,6 +601,35 @@ export function AlignJustifyIcon({ className }: IconProps) {
   );
 }
 
+export function OrderedListIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={1.6}>
+      <line x1="9" y1="6" x2="21" y2="6" />
+      <line x1="9" y1="12" x2="21" y2="12" />
+      <line x1="9" y1="18" x2="21" y2="18" />
+      <text x="2" y="8.5" fontSize="6" fill="currentColor" stroke="none">
+        1
+      </text>
+      <text x="2" y="14.5" fontSize="6" fill="currentColor" stroke="none">
+        2
+      </text>
+      <text x="2" y="20.5" fontSize="6" fill="currentColor" stroke="none">
+        3
+      </text>
+    </Icon>
+  );
+}
+
+export function HighlighterIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={1.6}>
+      <path d="M9.5 17.5 3 21l3.5-6.5" />
+      <path d="M6.5 14.5 15 6a2.1 2.1 0 0 1 3 3l-8.5 8.5Z" />
+      <path d="M13 4 20 11" />
+    </Icon>
+  );
+}
+
 export function TableCellsIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

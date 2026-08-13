@@ -7,15 +7,27 @@
 import { Text, View } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 import type { Block, TextSpan } from "./modelo-blocks";
-import type { PdfPageConfig, buildStyles } from "./pdf-config";
+import {
+  getFontVariants,
+  type PdfPageConfig,
+  type buildStyles,
+} from "./pdf-config";
 
 type Styles = ReturnType<typeof buildStyles>;
 
 function spanFontFamily(cfg: PdfPageConfig, span: TextSpan): string {
-  if (span.bold && span.italic) return cfg.fontBoldItalic;
-  if (span.bold) return cfg.fontBold;
-  if (span.italic) return cfg.fontItalic;
-  return cfg.fontRegular;
+  const variants = span.font
+    ? getFontVariants(span.font)
+    : {
+        regular: cfg.fontRegular,
+        bold: cfg.fontBold,
+        italic: cfg.fontItalic,
+        boldItalic: cfg.fontBoldItalic,
+      };
+  if (span.bold && span.italic) return variants.boldItalic;
+  if (span.bold) return variants.bold;
+  if (span.italic) return variants.italic;
+  return variants.regular;
 }
 
 function renderSpans(
@@ -32,6 +44,7 @@ function renderSpans(
         fontSize,
         textDecoration: span.underline ? ("underline" as const) : undefined,
         color: span.color ?? baseColor ?? "#1a1a1a",
+        ...(span.highlight ? { backgroundColor: span.highlight } : {}),
       }}
     >
       {span.text}

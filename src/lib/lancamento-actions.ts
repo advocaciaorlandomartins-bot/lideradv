@@ -445,7 +445,7 @@ export async function createLancamentoAction(
     if (tipo === "entrada" && clientId && status === "pendente") {
       try {
         const clienteRows = await sql`
-          SELECT name, phone, responsavel_nome, responsavel_telefone
+          SELECT name, phone, menor_incapaz, responsavel_nome, responsavel_telefone
           FROM clients WHERE id = ${clientId}::uuid LIMIT 1
         `;
         if (
@@ -456,8 +456,11 @@ export async function createLancamentoAction(
           const telefone = clienteRows[0].phone
             ? String(clienteRows[0].phone)
             : null;
-          // Responsável legal tem prioridade (menor/incapaz)
+          // Responsável legal só tem prioridade quando o cliente é
+          // efetivamente menor/incapaz — clientes adultos com contato de
+          // emergência cadastrado continuam recebendo no próprio telefone.
           const responsavel =
+            clienteRows[0].menor_incapaz &&
             clienteRows[0].responsavel_nome &&
             clienteRows[0].responsavel_telefone
               ? {
@@ -776,7 +779,7 @@ export async function markAsPagoAction(id: string): Promise<void> {
     if (lan?.client_id && lan.tipo === "entrada") {
       await cancelarLembretesLancamento(id).catch(() => null);
       const clienteRows = await sql`
-        SELECT name, phone, responsavel_nome, responsavel_telefone
+        SELECT name, phone, menor_incapaz, responsavel_nome, responsavel_telefone
         FROM clients WHERE id = ${lan.client_id}::uuid LIMIT 1
       `.catch(() => []);
       if (clienteRows.length > 0) {
@@ -789,7 +792,9 @@ export async function markAsPagoAction(id: string): Promise<void> {
         `.catch(() => []);
         const saldo = Number(pendentesRows[0]?.total ?? 0);
         const respLegal =
-          clienteRows[0].responsavel_nome && clienteRows[0].responsavel_telefone
+          clienteRows[0].menor_incapaz &&
+          clienteRows[0].responsavel_nome &&
+          clienteRows[0].responsavel_telefone
             ? {
                 nome: String(clienteRows[0].responsavel_nome),
                 telefone: String(clienteRows[0].responsavel_telefone),
@@ -861,7 +866,7 @@ export async function markMultiplePagoAction(ids: string[]): Promise<void> {
 
     for (const [clientId, totalValor] of byClient) {
       const cr = await sql`
-        SELECT name, phone, responsavel_nome, responsavel_telefone
+        SELECT name, phone, menor_incapaz, responsavel_nome, responsavel_telefone
         FROM clients WHERE id = ${clientId}::uuid LIMIT 1
       `.catch(() => []);
       if (!cr.length) continue;
@@ -873,7 +878,9 @@ export async function markMultiplePagoAction(ids: string[]): Promise<void> {
       `.catch(() => []);
       const saldo = Number(pr[0]?.total ?? 0);
       const respLegal =
-        cr[0].responsavel_nome && cr[0].responsavel_telefone
+        cr[0].menor_incapaz &&
+        cr[0].responsavel_nome &&
+        cr[0].responsavel_telefone
           ? {
               nome: String(cr[0].responsavel_nome),
               telefone: String(cr[0].responsavel_telefone),
@@ -976,7 +983,7 @@ export async function pagamentoParcialAction(opts: {
     }
 
     const cr = await sql`
-      SELECT name, phone, responsavel_nome, responsavel_telefone
+      SELECT name, phone, menor_incapaz, responsavel_nome, responsavel_telefone
       FROM clients WHERE id = ${opts.clientId}::uuid LIMIT 1
     `.catch(() => []);
 
@@ -988,7 +995,9 @@ export async function pagamentoParcialAction(opts: {
       `.catch(() => []);
       const saldo = Number(pr[0]?.total ?? 0);
       const respLegal =
-        cr[0].responsavel_nome && cr[0].responsavel_telefone
+        cr[0].menor_incapaz &&
+        cr[0].responsavel_nome &&
+        cr[0].responsavel_telefone
           ? {
               nome: String(cr[0].responsavel_nome),
               telefone: String(cr[0].responsavel_telefone),

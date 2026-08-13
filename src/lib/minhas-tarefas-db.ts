@@ -30,6 +30,29 @@ export interface MinhaTarefa {
 
 export type MinhaItem = MinhaControle | MinhaTarefa;
 
+/**
+ * tarefas_processo.responsavel é texto livre (sem FK) preenchido a partir do
+ * nome em colaboradores — que pode divergir do usuarios.nome da sessão.
+ * Resolve as variantes de nome (sessão + colaborador vinculado) para casar
+ * com qualquer uma delas, em vez de depender só de usuarios.nome.
+ */
+async function nomesResponsavel(
+  login: string,
+  nomeSessao: string
+): Promise<string[]> {
+  const rows = await sql`
+    SELECT c.nome AS colaborador_nome
+    FROM usuarios u
+    LEFT JOIN colaboradores c ON c.id = u.colaborador_id
+    WHERE u.login = ${login}
+    LIMIT 1
+  `;
+  const nomes = new Set<string>([nomeSessao]);
+  const colaboradorNome = rows[0]?.colaborador_nome;
+  if (colaboradorNome) nomes.add(String(colaboradorNome));
+  return Array.from(nomes);
+}
+
 export async function getMinhasTarefas(
   login: string,
   nome: string
@@ -38,6 +61,7 @@ export async function getMinhasTarefas(
   emAndamento: MinhaItem[];
   concluidas: MinhaItem[];
 }> {
+  const nomes = await nomesResponsavel(login, nome);
   const [controlesRows, tarefasRows] = await Promise.all([
     sql`
       SELECT
@@ -65,7 +89,7 @@ export async function getMinhasTarefas(
       FROM tarefas_processo t
       JOIN processos p ON p.id = t.processo_id
       LEFT JOIN clients cl ON cl.id = p.client_id
-      WHERE t.responsavel = ${nome}
+      WHERE t.responsavel = ANY(${nomes})
         AND t.status != 'Cancelada'
       ORDER BY
         CASE t.prioridade WHEN 'Alta' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,
@@ -131,6 +155,7 @@ export async function countMinhasPendentes(
   login: string,
   nome: string
 ): Promise<number> {
+  const nomes = await nomesResponsavel(login, nome);
   const [c, t] = await Promise.all([
     sql`
       SELECT COUNT(*)::int AS n FROM controles c
@@ -140,7 +165,7 @@ export async function countMinhasPendentes(
     `,
     sql`
       SELECT COUNT(*)::int AS n FROM tarefas_processo
-      WHERE responsavel = ${nome} AND status = 'Pendente'
+      WHERE responsavel = ANY(${nomes}) AND status = 'Pendente'
     `,
   ]);
   return Number(c[0]?.n ?? 0) + Number(t[0]?.n ?? 0);

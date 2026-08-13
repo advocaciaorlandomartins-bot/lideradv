@@ -381,8 +381,11 @@ export async function agendarLembretesHonorario(opts: {
     ? `*Honorário referente a: ${opts.clienteNome}*\n\n`
     : "";
 
+  let algumAgendado = false;
+
   for (const lembrete of tiposLembrete) {
     if (lembrete.enviarEm <= new Date()) continue;
+    algumAgendado = true;
 
     const mensagem =
       prefixo +
@@ -403,6 +406,33 @@ export async function agendarLembretesHonorario(opts: {
          ${opts.clienteId}::uuid, ${opts.clienteNome},
          ${destTipo}, ${destTelefone}, ${destNome},
          ${mensagem}, ${lembrete.enviarEm.toISOString()})
+    `;
+  }
+
+  // Lançamento criado (ou editado) com vencimento já hoje/passado: todos os
+  // horários calculados (10d/5d/1d/vence-hoje antes) já ficaram no passado e
+  // nenhum lembrete seria agendado — sem isso, o cliente nunca recebe
+  // cobrança nenhuma. Agenda um aviso imediato em vez de deixar passar em branco.
+  if (!algumAgendado) {
+    const mensagem =
+      prefixo +
+      renderMensagem(cfg.honorario_vence_hoje, {
+        nome: primeiroNome(destNome),
+        escritorio,
+        valor,
+        data: formatarData(opts.dataVencimento),
+      });
+
+    await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+         destinatario_tipo, destinatario_telefone, destinatario_nome,
+         mensagem, enviar_em)
+      VALUES
+        ('honorario_vence_hoje', 'lancamento', ${opts.lancamentoId}::uuid,
+         ${opts.clienteId}::uuid, ${opts.clienteNome},
+         ${destTipo}, ${destTelefone}, ${destNome},
+         ${mensagem}, ${new Date().toISOString()})
     `;
   }
 }

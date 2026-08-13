@@ -57,7 +57,7 @@ export async function criarCompromissoAction(
         `.catch(() => [] as Record<string, unknown>[]),
         data.clienteId
           ? sql`
-              SELECT id::text, name, phone, responsavel_nome, responsavel_telefone
+              SELECT id::text, name, phone, menor_incapaz, responsavel_nome, responsavel_telefone
               FROM clients WHERE id = ${data.clienteId}::uuid LIMIT 1
             `.catch(() => [] as Record<string, unknown>[])
           : Promise.resolve([] as Record<string, unknown>[]),
@@ -83,9 +83,14 @@ export async function criarCompromissoAction(
               telefone: String(clienteRow.phone),
             }
           : null;
-      // Responsável legal do cliente (menor/incapaz) — mensagens vão a ele
+      // Responsável legal do cliente (menor/incapaz) — mensagens vão a ele.
+      // Só redireciona quando o cliente é efetivamente menor/incapaz —
+      // um contato de emergência cadastrado não deve desviar as mensagens
+      // de um cliente adulto.
       const clienteResponsavel =
-        clienteRow?.responsavel_nome && clienteRow?.responsavel_telefone
+        clienteRow?.menor_incapaz &&
+        clienteRow?.responsavel_nome &&
+        clienteRow?.responsavel_telefone
           ? {
               nome: String(clienteRow.responsavel_nome),
               telefone: String(clienteRow.responsavel_telefone),

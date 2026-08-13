@@ -73,7 +73,7 @@ interface Props {
   pendencias: PendenciaCliente[];
   colaboradores: ColaboradorSimples[];
   modelos: ModeloDocumento[];
-  sessionLogin?: string;
+  sessionNome?: string;
 }
 
 type Tab = "dados" | "relato" | "linha_do_tempo";
@@ -1300,12 +1300,12 @@ function TarefasSection({
   tarefas,
   processo,
   onNova,
-  sessionLogin,
+  sessionNome,
 }: {
   tarefas: TarefaProcesso[];
   processo: ProcessoExtended;
   onNova: () => void;
-  sessionLogin?: string;
+  sessionNome?: string;
 }) {
   const [, startTransition] = useTransition();
   const router = useRouter();
@@ -1362,7 +1362,7 @@ function TarefasSection({
         <ul className="space-y-2">
           {tarefas.map((t) => {
             const done = isConcluida(t);
-            const isMinha = sessionLogin && t.responsavel === sessionLogin;
+            const isMinha = sessionNome && t.responsavel === sessionNome;
             return (
               <li
                 key={t.id}
@@ -1419,12 +1419,11 @@ function TarefasSection({
         </ul>
       )}
 
-      {sessionLogin &&
-        pendentes.some((t) => t.responsavel === sessionLogin) && (
-          <p className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 font-body text-xs font-semibold text-amber-700">
-            Você tem tarefas pendentes. Clique no checkbox para dar baixa.
-          </p>
-        )}
+      {sessionNome && pendentes.some((t) => t.responsavel === sessionNome) && (
+        <p className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 font-body text-xs font-semibold text-amber-700">
+          Você tem tarefas pendentes. Clique no checkbox para dar baixa.
+        </p>
+      )}
     </div>
   );
 }
@@ -2399,7 +2398,7 @@ export default function ProcessoDetailClient({
   pendencias,
   colaboradores,
   modelos,
-  sessionLogin,
+  sessionNome,
 }: Props) {
   const [tab, setTab] = useState<Tab>("dados");
   const [avancarOpen, setAvancarOpen] = useState(false);
@@ -2568,7 +2567,7 @@ export default function ProcessoDetailClient({
             tarefas={tarefas}
             processo={processo}
             onNova={() => setNovaTarefaOpen(true)}
-            sessionLogin={sessionLogin}
+            sessionNome={sessionNome}
           />
           <PendenciasSection
             pendencias={pendencias}

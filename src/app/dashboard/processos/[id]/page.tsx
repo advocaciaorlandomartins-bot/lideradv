@@ -93,7 +93,7 @@ export default async function ProcessoDetailPage({
         pendencias={pendencias}
         colaboradores={colaboradores}
         modelos={modelos}
-        sessionLogin={session.login}
+        sessionNome={session.nome}
       />
 
       {/* Arquivos (server, static) */}

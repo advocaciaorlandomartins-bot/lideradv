@@ -77,6 +77,16 @@ export async function getSenhaHash(id: string): Promise<string | null> {
   return rows.length > 0 ? String(rows[0].senha_hash) : null;
 }
 
+/** colaborador_id vinculado ao usuário logado — usado para restringir dados a "só os meus". */
+export async function getColaboradorIdForUser(
+  userId: string
+): Promise<string | null> {
+  const rows = await sql`
+    SELECT colaborador_id::text FROM usuarios WHERE id = ${userId}::uuid
+  `;
+  return rows[0]?.colaborador_id ?? null;
+}
+
 /**
  * currentId: colaborador atualmente vinculado ao usuário sendo editado.
  * Sempre incluído mesmo se inativo — senão o <select> controlado do

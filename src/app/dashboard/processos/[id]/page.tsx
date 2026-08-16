@@ -15,6 +15,7 @@ import {
 } from "@/lib/processo-full-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import DeleteProcessoButton from "@/components/dashboard/processos/delete-processo-button";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import ProcessoDetailClient from "@/components/dashboard/processos/processo-detail-client";
@@ -51,6 +52,13 @@ export default async function ProcessoDetailPage({
   ]);
 
   if (!processo) notFound();
+
+  // Sem "processos_ver_todos": só pode abrir o processo se for o responsável.
+  const verTodos = hasPermission(session, "processos_ver_todos", "ver");
+  if (!verTodos) {
+    const colaboradorId = await getColaboradorIdForUser(session.id);
+    if (!colaboradorId || processo.responsavel_id !== colaboradorId) notFound();
+  }
 
   // Carrega documentos do processo + documentos do cliente (enviados pela ficha do cliente)
   const [docsProcesso, docsCliente] = await Promise.all([

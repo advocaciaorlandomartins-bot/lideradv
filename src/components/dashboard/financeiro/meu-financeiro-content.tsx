@@ -16,8 +16,8 @@ import type {
   ProcessoHonorario,
   EscritorioMes,
   FluxoMensalItem,
+  LancamentoComComissao,
 } from "@/lib/meu-financeiro-db";
-import type { Lancamento } from "@/lib/lancamentos-db";
 import type { EstagioSnapshot } from "@/lib/producao-db";
 import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
 import {
@@ -225,11 +225,12 @@ interface Props {
   processosHonorarios: ProcessoHonorario[];
   escritorioMes: EscritorioMes;
   fluxoEscritorio: FluxoMensalItem[];
-  aguardandoResultado: Lancamento[];
+  aguardandoResultado: LancamentoComComissao[];
   aguardandoResultadoTotal: number;
   fluxoHonorarios: FluxoMensalItem[];
   processosAtivosCount: number;
   estagioSnapshot: EstagioSnapshot;
+  comissaoConfigurada: boolean;
 }
 
 type FiltroTipo = "todos" | "receita" | "despesa";
@@ -245,6 +246,7 @@ export default function MeuFinanceiroContent({
   fluxoHonorarios,
   processosAtivosCount,
   estagioSnapshot,
+  comissaoConfigurada,
 }: Props) {
   const hoje = new Date();
   const mesHojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
@@ -614,8 +616,12 @@ export default function MeuFinanceiroContent({
           icon={ScalesIcon}
         />
         <KpiCard
-          label="Escritório"
-          sub="Honorários estimados"
+          label="Minha comissão"
+          sub={
+            comissaoConfigurada
+              ? "Estimada — processos ativos"
+              : "Comissão não configurada — mostrando valor total"
+          }
           value={fmt(honorariosEscritorio)}
           color="blue"
           icon={BanknotesIcon}
@@ -739,11 +745,24 @@ export default function MeuFinanceiroContent({
           </button>
         </div>
 
+        {!comissaoConfigurada && (
+          <div className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <p className="font-body text-xs text-amber-800">
+              Seu % de comissão por fase ainda não foi configurado — os valores
+              abaixo mostram o honorário total do processo, não a sua parte.
+              Peça para o administrador configurar em Colaboradores → seu perfil
+              → Comissão por fase.
+            </p>
+          </div>
+        )}
+
         {/* Mini KPIs */}
         <div className="grid grid-cols-2 gap-3 px-4 pb-4 sm:grid-cols-4">
           <div className="rounded-lg border border-blue-100 bg-white px-3 py-2.5">
             <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-blue-400">
-              Honorários — meus processos
+              {comissaoConfigurada
+                ? "Minha comissão — processos ativos"
+                : "Honorário total — meus processos"}
             </p>
             <p className="mt-0.5 font-heading text-base font-bold tabular-nums text-blue-700">
               {fmt(honorariosEscritorio)}
@@ -805,7 +824,10 @@ export default function MeuFinanceiroContent({
                           Modelo
                         </th>
                         <th className="px-3 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
-                          Estimado
+                          Honorário total
+                        </th>
+                        <th className="px-3 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
+                          Minha comissão
                         </th>
                       </tr>
                     </thead>
@@ -831,8 +853,16 @@ export default function MeuFinanceiroContent({
                                   : (p.modelo_honorario ?? "–")}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-right font-heading text-sm font-bold tabular-nums text-blue-700">
+                          <td className="px-3 py-2.5 text-right font-body text-sm text-muted tabular-nums">
                             {fmt(p.honorario_estimado)}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-heading text-sm font-bold tabular-nums text-blue-700">
+                            {fmt(p.comissao_estimada)}
+                            {p.comissao_pct != null && (
+                              <span className="ml-1 font-body text-[10px] font-normal text-blue-400">
+                                ({p.comissao_pct}%)
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -843,8 +873,16 @@ export default function MeuFinanceiroContent({
                           colSpan={3}
                           className="px-3 py-2.5 font-body text-xs font-semibold text-blue-600"
                         >
-                          Total estimado ({processosHonorarios.length} processo
+                          Total ({processosHonorarios.length} processo
                           {processosHonorarios.length !== 1 ? "s" : ""})
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-body text-xs text-muted tabular-nums">
+                          {fmt(
+                            processosHonorarios.reduce(
+                              (s, p) => s + p.honorario_estimado,
+                              0
+                            )
+                          )}
                         </td>
                         <td className="px-3 py-2.5 text-right font-heading text-sm font-bold tabular-nums text-blue-800">
                           {fmt(honorariosEscritorio)}
@@ -887,10 +925,16 @@ export default function MeuFinanceiroContent({
                         <p className="font-body text-xs text-muted">
                           {l.client_name ?? "—"}
                           {l.processo_tipo ? ` · ${l.processo_tipo}` : ""}
+                          {l.comissao_pct != null && (
+                            <>
+                              {" · "}
+                              {fmt(l.valor)} total ({l.comissao_pct}%)
+                            </>
+                          )}
                         </p>
                       </div>
                       <span className="flex-shrink-0 font-heading text-sm font-bold tabular-nums text-amber-700">
-                        {fmt(l.valor)}
+                        {fmt(l.valor_comissao)}
                       </span>
                     </div>
                   ))}

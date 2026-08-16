@@ -38,6 +38,7 @@ export default async function MeuFinanceiroPage() {
         fluxoHonorarios={dados.fluxoHonorarios}
         processosAtivosCount={dados.processosAtivosCount}
         estagioSnapshot={dados.estagioSnapshot}
+        comissaoConfigurada={dados.comissaoConfigurada}
       />
     </div>
   );

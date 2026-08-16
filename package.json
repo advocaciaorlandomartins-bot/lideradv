@@ -24,6 +24,7 @@
     "migrate:compromissos:status": "tsx scripts/migrate-add-status-compromissos.ts",
     "migrate:modelos:blocks": "tsx scripts/migrate-add-modelo-blocks.ts",
     "migrate:timbrado:toggles": "tsx scripts/migrate-add-timbrado-toggles.ts",
+    "migrate:colaboradores:comissao": "tsx scripts/migrate-add-comissao-colaborador.ts",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

@@ -8,6 +8,13 @@ import { hasPermission } from "./permissoes";
 
 export type ColaboradorFormState = { error: string } | null;
 
+function pctField(formData: FormData, name: string): string | null {
+  const raw = ((formData.get(name) as string | null) ?? "").trim();
+  if (!raw) return null;
+  const n = Number(raw.replace(",", "."));
+  return !isNaN(n) && n >= 0 && n <= 100 ? String(n) : null;
+}
+
 function getFields(formData: FormData) {
   const salarioRaw = (
     (formData.get("salario_mensal") as string | null) ?? ""
@@ -29,6 +36,12 @@ function getFields(formData: FormData) {
     status,
     observacoes:
       ((formData.get("observacoes") as string | null) ?? "").trim() || null,
+    comissaoAdministrativoPct: pctField(
+      formData,
+      "comissao_administrativo_pct"
+    ),
+    comissaoJudicialPct: pctField(formData, "comissao_judicial_pct"),
+    comissaoAmbosPct: pctField(formData, "comissao_ambos_pct"),
   };
 }
 
@@ -61,7 +74,11 @@ export async function createColaboradorAction(
 
   try {
     const rows = await sql`
-      INSERT INTO colaboradores (nome, cargo, email, telefone, oab, salario_mensal, data_admissao, data_demissao, status, observacoes)
+      INSERT INTO colaboradores (
+        nome, cargo, email, telefone, oab, salario_mensal, data_admissao,
+        data_demissao, status, observacoes,
+        comissao_administrativo_pct, comissao_judicial_pct, comissao_ambos_pct
+      )
       VALUES (
         ${f.nome},
         ${f.cargo},
@@ -72,7 +89,10 @@ export async function createColaboradorAction(
         ${f.dataAdmissao ? f.dataAdmissao : null}::date,
         ${f.dataDemissao ? f.dataDemissao : null}::date,
         ${f.status},
-        ${f.observacoes}
+        ${f.observacoes},
+        ${f.comissaoAdministrativoPct}::numeric,
+        ${f.comissaoJudicialPct}::numeric,
+        ${f.comissaoAmbosPct}::numeric
       )
       RETURNING id
     `;
@@ -136,17 +156,20 @@ export async function updateColaboradorAction(
   try {
     await sql`
       UPDATE colaboradores SET
-        nome           = ${f.nome},
-        cargo          = ${f.cargo},
-        email          = ${f.email},
-        telefone       = ${f.telefone},
-        oab            = ${f.oab},
-        salario_mensal = ${f.salarioMensal ? f.salarioMensal : null}::numeric,
-        data_admissao  = ${f.dataAdmissao ? f.dataAdmissao : null}::date,
-        data_demissao  = ${f.dataDemissao ? f.dataDemissao : null}::date,
-        status         = ${f.status},
-        observacoes    = ${f.observacoes},
-        updated_at     = NOW()
+        nome                         = ${f.nome},
+        cargo                        = ${f.cargo},
+        email                        = ${f.email},
+        telefone                     = ${f.telefone},
+        oab                          = ${f.oab},
+        salario_mensal               = ${f.salarioMensal ? f.salarioMensal : null}::numeric,
+        data_admissao                = ${f.dataAdmissao ? f.dataAdmissao : null}::date,
+        data_demissao                = ${f.dataDemissao ? f.dataDemissao : null}::date,
+        status                       = ${f.status},
+        observacoes                  = ${f.observacoes},
+        comissao_administrativo_pct  = ${f.comissaoAdministrativoPct}::numeric,
+        comissao_judicial_pct        = ${f.comissaoJudicialPct}::numeric,
+        comissao_ambos_pct           = ${f.comissaoAmbosPct}::numeric,
+        updated_at                   = NOW()
       WHERE id = ${id}::uuid
     `;
   } catch (err) {

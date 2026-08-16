@@ -93,42 +93,85 @@ function mapRow(r: any): Processo {
   };
 }
 
-export async function getAllProcessos(): Promise<Processo[]> {
-  const rows = await sql`
-    SELECT
-      p.id::text,
-      p.client_id::text,
-      c.name AS client_name,
-      p.numero,
-      p.tipo_acao,
-      p.area,
-      p.fase,
-      p.vara,
-      p.comarca,
-      p.parte_contraria,
-      p.parte_contraria_doc,
-      p.valor_causa,
-      p.status,
-      to_char(p.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
-      to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao_iso,
-      p.created_at,
-      p.updated_at,
-      p.estagio_producao,
-      p.resultado_administrativo,
-      p.resultado_judicial,
-      to_char(p.data_protocolo_inss, 'YYYY-MM-DD') AS data_protocolo_inss,
-      p.protocolo_inss, p.agencia_inss, p.resultado_admin,
-      to_char(p.data_resultado_admin, 'YYYY-MM-DD') AS data_resultado_admin,
-      p.motivo_indeferimento, p.modelo_honorario,
-      p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
-      to_char(p.der, 'YYYY-MM-DD') AS der,
-      to_char(p.dib, 'YYYY-MM-DD') AS dib,
-      to_char(p.dcb, 'YYYY-MM-DD') AS dcb
-    FROM processos p
-    JOIN clients c ON c.id = p.client_id
-    WHERE p.deleted_at IS NULL
-    ORDER BY COALESCE(p.updated_at, p.created_at) DESC
-  `;
+/**
+ * responsavelId: quando informado, restringe aos processos em que esse
+ * colaborador é responsável — usado para quem não tem a permissão
+ * "processos_ver_todos" (por padrão, só Administrador(a)/Sócio(a) veem tudo).
+ */
+export async function getAllProcessos(
+  responsavelId?: string | null
+): Promise<Processo[]> {
+  const rows = responsavelId
+    ? await sql`
+        SELECT
+          p.id::text,
+          p.client_id::text,
+          c.name AS client_name,
+          p.numero,
+          p.tipo_acao,
+          p.area,
+          p.fase,
+          p.vara,
+          p.comarca,
+          p.parte_contraria,
+          p.parte_contraria_doc,
+          p.valor_causa,
+          p.status,
+          to_char(p.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
+          to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao_iso,
+          p.created_at,
+          p.updated_at,
+          p.estagio_producao,
+          p.resultado_administrativo,
+          p.resultado_judicial,
+          to_char(p.data_protocolo_inss, 'YYYY-MM-DD') AS data_protocolo_inss,
+          p.protocolo_inss, p.agencia_inss, p.resultado_admin,
+          to_char(p.data_resultado_admin, 'YYYY-MM-DD') AS data_resultado_admin,
+          p.motivo_indeferimento, p.modelo_honorario,
+          p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
+          to_char(p.der, 'YYYY-MM-DD') AS der,
+          to_char(p.dib, 'YYYY-MM-DD') AS dib,
+          to_char(p.dcb, 'YYYY-MM-DD') AS dcb
+        FROM processos p
+        JOIN clients c ON c.id = p.client_id
+        WHERE p.deleted_at IS NULL AND p.responsavel_id = ${responsavelId}::uuid
+        ORDER BY COALESCE(p.updated_at, p.created_at) DESC
+      `
+    : await sql`
+        SELECT
+          p.id::text,
+          p.client_id::text,
+          c.name AS client_name,
+          p.numero,
+          p.tipo_acao,
+          p.area,
+          p.fase,
+          p.vara,
+          p.comarca,
+          p.parte_contraria,
+          p.parte_contraria_doc,
+          p.valor_causa,
+          p.status,
+          to_char(p.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
+          to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao_iso,
+          p.created_at,
+          p.updated_at,
+          p.estagio_producao,
+          p.resultado_administrativo,
+          p.resultado_judicial,
+          to_char(p.data_protocolo_inss, 'YYYY-MM-DD') AS data_protocolo_inss,
+          p.protocolo_inss, p.agencia_inss, p.resultado_admin,
+          to_char(p.data_resultado_admin, 'YYYY-MM-DD') AS data_resultado_admin,
+          p.motivo_indeferimento, p.modelo_honorario,
+          p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
+          to_char(p.der, 'YYYY-MM-DD') AS der,
+          to_char(p.dib, 'YYYY-MM-DD') AS dib,
+          to_char(p.dcb, 'YYYY-MM-DD') AS dcb
+        FROM processos p
+        JOIN clients c ON c.id = p.client_id
+        WHERE p.deleted_at IS NULL
+        ORDER BY COALESCE(p.updated_at, p.created_at) DESC
+      `;
   return rows.map(mapRow);
 }
 

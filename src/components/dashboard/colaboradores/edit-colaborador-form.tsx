@@ -271,6 +271,57 @@ export default function EditColaboradorForm({ colaborador }: Props) {
         </div>
       </div>
 
+      {/* ── Comissão por fase ── */}
+      <div className="space-y-4">
+        <SectionTitle>Comissão por fase do processo</SectionTitle>
+        <p className="font-body text-xs text-muted">
+          % sobre o honorário do processo, aplicado em &ldquo;Meu
+          Financeiro&rdquo; de acordo com a fase que o colaborador trabalhou.
+          Deixe em branco para não calcular comissão automaticamente.
+        </p>
+        <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Field label="Só administrativo (%)">
+            <input
+              name="comissao_administrativo_pct"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              defaultValue={colaborador.comissao_administrativo_pct ?? ""}
+              placeholder="Ex: 10"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Só judicial (%)">
+            <input
+              name="comissao_judicial_pct"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              defaultValue={colaborador.comissao_judicial_pct ?? ""}
+              placeholder="Ex: 15"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Administrativo + judicial (%)">
+            <input
+              name="comissao_ambos_pct"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              defaultValue={colaborador.comissao_ambos_pct ?? ""}
+              placeholder="Ex: 25"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+        </div>
+      </div>
+
       {/* ── Observações ── */}
       <div>
         <SectionTitle>Observações</SectionTitle>

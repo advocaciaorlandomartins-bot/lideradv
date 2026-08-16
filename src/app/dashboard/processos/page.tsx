@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getAllProcessos } from "@/lib/processos-db";
 import { getAllClients } from "@/lib/clients-db";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import ProcessosContent from "@/components/dashboard/processos/processos-content";
 import ProcessosSubNav from "@/components/dashboard/processos/processos-sub-nav";
 import { getSession } from "@/lib/session";
@@ -22,10 +23,32 @@ export default async function ProcessosPage({
 
   const { busca } = await searchParams;
 
-  const [processos, clients] = await Promise.all([
-    getAllProcessos(),
+  // Sem "processos_ver_todos": restringe aos processos onde o usuário é responsável.
+  // Sem colaborador_id vinculado nesse caso, não há processo nenhum que seja
+  // "dele" — usa um UUID inexistente para garantir lista vazia (nunca "todos").
+  const verTodos = hasPermission(session, "processos_ver_todos", "ver");
+  const colaboradorId = verTodos
+    ? null
+    : ((await getColaboradorIdForUser(session.id)) ??
+      "00000000-0000-0000-0000-000000000000");
+
+  const [processosRaw, clients] = await Promise.all([
+    getAllProcessos(verTodos ? null : colaboradorId),
     getAllClients(),
   ]);
+
+  // Sem permissão de financeiro: remove valores monetários já no servidor
+  // (não é só esconder na tela — o payload enviado ao navegador não deve
+  // conter o dado).
+  const podeVerFinanceiro = hasPermission(session, "financeiro", "ver");
+  const processos = podeVerFinanceiro
+    ? processosRaw
+    : processosRaw.map((p) => ({
+        ...p,
+        valor_causa: null,
+        valor_honorario: null,
+        percentual_honorario: null,
+      }));
 
   const ativos = processos.filter((p) => p.status === "ativo").length;
   const total = processos.length;

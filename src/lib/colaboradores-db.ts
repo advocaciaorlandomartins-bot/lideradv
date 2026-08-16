@@ -16,6 +16,12 @@ export interface Colaborador {
   status: "ativo" | "inativo";
   observacoes: string | null;
   created_at_formatted: string;
+  /** % sobre o honorário quando o colaborador atuou só na fase administrativa. */
+  comissao_administrativo_pct: number | null;
+  /** % sobre o honorário quando o colaborador atuou só na fase judicial. */
+  comissao_judicial_pct: number | null;
+  /** % sobre o honorário quando o colaborador atuou nas duas fases. */
+  comissao_ambos_pct: number | null;
 }
 
 export interface ColaboradorFull extends Colaborador {
@@ -38,6 +44,14 @@ function mapRow(r: any): Colaborador {
     status: r.status as "ativo" | "inativo",
     observacoes: r.observacoes ?? null,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
+    comissao_administrativo_pct:
+      r.comissao_administrativo_pct != null
+        ? Number(r.comissao_administrativo_pct)
+        : null,
+    comissao_judicial_pct:
+      r.comissao_judicial_pct != null ? Number(r.comissao_judicial_pct) : null,
+    comissao_ambos_pct:
+      r.comissao_ambos_pct != null ? Number(r.comissao_ambos_pct) : null,
   };
 }
 
@@ -55,6 +69,9 @@ export async function getAllColaboradores(): Promise<Colaborador[]> {
       to_char(data_demissao, 'DD/MM/YYYY') AS data_demissao,
       status,
       observacoes,
+      comissao_administrativo_pct,
+      comissao_judicial_pct,
+      comissao_ambos_pct,
       created_at
     FROM colaboradores
     ORDER BY nome ASC
@@ -80,6 +97,9 @@ export async function getColaboradorFull(
       to_char(data_demissao, 'YYYY-MM-DD')  AS data_demissao_iso,
       status,
       observacoes,
+      comissao_administrativo_pct,
+      comissao_judicial_pct,
+      comissao_ambos_pct,
       created_at
     FROM colaboradores
     WHERE id = ${id}::uuid

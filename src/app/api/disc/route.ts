@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -83,8 +84,8 @@ function analisarDISC(pa: number, pb: number, pc: number, pd: number) {
 
 export async function GET() {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!session || !hasPermission(session, "disc", "ver")) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   const testes = await sql`
@@ -101,8 +102,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (!session || !hasPermission(session, "disc", "criar")) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => null);

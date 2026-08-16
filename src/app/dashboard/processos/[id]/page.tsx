@@ -94,6 +94,12 @@ export default async function ProcessoDetailPage({
         colaboradores={colaboradores}
         modelos={modelos}
         sessionNome={session.nome}
+        podeAlterarResponsavel={hasPermission(
+          session,
+          "processos_responsavel",
+          "editar"
+        )}
+        podeVerFinanceiro={hasPermission(session, "financeiro", "ver")}
       />
 
       {/* Arquivos (server, static) */}

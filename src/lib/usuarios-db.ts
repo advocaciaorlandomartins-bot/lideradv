@@ -77,18 +77,32 @@ export async function getSenhaHash(id: string): Promise<string | null> {
   return rows.length > 0 ? String(rows[0].senha_hash) : null;
 }
 
-export async function getColaboradoresForSelect(): Promise<
-  ColaboradorOption[]
-> {
-  const rows = await sql`
-    SELECT id::text, nome, cargo
-    FROM colaboradores
-    WHERE status = 'ativo'
-    ORDER BY nome ASC
-  `;
+/**
+ * currentId: colaborador atualmente vinculado ao usuário sendo editado.
+ * Sempre incluído mesmo se inativo — senão o <select> controlado do
+ * formulário não encontra a opção correspondente ao value atual, mostra
+ * como "sem seleção" e, ao salvar sem tocar no campo, desvincula o usuário
+ * silenciosamente (o value enviado vira "").
+ */
+export async function getColaboradoresForSelect(
+  currentId?: string | null
+): Promise<ColaboradorOption[]> {
+  const rows = currentId
+    ? await sql`
+        SELECT id::text, nome, cargo, status
+        FROM colaboradores
+        WHERE status = 'ativo' OR id = ${currentId}::uuid
+        ORDER BY (status = 'ativo') DESC, nome ASC
+      `
+    : await sql`
+        SELECT id::text, nome, cargo, status
+        FROM colaboradores
+        WHERE status = 'ativo'
+        ORDER BY nome ASC
+      `;
   return rows.map((r) => ({
     id: String(r.id),
-    nome: String(r.nome),
+    nome: String(r.nome) + (r.status !== "ativo" ? " (inativo)" : ""),
     cargo: String(r.cargo),
   }));
 }

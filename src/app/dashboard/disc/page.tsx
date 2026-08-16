@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
 import DiscList from "@/components/dashboard/disc/disc-list";
 import Link from "next/link";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DiscPage() {
   const session = await getSession();
-  if (!session) notFound();
+  if (!session || !hasPermission(session, "disc", "ver")) notFound();
 
   const testes = await sql`
     SELECT id, nome_candidato, cargo_vaga, perfil_dominante, funcao_sugerida,

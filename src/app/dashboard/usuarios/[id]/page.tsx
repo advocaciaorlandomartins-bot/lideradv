@@ -18,11 +18,9 @@ export default async function EditarUsuarioPage({
   if (!session || !hasPermission(session, "usuarios", "editar")) notFound();
 
   const { id } = await params;
-  const [usuario, colaboradores] = await Promise.all([
-    getUsuarioById(id),
-    getColaboradoresForSelect(),
-  ]);
+  const usuario = await getUsuarioById(id);
   if (!usuario) notFound();
+  const colaboradores = await getColaboradoresForSelect(usuario.colaborador_id);
 
   return (
     <div className="space-y-6">

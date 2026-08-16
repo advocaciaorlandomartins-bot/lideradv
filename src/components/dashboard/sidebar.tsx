@@ -162,7 +162,7 @@ const GROUPS: {
         href: "/dashboard/disc",
         icon: IdentificationIcon,
         label: "Teste DISC",
-        modulo: null,
+        modulo: "disc",
       },
     ],
   },

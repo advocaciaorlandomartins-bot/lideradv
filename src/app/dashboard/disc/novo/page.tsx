@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import DiscForm from "@/components/dashboard/disc/disc-form";
 import Link from "next/link";
 
@@ -9,7 +10,7 @@ export const metadata = {
 
 export default async function DiscNovoPage() {
   const session = await getSession();
-  if (!session) notFound();
+  if (!session || !hasPermission(session, "disc", "criar")) notFound();
 
   return (
     <div className="space-y-6">

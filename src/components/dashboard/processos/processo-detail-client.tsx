@@ -74,6 +74,8 @@ interface Props {
   colaboradores: ColaboradorSimples[];
   modelos: ModeloDocumento[];
   sessionNome?: string;
+  podeAlterarResponsavel?: boolean;
+  podeVerFinanceiro?: boolean;
 }
 
 type Tab = "dados" | "relato" | "linha_do_tempo";
@@ -651,7 +653,13 @@ function DadosField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DadosTab({ processo }: { processo: ProcessoExtended }) {
+function DadosTab({
+  processo,
+  podeVerFinanceiro,
+}: {
+  processo: ProcessoExtended;
+  podeVerFinanceiro: boolean;
+}) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap gap-2 mb-4">
@@ -684,7 +692,7 @@ function DadosTab({ processo }: { processo: ProcessoExtended }) {
       {processo.data_distribuicao && (
         <DadosField label="Distribuição" value={processo.data_distribuicao} />
       )}
-      {processo.valor_causa != null && (
+      {podeVerFinanceiro && processo.valor_causa != null && (
         <DadosField
           label="Valor da causa"
           value={processo.valor_causa.toLocaleString("pt-BR", {
@@ -815,7 +823,7 @@ function DadosTab({ processo }: { processo: ProcessoExtended }) {
               }
             />
           )}
-          {processo.valor_honorario != null && (
+          {podeVerFinanceiro && processo.valor_honorario != null && (
             <DadosField
               label="Valor honorário"
               value={processo.valor_honorario.toLocaleString("pt-BR", {
@@ -824,7 +832,7 @@ function DadosTab({ processo }: { processo: ProcessoExtended }) {
               })}
             />
           )}
-          {processo.percentual_honorario != null && (
+          {podeVerFinanceiro && processo.percentual_honorario != null && (
             <DadosField
               label="Percentual"
               value={`${processo.percentual_honorario.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%`}
@@ -1249,9 +1257,11 @@ function EventosSection({
 function ResponsavelSection({
   processo,
   colaboradores,
+  podeAlterar,
 }: {
   processo: ProcessoExtended;
   colaboradores: ColaboradorSimples[];
+  podeAlterar: boolean;
 }) {
   const [value, setValue] = useState(processo.responsavel_id ?? "");
   const [saving, setSaving] = useState(false);
@@ -1263,6 +1273,23 @@ function ResponsavelSection({
     await updateResponsavelAction(processo.id, v || null);
     setSaving(false);
     router.refresh();
+  }
+
+  if (!podeAlterar) {
+    const nomeAtual =
+      colaboradores.find((c) => c.id === processo.responsavel_id)?.nome ??
+      "— Sem responsável —";
+    return (
+      <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+        <h3 className="font-heading text-sm font-semibold text-fg mb-3">
+          Responsável
+        </h3>
+        <p className="font-body text-sm text-fg">{nomeAtual}</p>
+        <p className="mt-1 font-body text-xs text-muted">
+          Somente o administrador pode alterar o responsável.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -2399,6 +2426,8 @@ export default function ProcessoDetailClient({
   colaboradores,
   modelos,
   sessionNome,
+  podeAlterarResponsavel,
+  podeVerFinanceiro,
 }: Props) {
   const [tab, setTab] = useState<Tab>("dados");
   const [avancarOpen, setAvancarOpen] = useState(false);
@@ -2479,12 +2508,14 @@ export default function ProcessoDetailClient({
             >
               Editar
             </Link>
-            <Link
-              href={`/dashboard/financeiro/novo?client_id=${processo.client_id}&processo_id=${processo.id}`}
-              className={btnOutline}
-            >
-              Financeiro
-            </Link>
+            {podeVerFinanceiro && (
+              <Link
+                href={`/dashboard/financeiro/novo?client_id=${processo.client_id}&processo_id=${processo.id}`}
+                className={btnOutline}
+              >
+                Financeiro
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -2535,7 +2566,12 @@ export default function ProcessoDetailClient({
 
       {/* Tab Content */}
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-        {tab === "dados" && <DadosTab processo={processo} />}
+        {tab === "dados" && (
+          <DadosTab
+            processo={processo}
+            podeVerFinanceiro={podeVerFinanceiro ?? false}
+          />
+        )}
         {tab === "relato" && <RelatoTab processo={processo} />}
         {tab === "linha_do_tempo" && (
           <LinhaDoTempoTab
@@ -2562,6 +2598,7 @@ export default function ProcessoDetailClient({
           <ResponsavelSection
             processo={processo}
             colaboradores={colaboradores}
+            podeAlterar={podeAlterarResponsavel ?? false}
           />
           <TarefasSection
             tarefas={tarefas}

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
 import DiscResultado from "@/components/dashboard/disc/disc-resultado";
 import Link from "next/link";
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function DiscDetailPage({ params }: Props) {
   const session = await getSession();
-  if (!session) notFound();
+  if (!session || !hasPermission(session, "disc", "ver")) notFound();
 
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();

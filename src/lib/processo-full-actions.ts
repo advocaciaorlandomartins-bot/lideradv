@@ -84,7 +84,7 @@ export async function updateResponsavelAction(
   responsavelId: string | null
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "processos", "editar"))
+  if (!session || !hasPermission(session, "processos_responsavel", "editar"))
     return { error: "Sem permissão." };
   try {
     if (responsavelId) {

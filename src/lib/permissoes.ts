@@ -27,6 +27,11 @@ export const MODULOS = [
   },
   { key: "clientes", label: "Clientes", parent: null },
   { key: "processos", label: "Processos", parent: null },
+  {
+    key: "processos_responsavel",
+    label: "Processos — Alterar responsável",
+    parent: null,
+  },
   { key: "financeiro", label: "Financeiro", parent: null },
   {
     key: "financeiro_entradas",
@@ -62,6 +67,7 @@ export const MODULOS = [
   { key: "gerenciador", label: "Gerenciador", parent: null },
   { key: "configuracoes", label: "Configurações", parent: null },
   { key: "usuarios", label: "Usuários", parent: null },
+  { key: "disc", label: "Teste DISC", parent: null },
 ] as const;
 
 export const ACOES = [
@@ -98,6 +104,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     producao: FULL,
     clientes: FULL,
     processos: FULL,
+    processos_responsavel: FULL,
     publicacoes: FULL,
     financeiro: FULL,
     controles: FULL,
@@ -110,6 +117,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     gerenciador: FULL,
     configuracoes: FULL,
     usuarios: FULL,
+    disc: FULL,
   },
   "Sócio(a)": {
     dashboard: VER,
@@ -120,6 +128,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     producao: FULL,
     clientes: FULL,
     processos: FULL,
+    processos_responsavel: FULL,
     publicacoes: FULL,
     financeiro: FULL,
     controles: FULL,
@@ -132,6 +141,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     gerenciador: FULL,
     configuracoes: VER,
     usuarios: VER,
+    disc: FULL,
   },
   "Advogado(a)": {
     dashboard: VER,
@@ -142,6 +152,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     producao: FULL,
     clientes: ["ver", "criar", "editar"],
     processos: FULL,
+    processos_responsavel: NONE,
     publicacoes: FULL,
     financeiro: VER,
     controles: FULL,
@@ -155,6 +166,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     gerenciador: VER,
     configuracoes: NONE,
     usuarios: NONE,
+    disc: NONE,
   },
   "Estagiário(a)": {
     dashboard: VER,
@@ -167,6 +179,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     producao_resultado_jud: NONE,
     clientes: VER,
     processos: ["ver", "criar", "editar"],
+    processos_responsavel: NONE,
     publicacoes: VER,
     financeiro: NONE,
     controles: ["ver", "criar", "editar"],
@@ -179,6 +192,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     gerenciador: NONE,
     configuracoes: NONE,
     usuarios: NONE,
+    disc: NONE,
   },
   "Colaborador(a)": {
     dashboard: VER,
@@ -189,6 +203,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     producao: NONE,
     clientes: VER,
     processos: VER,
+    processos_responsavel: NONE,
     publicacoes: NONE,
     financeiro: NONE,
     controles: NONE,
@@ -201,6 +216,7 @@ export const DEFAULTS_POR_CATEGORIA: Record<string, Permissoes> = {
     gerenciador: NONE,
     configuracoes: NONE,
     usuarios: NONE,
+    disc: NONE,
   },
 };
 

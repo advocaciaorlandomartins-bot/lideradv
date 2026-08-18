@@ -12,6 +12,7 @@ import {
   cancelarLembretesLancamento,
   agendarConfirmacaoPagamento,
 } from "./lembretes";
+import { gerarComissaoAutomaticaPorPagamento } from "./comissao-colaborador";
 
 export type LancamentoFormState = { error: string } | null;
 
@@ -774,6 +775,11 @@ export async function markAsPagoAction(id: string): Promise<void> {
         clientId: lan.client_id,
         dados: { valor_honorario: lan.valor },
       });
+      await gerarComissaoAutomaticaPorPagamento(
+        id,
+        lan.processo_id,
+        Number(lan.valor)
+      );
     }
     // Lembretes: cancela pendentes + envia confirmação de pagamento
     if (lan?.client_id && lan.tipo === "entrada") {
@@ -839,7 +845,7 @@ export async function markMultiplePagoAction(ids: string[]): Promise<void> {
       SET status = 'pago', data_pagamento = ${todayBR()}::date
       WHERE id = ANY(${ids}::uuid[])
         AND status != 'pago'
-      RETURNING id::text, client_id::text, tipo, valor, remuneracao_id
+      RETURNING id::text, client_id::text, processo_id::text, tipo, valor, remuneracao_id
     `;
 
     for (const lan of rows) {
@@ -849,6 +855,13 @@ export async function markMultiplePagoAction(ids: string[]): Promise<void> {
           SET status = 'pago', data_pagamento = ${todayBR()}::date, updated_at = NOW()
           WHERE id = ${lan.remuneracao_id}::uuid
         `;
+      }
+      if (lan.tipo === "entrada" && lan.processo_id) {
+        await gerarComissaoAutomaticaPorPagamento(
+          String(lan.id),
+          String(lan.processo_id),
+          Number(lan.valor)
+        );
       }
       await cancelarLembretesLancamento(String(lan.id)).catch(() => null);
     }
@@ -945,6 +958,13 @@ export async function pagamentoParcialAction(opts: {
           WHERE id = ${row.id}::uuid
         `;
         paidIds.push(String(row.id));
+        if (row.tipo === "entrada" && row.processo_id) {
+          await gerarComissaoAutomaticaPorPagamento(
+            String(row.id),
+            String(row.processo_id),
+            itemValor
+          );
+        }
         remaining = Math.round((remaining - itemValor) * 100) / 100;
       } else {
         // Partial: update existing to paid portion; insert remainder as new row
@@ -957,6 +977,13 @@ export async function pagamentoParcialAction(opts: {
           WHERE id = ${row.id}::uuid
         `;
         paidIds.push(String(row.id));
+        if (row.tipo === "entrada" && row.processo_id) {
+          await gerarComissaoAutomaticaPorPagamento(
+            String(row.id),
+            String(row.processo_id),
+            paidPortion
+          );
+        }
 
         await sql`
           INSERT INTO lancamentos
@@ -1068,6 +1095,14 @@ export async function revertParaPendenteAction(id: string): Promise<void> {
         WHERE id = ${remuneracaoId}::uuid
       `;
     }
+    // Se esse lançamento (pagamento do cliente) tinha gerado uma comissão
+    // automática ainda não paga ao colaborador, ela deixa de fazer sentido —
+    // remove (ON DELETE CASCADE já apaga o lançamento "saída" espelhado).
+    // Se já tiver sido paga ao colaborador, não mexe — fica pra revisão manual.
+    await sql`
+      DELETE FROM remuneracoes
+      WHERE origem_lancamento_id = ${id}::uuid AND status = 'pendente'
+    `;
   } catch (err) {
     console.error("revertParaPendenteAction DB error:", err);
   }

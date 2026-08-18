@@ -855,7 +855,7 @@ export default function MeuFinanceiroContent({
                                   : p.modelo_honorario === "percentual" &&
                                       p.percentual_honorario != null
                                     ? `${p.percentual_honorario}% s/ causa`
-                                    : (p.modelo_honorario ?? "–")}
+                                    : (p.modelo_honorario ?? "Lançado")}
                               </span>
                             )}
                           </td>

@@ -155,11 +155,12 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Botões: "Nova Receita" (verde) e "Nova Despesa" (vermelho) → formulário com tipo, descrição, valor, vencimento, status, cliente, processo; suporte a parcelamento de honorários
 - Quando lançamento de honorário tem cliente com telefone cadastrado: sistema agenda lembretes de cobrança por WhatsApp automaticamente (antes do vencimento)
 - Registrar pagamento: no lançamento → "Registrar Pagamento" → sistema envia confirmação ao cliente por WhatsApp
+- Quando um lançamento de honorário do cliente (vinculado a um processo) é marcado como pago, o sistema gera automaticamente a comissão do colaborador responsável (percentual configurado no cadastro dele, pela fase do processo) como uma remuneração "Pendente" em Remunerações — se o cliente pagar parcelado, cada parcela paga gera sua própria comissão pendente, na mesma cadência
 
 ## MEU FINANCEIRO (menu: Equipe → Meu Financeiro)
 - Visão financeira pessoal do colaborador logado
-- Exibe: lançamentos pessoais, honorários do escritório, processos com honorários, fluxo do mês
-- Somente visualização — sem criação de lançamentos aqui
+- Exibe: lançamentos pessoais, todos os processos ativos do colaborador (com a comissão calculada pela fase, ou "Não cadastrado"/"Lançado" quando ainda falta ou já tem valor lançado), honorários aguardando resultado, fluxo do mês
+- Somente visualização — sem criação de lançamentos aqui; a comissão em si é configurada no cadastro do colaborador (Equipe → Colaboradores → editar) e paga de fato em Remunerações
 
 ## MODELOS DE DOCUMENTOS (menu: Documentos → Modelos)
 - Documentos padrão do escritório: procurações, contratos, declarações, petições, etc.

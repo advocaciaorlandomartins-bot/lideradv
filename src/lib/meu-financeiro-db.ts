@@ -4,6 +4,11 @@ import {
   getEstagioSnapshotByResponsavel,
   type EstagioSnapshot,
 } from "./producao-db";
+import {
+  resolveComissaoPct,
+  aplicarComissao,
+  type ComissaoConfig,
+} from "./comissao-colaborador";
 
 export interface LancamentoPessoal {
   id: string;
@@ -102,49 +107,6 @@ const MESES_CURTO_DB = [
   "Dez",
 ];
 
-interface ComissaoConfig {
-  comissao_administrativo_pct: number | null;
-  comissao_judicial_pct: number | null;
-  comissao_ambos_pct: number | null;
-}
-
-/**
- * Resolve o % de comissão do colaborador para um processo, de acordo com o
- * caminho que o caso percorreu:
- * - Administrativo DEFERIDO (concedido) → só a parte administrativa.
- * - Administrativo INDEFERIDO (negado) → o caso necessariamente segue para o
- *   judicial, então já conta como "ambos" a partir daí, mesmo antes do
- *   resultado judicial sair (o colaborador já vai atuar nas duas fases).
- * - Sem resultado administrativo registrado, mas já no judicial (ação que foi
- *   direto à via judicial, sem passar pelo administrativo) → só judicial.
- * - Ainda sem nenhum resultado e ainda na fase administrativa (em andamento)
- *   → estimativa pela fase administrativa, atualizada automaticamente assim
- *   que sair o resultado.
- */
-function resolveComissaoPct(
-  config: ComissaoConfig | null,
-  estagioProducao: string | null,
-  resultadoAdministrativo: unknown,
-  resultadoJudicial: unknown
-): number | null {
-  if (!config) return null;
-
-  if (resultadoAdministrativo === "negado") return config.comissao_ambos_pct;
-  if (resultadoAdministrativo === "concedido")
-    return config.comissao_administrativo_pct;
-
-  if (resultadoJudicial != null || estagioProducao === "judicial")
-    return config.comissao_judicial_pct;
-
-  // Ainda em andamento, sem resultado definido — estimativa pela fase administrativa.
-  return config.comissao_administrativo_pct;
-}
-
-function aplicarComissao(valor: number, pct: number | null): number {
-  if (pct == null) return valor;
-  return Math.round(valor * (pct / 100) * 100) / 100;
-}
-
 export async function getMeuFinanceiroInitial(
   userId: string
 ): Promise<MeuFinanceiroInitial> {
@@ -194,7 +156,14 @@ export async function getMeuFinanceiroInitial(
             p.valor_causa,
             p.estagio_producao,
             p.resultado_administrativo,
-            p.resultado_judicial
+            p.resultado_judicial,
+            (
+              SELECT COALESCE(SUM(l.valor), 0)
+              FROM lancamentos l
+              WHERE l.processo_id = p.id
+                AND l.tipo = 'entrada'
+                AND l.status IN ('pendente', 'aguardando_resultado')
+            ) AS honorario_lancado
           FROM processos p
           LEFT JOIN clients c ON c.id = p.client_id
           WHERE p.responsavel_id = ${colaboradorId}::uuid
@@ -384,8 +353,17 @@ export async function getMeuFinanceiroInitial(
       r.percentual_honorario != null && r.valor_causa != null
         ? (Number(r.percentual_honorario) / 100) * Number(r.valor_causa)
         : null;
-    const honorario_estimado = fixo ?? perc ?? 0;
-    const semHonorarioDefinido = fixo == null && perc == null;
+    // Quando o processo não tem valor/percentual cadastrado diretamente, cai
+    // pro que já foi lançado em lancamentos (honorário pendente/aguardando
+    // resultado) — evita mostrar "não cadastrado" para um caso que já tem
+    // valor real, só que registrado como lançamento em vez de no processo.
+    const lancado =
+      r.honorario_lancado != null && Number(r.honorario_lancado) > 0
+        ? Number(r.honorario_lancado)
+        : null;
+    const honorario_estimado = fixo ?? perc ?? lancado ?? 0;
+    const semHonorarioDefinido =
+      fixo == null && perc == null && lancado == null;
     const comissao_pct = resolveComissaoPct(
       comissaoConfig,
       r.estagio_producao,

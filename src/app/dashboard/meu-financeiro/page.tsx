@@ -16,6 +16,9 @@ export default async function MeuFinanceiroPage() {
   if (!hasPermission(session, "meu_financeiro", "ver")) redirect("/dashboard");
 
   const dados = await getMeuFinanceiroInitial(session.id);
+  const podeVerHonorarioTotal =
+    session.categoria === "Administrador(a)" ||
+    session.categoria === "Sócio(a)";
 
   return (
     <div className="space-y-6">
@@ -39,6 +42,7 @@ export default async function MeuFinanceiroPage() {
         processosAtivosCount={dados.processosAtivosCount}
         estagioSnapshot={dados.estagioSnapshot}
         comissaoConfigurada={dados.comissaoConfigurada}
+        podeVerHonorarioTotal={podeVerHonorarioTotal}
       />
     </div>
   );

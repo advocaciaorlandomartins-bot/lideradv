@@ -231,6 +231,10 @@ interface Props {
   processosAtivosCount: number;
   estagioSnapshot: EstagioSnapshot;
   comissaoConfigurada: boolean;
+  /** Só admin/sócio vê o valor total do honorário do cliente — pro colaborador
+   * mostra só a comissão dele, pra não expor o quanto o escritório fica com
+   * o restante (evita a comparação "trabalho tanto e não vejo nada disso"). */
+  podeVerHonorarioTotal: boolean;
 }
 
 type FiltroTipo = "todos" | "receita" | "despesa";
@@ -247,6 +251,7 @@ export default function MeuFinanceiroContent({
   processosAtivosCount,
   estagioSnapshot,
   comissaoConfigurada,
+  podeVerHonorarioTotal,
 }: Props) {
   const hoje = new Date();
   const mesHojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
@@ -823,9 +828,11 @@ export default function MeuFinanceiroContent({
                         <th className="px-3 py-2 text-left font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
                           Modelo
                         </th>
-                        <th className="px-3 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
-                          Honorário total
-                        </th>
+                        {podeVerHonorarioTotal && (
+                          <th className="px-3 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
+                            Honorário total
+                          </th>
+                        )}
                         <th className="px-3 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-blue-400">
                           Minha comissão
                         </th>
@@ -859,11 +866,13 @@ export default function MeuFinanceiroContent({
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-2.5 text-right font-body text-sm text-muted tabular-nums">
-                            {p.semHonorarioDefinido
-                              ? "–"
-                              : fmt(p.honorario_estimado)}
-                          </td>
+                          {podeVerHonorarioTotal && (
+                            <td className="px-3 py-2.5 text-right font-body text-sm text-muted tabular-nums">
+                              {p.semHonorarioDefinido
+                                ? "–"
+                                : fmt(p.honorario_estimado)}
+                            </td>
+                          )}
                           <td className="px-3 py-2.5 text-right font-heading text-sm font-bold tabular-nums text-blue-700">
                             {p.semHonorarioDefinido ? (
                               <span className="font-body text-xs font-normal text-slate-400">
@@ -892,14 +901,16 @@ export default function MeuFinanceiroContent({
                           Total ({processosHonorarios.length} processo
                           {processosHonorarios.length !== 1 ? "s" : ""})
                         </td>
-                        <td className="px-3 py-2.5 text-right font-body text-xs text-muted tabular-nums">
-                          {fmt(
-                            processosHonorarios.reduce(
-                              (s, p) => s + p.honorario_estimado,
-                              0
-                            )
-                          )}
-                        </td>
+                        {podeVerHonorarioTotal && (
+                          <td className="px-3 py-2.5 text-right font-body text-xs text-muted tabular-nums">
+                            {fmt(
+                              processosHonorarios.reduce(
+                                (s, p) => s + p.honorario_estimado,
+                                0
+                              )
+                            )}
+                          </td>
+                        )}
                         <td className="px-3 py-2.5 text-right font-heading text-sm font-bold tabular-nums text-blue-800">
                           {fmt(honorariosEscritorio)}
                         </td>
@@ -944,7 +955,9 @@ export default function MeuFinanceiroContent({
                           {l.comissao_pct != null && (
                             <>
                               {" · "}
-                              {fmt(l.valor)} total ({l.comissao_pct}%)
+                              {podeVerHonorarioTotal &&
+                                `${fmt(l.valor)} total `}
+                              ({l.comissao_pct}%)
                             </>
                           )}
                         </p>

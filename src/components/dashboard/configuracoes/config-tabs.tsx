@@ -2,14 +2,12 @@
 
 import { useState } from "react";
 import ConfigForm from "./config-form";
-import ComissoesSection from "./comissoes-section";
 import MensagensSection from "./mensagens-section";
-import { CogIcon, PercentIcon, BellIcon } from "@/components/icons";
+import { CogIcon, BellIcon } from "@/components/icons";
 import type { EscritorioConfig } from "@/lib/escritorio-db";
-import type { ComissaoConfig } from "@/lib/comissoes-config-db";
 import type { MensagensConfig } from "@/config/mensagens";
 
-type Tab = "escritorio" | "comissoes" | "mensagens";
+type Tab = "escritorio" | "mensagens";
 
 interface TabMeta {
   key: Tab;
@@ -20,7 +18,6 @@ interface TabMeta {
 
 interface Props {
   config: EscritorioConfig;
-  comissoes: ComissaoConfig[];
   mensagensConfig: MensagensConfig;
 }
 
@@ -32,12 +29,6 @@ const TABS: TabMeta[] = [
     icon: CogIcon,
   },
   {
-    key: "comissoes",
-    label: "Comissões e Bonificações",
-    description: "Regras de comissão e bonificação",
-    icon: PercentIcon,
-  },
-  {
     key: "mensagens",
     label: "Mensagens Automáticas",
     description: "Templates e intervalos de WhatsApp",
@@ -45,11 +36,7 @@ const TABS: TabMeta[] = [
   },
 ];
 
-export default function ConfigTabs({
-  config,
-  comissoes,
-  mensagensConfig,
-}: Props) {
+export default function ConfigTabs({ config, mensagensConfig }: Props) {
   const [tab, setTab] = useState<Tab>("escritorio");
 
   const activeMeta = TABS.find((t) => t.key === tab)!;
@@ -116,7 +103,6 @@ export default function ConfigTabs({
               <ConfigForm config={config} />
             </div>
           )}
-          {tab === "comissoes" && <ComissoesSection comissoes={comissoes} />}
           {tab === "mensagens" && (
             <MensagensSection initialConfig={mensagensConfig} />
           )}

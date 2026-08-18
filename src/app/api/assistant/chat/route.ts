@@ -235,10 +235,10 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Botão "Novo Usuário" → formulário de criação
 
 ## CONFIGURAÇÕES (menu: Sistema → Configurações — somente Administradores)
-- 3 abas:
+- 2 abas:
   1. "Escritório" — nome, OAB, CNPJ, logomarca, endereço, dados de contato, parâmetros de documentos
-  2. "Comissões e Bonificações" — regras de cálculo de comissão para colaboradores por tipo de processo
-  3. "Mensagens Automáticas" — edição dos textos de WhatsApp (lembretes INSS, cobranças, convites de reunião) e intervalos de envio
+  2. "Mensagens Automáticas" — edição dos textos de WhatsApp (lembretes INSS, cobranças, convites de reunião) e intervalos de envio
+- A comissão de cada colaborador (por fase administrativo/judicial/ambos) não fica aqui — é configurada no cadastro do próprio colaborador, em Equipe → Colaboradores → editar
 
 ## MENSAGENS WHATSAPP AUTOMÁTICAS
 - O sistema envia mensagens automáticas pelo WhatsApp via PrevBot

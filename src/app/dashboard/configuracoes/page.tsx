@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
-import { getAllComissoesConfig } from "@/lib/comissoes-config-db";
 import { getMensagensConfig } from "@/lib/mensagens-config-db";
 import ConfigTabs from "@/components/dashboard/configuracoes/config-tabs";
 
@@ -13,9 +12,8 @@ export default async function ConfiguracoesPage() {
   const user = await getSession();
   if (!user || !hasPermission(user, "configuracoes", "ver")) notFound();
 
-  const [config, comissoes, mensagensConfig] = await Promise.all([
+  const [config, mensagensConfig] = await Promise.all([
     getEscritorioConfig(),
-    getAllComissoesConfig(),
     getMensagensConfig(),
   ]);
 
@@ -26,15 +24,12 @@ export default async function ConfiguracoesPage() {
           Configurações
         </h1>
         <p className="font-body text-sm text-muted mt-1">
-          Dados do escritório, regras de comissão e mensagens automáticas.
+          Dados do escritório e mensagens automáticas. A comissão de cada
+          colaborador é configurada no cadastro dele, em Colaboradores.
         </p>
       </div>
 
-      <ConfigTabs
-        config={config}
-        comissoes={comissoes}
-        mensagensConfig={mensagensConfig}
-      />
+      <ConfigTabs config={config} mensagensConfig={mensagensConfig} />
     </div>
   );
 }

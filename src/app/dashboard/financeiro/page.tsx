@@ -119,28 +119,12 @@ export default async function FinanceiroPage({
           </p>
         </div>
 
-        {/* Botões de ação — um por aba, sem duplicatas */}
+        {/* Botões de ação — "Nova Receita"/"Nova Despesa" ficam sempre visíveis
+            (menos na aba Remunerações, que tem seu próprio fluxo de folha),
+            pra não depender de estar na aba certa pra achar a opção. */}
         {canEdit && (
           <div className="flex items-center gap-2 flex-wrap">
-            {tab === "receber" && (
-              <Link
-                href="/dashboard/financeiro/novo?tipo=entrada"
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-emerald-700 whitespace-nowrap"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Nova Receita
-              </Link>
-            )}
-            {tab === "pagar" && (
-              <Link
-                href="/dashboard/financeiro/novo?tipo=saida"
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 whitespace-nowrap"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Nova Despesa
-              </Link>
-            )}
-            {tab === "remuneracoes" && (
+            {tab === "remuneracoes" ? (
               <Link
                 href="/dashboard/remuneracoes/nova"
                 className="flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3 font-body text-sm font-semibold text-white transition-colors hover:bg-purple-700 whitespace-nowrap"
@@ -148,8 +132,7 @@ export default async function FinanceiroPage({
                 <PlusIcon className="h-4 w-4" />
                 Nova Remuneração
               </Link>
-            )}
-            {tab === "historico" && (
+            ) : (
               <>
                 <Link
                   href="/dashboard/financeiro/novo?tipo=entrada"

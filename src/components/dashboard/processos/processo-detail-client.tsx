@@ -49,6 +49,7 @@ import {
   RESULTADO_ADMIN_META,
   RESULTADO_JUDICIAL_META,
 } from "@/lib/producao-types";
+import { getProximaAcaoProcesso } from "@/lib/processo-fases";
 import {
   XMarkIcon,
   SpinnerIcon,
@@ -127,6 +128,13 @@ function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
   const inputCls2 =
     "w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg focus:border-primary focus:outline-none";
 
+  const proximaAcao = getProximaAcaoProcesso({
+    estagio_producao: processo.estagio_producao,
+    resultado_administrativo: processo.resultado_administrativo,
+    resultado_judicial: processo.resultado_judicial,
+    protocolo_inss: processo.protocolo_inss,
+  });
+
   return (
     <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
       {/* Header */}
@@ -149,6 +157,26 @@ function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
           Ver na Produção
         </Link>
       </div>
+
+      {/* Próxima ação — resume em uma frase o que falta fazer no caso */}
+      {proximaAcao && (
+        <div
+          className={`flex items-center gap-2 border-b px-5 py-2.5 ${
+            proximaAcao.urgente
+              ? "border-red-100 bg-red-50"
+              : "border-border bg-slate-50"
+          }`}
+        >
+          <span
+            className={`h-2 w-2 flex-shrink-0 rounded-full ${proximaAcao.urgente ? "bg-red-500" : "bg-slate-400"}`}
+          />
+          <p
+            className={`font-body text-xs font-semibold ${proximaAcao.urgente ? "text-red-700" : "text-slate-600"}`}
+          >
+            Próxima ação: {proximaAcao.label}
+          </p>
+        </div>
+      )}
 
       {/* Stepper */}
       <div className="px-5 py-4">

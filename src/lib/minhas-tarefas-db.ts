@@ -1,4 +1,5 @@
 import sql from "./db";
+import { getProximaAcaoProcesso } from "./processo-fases";
 
 export interface MinhaControle {
   id: string;
@@ -28,20 +29,39 @@ export interface MinhaTarefa {
   source: "tarefa";
 }
 
-export type MinhaItem = MinhaControle | MinhaTarefa;
+/**
+ * Ação pendente derivada do próprio estado do processo (estágio + resultados),
+ * sem depender de alguém ter criado uma tarefa/controle manual — ex.: "dar
+ * entrada no requerimento administrativo" aparece assim que o processo entra
+ * em produção/administrativo sem protocolo, mesmo sem data agendada.
+ */
+export interface MinhaAcaoProcesso {
+  id: string;
+  titulo: string;
+  urgente: boolean;
+  processo_id: string;
+  processo_numero: string | null;
+  cliente_nome: string | null;
+  cliente_id: string | null;
+  estagio_producao: string | null;
+  source: "processo";
+}
+
+export type MinhaItem = MinhaControle | MinhaTarefa | MinhaAcaoProcesso;
 
 /**
  * tarefas_processo.responsavel é texto livre (sem FK) preenchido a partir do
  * nome em colaboradores — que pode divergir do usuarios.nome da sessão.
  * Resolve as variantes de nome (sessão + colaborador vinculado) para casar
- * com qualquer uma delas, em vez de depender só de usuarios.nome.
+ * com qualquer uma delas, em vez de depender só de usuarios.nome, e devolve
+ * também o colaborador_id vinculado (usado para achar os processos dele).
  */
 async function nomesResponsavel(
   login: string,
   nomeSessao: string
-): Promise<string[]> {
+): Promise<{ nomes: string[]; colaboradorId: string | null }> {
   const rows = await sql`
-    SELECT c.nome AS colaborador_nome
+    SELECT c.id::text AS colaborador_id, c.nome AS colaborador_nome
     FROM usuarios u
     LEFT JOIN colaboradores c ON c.id = u.colaborador_id
     WHERE u.login = ${login}
@@ -50,7 +70,12 @@ async function nomesResponsavel(
   const nomes = new Set<string>([nomeSessao]);
   const colaboradorNome = rows[0]?.colaborador_nome;
   if (colaboradorNome) nomes.add(String(colaboradorNome));
-  return Array.from(nomes);
+  return {
+    nomes: Array.from(nomes),
+    colaboradorId: rows[0]?.colaborador_id
+      ? String(rows[0].colaborador_id)
+      : null,
+  };
 }
 
 export async function getMinhasTarefas(
@@ -61,8 +86,8 @@ export async function getMinhasTarefas(
   emAndamento: MinhaItem[];
   concluidas: MinhaItem[];
 }> {
-  const nomes = await nomesResponsavel(login, nome);
-  const [controlesRows, tarefasRows] = await Promise.all([
+  const { nomes, colaboradorId } = await nomesResponsavel(login, nome);
+  const [controlesRows, tarefasRows, processosRows] = await Promise.all([
     sql`
       SELECT
         c.id::text, c.tipo, c.descricao, c.data_evento::text,
@@ -95,6 +120,20 @@ export async function getMinhasTarefas(
         CASE t.prioridade WHEN 'Alta' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,
         t.prazo ASC NULLS LAST
     `,
+    colaboradorId
+      ? sql`
+          SELECT
+            p.id::text AS processo_id, p.numero AS processo_numero,
+            p.estagio_producao, p.resultado_administrativo,
+            p.resultado_judicial, p.protocolo_inss,
+            cl.id::text AS cliente_id, cl.name AS cliente_nome
+          FROM processos p
+          LEFT JOIN clients cl ON cl.id = p.client_id
+          WHERE p.responsavel_id = ${colaboradorId}::uuid
+            AND p.deleted_at IS NULL
+            AND p.status IN ('ativo', 'em_andamento')
+        `
+      : Promise.resolve([]),
   ]);
 
   const controles: MinhaControle[] = controlesRows.map((r) => ({
@@ -130,14 +169,49 @@ export async function getMinhasTarefas(
     source: "tarefa" as const,
   }));
 
+  const acoesProcesso: MinhaAcaoProcesso[] = processosRows
+    .map((r) => {
+      const acao = getProximaAcaoProcesso({
+        estagio_producao: r.estagio_producao
+          ? String(r.estagio_producao)
+          : null,
+        resultado_administrativo: r.resultado_administrativo
+          ? String(r.resultado_administrativo)
+          : null,
+        resultado_judicial: r.resultado_judicial
+          ? String(r.resultado_judicial)
+          : null,
+        protocolo_inss: r.protocolo_inss ? String(r.protocolo_inss) : null,
+      });
+      if (!acao) return null;
+      return {
+        id: `acao-${r.processo_id}`,
+        titulo: acao.label,
+        urgente: acao.urgente,
+        processo_id: String(r.processo_id),
+        processo_numero: r.processo_numero ? String(r.processo_numero) : null,
+        cliente_nome: r.cliente_nome ? String(r.cliente_nome) : null,
+        cliente_id: r.cliente_id ? String(r.cliente_id) : null,
+        estagio_producao: r.estagio_producao
+          ? String(r.estagio_producao)
+          : null,
+        source: "processo" as const,
+      };
+    })
+    .filter((a): a is MinhaAcaoProcesso => a !== null)
+    .sort((a, b) => Number(b.urgente) - Number(a.urgente));
+
   const all: MinhaItem[] = [...controles, ...tarefas];
 
   return {
-    pendentes: all.filter((i) =>
-      i.source === "controle"
-        ? (i as MinhaControle).status === "pendente"
-        : (i as MinhaTarefa).status === "Pendente"
-    ),
+    pendentes: [
+      ...acoesProcesso,
+      ...all.filter((i) =>
+        i.source === "controle"
+          ? (i as MinhaControle).status === "pendente"
+          : (i as MinhaTarefa).status === "Pendente"
+      ),
+    ],
     emAndamento: all.filter((i) =>
       i.source === "controle"
         ? (i as MinhaControle).status === "em_andamento"
@@ -155,18 +229,6 @@ export async function countMinhasPendentes(
   login: string,
   nome: string
 ): Promise<number> {
-  const nomes = await nomesResponsavel(login, nome);
-  const [c, t] = await Promise.all([
-    sql`
-      SELECT COUNT(*)::int AS n FROM controles c
-      LEFT JOIN usuarios u ON u.id = c.responsavel_id
-      WHERE (u.login = ${login} OR c.responsavel_id IS NULL)
-        AND (c.status IS NULL OR c.status = 'pendente')
-    `,
-    sql`
-      SELECT COUNT(*)::int AS n FROM tarefas_processo
-      WHERE responsavel = ANY(${nomes}) AND status = 'Pendente'
-    `,
-  ]);
-  return Number(c[0]?.n ?? 0) + Number(t[0]?.n ?? 0);
+  const { pendentes } = await getMinhasTarefas(login, nome);
+  return pendentes.length;
 }

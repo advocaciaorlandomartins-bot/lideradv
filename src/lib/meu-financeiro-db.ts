@@ -107,10 +107,17 @@ interface ComissaoConfig {
 }
 
 /**
- * Resolve o % de comissão do colaborador para um processo, com base na fase
- * já concluída (resultado administrativo/judicial definido) ou, se o
- * processo ainda não tem resultado, na fase atual (estagio_producao) como
- * melhor indicativo disponível de em que fase o colaborador está atuando.
+ * Resolve o % de comissão do colaborador para um processo, de acordo com o
+ * caminho que o caso percorreu:
+ * - Administrativo DEFERIDO (concedido) → só a parte administrativa.
+ * - Administrativo INDEFERIDO (negado) → o caso necessariamente segue para o
+ *   judicial, então já conta como "ambos" a partir daí, mesmo antes do
+ *   resultado judicial sair (o colaborador já vai atuar nas duas fases).
+ * - Sem resultado administrativo registrado, mas já no judicial (ação que foi
+ *   direto à via judicial, sem passar pelo administrativo) → só judicial.
+ * - Ainda sem nenhum resultado e ainda na fase administrativa (em andamento)
+ *   → estimativa pela fase administrativa, atualizada automaticamente assim
+ *   que sair o resultado.
  */
 function resolveComissaoPct(
   config: ComissaoConfig | null,
@@ -119,12 +126,15 @@ function resolveComissaoPct(
   resultadoJudicial: unknown
 ): number | null {
   if (!config) return null;
-  const temAdmin = resultadoAdministrativo != null;
-  const temJudicial = resultadoJudicial != null;
-  if (temAdmin && temJudicial) return config.comissao_ambos_pct;
-  if (temJudicial) return config.comissao_judicial_pct;
-  if (temAdmin) return config.comissao_administrativo_pct;
-  if (estagioProducao === "judicial") return config.comissao_judicial_pct;
+
+  if (resultadoAdministrativo === "negado") return config.comissao_ambos_pct;
+  if (resultadoAdministrativo === "concedido")
+    return config.comissao_administrativo_pct;
+
+  if (resultadoJudicial != null || estagioProducao === "judicial")
+    return config.comissao_judicial_pct;
+
+  // Ainda em andamento, sem resultado definido — estimativa pela fase administrativa.
   return config.comissao_administrativo_pct;
 }
 

@@ -6,6 +6,7 @@ import type {
   MinhaItem,
   MinhaControle,
   MinhaTarefa,
+  MinhaAcaoProcesso,
 } from "@/lib/minhas-tarefas-db";
 import {
   darBaixaControleAction,
@@ -86,8 +87,82 @@ interface ItemCardProps {
   isConcluida?: boolean;
 }
 
+function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
+  const estagioMeta =
+    item.estagio_producao && item.estagio_producao in ESTAGIO_PRODUCAO_META
+      ? ESTAGIO_PRODUCAO_META[
+          item.estagio_producao as keyof typeof ESTAGIO_PRODUCAO_META
+        ]
+      : null;
+
+  return (
+    <div
+      className={`rounded-xl border bg-white shadow-sm ${
+        item.urgente
+          ? "border-red-200"
+          : "border-border hover:border-primary/30 hover:shadow-md"
+      }`}
+    >
+      <div className="p-4">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <span
+            className={`rounded px-1.5 py-0.5 font-body text-[10px] font-semibold ${
+              item.urgente
+                ? "bg-red-100 text-red-700"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {item.urgente ? "Ação urgente" : "Próxima ação"}
+          </span>
+        </div>
+
+        <p className="font-body text-sm font-semibold leading-snug text-fg">
+          {item.titulo}
+        </p>
+
+        {item.cliente_nome && (
+          <p className="mt-1 font-body text-xs font-semibold text-primary truncate">
+            {item.cliente_nome}
+          </p>
+        )}
+
+        {item.processo_numero && (
+          <p className="mt-0.5 font-body text-xs text-muted truncate">
+            Proc. {item.processo_numero}
+          </p>
+        )}
+
+        {estagioMeta && (
+          <Link
+            href="/dashboard/producao"
+            className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-body text-[10px] font-semibold transition-opacity hover:opacity-80 ${estagioMeta.bg} ${estagioMeta.color}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${estagioMeta.dot}`} />
+            {estagioMeta.label}
+          </Link>
+        )}
+      </div>
+
+      <div className="border-t border-border px-3 pb-3 pt-3">
+        <Link
+          href={`/dashboard/processos/${item.processo_id}`}
+          style={{ touchAction: "manipulation" }}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
+        >
+          <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />
+          Ver processo
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function ItemCard({ item, isConcluida = false }: ItemCardProps) {
   const [pending, startTransition] = useTransition();
+
+  if (item.source === "processo") {
+    return <AcaoProcessoCard item={item} />;
+  }
 
   const isControle = item.source === "controle";
   const ctrl = isControle ? (item as MinhaControle) : null;

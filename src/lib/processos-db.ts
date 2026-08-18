@@ -94,6 +94,25 @@ function mapRow(r: any): Processo {
 }
 
 /**
+ * Contagem de processos visíveis — mesma regra de escopo de getAllProcessos,
+ * sem carregar as linhas inteiras. Usado no KPI do Dashboard para bater com
+ * o número que a lista de Processos realmente mostra para aquele usuário.
+ */
+export async function getProcessosCount(
+  responsavelId?: string | null
+): Promise<number> {
+  const rows = responsavelId
+    ? await sql`
+        SELECT COUNT(*)::int AS total FROM processos
+        WHERE deleted_at IS NULL AND responsavel_id = ${responsavelId}::uuid
+      `
+    : await sql`
+        SELECT COUNT(*)::int AS total FROM processos WHERE deleted_at IS NULL
+      `;
+  return Number(rows[0]?.total ?? 0);
+}
+
+/**
  * responsavelId: quando informado, restringe aos processos em que esse
  * colaborador é responsável — usado para quem não tem a permissão
  * "processos_ver_todos" (por padrão, só Administrador(a)/Sócio(a) veem tudo).

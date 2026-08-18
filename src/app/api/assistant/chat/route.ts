@@ -75,6 +75,7 @@ Abas:
 
 ### Detalhe do processo:
 - Linha de Produção no topo: stepper visual Análise → Produção → Administrativo → Judicial → Arquivado
+- Logo abaixo do stepper, uma faixa "Próxima ação" resume em uma frase o que falta fazer no caso (ex: "Dar entrada no requerimento administrativo (INSS)", "INSS indeferiu — ingressar com ação judicial", "Aguardando resultado do INSS") — calculada automaticamente a partir do estágio e dos resultados administrativo/judicial, sem precisar de tarefa manual; fica vermelha quando é urgente
 - Abas: "Dados" · "Relato" · "Linha do tempo"
 - Linha do tempo: adicionar histórico, criar evento de controle, criar tarefa, criar pendência — com botões de baixa, reabertura, exclusão
 - Botões de avanço: "Mover para Produção", "Registrar resultado Administrativo", "Registrar resultado Judicial", "Arquivar", "Reabrir", "Voltar etapa"
@@ -191,8 +192,9 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 
 ## MINHAS TAREFAS (menu: Equipe → Minhas Tarefas)
 - Kanban pessoal com colunas: "Pendentes" · "Em Andamento" · "Concluídas"
-- Mostra apenas tarefas atribuídas ao usuário logado
-- Somente visualização — tarefas são criadas pelos gestores dentro do detalhe de cada processo
+- Mostra tarefas e controles atribuídos ao usuário logado
+- A coluna "Pendentes" também mostra, automaticamente, uma "ação pendente" para cada processo em que o colaborador é responsável e que precisa de alguma providência — mesmo sem tarefa/controle agendado (ex: "Dar entrada no requerimento administrativo (INSS)" quando o processo está na fase Administrativo sem protocolo ainda, ou "INSS indeferiu — ingressar com ação judicial"). Essas ações vêm direto do estágio do processo (Análise/Produção/Administrativo/Judicial) e ficam marcadas como "Ação urgente" quando fazem parte crítica; clicar em "Ver processo" leva direto ao caso
+- Tarefas/controles explícitos são criados pelos gestores dentro do detalhe de cada processo — as ações derivadas de processo não precisam ser criadas por ninguém
 
 ## COLABORADORES (menu: Equipe → Colaboradores)
 - Lista de todos os colaboradores do escritório

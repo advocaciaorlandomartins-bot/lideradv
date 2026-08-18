@@ -13,6 +13,8 @@ import { countMinhasPendentes } from "@/lib/minhas-tarefas-db";
 import { TIPO_LABELS_COMP, TIPO_ICONS_COMP } from "@/lib/compromissos-db";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { getProcessosCount } from "@/lib/processos-db";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import MiniCalendar from "@/components/dashboard/mini-calendar";
 import DashboardAniversariosCard from "@/components/dashboard/dashboard-aniversarios-card";
 import {
@@ -207,6 +209,23 @@ export default async function DashboardPage() {
       ? getAlertasPrevidenciarios().catch(() => [])
       : Promise.resolve([]),
   ]);
+
+  // "totalProcessos" do gerenciador é a contagem do escritório inteiro — sem
+  // "processos_ver_todos" o usuário só pode ver os próprios, então o KPI
+  // precisa bater com o que a lista de Processos realmente mostra para ele.
+  const verTodosProcessos = hasPermission(
+    session,
+    "processos_ver_todos",
+    "ver"
+  );
+  const processosVisiveisCount = perm.processos
+    ? verTodosProcessos
+      ? (gerData?.counts.totalProcessos ?? 0)
+      : await getProcessosCount(
+          (await getColaboradorIdForUser(session.id)) ??
+            "00000000-0000-0000-0000-000000000000"
+        )
+    : 0;
 
   const kpis = gerData?.kpis;
   const counts = gerData?.counts;
@@ -436,7 +455,7 @@ export default async function DashboardPage() {
               </span>
             </div>
             <p className="mt-3 font-heading text-3xl font-bold text-fg">
-              {counts.totalProcessos}
+              {processosVisiveisCount}
             </p>
             <p className="mt-0.5 font-body text-xs font-semibold text-muted">
               Processos

@@ -17,6 +17,7 @@ export interface ProcessoFaseInput {
   resultado_administrativo: string | null;
   resultado_judicial: string | null;
   protocolo_inss?: string | null;
+  data_distribuicao?: string | null;
 }
 
 export function getProximaAcaoProcesso(
@@ -62,8 +63,14 @@ export function getProximaAcaoProcesso(
   }
 
   if (estagio === "judicial") {
+    if (!p.data_distribuicao) {
+      return {
+        label: "Ingressar com a ação judicial (registrar distribuição)",
+        urgente: true,
+      };
+    }
     if (!p.resultado_judicial) {
-      return { label: "Acompanhar andamento judicial", urgente: false };
+      return { label: "Aguardando resultado da ação judicial", urgente: false };
     }
     return {
       label: "Processo julgado — providenciar encerramento",

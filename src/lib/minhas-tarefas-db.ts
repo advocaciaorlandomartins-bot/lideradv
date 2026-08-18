@@ -126,6 +126,7 @@ export async function getMinhasTarefas(
             p.id::text AS processo_id, p.numero AS processo_numero,
             p.estagio_producao, p.resultado_administrativo,
             p.resultado_judicial, p.protocolo_inss,
+            to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao,
             cl.id::text AS cliente_id, cl.name AS cliente_nome
           FROM processos p
           LEFT JOIN clients cl ON cl.id = p.client_id
@@ -182,6 +183,9 @@ export async function getMinhasTarefas(
           ? String(r.resultado_judicial)
           : null,
         protocolo_inss: r.protocolo_inss ? String(r.protocolo_inss) : null,
+        data_distribuicao: r.data_distribuicao
+          ? String(r.data_distribuicao)
+          : null,
       });
       if (!acao) return null;
       return {

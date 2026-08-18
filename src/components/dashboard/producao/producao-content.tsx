@@ -369,7 +369,9 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
                   )
                 )
                   return;
-                startTransition(() => arquivarProcessoAction(processo.id));
+                startTransition(() => {
+                  void arquivarProcessoAction(processo.id);
+                });
               }}
               disabled={isPending}
               className="ml-auto flex items-center gap-1 rounded px-1.5 py-1 font-body text-[11px] text-muted transition-colors hover:text-red-600 disabled:opacity-50"

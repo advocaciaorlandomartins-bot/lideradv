@@ -79,6 +79,7 @@ Abas:
 - Abas: "Dados" · "Relato" · "Linha do tempo"
 - Linha do tempo: adicionar histórico, criar evento de controle, criar tarefa, criar pendência — com botões de baixa, reabertura, exclusão
 - Botões de avanço: "Mover para Produção", "Registrar resultado Administrativo", "Registrar resultado Judicial", "Arquivar", "Reabrir", "Voltar etapa"
+- "Arquivar" abre um formulário pedindo o resultado final (Deferido, Indeferido, Sentença favorável, Desistência, etc.) e observação — existe só essa via de arquivamento no processo, para o estágio da Linha de Produção e o status do processo nunca ficarem dessincronizados
 - Seção IA Jurídica: análise, diagnóstico estratégico, geração de petições
 - Seção Documentos: upload de documentos do processo
 

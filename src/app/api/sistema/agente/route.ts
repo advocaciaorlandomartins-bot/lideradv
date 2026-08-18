@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
 import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
+import { getLancamentoKpis, getContasAReceber } from "@/lib/lancamentos-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -127,6 +128,22 @@ const TOOLS: Anthropic.Tool[] = [
     description:
       "Mostra os erros e mensagens falhadas recentes do sistema para diagnóstico.",
     input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "consultar_financeiro",
+    description:
+      "Consulta dados financeiros do escritório: KPIs gerais (a receber, recebido, a pagar, pago, folha, lançamentos atrasados) e contas a receber por cliente (total pendente, total pago, histórico de lançamentos). Use quando o usuário pedir contas em aberto, histórico de pagamentos, meses em aberto por cliente, ou situação financeira geral.",
+    input_schema: {
+      type: "object",
+      properties: {
+        cliente_nome: {
+          type: "string",
+          description:
+            "Nome (ou parte do nome) do cliente para detalhar a conta dele. Se omitido, retorna o resumo geral do escritório e o ranking de clientes com maior valor pendente.",
+        },
+      },
+      required: [],
+    },
   },
 ];
 
@@ -499,6 +516,43 @@ async function executarFerramenta(
       });
     }
 
+    case "consultar_financeiro": {
+      const kpis = await getLancamentoKpis();
+      const contas = await getContasAReceber();
+
+      const cliente_nome =
+        typeof input.cliente_nome === "string" ? input.cliente_nome.trim() : "";
+      if (cliente_nome) {
+        const termo = cliente_nome.toLowerCase();
+        const encontrados = contas.filter((c) =>
+          c.client_name.toLowerCase().includes(termo)
+        );
+        if (encontrados.length === 0) {
+          return JSON.stringify({
+            mensagem: `Nenhum cliente encontrado com o nome "${cliente_nome}".`,
+          });
+        }
+        return JSON.stringify({
+          clientes: encontrados.map((c) => ({
+            nome: c.client_name,
+            documento: c.client_doc,
+            total_pendente: c.totalPendente,
+            total_pago: c.totalPago,
+            lancamentos: c.items.slice(0, 20),
+          })),
+        });
+      }
+
+      return JSON.stringify({
+        kpis_gerais: kpis,
+        maiores_pendencias: contas.slice(0, 10).map((c) => ({
+          nome: c.client_name,
+          total_pendente: c.totalPendente,
+          total_pago: c.totalPago,
+        })),
+      });
+    }
+
     default:
       return JSON.stringify({ erro: `Ferramenta "${name}" não reconhecida` });
   }
@@ -517,6 +571,7 @@ Suas capacidades:
 - Atualizar dados do escritório (telefone, e-mail, endereço, etc.)
 - Testar integração WhatsApp
 - Ver logs de erros (inclui erros de lembretes E eventos CRM)
+- Consultar dados financeiros via consultar_financeiro: KPIs gerais (a receber, recebido, a pagar, pago, folha, atrasados) e contas por cliente (pendente, pago, histórico de lançamentos) — use sempre que o usuário pedir situação financeira, contas em aberto, histórico de pagamentos ou meses em aberto de um cliente
 
 Quando o usuário relatar que mensagens não chegaram, use SEMPRE: 1) ver_erros para diagnosticar, 2) reenviar_lembretes para reenviar.
 Após executar, reporte claramente o resultado com emojis: ✅ sucesso, ❌ erro, ⚠️ atenção.

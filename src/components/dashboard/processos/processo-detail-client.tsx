@@ -16,8 +16,6 @@ import type {
 } from "@/lib/processo-full-db";
 import type { ModeloDocumento } from "@/lib/modelos-db";
 import {
-  avancarFaseAction,
-  arquivarProcessoAction,
   updateRelatoAction,
   updateResponsavelAction,
   createHistoricoRegistroAction,
@@ -40,7 +38,9 @@ import {
   moverParaAdministrativoAction,
   registrarResultadoAdminAction,
   registrarResultadoJudicialAction,
-  arquivarProcessoAction as arquivarProducaoAction,
+  registrarProtocoloAdminAction,
+  registrarDistribuicaoJudicialAction,
+  arquivarProcessoAction,
   reabrirProcessoAction,
   voltarEstagioAction,
 } from "@/lib/producao-actions";
@@ -105,7 +105,13 @@ const PIPELINE_PROD = [
   "judicial",
 ] as const;
 
-function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
+function ProducaoBar({
+  processo,
+  onArquivar,
+}: {
+  processo: ProcessoExtended;
+  onArquivar: () => void;
+}) {
   const [showFormAdmin, setShowFormAdmin] = useState(false);
   const [showFormJud, setShowFormJud] = useState(false);
   const [resultadoAdmin, setResultadoAdmin] = useState<"concedido" | "negado">(
@@ -117,6 +123,13 @@ function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
   const [resultadoJud, setResultadoJud] = useState<
     "procedente" | "improcedente" | "parcial"
   >("procedente");
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [showFormProtocolo, setShowFormProtocolo] = useState(false);
+  const [protocoloNumero, setProtocoloNumero] = useState("");
+  const [protocoloData, setProtocoloData] = useState(hoje);
+  const [showFormDistribuicao, setShowFormDistribuicao] = useState(false);
+  const [distribuicaoNumero, setDistribuicaoNumero] = useState("");
+  const [distribuicaoData, setDistribuicaoData] = useState(hoje);
   const [isPending, startTransition] = useTransition();
 
   const estagio = processo.estagio_producao;
@@ -133,6 +146,7 @@ function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
     resultado_administrativo: processo.resultado_administrativo,
     resultado_judicial: processo.resultado_judicial,
     protocolo_inss: processo.protocolo_inss,
+    data_distribuicao: processo.data_distribuicao_iso,
   });
 
   return (
@@ -334,6 +348,15 @@ function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
                 Protocolar Adm.
               </button>
             )}
+            {estagio === "administrativo" && !processo.protocolo_inss && (
+              <button
+                onClick={() => setShowFormProtocolo(true)}
+                className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1 font-body text-xs font-semibold text-red-700 hover:bg-red-100"
+              >
+                <ChevronRightIcon className="h-3 w-3" />
+                Registrar Protocolo
+              </button>
+            )}
             {estagio === "administrativo" && (
               <button
                 onClick={() => setShowFormAdmin(true)}
@@ -341,6 +364,15 @@ function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
               >
                 <ChevronRightIcon className="h-3 w-3" />
                 Registrar Resultado
+              </button>
+            )}
+            {estagio === "judicial" && !processo.data_distribuicao_iso && (
+              <button
+                onClick={() => setShowFormDistribuicao(true)}
+                className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1 font-body text-xs font-semibold text-red-700 hover:bg-red-100"
+              >
+                <ChevronRightIcon className="h-3 w-3" />
+                Registrar Distribuição
               </button>
             )}
             {estagio === "judicial" && (
@@ -366,10 +398,7 @@ function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
             )}
             {!isArquivado && (
               <button
-                onClick={() => {
-                  if (!confirm("Arquivar este processo na produção?")) return;
-                  startTransition(() => arquivarProducaoAction(processo.id));
-                }}
+                onClick={onArquivar}
                 disabled={isPending}
                 className="ml-auto flex items-center gap-1 rounded px-2 py-1 font-body text-xs text-muted hover:text-red-600 disabled:opacity-40"
               >
@@ -496,6 +525,118 @@ function ProducaoBar({ processo }: { processo: ProcessoExtended }) {
             </div>
           </div>
         )}
+
+        {/* Form protocolo administrativo (INSS) */}
+        {showFormProtocolo && (
+          <div className="mt-3 space-y-3 rounded-lg border border-border bg-slate-50 p-4">
+            <p className="font-body text-xs font-semibold text-fg">
+              Protocolo do Requerimento Administrativo
+            </p>
+            <div>
+              <label className="font-body text-xs text-muted">
+                Número do protocolo (opcional)
+              </label>
+              <input
+                type="text"
+                value={protocoloNumero}
+                onChange={(e) => setProtocoloNumero(e.target.value)}
+                placeholder="Ex: 700.123.456-7"
+                className={inputCls2}
+              />
+            </div>
+            <div>
+              <label className="font-body text-xs text-muted">
+                Data do protocolo
+              </label>
+              <input
+                type="date"
+                value={protocoloData}
+                onChange={(e) => setProtocoloData(e.target.value)}
+                className={inputCls2}
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() =>
+                  startTransition(async () => {
+                    await registrarProtocoloAdminAction(
+                      processo.id,
+                      protocoloNumero,
+                      protocoloData
+                    );
+                    setShowFormProtocolo(false);
+                  })
+                }
+                disabled={isPending}
+                className="flex flex-1 justify-center items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-body text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {isPending && <SpinnerIcon className="h-3 w-3" />} Confirmar
+              </button>
+              <button
+                onClick={() => setShowFormProtocolo(false)}
+                className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Form distribuição judicial */}
+        {showFormDistribuicao && (
+          <div className="mt-3 space-y-3 rounded-lg border border-border bg-slate-50 p-4">
+            <p className="font-body text-xs font-semibold text-fg">
+              Distribuição da Ação Judicial
+            </p>
+            <div>
+              <label className="font-body text-xs text-muted">
+                Número do processo (CNJ, opcional)
+              </label>
+              <input
+                type="text"
+                value={distribuicaoNumero}
+                onChange={(e) => setDistribuicaoNumero(e.target.value)}
+                placeholder={processo.numero || "0000000-00.0000.0.00.0000"}
+                className={inputCls2}
+              />
+            </div>
+            <div>
+              <label className="font-body text-xs text-muted">
+                Data da distribuição
+              </label>
+              <input
+                type="date"
+                value={distribuicaoData}
+                onChange={(e) => setDistribuicaoData(e.target.value)}
+                className={inputCls2}
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() =>
+                  startTransition(async () => {
+                    await registrarDistribuicaoJudicialAction(
+                      processo.id,
+                      distribuicaoNumero,
+                      distribuicaoData
+                    );
+                    setShowFormDistribuicao(false);
+                  })
+                }
+                disabled={isPending}
+                className="flex flex-1 justify-center items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-body text-xs font-semibold text-white disabled:opacity-60"
+              >
+                {isPending && <SpinnerIcon className="h-3 w-3" />} Confirmar
+              </button>
+              <button
+                onClick={() => setShowFormDistribuicao(false)}
+                className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -530,133 +671,6 @@ function Modal({
           </button>
         </div>
         <div className="overflow-y-auto">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-// ── Phase Timeline ─────────────────────────────────────────────
-
-const FASES = [
-  {
-    key: "pre_contrato",
-    label: "Pré-contrato",
-    field: "fase_precontrato_at" as const,
-  },
-  {
-    key: "elaboracao",
-    label: "Elaboração",
-    field: "fase_elaboracao_at" as const,
-  },
-  {
-    key: "arquivado",
-    label: "Arquivada(o)",
-    field: "fase_arquivado_at" as const,
-  },
-];
-
-function FaseTimeline({
-  processo,
-  onAvancar,
-  onArquivar,
-}: {
-  processo: ProcessoExtended;
-  onAvancar: () => void;
-  onArquivar: () => void;
-}) {
-  const currentIdx = FASES.findIndex((f) => f.key === processo.fase_workflow);
-
-  return (
-    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-heading text-sm font-semibold text-fg">
-          Progressão do Processo
-        </h3>
-        <div className="flex gap-2">
-          {processo.fase_workflow !== "arquivado" && (
-            <>
-              {processo.fase_workflow === "pre_contrato" && (
-                <button onClick={onAvancar} className={btnOutline}>
-                  <ChevronRightIcon className="h-3.5 w-3.5" />
-                  Avançar Fase
-                </button>
-              )}
-              <button onClick={onArquivar} className={btnOutline}>
-                <FolderOpenIcon className="h-3.5 w-3.5" />
-                Arquivar
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-start gap-0">
-        {FASES.map((fase, idx) => {
-          const done = idx < currentIdx;
-          const active = idx === currentIdx;
-          const pending = idx > currentIdx;
-          const date = processo[fase.field];
-
-          return (
-            <div key={fase.key} className="flex flex-1 items-start">
-              <div className="flex flex-col items-center flex-1">
-                <div className="flex items-center w-full">
-                  {idx > 0 && (
-                    <div
-                      className={`h-0.5 flex-1 transition-colors ${done || active ? "bg-primary" : "bg-border"}`}
-                    />
-                  )}
-                  <div
-                    className={`h-8 w-8 flex-shrink-0 rounded-full flex items-center justify-center border-2 transition-colors ${
-                      done
-                        ? "border-primary bg-primary"
-                        : active
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-white"
-                    }`}
-                  >
-                    {done ? (
-                      <CheckIcon className="h-4 w-4 text-white" />
-                    ) : (
-                      <span
-                        className={`font-body text-xs font-bold ${active ? "text-primary" : "text-muted"}`}
-                      >
-                        {idx + 1}
-                      </span>
-                    )}
-                  </div>
-                  {idx < FASES.length - 1 && (
-                    <div
-                      className={`h-0.5 flex-1 transition-colors ${done ? "bg-primary" : "bg-border"}`}
-                    />
-                  )}
-                </div>
-                <div className="mt-2 text-center">
-                  <p
-                    className={`font-body text-xs font-semibold ${active ? "text-primary" : done ? "text-fg" : "text-muted"}`}
-                  >
-                    {fase.label}
-                  </p>
-                  {date && (
-                    <p className="font-body text-[10px] text-muted mt-0.5">
-                      {date}
-                    </p>
-                  )}
-                  {active && !date && (
-                    <p className="font-body text-[10px] text-primary mt-0.5">
-                      Fase atual
-                    </p>
-                  )}
-                  {pending && (
-                    <p className="font-body text-[10px] text-slate-300 mt-0.5">
-                      —
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -1803,69 +1817,6 @@ function DocsAutomatizadosSection({
 
 // ── Modals ─────────────────────────────────────────────────────
 
-function AvancarFaseModal({
-  processo,
-  onClose,
-}: {
-  processo: ProcessoExtended;
-  onClose: () => void;
-}) {
-  const [loading, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-
-  function handleAvancar() {
-    setError(null);
-    startTransition(async () => {
-      const result = await avancarFaseAction(processo.id, "elaboracao");
-      if (result.error) {
-        setError(result.error);
-      } else {
-        router.refresh();
-        onClose();
-      }
-    });
-  }
-
-  return (
-    <Modal title="Avançar Fase" onClose={onClose}>
-      <div className="px-6 py-5 space-y-4">
-        <p className="font-body text-sm text-muted">
-          Você está avançando este processo de <strong>Pré-contrato</strong>{" "}
-          para <strong>Elaboração</strong>.
-        </p>
-        <div className="rounded-lg border border-border p-4 bg-slate-50 space-y-1">
-          <p className="font-body text-xs text-muted font-semibold uppercase tracking-wide">
-            Processo
-          </p>
-          <p className="font-body text-sm font-semibold text-fg">
-            {processo.tipo_acao}
-          </p>
-          <p className="font-body text-xs text-muted">{processo.client_name}</p>
-        </div>
-        {error && (
-          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 font-body text-sm text-red-700">
-            {error}
-          </div>
-        )}
-      </div>
-      <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-        <button onClick={onClose} className={btnOutline}>
-          Cancelar
-        </button>
-        <button
-          onClick={handleAvancar}
-          disabled={loading}
-          className={btnPrimary}
-        >
-          {loading ? <SpinnerIcon className="h-4 w-4" /> : null}
-          Confirmar Avanço
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
 function ArquivarModal({
   processo,
   onClose,
@@ -2458,7 +2409,6 @@ export default function ProcessoDetailClient({
   podeVerFinanceiro,
 }: Props) {
   const [tab, setTab] = useState<Tab>("dados");
-  const [avancarOpen, setAvancarOpen] = useState(false);
   const [arquivarOpen, setArquivarOpen] = useState(false);
   const [novoRegistroOpen, setNovoRegistroOpen] = useState(false);
   const [novoEventoOpen, setNovoEventoOpen] = useState(false);
@@ -2548,15 +2498,11 @@ export default function ProcessoDetailClient({
         </div>
       </div>
 
-      {/* Phase Timeline */}
-      <FaseTimeline
+      {/* Linha de Produção */}
+      <ProducaoBar
         processo={processo}
-        onAvancar={() => setAvancarOpen(true)}
         onArquivar={() => setArquivarOpen(true)}
       />
-
-      {/* Linha de Produção */}
-      <ProducaoBar processo={processo} />
 
       {/* IA Jurídica — Analisar Documento | Diagnóstico Estratégico | Gerar Petição */}
       <IaJuridicaSection
@@ -2647,12 +2593,6 @@ export default function ProcessoDetailClient({
       </div>
 
       {/* Modals */}
-      {avancarOpen && processo.fase_workflow === "pre_contrato" && (
-        <AvancarFaseModal
-          processo={processo}
-          onClose={() => setAvancarOpen(false)}
-        />
-      )}
       {arquivarOpen && (
         <ArquivarModal
           processo={processo}

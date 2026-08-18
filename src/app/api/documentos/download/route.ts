@@ -55,10 +55,19 @@ export async function GET(request: Request) {
   try {
     // Para blobs privados, head() retorna um downloadUrl assinado
     const blob = await head(url);
-    const target = blob.downloadUrl ?? url;
-    return NextResponse.redirect(target);
-  } catch {
-    // Fallback para URLs públicas ou externas
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(blob.downloadUrl ?? url);
+  } catch (err) {
+    // Blob privado sem downloadUrl válido não é acessível pela URL crua —
+    // redirecionar pra ela só trocaria "erro claro" por "Forbidden" sem
+    // explicação. Loga pra investigar (token expirado, blob removido, etc.)
+    // e devolve uma mensagem que a pessoa consegue entender.
+    console.error(`[documentos/download] head() falhou para ${id}:`, err);
+    return NextResponse.json(
+      {
+        error:
+          "Não foi possível abrir este arquivo no armazenamento. Ele pode ter sido corrompido ou removido — tente novamente ou contate o suporte.",
+      },
+      { status: 502 }
+    );
   }
 }

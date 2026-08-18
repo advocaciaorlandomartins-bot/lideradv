@@ -10,6 +10,12 @@
 export interface ProximaAcaoProcesso {
   label: string;
   urgente: boolean;
+  /**
+   * true = o caso já está andando, só esperando um terceiro (INSS, justiça) —
+   * deve aparecer em "Em Andamento", não em "Pendente" (senão parece que
+   * ninguém fez nada, quando na verdade a entrada já foi dada).
+   */
+  aguardando: boolean;
 }
 
 export interface ProcessoFaseInput {
@@ -31,6 +37,7 @@ export function getProximaAcaoProcesso(
     return {
       label: "INSS indeferiu — ingressar com ação judicial",
       urgente: true,
+      aguardando: false,
     };
   }
 
@@ -38,11 +45,16 @@ export function getProximaAcaoProcesso(
     return {
       label: "Reunir e conferir documentos do cliente",
       urgente: false,
+      aguardando: false,
     };
   }
 
   if (estagio === "producao") {
-    return { label: "Preparar requerimento/petição inicial", urgente: false };
+    return {
+      label: "Preparar requerimento/petição inicial",
+      urgente: false,
+      aguardando: false,
+    };
   }
 
   if (estagio === "administrativo") {
@@ -50,15 +62,21 @@ export function getProximaAcaoProcesso(
       return {
         label: "Dar entrada no requerimento administrativo (INSS)",
         urgente: true,
+        aguardando: false,
       };
     }
     if (!p.resultado_administrativo) {
-      return { label: "Aguardando resultado do INSS", urgente: false };
+      return {
+        label: "Aguardando resultado do INSS",
+        urgente: false,
+        aguardando: true,
+      };
     }
     // Só chega aqui com "concedido" — "negado" já foi tratado acima.
     return {
       label: "Benefício concedido — providenciar encerramento",
       urgente: false,
+      aguardando: false,
     };
   }
 
@@ -67,14 +85,20 @@ export function getProximaAcaoProcesso(
       return {
         label: "Ingressar com a ação judicial (registrar distribuição)",
         urgente: true,
+        aguardando: false,
       };
     }
     if (!p.resultado_judicial) {
-      return { label: "Aguardando resultado da ação judicial", urgente: false };
+      return {
+        label: "Aguardando resultado da ação judicial",
+        urgente: false,
+        aguardando: true,
+      };
     }
     return {
       label: "Processo julgado — providenciar encerramento",
       urgente: false,
+      aguardando: false,
     };
   }
 

@@ -109,10 +109,16 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
             className={`rounded px-1.5 py-0.5 font-body text-[10px] font-semibold ${
               item.urgente
                 ? "bg-red-100 text-red-700"
-                : "bg-slate-100 text-slate-600"
+                : item.aguardando
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-slate-100 text-slate-600"
             }`}
           >
-            {item.urgente ? "Ação urgente" : "Próxima ação"}
+            {item.urgente
+              ? "Ação urgente"
+              : item.aguardando
+                ? "Aguardando"
+                : "Próxima ação"}
           </span>
         </div>
 

@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteDocumentoAction } from "@/lib/document-actions";
 import type { Documento } from "@/lib/documents-db";
-import { PlusIcon, SpinnerIcon } from "@/components/icons";
+import { PlusIcon, SpinnerIcon, ArrowDownTrayIcon } from "@/components/icons";
 
 const MAX_FILE_MB = 5;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
@@ -66,7 +66,79 @@ export default function DocumentsSection({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [downloadingZip, setDownloadingZip] = useState(false);
   const [, startTransition] = useTransition();
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === documents.length
+        ? new Set()
+        : new Set(documents.map((d) => d.id))
+    );
+  }
+
+  async function handleAbrir(doc: Documento) {
+    setOpenError(null);
+    setOpeningId(doc.id);
+    try {
+      const res = await fetch(`/api/documentos/download?id=${doc.id}`);
+      if (!res.ok) {
+        const data: { error?: string } = await res.json().catch(() => ({}));
+        setOpenError(data.error ?? `Erro ao abrir "${doc.nome}".`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setOpenError(`Erro ao abrir "${doc.nome}": sem conexão com o servidor.`);
+    } finally {
+      setOpeningId(null);
+    }
+  }
+
+  async function handleDownloadZip(ids: string[] | null) {
+    setOpenError(null);
+    setDownloadingZip(true);
+    try {
+      const res = await fetch("/api/documentos/download-zip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityType, entityId, ids }),
+      });
+      if (!res.ok) {
+        const data: { error?: string } = await res.json().catch(() => ({}));
+        setOpenError(data.error ?? "Erro ao gerar o arquivo zip.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "documentos.zip";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setOpenError("Erro ao gerar o arquivo zip: sem conexão com o servidor.");
+    } finally {
+      setDownloadingZip(false);
+    }
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -163,23 +235,39 @@ export default function DocumentsSection({
             </p>
           )}
         </div>
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="flex items-center gap-1.5 rounded-lg bg-cta px-3 py-2 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
-        >
-          {uploading ? (
-            <>
-              <SpinnerIcon className="h-3.5 w-3.5" />
-              Enviando…
-            </>
-          ) : (
-            <>
-              <PlusIcon className="h-3.5 w-3.5" />
-              Adicionar
-            </>
+        <div className="flex items-center gap-2">
+          {documents.length > 0 && (
+            <button
+              onClick={() => handleDownloadZip(null)}
+              disabled={downloadingZip}
+              className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-sm font-semibold text-fg transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+            >
+              {downloadingZip ? (
+                <SpinnerIcon className="h-3.5 w-3.5" />
+              ) : (
+                <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+              )}
+              Baixar todos
+            </button>
           )}
-        </button>
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1.5 rounded-lg bg-cta px-3 py-2 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+          >
+            {uploading ? (
+              <>
+                <SpinnerIcon className="h-3.5 w-3.5" />
+                Enviando…
+              </>
+            ) : (
+              <>
+                <PlusIcon className="h-3.5 w-3.5" />
+                Adicionar
+              </>
+            )}
+          </button>
+        </div>
         <input
           ref={inputRef}
           type="file"
@@ -189,10 +277,48 @@ export default function DocumentsSection({
         />
       </div>
 
+      {/* Barra de seleção */}
+      {documents.length > 1 && (
+        <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-slate-50 px-3 py-2">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selected.size === documents.length}
+              onChange={toggleSelectAll}
+              className="h-4 w-4 cursor-pointer rounded border-border accent-primary"
+            />
+            <span className="font-body text-xs font-semibold text-fg">
+              {selected.size === documents.length
+                ? "Desmarcar todos"
+                : "Selecionar todos"}
+            </span>
+          </label>
+          {selected.size > 0 && (
+            <>
+              <span className="font-body text-xs text-muted">
+                {selected.size} selecionado{selected.size !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={() => handleDownloadZip(Array.from(selected))}
+                disabled={downloadingZip}
+                className="ml-auto flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1.5 font-body text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50 cursor-pointer"
+              >
+                {downloadingZip ? (
+                  <SpinnerIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                )}
+                Baixar selecionados
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Error */}
-      {uploadError && (
+      {(uploadError || openError) && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">
-          {uploadError}
+          {uploadError || openError}
         </div>
       )}
 
@@ -238,6 +364,14 @@ export default function DocumentsSection({
                 key={doc.id}
                 className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 transition-colors duration-150 hover:bg-slate-50"
               >
+                {/* Seleção */}
+                <input
+                  type="checkbox"
+                  checked={selected.has(doc.id)}
+                  onChange={() => toggleSelected(doc.id)}
+                  className="h-4 w-4 flex-shrink-0 cursor-pointer rounded border-border accent-primary"
+                />
+
                 {/* File type badge */}
                 <div
                   className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg font-body text-[11px] font-bold ${fileColor(doc.tipo)}`}
@@ -258,14 +392,13 @@ export default function DocumentsSection({
 
                 {/* Actions */}
                 <div className="flex flex-shrink-0 items-center gap-3">
-                  <a
-                    href={`/api/documentos/download?id=${doc.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-body text-xs font-semibold text-primary transition-colors duration-150 hover:text-primary-dark"
+                  <button
+                    onClick={() => handleAbrir(doc)}
+                    disabled={openingId === doc.id}
+                    className="font-body text-xs font-semibold text-primary transition-colors duration-150 hover:text-primary-dark disabled:opacity-50 cursor-pointer"
                   >
-                    Abrir
-                  </a>
+                    {openingId === doc.id ? "Abrindo…" : "Abrir"}
+                  </button>
                   <span className="text-slate-300">·</span>
                   <button
                     onClick={() => handleDelete(doc)}

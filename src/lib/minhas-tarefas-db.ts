@@ -39,6 +39,7 @@ export interface MinhaAcaoProcesso {
   id: string;
   titulo: string;
   urgente: boolean;
+  aguardando: boolean;
   processo_id: string;
   processo_numero: string | null;
   cliente_nome: string | null;
@@ -192,6 +193,7 @@ export async function getMinhasTarefas(
         id: `acao-${r.processo_id}`,
         titulo: acao.label,
         urgente: acao.urgente,
+        aguardando: acao.aguardando,
         processo_id: String(r.processo_id),
         processo_numero: r.processo_numero ? String(r.processo_numero) : null,
         cliente_nome: r.cliente_nome ? String(r.cliente_nome) : null,
@@ -205,22 +207,32 @@ export async function getMinhasTarefas(
     .filter((a): a is MinhaAcaoProcesso => a !== null)
     .sort((a, b) => Number(b.urgente) - Number(a.urgente));
 
+  // Ações que exigem que o colaborador faça algo agora (dar entrada, preparar
+  // petição etc.) ficam em Pendente. Ações "aguardando" significam que o caso
+  // já está andando, só esperando um terceiro (INSS, justiça) — ficam em Em
+  // Andamento, para não parecer que ninguém fez nada.
+  const acoesPendentes = acoesProcesso.filter((a) => !a.aguardando);
+  const acoesAcompanhamento = acoesProcesso.filter((a) => a.aguardando);
+
   const all: MinhaItem[] = [...controles, ...tarefas];
 
   return {
     pendentes: [
-      ...acoesProcesso,
+      ...acoesPendentes,
       ...all.filter((i) =>
         i.source === "controle"
           ? (i as MinhaControle).status === "pendente"
           : (i as MinhaTarefa).status === "Pendente"
       ),
     ],
-    emAndamento: all.filter((i) =>
-      i.source === "controle"
-        ? (i as MinhaControle).status === "em_andamento"
-        : (i as MinhaTarefa).status === "Em andamento"
-    ),
+    emAndamento: [
+      ...acoesAcompanhamento,
+      ...all.filter((i) =>
+        i.source === "controle"
+          ? (i as MinhaControle).status === "em_andamento"
+          : (i as MinhaTarefa).status === "Em andamento"
+      ),
+    ],
     concluidas: all.filter((i) =>
       i.source === "controle"
         ? (i as MinhaControle).status === "concluido"

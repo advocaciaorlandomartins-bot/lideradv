@@ -178,16 +178,31 @@ function ProducaoBar({
           className={`flex items-center gap-2 border-b px-5 py-2.5 ${
             proximaAcao.urgente
               ? "border-red-100 bg-red-50"
-              : "border-border bg-slate-50"
+              : proximaAcao.aguardando
+                ? "border-blue-100 bg-blue-50"
+                : "border-border bg-slate-50"
           }`}
         >
           <span
-            className={`h-2 w-2 flex-shrink-0 rounded-full ${proximaAcao.urgente ? "bg-red-500" : "bg-slate-400"}`}
+            className={`h-2 w-2 flex-shrink-0 rounded-full ${
+              proximaAcao.urgente
+                ? "bg-red-500"
+                : proximaAcao.aguardando
+                  ? "bg-blue-500"
+                  : "bg-slate-400"
+            }`}
           />
           <p
-            className={`font-body text-xs font-semibold ${proximaAcao.urgente ? "text-red-700" : "text-slate-600"}`}
+            className={`font-body text-xs font-semibold ${
+              proximaAcao.urgente
+                ? "text-red-700"
+                : proximaAcao.aguardando
+                  ? "text-blue-700"
+                  : "text-slate-600"
+            }`}
           >
-            Próxima ação: {proximaAcao.label}
+            {proximaAcao.aguardando ? "Aguardando" : "Próxima ação"}:{" "}
+            {proximaAcao.label}
           </p>
         </div>
       )}

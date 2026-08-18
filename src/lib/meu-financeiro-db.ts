@@ -33,6 +33,8 @@ export interface ProcessoHonorario {
   comissao_pct: number | null;
   /** Parte do honorário que cabe a este colaborador. Igual ao honorário total quando comissao_pct é null (comissão ainda não configurada). */
   comissao_estimada: number;
+  /** true quando o processo ainda não tem valor nem percentual de honorário cadastrado. */
+  semHonorarioDefinido: boolean;
 }
 
 export interface EscritorioMes {
@@ -174,9 +176,11 @@ export async function getMeuFinanceiroInitial(
       WHERE usuario_id = ${userId}::uuid
       ORDER BY data DESC, created_at DESC
     `,
-    // Processos com honorários:
-    // • se tem colaborador_id: apenas processos onde é responsável
-    // • se não tem (admin solo): todos os processos ativos com honorário
+    // Processos ativos:
+    // • se tem colaborador_id: todos os processos onde é responsável — com ou
+    //   sem honorário cadastrado, para dar visão completa de tudo que está
+    //   sob a sua responsabilidade (não só os que já têm valor lançado)
+    // • se não tem (admin solo): todos os processos ativos do escritório
     colaboradorId
       ? sql`
           SELECT
@@ -196,10 +200,6 @@ export async function getMeuFinanceiroInitial(
           WHERE p.responsavel_id = ${colaboradorId}::uuid
             AND p.status IN ('ativo', 'em_andamento')
             AND p.deleted_at IS NULL
-            AND (
-              p.valor_honorario IS NOT NULL
-              OR (p.percentual_honorario IS NOT NULL AND p.valor_causa IS NOT NULL)
-            )
           ORDER BY
             COALESCE(p.valor_honorario, p.valor_causa * p.percentual_honorario / 100) DESC NULLS LAST
           LIMIT 50
@@ -385,6 +385,7 @@ export async function getMeuFinanceiroInitial(
         ? (Number(r.percentual_honorario) / 100) * Number(r.valor_causa)
         : null;
     const honorario_estimado = fixo ?? perc ?? 0;
+    const semHonorarioDefinido = fixo == null && perc == null;
     const comissao_pct = resolveComissaoPct(
       comissaoConfig,
       r.estagio_producao,
@@ -405,6 +406,7 @@ export async function getMeuFinanceiroInitial(
       honorario_estimado,
       comissao_pct,
       comissao_estimada: aplicarComissao(honorario_estimado, comissao_pct),
+      semHonorarioDefinido,
     };
   });
 

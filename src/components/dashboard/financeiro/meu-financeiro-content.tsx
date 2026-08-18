@@ -800,14 +800,14 @@ export default function MeuFinanceiroContent({
             {/* Tabela de processos */}
             <div>
               <h4 className="mb-3 font-heading text-xs font-semibold uppercase tracking-wide text-blue-700">
-                Processos ativos com honorários
+                Meus processos ativos
                 <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 font-body text-[10px] font-semibold text-blue-500">
                   {processosHonorarios.length}
                 </span>
               </h4>
               {processosHonorarios.length === 0 ? (
                 <p className="py-6 text-center font-body text-sm text-muted">
-                  Nenhum processo ativo com honorários definidos.
+                  Nenhum processo ativo no momento.
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-blue-100">
@@ -844,24 +844,40 @@ export default function MeuFinanceiroContent({
                             {p.tipo_acao}
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className="rounded-full bg-blue-100 px-2 py-0.5 font-body text-[10px] font-semibold text-blue-700">
-                              {p.modelo_honorario === "fixo"
-                                ? "Fixo"
-                                : p.modelo_honorario === "percentual" &&
-                                    p.percentual_honorario != null
-                                  ? `${p.percentual_honorario}% s/ causa`
-                                  : (p.modelo_honorario ?? "–")}
-                            </span>
+                            {p.semHonorarioDefinido ? (
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-body text-[10px] font-semibold text-slate-500">
+                                Não cadastrado
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-blue-100 px-2 py-0.5 font-body text-[10px] font-semibold text-blue-700">
+                                {p.modelo_honorario === "fixo"
+                                  ? "Fixo"
+                                  : p.modelo_honorario === "percentual" &&
+                                      p.percentual_honorario != null
+                                    ? `${p.percentual_honorario}% s/ causa`
+                                    : (p.modelo_honorario ?? "–")}
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 text-right font-body text-sm text-muted tabular-nums">
-                            {fmt(p.honorario_estimado)}
+                            {p.semHonorarioDefinido
+                              ? "–"
+                              : fmt(p.honorario_estimado)}
                           </td>
                           <td className="px-3 py-2.5 text-right font-heading text-sm font-bold tabular-nums text-blue-700">
-                            {fmt(p.comissao_estimada)}
-                            {p.comissao_pct != null && (
-                              <span className="ml-1 font-body text-[10px] font-normal text-blue-400">
-                                ({p.comissao_pct}%)
+                            {p.semHonorarioDefinido ? (
+                              <span className="font-body text-xs font-normal text-slate-400">
+                                —
                               </span>
+                            ) : (
+                              <>
+                                {fmt(p.comissao_estimada)}
+                                {p.comissao_pct != null && (
+                                  <span className="ml-1 font-body text-[10px] font-normal text-blue-400">
+                                    ({p.comissao_pct}%)
+                                  </span>
+                                )}
+                              </>
                             )}
                           </td>
                         </tr>

@@ -39,7 +39,7 @@ export async function registrarResultadoAdminAction(
   proximoEstagio: "judicial" | "arquivado"
 ): Promise<{ error?: string }> {
   const user = await getSession();
-  if (!user || !hasPermission(user, "producao_resultado_adm", "ver")) {
+  if (!user || !hasPermission(user, "producao", "editar")) {
     return { error: "Sem permissão para registrar resultado administrativo." };
   }
   // Quando o próximo passo é arquivar, processos.status precisa refletir isso —
@@ -64,7 +64,7 @@ export async function registrarResultadoJudicialAction(
   resultado: "procedente" | "improcedente" | "parcial"
 ): Promise<{ error?: string }> {
   const user = await getSession();
-  if (!user || !hasPermission(user, "producao_resultado_jud", "ver")) {
+  if (!user || !hasPermission(user, "producao", "editar")) {
     return { error: "Sem permissão para registrar resultado judicial." };
   }
   await sql`

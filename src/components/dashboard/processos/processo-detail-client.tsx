@@ -130,7 +130,9 @@ function ProducaoBar({
   const [showFormDistribuicao, setShowFormDistribuicao] = useState(false);
   const [distribuicaoNumero, setDistribuicaoNumero] = useState("");
   const [distribuicaoData, setDistribuicaoData] = useState(hoje);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const estagio = processo.estagio_producao;
   const isArquivado = estagio === "arquivado";
@@ -302,7 +304,10 @@ function ProducaoBar({
             {["producao", "administrativo", "judicial"].includes(estagio) && (
               <button
                 onClick={() =>
-                  startTransition(() => voltarEstagioAction(processo.id))
+                  startTransition(async () => {
+                    await voltarEstagioAction(processo.id);
+                    router.refresh();
+                  })
                 }
                 disabled={isPending}
                 className="flex items-center gap-1 rounded px-2 py-1 font-body text-xs text-muted transition-colors hover:text-fg disabled:opacity-40"
@@ -332,7 +337,10 @@ function ProducaoBar({
             {estagio === "analise" && (
               <button
                 onClick={() =>
-                  startTransition(() => moverParaProducaoAction(processo.id))
+                  startTransition(async () => {
+                    await moverParaProducaoAction(processo.id);
+                    router.refresh();
+                  })
                 }
                 disabled={isPending}
                 className="flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1 font-body text-xs font-semibold text-teal-700 hover:bg-teal-100 disabled:opacity-50"
@@ -348,9 +356,10 @@ function ProducaoBar({
             {estagio === "producao" && (
               <button
                 onClick={() =>
-                  startTransition(() =>
-                    moverParaAdministrativoAction(processo.id)
-                  )
+                  startTransition(async () => {
+                    await moverParaAdministrativoAction(processo.id);
+                    router.refresh();
+                  })
                 }
                 disabled={isPending}
                 className="flex items-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1 font-body text-xs font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
@@ -402,7 +411,10 @@ function ProducaoBar({
             {isArquivado && (
               <button
                 onClick={() =>
-                  startTransition(() => reabrirProcessoAction(processo.id))
+                  startTransition(async () => {
+                    await reabrirProcessoAction(processo.id);
+                    router.refresh();
+                  })
                 }
                 disabled={isPending}
                 className="flex items-center gap-1 rounded px-2 py-1 font-body text-xs text-muted hover:text-primary disabled:opacity-40"
@@ -470,14 +482,20 @@ function ProducaoBar({
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    await registrarResultadoAdminAction(
+                    setActionError(null);
+                    const result = await registrarResultadoAdminAction(
                       processo.id,
                       resultadoAdmin,
                       resultadoAdmin === "concedido"
                         ? "arquivado"
                         : proximoAdmin
                     );
+                    if (result.error) {
+                      setActionError(result.error);
+                      return;
+                    }
                     setShowFormAdmin(false);
+                    router.refresh();
                   })
                 }
                 disabled={isPending}
@@ -486,12 +504,20 @@ function ProducaoBar({
                 {isPending && <SpinnerIcon className="h-3 w-3" />} Confirmar
               </button>
               <button
-                onClick={() => setShowFormAdmin(false)}
+                onClick={() => {
+                  setShowFormAdmin(false);
+                  setActionError(null);
+                }}
                 className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
               >
                 Cancelar
               </button>
             </div>
+            {actionError && (
+              <p className="font-body text-xs font-semibold text-red-600">
+                {actionError}
+              </p>
+            )}
           </div>
         )}
 
@@ -518,11 +544,17 @@ function ProducaoBar({
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    await registrarResultadoJudicialAction(
+                    setActionError(null);
+                    const result = await registrarResultadoJudicialAction(
                       processo.id,
                       resultadoJud
                     );
+                    if (result.error) {
+                      setActionError(result.error);
+                      return;
+                    }
                     setShowFormJud(false);
+                    router.refresh();
                   })
                 }
                 disabled={isPending}
@@ -532,12 +564,20 @@ function ProducaoBar({
                 Arquivar
               </button>
               <button
-                onClick={() => setShowFormJud(false)}
+                onClick={() => {
+                  setShowFormJud(false);
+                  setActionError(null);
+                }}
                 className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
               >
                 Cancelar
               </button>
             </div>
+            {actionError && (
+              <p className="font-body text-xs font-semibold text-red-600">
+                {actionError}
+              </p>
+            )}
           </div>
         )}
 
@@ -574,12 +614,18 @@ function ProducaoBar({
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    await registrarProtocoloAdminAction(
+                    setActionError(null);
+                    const result = await registrarProtocoloAdminAction(
                       processo.id,
                       protocoloNumero,
                       protocoloData
                     );
+                    if (result.error) {
+                      setActionError(result.error);
+                      return;
+                    }
                     setShowFormProtocolo(false);
+                    router.refresh();
                   })
                 }
                 disabled={isPending}
@@ -588,12 +634,20 @@ function ProducaoBar({
                 {isPending && <SpinnerIcon className="h-3 w-3" />} Confirmar
               </button>
               <button
-                onClick={() => setShowFormProtocolo(false)}
+                onClick={() => {
+                  setShowFormProtocolo(false);
+                  setActionError(null);
+                }}
                 className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
               >
                 Cancelar
               </button>
             </div>
+            {actionError && (
+              <p className="font-body text-xs font-semibold text-red-600">
+                {actionError}
+              </p>
+            )}
           </div>
         )}
 
@@ -630,12 +684,18 @@ function ProducaoBar({
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    await registrarDistribuicaoJudicialAction(
+                    setActionError(null);
+                    const result = await registrarDistribuicaoJudicialAction(
                       processo.id,
                       distribuicaoNumero,
                       distribuicaoData
                     );
+                    if (result.error) {
+                      setActionError(result.error);
+                      return;
+                    }
                     setShowFormDistribuicao(false);
+                    router.refresh();
                   })
                 }
                 disabled={isPending}
@@ -644,12 +704,20 @@ function ProducaoBar({
                 {isPending && <SpinnerIcon className="h-3 w-3" />} Confirmar
               </button>
               <button
-                onClick={() => setShowFormDistribuicao(false)}
+                onClick={() => {
+                  setShowFormDistribuicao(false);
+                  setActionError(null);
+                }}
                 className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
               >
                 Cancelar
               </button>
             </div>
+            {actionError && (
+              <p className="font-body text-xs font-semibold text-red-600">
+                {actionError}
+              </p>
+            )}
           </div>
         )}
       </div>

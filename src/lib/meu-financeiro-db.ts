@@ -375,15 +375,20 @@ export async function getMeuFinanceiroInitial(
     const semHonorarioDefinido =
       fixo == null && perc == null && lancado == null;
     const comissao_pct = colaboradorId
-      ? resolveComissaoPctParaColaborador(colaboradorId, comissaoConfig, {
-          estagio_producao: r.estagio_producao ?? null,
-          resultado_administrativo: r.resultado_administrativo ?? null,
-          resultado_judicial: r.resultado_judicial ?? null,
-          responsavel_id: r.responsavel_id ?? null,
-          responsavel_administrativo_id:
-            r.responsavel_administrativo_id ?? null,
-          responsavel_judicial_id: r.responsavel_judicial_id ?? null,
-        })
+      ? resolveComissaoPctParaColaborador(
+          colaboradorId,
+          comissaoConfig,
+          {
+            estagio_producao: r.estagio_producao ?? null,
+            resultado_administrativo: r.resultado_administrativo ?? null,
+            resultado_judicial: r.resultado_judicial ?? null,
+            responsavel_id: r.responsavel_id ?? null,
+            responsavel_administrativo_id:
+              r.responsavel_administrativo_id ?? null,
+            responsavel_judicial_id: r.responsavel_judicial_id ?? null,
+          },
+          "estimativa"
+        )
       : null;
     return {
       id: r.id,
@@ -457,15 +462,20 @@ export async function getMeuFinanceiroInitial(
       const iso = String(r.mes_iso);
       if (!map.has(iso)) continue;
       const pct = colaboradorId
-        ? resolveComissaoPctParaColaborador(colaboradorId, comissaoConfig, {
-            estagio_producao: r.estagio_producao ?? null,
-            resultado_administrativo: r.resultado_administrativo ?? null,
-            resultado_judicial: r.resultado_judicial ?? null,
-            responsavel_id: r.responsavel_id ?? null,
-            responsavel_administrativo_id:
-              r.responsavel_administrativo_id ?? null,
-            responsavel_judicial_id: r.responsavel_judicial_id ?? null,
-          })
+        ? resolveComissaoPctParaColaborador(
+            colaboradorId,
+            comissaoConfig,
+            {
+              estagio_producao: r.estagio_producao ?? null,
+              resultado_administrativo: r.resultado_administrativo ?? null,
+              resultado_judicial: r.resultado_judicial ?? null,
+              responsavel_id: r.responsavel_id ?? null,
+              responsavel_administrativo_id:
+                r.responsavel_administrativo_id ?? null,
+              responsavel_judicial_id: r.responsavel_judicial_id ?? null,
+            },
+            "estimativa"
+          )
         : null;
       const comissao = aplicarComissao(Number(r.valor), pct);
       map.set(iso, (map.get(iso) ?? 0) + comissao);
@@ -487,15 +497,20 @@ export async function getMeuFinanceiroInitial(
     aguardandoResultadoRows.map((r) => {
       const base = mapLancamentoRow(r);
       const pct = colaboradorId
-        ? resolveComissaoPctParaColaborador(colaboradorId, comissaoConfig, {
-            estagio_producao: r.estagio_producao ?? null,
-            resultado_administrativo: r.resultado_administrativo ?? null,
-            resultado_judicial: r.resultado_judicial ?? null,
-            responsavel_id: r.responsavel_id ?? null,
-            responsavel_administrativo_id:
-              r.responsavel_administrativo_id ?? null,
-            responsavel_judicial_id: r.responsavel_judicial_id ?? null,
-          })
+        ? resolveComissaoPctParaColaborador(
+            colaboradorId,
+            comissaoConfig,
+            {
+              estagio_producao: r.estagio_producao ?? null,
+              resultado_administrativo: r.resultado_administrativo ?? null,
+              resultado_judicial: r.resultado_judicial ?? null,
+              responsavel_id: r.responsavel_id ?? null,
+              responsavel_administrativo_id:
+                r.responsavel_administrativo_id ?? null,
+              responsavel_judicial_id: r.responsavel_judicial_id ?? null,
+            },
+            "estimativa"
+          )
         : null;
       return {
         ...base,

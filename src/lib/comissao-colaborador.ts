@@ -25,57 +25,47 @@ export interface ProcessoFaseOwnership {
 
 /**
  * Resolve quanto % de comissão UM colaborador específico tem direito num
- * processo — considerando que administrativo e judicial podem ter sido
- * feitos por pessoas diferentes (processo reatribuído no meio do caminho).
+ * processo — só há comissão em fase com ÊXITO. Uma fase perdida (negado /
+ * improcedente) não paga nada a quem a fez; só quem entrega o resultado
+ * favorável final é que recebe.
  *
  * Regras:
- * - Concedido no administrativo → só quem fez o administrativo (ou o
- *   responsável atual, se a fase nunca foi explicitamente registrada) recebe,
- *   pelo % "só administrativo".
- * - Negado no administrativo:
- *   - Mesma pessoa nas duas fases (ou judicial ainda não tem dono definido) →
- *     ela recebe pelo % "administrativo + judicial" (bônus por fazer as duas).
- *   - Pessoas diferentes em cada fase → cada uma recebe SÓ pelo seu próprio %
- *     individual daquela fase (ninguém recebe o % combinado nesse caso).
- * - Foi direto pro judicial (sem passar por administrativo) → quem fez o
- *   judicial recebe pelo % "só judicial".
- * - Ainda em andamento, sem resultado → estimativa pela fase administrativa.
+ * - Concedido no administrativo → só quem fez o administrativo recebe, pelo
+ *   % "só administrativo". Caso encerra aqui, ninguém mais participa.
+ * - Negado no administrativo → quem fez essa fase NÃO recebe nada por ela
+ *   (foi derrota). Só há comissão se o judicial depois der êxito
+ *   (procedente/parcial):
+ *   - Mesma pessoa nas duas fases → recebe pelo % "administrativo + judicial"
+ *     (ela carregou o caso do início ao fim vencedor).
+ *   - Pessoas diferentes → só quem fez e venceu o judicial recebe, pelo seu
+ *     próprio % "só judicial" (quem perdeu o administrativo fica sem nada).
+ *   - Judicial improcedente, ou ainda sem resultado → sem comissão real
+ *     ainda (no modo "estimativa", mostra uma expectativa otimista).
+ * - Foi direto pro judicial (sem passar por administrativo) e deu êxito →
+ *   quem fez o judicial recebe pelo % "só judicial". Improcedente → nada.
+ * - Ainda em andamento, sem nenhum resultado → sem comissão real ainda
+ *   (modo "estimativa" mostra uma expectativa pela fase administrativa).
+ *
+ * @param modo "pagamento" (padrão) só resolve % quando há êxito confirmado —
+ *   usado pra gerar dinheiro de verdade. "estimativa" mostra uma expectativa
+ *   otimista mesmo antes do resultado sair, pro colaborador ter uma noção do
+ *   que pode vir a receber (usado só no preview de Meu Financeiro).
  */
 export function resolveComissaoPctParaColaborador(
   colaboradorId: string,
   config: ComissaoConfig | null,
-  p: ProcessoFaseOwnership
+  p: ProcessoFaseOwnership,
+  modo: "estimativa" | "pagamento" = "pagamento"
 ): number | null {
   // null aqui = "comissão não configurada" (nenhum % cadastrado pra esse
   // colaborador) — chamador trata como estimativa indefinida. A partir daqui,
-  // config existe, então "não é a fase desse colaborador" retorna 0, nunca
-  // null — pra não ser confundido com "não configurado" e mostrar o valor
-  // cheio do processo como se fosse a comissão dele.
+  // config existe, então "não tem direito a essa fase" retorna 0, nunca
+  // null — pra não ser confundido com "não configurado" e acabar mostrando o
+  // valor cheio do processo como se fosse a comissão dele.
   if (!config) return null;
 
   const adminId = p.responsavel_administrativo_id ?? p.responsavel_id;
   const judId = p.responsavel_judicial_id ?? p.responsavel_id;
-
-  if (p.resultado_administrativo === "negado") {
-    const fasesDivididas =
-      p.responsavel_administrativo_id != null &&
-      p.responsavel_judicial_id != null &&
-      p.responsavel_administrativo_id !== p.responsavel_judicial_id;
-
-    if (fasesDivididas) {
-      if (colaboradorId === p.responsavel_administrativo_id)
-        return config.comissao_administrativo_pct ?? 0;
-      if (colaboradorId === p.responsavel_judicial_id)
-        return config.comissao_judicial_pct ?? 0;
-      return 0;
-    }
-
-    const dono =
-      p.responsavel_administrativo_id ??
-      p.responsavel_judicial_id ??
-      p.responsavel_id;
-    return colaboradorId === dono ? (config.comissao_ambos_pct ?? 0) : 0;
-  }
 
   if (p.resultado_administrativo === "concedido") {
     return colaboradorId === adminId
@@ -83,14 +73,43 @@ export function resolveComissaoPctParaColaborador(
       : 0;
   }
 
-  if (p.resultado_judicial != null || p.estagio_producao === "judicial") {
-    return colaboradorId === judId ? (config.comissao_judicial_pct ?? 0) : 0;
+  if (p.resultado_administrativo === "negado") {
+    if (
+      p.resultado_judicial === "procedente" ||
+      p.resultado_judicial === "parcial"
+    ) {
+      const mesmaPessoa = adminId != null && adminId === judId;
+      if (mesmaPessoa) {
+        return colaboradorId === judId ? (config.comissao_ambos_pct ?? 0) : 0;
+      }
+      // Fases divididas: só quem venceu no judicial recebe — quem perdeu o
+      // administrativo não leva nada dessa fase.
+      return colaboradorId === judId ? (config.comissao_judicial_pct ?? 0) : 0;
+    }
+    if (p.resultado_judicial === "improcedente") return 0; // sem êxito em lugar nenhum
+
+    // Judicial ainda não resolvido.
+    if (modo === "estimativa") {
+      return colaboradorId === judId ? (config.comissao_judicial_pct ?? 0) : 0;
+    }
+    return 0; // pagamento real: nada a pagar até o judicial dar êxito
   }
 
-  // Ainda em andamento, sem resultado — estimativa pela fase administrativa.
-  return colaboradorId === adminId
-    ? (config.comissao_administrativo_pct ?? 0)
-    : 0;
+  if (
+    p.resultado_judicial === "procedente" ||
+    p.resultado_judicial === "parcial"
+  ) {
+    return colaboradorId === judId ? (config.comissao_judicial_pct ?? 0) : 0;
+  }
+  if (p.resultado_judicial === "improcedente") return 0;
+
+  // Ainda sem nenhum resultado (caso em andamento).
+  if (modo === "estimativa") {
+    return colaboradorId === adminId
+      ? (config.comissao_administrativo_pct ?? 0)
+      : 0;
+  }
+  return 0; // pagamento real: nada a pagar enquanto não há resultado
 }
 
 export function aplicarComissao(valor: number, pct: number | null): number {
@@ -98,20 +117,16 @@ export function aplicarComissao(valor: number, pct: number | null): number {
   return Math.round(valor * (pct / 100) * 100) / 100;
 }
 
-const TIPO_LABEL_REMUNERACAO: Record<string, string> = {
-  concedido: "administrativo",
-  negado: "administrativo + judicial",
-};
-
 /**
  * Quando um lançamento de honorário do cliente (entrada, vinculado a um
  * processo) é marcado como pago, gera automaticamente a comissão de quem
- * trabalhou o caso — sem precisar que o admin digite o valor na mão. Se
- * administrativo e judicial foram feitos por colaboradores diferentes, gera
- * uma remuneração pra cada um, cada qual pelo seu próprio % de fase. Fica
- * "pendente" até alguém confirmar o pagamento em Remunerações. Se o cliente
- * pagar parcelado, cada parcela paga gera sua própria comissão (mesma
- * cadência).
+ * entregou o resultado favorável — sem precisar que o admin digite o valor
+ * na mão. Só gera comissão pra quem teve êxito na fase que fez; quem perdeu
+ * uma fase (ex: administrativo negado) não recebe nada por ela. Se
+ * administrativo e judicial foram pessoas diferentes e o judicial venceu,
+ * só a pessoa do judicial é paga. Fica "pendente" até alguém confirmar o
+ * pagamento em Remunerações. Se o cliente pagar parcelado, cada parcela
+ * paga gera sua própria comissão (mesma cadência).
  *
  * Idempotente: não gera duas vezes para o mesmo lançamento (origem_lancamento_id).
  */
@@ -188,7 +203,8 @@ export async function gerarComissaoAutomaticaPorPagamento(
       const pct = resolveComissaoPctParaColaborador(
         colaboradorId,
         config,
-        ownership
+        ownership,
+        "pagamento"
       );
       if (pct == null) continue;
 
@@ -196,8 +212,11 @@ export async function gerarComissaoAutomaticaPorPagamento(
       if (valorComissao <= 0) continue;
 
       const faseLabel =
-        TIPO_LABEL_REMUNERACAO[String(p.resultado_administrativo)] ??
-        (p.estagio_producao === "judicial" ? "judicial" : "administrativo");
+        pct === config.comissao_ambos_pct
+          ? "administrativo + judicial"
+          : pct === config.comissao_judicial_pct
+            ? "judicial"
+            : "administrativo";
       const descricao = `Comissão automática — ${p.tipo_acao ?? "processo"}${p.numero ? ` (${p.numero})` : ""} — ${faseLabel} (${pct}%)`;
 
       const remRows = await sql`

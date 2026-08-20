@@ -17,12 +17,16 @@ async function main() {
   const sql = (await import("../src/lib/db")).default;
   const { gerarComissaoAutomaticaPorPagamento } =
     await import("../src/lib/comissao-colaborador");
+  const { getMeuFinanceiroInitial } =
+    await import("../src/lib/meu-financeiro-db");
+  const { getLancamentoKpis } = await import("../src/lib/lancamentos-db");
 
   let clientId: string | null = null;
   let colabAId: string | null = null;
   let colabBId: string | null = null;
   let processoId: string | null = null;
   let lancamentoId: string | null = null;
+  let usuarioBId: string | null = null;
 
   try {
     // ── Setup ──────────────────────────────────────────────────────────
@@ -132,9 +136,65 @@ async function main() {
       remRows2.length === remRows.length,
       `obtido ${remRows2.length}, esperado ${remRows.length}`
     );
+
+    // ── Parte 2: dar baixa na comissão e conferir Meu Financeiro ────────
+    console.log("\n  Parte 2 — dar baixa na comissão do colaborador B...");
+    const usuarioRows = await sql`
+      INSERT INTO usuarios (login, nome, categoria, colaborador_id, ativo)
+      VALUES ('teste_comissao_baixa', 'TESTE Usuario B', 'Advogado(a)', ${colabBId}::uuid, true)
+      RETURNING id::text
+    `;
+    usuarioBId = usuarioRows[0].id;
+
+    // Antes de dar baixa: confere que a comissão aparece como "a receber"
+    const antes = await getMeuFinanceiroInitial(usuarioBId!);
+    check(
+      "antes da baixa: aparece em 'a receber' (remunerações pendentes)",
+      antes.escritorioMes.totalAReceber >= 150,
+      `totalAReceber=${antes.escritorioMes.totalAReceber}`
+    );
+    check(
+      "antes da baixa: ainda não conta como recebido no mês",
+      antes.escritorioMes.recebidoMes === 0,
+      `recebidoMes=${antes.escritorioMes.recebidoMes}`
+    );
+
+    // Replica exatamente o que markRemuneracaoPagaAction faz
+    await sql`
+      UPDATE remuneracoes SET status = 'pago', data_pagamento = CURRENT_DATE, updated_at = NOW()
+      WHERE origem_lancamento_id = ${lancamentoId}::uuid
+    `;
+    await sql`
+      UPDATE lancamentos SET status = 'pago', data_pagamento = CURRENT_DATE
+      WHERE remuneracao_id = (SELECT id FROM remuneracoes WHERE origem_lancamento_id = ${lancamentoId}::uuid)
+    `;
+
+    // Depois de dar baixa: confere "recebido no mês" e "a receber"
+    const depois = await getMeuFinanceiroInitial(usuarioBId!);
+    check(
+      "depois da baixa: entra em 'recebido no mês'",
+      depois.escritorioMes.recebidoMes >= 150,
+      `recebidoMes=${depois.escritorioMes.recebidoMes}`
+    );
+    check(
+      "depois da baixa: sai de 'a receber' (não conta mais como pendente)",
+      depois.escritorioMes.totalAReceber ===
+        antes.escritorioMes.totalAReceber - 150,
+      `antes=${antes.escritorioMes.totalAReceber} depois=${depois.escritorioMes.totalAReceber}`
+    );
+
+    // Confere que também aparece corretamente no Financeiro geral (folha)
+    const kpisAntesEDepois = await getLancamentoKpis();
+    check(
+      "aparece na folha paga do Financeiro geral",
+      kpisAntesEDepois.folhaPaga >= 150,
+      `folhaPaga=${kpisAntesEDepois.folhaPaga}`
+    );
   } finally {
     // ── Limpeza — sempre executa, mesmo se algum check falhar ──────────
     console.log("\n  limpando dados de teste...");
+    if (usuarioBId)
+      await sql`DELETE FROM usuarios WHERE id = ${usuarioBId}::uuid`;
     if (lancamentoId) {
       await sql`DELETE FROM remuneracoes WHERE origem_lancamento_id = ${lancamentoId}::uuid`;
       await sql`DELETE FROM lancamentos WHERE id = ${lancamentoId}::uuid`;

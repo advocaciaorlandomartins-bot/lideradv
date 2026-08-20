@@ -93,11 +93,16 @@ export async function registrarProtocoloAdminAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
     return { error: "Sem permissão." };
+  // Registra quem é o responsável NESTE momento como "dono" da fase
+  // administrativa — se o processo for reatribuído depois (ex: pra alguém
+  // tocar o judicial), a comissão do administrativo continua sendo desse
+  // colaborador, não de quem assumir depois.
   await sql`
     UPDATE processos
-    SET protocolo_inss      = ${protocolo.trim() || null},
-        data_protocolo_inss = ${data || null}::date,
-        updated_at          = NOW()
+    SET protocolo_inss                = ${protocolo.trim() || null},
+        data_protocolo_inss           = ${data || null}::date,
+        responsavel_administrativo_id = responsavel_id,
+        updated_at                    = NOW()
     WHERE id = ${id}::uuid
   `;
   revalidate(id);
@@ -116,11 +121,15 @@ export async function registrarDistribuicaoJudicialAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
     return { error: "Sem permissão." };
+  // Mesma lógica do protocolo administrativo: quem é responsável na hora de
+  // distribuir a ação fica marcado como dono da fase judicial pra fins de
+  // comissão, mesmo que o responsável do processo mude depois disso.
   await sql`
     UPDATE processos
-    SET numero            = COALESCE(NULLIF(${numero.trim()}, ''), numero),
-        data_distribuicao = ${data || null}::date,
-        updated_at        = NOW()
+    SET numero                   = COALESCE(NULLIF(${numero.trim()}, ''), numero),
+        data_distribuicao        = ${data || null}::date,
+        responsavel_judicial_id  = responsavel_id,
+        updated_at               = NOW()
     WHERE id = ${id}::uuid
   `;
   revalidate(id);
@@ -192,13 +201,15 @@ export async function reabrirProcessoAction(id: string): Promise<void> {
   if (!session || !hasPermission(session, "producao", "editar")) return;
   await sql`
     UPDATE processos
-    SET estagio_producao          = 'analise',
-        resultado_administrativo  = NULL,
-        resultado_judicial        = NULL,
-        status                    = 'ativo',
-        fase_workflow             = 'elaboracao',
-        resultado                 = NULL,
-        data_estagio_at           = NOW()
+    SET estagio_producao              = 'analise',
+        resultado_administrativo      = NULL,
+        resultado_judicial            = NULL,
+        status                        = 'ativo',
+        fase_workflow                 = 'elaboracao',
+        resultado                     = NULL,
+        responsavel_administrativo_id = NULL,
+        responsavel_judicial_id       = NULL,
+        data_estagio_at               = NOW()
     WHERE id = ${id}::uuid
   `;
   revalidate(id);

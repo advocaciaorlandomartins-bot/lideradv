@@ -5,7 +5,7 @@ import {
   type EstagioSnapshot,
 } from "./producao-db";
 import {
-  resolveComissaoPct,
+  resolveComissaoPctParaColaborador,
   aplicarComissao,
   type ComissaoConfig,
 } from "./comissao-colaborador";
@@ -157,6 +157,9 @@ export async function getMeuFinanceiroInitial(
             p.estagio_producao,
             p.resultado_administrativo,
             p.resultado_judicial,
+            p.responsavel_id::text,
+            p.responsavel_administrativo_id::text,
+            p.responsavel_judicial_id::text,
             (
               SELECT COALESCE(SUM(l.valor), 0)
               FROM lancamentos l
@@ -244,7 +247,9 @@ export async function getMeuFinanceiroInitial(
             to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento,
             l.parcela_atual, l.total_parcelas, l.grupo_parcelas::text,
             l.observacoes, l.created_at,
-            p.estagio_producao, p.resultado_administrativo, p.resultado_judicial
+            p.estagio_producao, p.resultado_administrativo, p.resultado_judicial,
+            p.responsavel_id::text,
+            p.responsavel_administrativo_id::text, p.responsavel_judicial_id::text
           FROM lancamentos l
           INNER JOIN processos p ON p.id = l.processo_id
           LEFT JOIN clients c ON c.id = l.client_id
@@ -276,7 +281,9 @@ export async function getMeuFinanceiroInitial(
           SELECT
             to_char(date_trunc('month', l.data_vencimento), 'YYYY-MM') AS mes_iso,
             l.valor,
-            p.estagio_producao, p.resultado_administrativo, p.resultado_judicial
+            p.estagio_producao, p.resultado_administrativo, p.resultado_judicial,
+            p.responsavel_id::text,
+            p.responsavel_administrativo_id::text, p.responsavel_judicial_id::text
           FROM lancamentos l
           INNER JOIN processos p ON p.id = l.processo_id
           WHERE p.responsavel_id = ${colaboradorId}::uuid
@@ -291,7 +298,10 @@ export async function getMeuFinanceiroInitial(
             l.valor,
             NULL::text AS estagio_producao,
             NULL::text AS resultado_administrativo,
-            NULL::text AS resultado_judicial
+            NULL::text AS resultado_judicial,
+            NULL::text AS responsavel_id,
+            NULL::text AS responsavel_administrativo_id,
+            NULL::text AS responsavel_judicial_id
           FROM lancamentos l
           WHERE l.status = 'pendente'
             AND l.tipo = 'entrada'
@@ -364,12 +374,17 @@ export async function getMeuFinanceiroInitial(
     const honorario_estimado = fixo ?? perc ?? lancado ?? 0;
     const semHonorarioDefinido =
       fixo == null && perc == null && lancado == null;
-    const comissao_pct = resolveComissaoPct(
-      comissaoConfig,
-      r.estagio_producao,
-      r.resultado_administrativo,
-      r.resultado_judicial
-    );
+    const comissao_pct = colaboradorId
+      ? resolveComissaoPctParaColaborador(colaboradorId, comissaoConfig, {
+          estagio_producao: r.estagio_producao ?? null,
+          resultado_administrativo: r.resultado_administrativo ?? null,
+          resultado_judicial: r.resultado_judicial ?? null,
+          responsavel_id: r.responsavel_id ?? null,
+          responsavel_administrativo_id:
+            r.responsavel_administrativo_id ?? null,
+          responsavel_judicial_id: r.responsavel_judicial_id ?? null,
+        })
+      : null;
     return {
       id: r.id,
       tipo_acao: r.tipo_acao ?? "–",
@@ -441,12 +456,17 @@ export async function getMeuFinanceiroInitial(
     for (const r of rows) {
       const iso = String(r.mes_iso);
       if (!map.has(iso)) continue;
-      const pct = resolveComissaoPct(
-        comissaoConfig,
-        r.estagio_producao,
-        r.resultado_administrativo,
-        r.resultado_judicial
-      );
+      const pct = colaboradorId
+        ? resolveComissaoPctParaColaborador(colaboradorId, comissaoConfig, {
+            estagio_producao: r.estagio_producao ?? null,
+            resultado_administrativo: r.resultado_administrativo ?? null,
+            resultado_judicial: r.resultado_judicial ?? null,
+            responsavel_id: r.responsavel_id ?? null,
+            responsavel_administrativo_id:
+              r.responsavel_administrativo_id ?? null,
+            responsavel_judicial_id: r.responsavel_judicial_id ?? null,
+          })
+        : null;
       const comissao = aplicarComissao(Number(r.valor), pct);
       map.set(iso, (map.get(iso) ?? 0) + comissao);
     }
@@ -466,12 +486,17 @@ export async function getMeuFinanceiroInitial(
   const aguardandoResultado: LancamentoComComissao[] =
     aguardandoResultadoRows.map((r) => {
       const base = mapLancamentoRow(r);
-      const pct = resolveComissaoPct(
-        comissaoConfig,
-        r.estagio_producao,
-        r.resultado_administrativo,
-        r.resultado_judicial
-      );
+      const pct = colaboradorId
+        ? resolveComissaoPctParaColaborador(colaboradorId, comissaoConfig, {
+            estagio_producao: r.estagio_producao ?? null,
+            resultado_administrativo: r.resultado_administrativo ?? null,
+            resultado_judicial: r.resultado_judicial ?? null,
+            responsavel_id: r.responsavel_id ?? null,
+            responsavel_administrativo_id:
+              r.responsavel_administrativo_id ?? null,
+            responsavel_judicial_id: r.responsavel_judicial_id ?? null,
+          })
+        : null;
       return {
         ...base,
         comissao_pct: pct,

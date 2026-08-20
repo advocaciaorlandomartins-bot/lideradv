@@ -26,6 +26,7 @@
     "migrate:timbrado:toggles": "tsx scripts/migrate-add-timbrado-toggles.ts",
     "migrate:colaboradores:comissao": "tsx scripts/migrate-add-comissao-colaborador.ts",
     "migrate:remuneracoes:origem-lancamento": "tsx scripts/migrate-add-origem-lancamento-remuneracao.ts",
+    "migrate:processos:responsavel-fase": "tsx scripts/migrate-add-responsavel-por-fase.ts",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

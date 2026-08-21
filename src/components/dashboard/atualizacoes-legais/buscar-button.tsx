@@ -18,6 +18,7 @@ export default function BuscarAtualizacoesButton() {
     setMsg("");
     try {
       const res = await fetch("/api/cron/atualizacoes-legais", {
+        method: "POST",
         credentials: "include",
       });
       const data = await res.json();

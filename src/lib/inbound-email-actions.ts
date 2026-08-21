@@ -70,7 +70,7 @@ export async function marcarLidoAction(
 
 export async function setupAction(): Promise<InboundEmailState> {
   const session = await getSession();
-  if (!session || session.categoria !== "admin")
+  if (!session || session.categoria !== "Administrador(a)")
     return { error: "Apenas admins podem executar setup." };
 
   try {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useEffect, useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { SpinnerIcon, EyeIcon, EyeOffIcon } from "@/components/icons";
 import {
@@ -112,9 +112,11 @@ export default function UsuarioForm({ usuario, colaboradores }: Props) {
     setPerms(resolvePermissoes(categoria, null));
   }
 
-  if (state?.success && !isEdit) {
-    router.push("/dashboard/usuarios");
-  }
+  useEffect(() => {
+    if (state?.success && !isEdit) {
+      router.push("/dashboard/usuarios");
+    }
+  }, [state, isEdit, router]);
 
   return (
     <form action={formAction} className="flex flex-col gap-6 max-w-3xl">

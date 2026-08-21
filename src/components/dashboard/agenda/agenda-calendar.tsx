@@ -203,6 +203,7 @@ export default function AgendaCalendar() {
   const calRef = useRef<FullCalendar>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [isPending, startTransition] = useTransition();
+  const [compError, setCompError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -384,23 +385,37 @@ export default function AgendaCalendar() {
       clienteId: form.clienteId || null,
       responsavelLogin: form.responsavelLogin || null,
     };
+    setCompError(null);
     startTransition(async () => {
-      if (modalComp?.mode === "edit" && modalComp.id) {
-        await atualizarCompromissoAction(modalComp.id, data);
-      } else {
-        await criarCompromissoAction(data);
+      try {
+        if (modalComp?.mode === "edit" && modalComp.id) {
+          await atualizarCompromissoAction(modalComp.id, data);
+        } else {
+          await criarCompromissoAction(data);
+        }
+        setModalComp(null);
+        getApi()?.refetchEvents();
+      } catch (err) {
+        setCompError(
+          err instanceof Error ? err.message : "Erro ao salvar compromisso."
+        );
       }
-      setModalComp(null);
-      getApi()?.refetchEvents();
     });
   }
 
   function handleDeleteCompromisso() {
     if (!modalComp?.id) return;
+    setCompError(null);
     startTransition(async () => {
-      await deletarCompromissoAction(modalComp.id!);
-      setModalComp(null);
-      getApi()?.refetchEvents();
+      try {
+        await deletarCompromissoAction(modalComp.id!);
+        setModalComp(null);
+        getApi()?.refetchEvents();
+      } catch (err) {
+        setCompError(
+          err instanceof Error ? err.message : "Erro ao excluir compromisso."
+        );
+      }
     });
   }
 
@@ -1246,6 +1261,12 @@ export default function AgendaCalendar() {
                 </div>
               </div>
               {/* fim campos scrolláveis */}
+
+              {compError && (
+                <p className="flex-shrink-0 px-6 pt-3 font-body text-sm font-semibold text-red-600">
+                  {compError}
+                </p>
+              )}
 
               {/* Botões — rodapé fixo */}
               <div className="flex flex-shrink-0 items-center gap-2 border-t border-border px-6 py-4">

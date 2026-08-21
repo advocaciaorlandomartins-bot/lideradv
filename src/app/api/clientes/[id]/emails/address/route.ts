@@ -10,6 +10,9 @@ import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -19,6 +22,8 @@ export async function GET(
     return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const { id } = await params;
+  if (!UUID_RE.test(id))
+    return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   const addr = await getAddressByClientId(id);
   return NextResponse.json({ address: addr });
 }
@@ -32,6 +37,8 @@ export async function POST(
     return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const { id } = await params;
+  if (!UUID_RE.test(id))
+    return NextResponse.json({ error: "ID inválido." }, { status: 400 });
 
   const clientRows = await sql`
     SELECT name FROM clients WHERE id = ${id}::uuid LIMIT 1

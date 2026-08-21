@@ -45,6 +45,7 @@ export default function IaPeticoesProcesso({
   const [baixandoPdf, setBaixandoPdf] = useState(false);
   const [confirmExcluir, setConfirmExcluir] = useState<string | null>(null);
   const [salvoOk, setSalvoOk] = useState(false);
+  const [erroEditor, setErroEditor] = useState<string | null>(null);
 
   const defaultSkill: SkillId =
     (areaProcesso ? SKILL_AREA_MAP[areaProcesso] : undefined) ??
@@ -85,12 +86,18 @@ export default function IaPeticoesProcesso({
   const salvarEdicao = async () => {
     if (!editando) return;
     setSalvandoEdicao(true);
+    setErroEditor(null);
     try {
-      await fetch(`/api/ia/banco/${editando.id}`, {
+      const res = await fetch(`/api/ia/banco/${editando.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texto: textoEditor, titulo: tituloEditor }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setErroEditor(body.error || "Erro ao salvar. Tente novamente.");
+        return;
+      }
       setSalvoOk(true);
       setTimeout(() => setSalvoOk(false), 3000);
       setPeticoes((prev) =>
@@ -104,6 +111,8 @@ export default function IaPeticoesProcesso({
             : p
         )
       );
+    } catch {
+      setErroEditor("Erro de conexão ao salvar. Tente novamente.");
     } finally {
       setSalvandoEdicao(false);
     }
@@ -113,6 +122,7 @@ export default function IaPeticoesProcesso({
   const modificarComIA = async () => {
     if (!editando || !instrucaoModif.trim()) return;
     setModificando(true);
+    setErroEditor(null);
     try {
       const skill =
         (editando.area as SkillId) in SKILLS
@@ -131,11 +141,17 @@ export default function IaPeticoesProcesso({
           clienteId,
         }),
       });
-      const data = await res.json();
-      if (data.resultado) {
-        setTextoEditor(data.resultado);
-        setInstrucaoModif("");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.resultado) {
+        setErroEditor(
+          data.error || "Não foi possível incorporar a modificação."
+        );
+        return;
       }
+      setTextoEditor(data.resultado);
+      setInstrucaoModif("");
+    } catch {
+      setErroEditor("Erro de conexão. Tente novamente.");
     } finally {
       setModificando(false);
     }
@@ -177,22 +193,38 @@ export default function IaPeticoesProcesso({
 
   // Aprovar petição
   const aprovar = async (id: string) => {
-    await fetch(`/api/ia/banco/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ aprovada: true }),
-    });
-    setPeticoes((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, aprovada: true } : p))
-    );
+    try {
+      const res = await fetch(`/api/ia/banco/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aprovada: true }),
+      });
+      if (!res.ok) {
+        alert("Erro ao aprovar petição. Tente novamente.");
+        return;
+      }
+      setPeticoes((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, aprovada: true } : p))
+      );
+    } catch {
+      alert("Erro de conexão ao aprovar petição.");
+    }
   };
 
   // Excluir
   const excluir = async (id: string) => {
-    await fetch(`/api/ia/banco/${id}`, { method: "DELETE" });
-    setPeticoes((prev) => prev.filter((p) => p.id !== id));
-    setConfirmExcluir(null);
-    if (editando?.id === id) setEditando(null);
+    try {
+      const res = await fetch(`/api/ia/banco/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        alert("Erro ao excluir petição. Tente novamente.");
+        return;
+      }
+      setPeticoes((prev) => prev.filter((p) => p.id !== id));
+      setConfirmExcluir(null);
+      if (editando?.id === id) setEditando(null);
+    } catch {
+      alert("Erro de conexão ao excluir petição.");
+    }
   };
 
   if (carregando) {
@@ -241,6 +273,11 @@ export default function IaPeticoesProcesso({
             </div>
 
             <div className="p-5 space-y-4">
+              {erroEditor && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 font-body text-sm font-semibold text-red-600">
+                  {erroEditor}
+                </p>
+              )}
               {/* Modificar com IA */}
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
                 <h3 className="font-body text-sm font-semibold text-amber-800 flex items-center gap-2">

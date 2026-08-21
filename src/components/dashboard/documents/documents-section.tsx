@@ -189,8 +189,12 @@ export default function DocumentsSection({
     setDeletingId(doc.id);
 
     startTransition(async () => {
-      await deleteDocumentoAction(doc.id, doc.url);
+      const result = await deleteDocumentoAction(doc.id, doc.url, entityType);
       setDeletingId(null);
+      if (result?.error) {
+        setUploadError(result.error);
+        return;
+      }
       router.refresh();
     });
   }

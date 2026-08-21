@@ -213,13 +213,19 @@ impacto baixo = informativo sem efeito prático imediato`,
 
 // ─── Handler principal ────────────────────────────────────────────────────────
 
-export async function GET(req: Request) {
-  // Aceita: CRON_SECRET via header (Vercel) OU sessão de administrador (manual)
+async function handler(req: Request) {
+  // Aceita: CRON_SECRET via header (Vercel, sempre GET) OU sessão de
+  // administrador (disparo manual pelo botão "Buscar agora" — exigido via
+  // POST, não GET, pra não ficar sujeito a CSRF por navegação/link com
+  // cookie sameSite=lax anexado automaticamente).
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
   const isVercel = secret && auth === `Bearer ${secret}`;
 
   if (!isVercel) {
+    if (req.method !== "POST") {
+      return NextResponse.json({ error: "Método inválido." }, { status: 405 });
+    }
     const session = await getSession();
     if (!session || session.categoria !== "Administrador(a)") {
       return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
@@ -395,4 +401,12 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({ ok: true, data: dataStr, ...resultados });
+}
+
+export async function GET(req: Request) {
+  return handler(req);
+}
+
+export async function POST(req: Request) {
+  return handler(req);
 }

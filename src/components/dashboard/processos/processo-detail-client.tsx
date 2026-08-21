@@ -976,17 +976,21 @@ function RelatoTab({ processo }: { processo: ProcessoExtended }) {
   const [text, setText] = useState(processo.relato ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleSave() {
     setSaving(true);
+    setErro(null);
     const result = await updateRelatoAction(processo.id, text);
     setSaving(false);
-    if (!result.error) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      router.refresh();
+    if (result.error) {
+      setErro(result.error);
+      return;
     }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    router.refresh();
   }
 
   return (
@@ -998,6 +1002,9 @@ function RelatoTab({ processo }: { processo: ProcessoExtended }) {
         placeholder="Descreva o relato do processo de forma narrativa…"
         className="w-full resize-y rounded-lg border border-border bg-white p-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
       />
+      {erro && (
+        <p className="font-body text-sm font-semibold text-red-600">{erro}</p>
+      )}
       <div className="flex justify-end">
         <button onClick={handleSave} disabled={saving} className={btnPrimary}>
           {saving ? (
@@ -1048,7 +1055,11 @@ function LinhaDoTempoTab({
   function handleDelete(id: string) {
     if (!confirm("Excluir este registro?")) return;
     startTransition(async () => {
-      await deleteHistoricoRegistroAction(id, processo.id);
+      const result = await deleteHistoricoRegistroAction(id, processo.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -1163,6 +1174,7 @@ function EventoRow({
   const [hora, setHora] = useState(ev.hora ?? "");
   const [local, setLocal] = useState(ev.local ?? "");
   const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
 
@@ -1170,14 +1182,22 @@ function EventoRow({
 
   function handleDarBaixa() {
     startTransition(async () => {
-      await darBaixaEventoControleAction(ev.id, processo.id);
+      const result = await darBaixaEventoControleAction(ev.id, processo.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
 
   function handleReabrir() {
     startTransition(async () => {
-      await reabrirEventoControleAction(ev.id, processo.id);
+      const result = await reabrirEventoControleAction(ev.id, processo.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -1185,14 +1205,19 @@ function EventoRow({
   function handleDelete() {
     if (!confirm("Excluir evento?")) return;
     startTransition(async () => {
-      await deleteEventoControleAction(ev.id, processo.id);
+      const result = await deleteEventoControleAction(ev.id, processo.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
 
   async function handleSave() {
     setSaving(true);
-    await updateEventoControleAction({
+    setErro(null);
+    const result = await updateEventoControleAction({
       id: ev.id,
       processoId: processo.id,
       titulo,
@@ -1202,6 +1227,10 @@ function EventoRow({
       local: local || null,
     });
     setSaving(false);
+    if (result?.error) {
+      setErro(result.error);
+      return;
+    }
     setEditing(false);
     router.refresh();
   }
@@ -1212,6 +1241,9 @@ function EventoRow({
   if (editing) {
     return (
       <li className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+        {erro && (
+          <p className="font-body text-xs font-semibold text-red-600">{erro}</p>
+        )}
         <input
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
@@ -1391,13 +1423,21 @@ function ResponsavelSection({
 }) {
   const [value, setValue] = useState(processo.responsavel_id ?? "");
   const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleChange(v: string) {
+    const anterior = value;
     setValue(v);
     setSaving(true);
-    await updateResponsavelAction(processo.id, v || null);
+    setErro(null);
+    const result = await updateResponsavelAction(processo.id, v || null);
     setSaving(false);
+    if (result?.error) {
+      setValue(anterior);
+      setErro(result.error);
+      return;
+    }
     router.refresh();
   }
 
@@ -1443,6 +1483,11 @@ function ResponsavelSection({
           </div>
         )}
       </div>
+      {erro && (
+        <p className="mt-2 font-body text-xs font-semibold text-red-600">
+          {erro}
+        </p>
+      )}
     </div>
   );
 }
@@ -1468,10 +1513,12 @@ function TarefasSection({
 
   function toggleStatus(t: TarefaProcesso) {
     startTransition(async () => {
-      if (isConcluida(t)) {
-        await reabrirTarefaProcessoAction(t.id, processo.id);
-      } else {
-        await darBaixaTarefaProcessoAction(t.id, processo.id);
+      const result = isConcluida(t)
+        ? await reabrirTarefaProcessoAction(t.id, processo.id)
+        : await darBaixaTarefaProcessoAction(t.id, processo.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
       }
       router.refresh();
     });
@@ -1480,7 +1527,11 @@ function TarefasSection({
   function handleDelete(id: string) {
     if (!confirm("Excluir tarefa?")) return;
     startTransition(async () => {
-      await deleteTarefaAction(id, processo.id);
+      const result = await deleteTarefaAction(id, processo.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -1598,7 +1649,11 @@ function PendenciasSection({
   function toggle(p: PendenciaCliente) {
     const next = p.status === "pendente" ? "resolvida" : "pendente";
     startTransition(async () => {
-      await updatePendenciaStatusAction(p.id, next, processo.id);
+      const result = await updatePendenciaStatusAction(p.id, next, processo.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -1606,7 +1661,11 @@ function PendenciasSection({
   function handleDelete(id: string) {
     if (!confirm("Excluir pendência?")) return;
     startTransition(async () => {
-      await deletePendenciaAction(id, processo.id);
+      const result = await deletePendenciaAction(id, processo.id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -1719,9 +1778,11 @@ function DocsAutomatizadosSection({
 }) {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [docTab, setDocTab] = useState<"padrao" | "meus">("padrao");
+  const [erro, setErro] = useState<string | null>(null);
 
   async function handleGerarPadrao(templateKey: string, label: string) {
     setLoadingKey(templateKey);
+    setErro(null);
     try {
       const res = await fetch(
         `/api/clientes/${clientId}/gerar-documento?template=${templateKey}`
@@ -1729,6 +1790,8 @@ function DocsAutomatizadosSection({
       if (!res.ok) throw new Error("Erro ao gerar");
       const blob = await res.blob();
       downloadBlob(blob, `${label.replace(/\s+/g, "_")}.pdf`);
+    } catch {
+      setErro("Não foi possível gerar o documento. Tente novamente.");
     } finally {
       setLoadingKey(null);
     }
@@ -1736,6 +1799,7 @@ function DocsAutomatizadosSection({
 
   async function handleGerarModelo(modeloId: string, titulo: string) {
     setLoadingKey(modeloId);
+    setErro(null);
     try {
       const res = await fetch(
         `/api/gerar-modelo?modeloId=${modeloId}&clienteId=${clientId}`
@@ -1743,6 +1807,8 @@ function DocsAutomatizadosSection({
       if (!res.ok) throw new Error("Erro ao gerar");
       const blob = await res.blob();
       downloadBlob(blob, `${titulo.replace(/\s+/g, "_")}.pdf`);
+    } catch {
+      setErro("Não foi possível gerar o documento. Tente novamente.");
     } finally {
       setLoadingKey(null);
     }
@@ -1770,6 +1836,12 @@ function DocsAutomatizadosSection({
           Documentos Automatizados
         </h3>
       </div>
+
+      {erro && (
+        <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 font-body text-xs font-semibold text-red-600">
+          {erro}
+        </p>
+      )}
 
       {/* Tab switcher */}
       <div className="flex gap-1 rounded-lg border border-border bg-slate-50 p-1 mb-4">

@@ -105,24 +105,30 @@ export async function updateModeloAction(
   redirect("/dashboard/modelos");
 }
 
-export async function deleteModeloAction(id: string): Promise<void> {
+export async function deleteModeloAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "modelos", "excluir")) return;
+  if (!session || !hasPermission(session, "modelos", "excluir"))
+    return { error: "Sem permissão." };
 
   try {
     await sql`DELETE FROM modelos_documento WHERE id = ${id}::uuid`;
     revalidatePath("/dashboard/modelos");
+    return {};
   } catch (err) {
     console.error("deleteModeloAction error:", err);
+    return { error: "Erro ao excluir modelo." };
   }
 }
 
 export async function toggleModeloAtivoAction(
   id: string,
   ativo: boolean
-): Promise<void> {
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "modelos", "editar")) return;
+  if (!session || !hasPermission(session, "modelos", "editar"))
+    return { error: "Sem permissão." };
 
   try {
     await sql`
@@ -130,7 +136,9 @@ export async function toggleModeloAtivoAction(
       WHERE id = ${id}::uuid
     `;
     revalidatePath("/dashboard/modelos");
+    return {};
   } catch (err) {
     console.error("toggleModeloAtivoAction error:", err);
+    return { error: "Erro ao atualizar modelo." };
   }
 }

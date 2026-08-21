@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
 import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
 import { getLancamentoKpis, getContasAReceber } from "@/lib/lancamentos-db";
+import { iaRateLimitExcedido } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -581,6 +582,16 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || !hasPermission(session, "configuracoes", "ver")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  }
+
+  if (await iaRateLimitExcedido(session.login)) {
+    return NextResponse.json(
+      {
+        error:
+          "Limite de requisições de IA excedido. Tente novamente em 1 hora.",
+      },
+      { status: 429 }
+    );
   }
 
   let messages: Anthropic.MessageParam[];

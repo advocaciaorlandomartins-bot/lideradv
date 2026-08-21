@@ -21,7 +21,11 @@ export default function DeleteModeloButton({ id, titulo }: Props) {
     )
       return;
     startTransition(async () => {
-      await deleteModeloAction(id);
+      const result = await deleteModeloAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }

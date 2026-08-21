@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
 import { criarCompromisso } from "@/lib/compromissos-db";
 import { agendarVideochamadaWhatsApp } from "@/lib/lembretes";
@@ -7,24 +8,28 @@ import { getEscritorioConfig } from "@/lib/escritorio-db";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session)
+  if (!session || !hasPermission(session, "controles", "criar"))
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
-  const { clienteId, titulo, data, hora, link, tipoReuniao } =
-    (await req.json()) as {
-      clienteId: string;
-      titulo?: string;
-      data: string;
-      hora: string;
-      link?: string;
-      tipoReuniao?: "meet" | "whatsapp";
-    };
+  const { clienteId, titulo, data, hora, link, tipoReuniao } = (await req
+    .json()
+    .catch(() => ({}))) as {
+    clienteId?: string;
+    titulo?: string;
+    data?: string;
+    hora?: string;
+    link?: string;
+    tipoReuniao?: "meet" | "whatsapp";
+  };
 
   const isMeet = (tipoReuniao ?? "meet") === "meet";
 
-  if (!clienteId || !data || !hora) {
+  if (!clienteId || !UUID_RE.test(clienteId) || !data || !hora) {
     return NextResponse.json(
       { error: "clienteId, data e hora são obrigatórios." },
       { status: 400 }

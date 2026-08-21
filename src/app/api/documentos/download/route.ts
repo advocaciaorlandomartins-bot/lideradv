@@ -39,6 +39,12 @@ export async function GET(request: Request) {
           SELECT 1 FROM clients c
           WHERE c.id = d.entity_id AND c.deleted_at IS NULL
         ))
+        OR
+        -- documento de perícia (sem soft-delete nessa tabela)
+        (d.entity_type = 'pericia' AND EXISTS (
+          SELECT 1 FROM pericias pe
+          WHERE pe.id = d.entity_id
+        ))
       )
     LIMIT 1
   `;

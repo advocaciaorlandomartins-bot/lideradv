@@ -66,6 +66,11 @@ export async function GET(req: Request) {
       }
     }
 
+    await sql`
+      INSERT INTO cron_execucoes (rota, processados, enviados, erros)
+      VALUES ('/api/cron/lembretes', ${pendentes.length}, ${enviados}, ${erros})
+    `.catch(() => null);
+
     return NextResponse.json({
       ok: true,
       processados: pendentes.length,
@@ -73,10 +78,12 @@ export async function GET(req: Request) {
       erros,
     });
   } catch (err) {
-    console.error(
-      "[cron/lembretes]",
-      err instanceof Error ? err.message : String(err)
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[cron/lembretes]", msg);
+    await sql`
+      INSERT INTO cron_execucoes (rota, erros, detalhe)
+      VALUES ('/api/cron/lembretes', 1, ${msg.slice(0, 500)})
+    `.catch(() => null);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
 }

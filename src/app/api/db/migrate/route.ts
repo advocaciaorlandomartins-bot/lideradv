@@ -281,6 +281,27 @@ export async function GET() {
       sql`INSERT INTO mensagens_config (id, config) VALUES (1, '{}') ON CONFLICT (id) DO NOTHING`
   );
 
+  await run(
+    "cron_execucoes",
+    () => sql`
+      CREATE TABLE IF NOT EXISTS cron_execucoes (
+        id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        rota         TEXT        NOT NULL,
+        executado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        processados  INT         NOT NULL DEFAULT 0,
+        enviados     INT         NOT NULL DEFAULT 0,
+        erros        INT         NOT NULL DEFAULT 0,
+        detalhe      TEXT
+      )
+    `
+  );
+
+  await run(
+    "cron_execucoes.idx_rota",
+    () =>
+      sql`CREATE INDEX IF NOT EXISTS cron_execucoes_rota_idx ON cron_execucoes (rota, executado_em DESC)`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

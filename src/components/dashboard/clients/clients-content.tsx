@@ -858,6 +858,11 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                                 {c.trade_name}
                               </p>
                             )}
+                            {c.indicador_nome && (
+                              <p className="truncate font-body text-xs text-primary">
+                                Indicado por {c.indicador_nome}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -933,6 +938,11 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                       <p className="truncate font-body text-xs text-muted">
                         {c.email}
                       </p>
+                      {c.indicador_nome && (
+                        <p className="truncate font-body text-xs text-primary">
+                          Indicado por {c.indicador_nome}
+                        </p>
+                      )}
                       <div className="mt-1 flex items-center gap-3">
                         <StatusBadge status={c.status} />
                         <span className="font-body text-xs text-muted">
@@ -973,6 +983,11 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                   {c.trade_name && (
                     <p className="mt-0.5 truncate font-body text-xs text-muted">
                       {c.trade_name}
+                    </p>
+                  )}
+                  {c.indicador_nome && (
+                    <p className="mt-0.5 truncate font-body text-xs text-primary">
+                      Indicado por {c.indicador_nome}
                     </p>
                   )}
                 </div>

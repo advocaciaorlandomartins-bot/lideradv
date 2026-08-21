@@ -233,9 +233,11 @@ function maskCEP(v: string) {
 export default function EditClientForm({
   client,
   colaboradores,
+  podeVerIndicador,
 }: {
   client: ClientFull;
   colaboradores: Colaborador[];
+  podeVerIndicador: boolean;
 }) {
   const boundAction = updateClientAction.bind(null, client.id);
   const [state, formAction, isPending] = useActionState<
@@ -1203,156 +1205,165 @@ export default function EditClientForm({
           </Field>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Origem / Parceria">
-            <select
-              value={origemTipo}
-              onChange={(e) => {
-                setOrigemTipo(e.target.value);
-                setOrigemTexto("");
-                setIndicadorId("");
-                setIndicadorCargo("");
-                setIndicadorTipoTrabalho("");
-                setComissaoTipo("");
-                setComissaoValor("");
-              }}
-              disabled={isPending}
-              className={selectClass}
-            >
-              <option value="">— Selecione a origem —</option>
-              <option value="escritorio">Escritório</option>
-              <option value="rede_social">Rede Social</option>
-              <option value="indicacao">Indicação</option>
-              <option value="trafego_pago">Tráfego Pago</option>
-              <option value="outros">Outros</option>
-            </select>
-          </Field>
+        {!podeVerIndicador && (
+          <p className="font-body text-xs text-muted">
+            Origem / Parceria — visível apenas para administradores e sócios.
+          </p>
+        )}
+        {podeVerIndicador && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Origem / Parceria">
+              <select
+                value={origemTipo}
+                onChange={(e) => {
+                  setOrigemTipo(e.target.value);
+                  setOrigemTexto("");
+                  setIndicadorId("");
+                  setIndicadorCargo("");
+                  setIndicadorTipoTrabalho("");
+                  setComissaoTipo("");
+                  setComissaoValor("");
+                }}
+                disabled={isPending}
+                className={selectClass}
+              >
+                <option value="">— Selecione a origem —</option>
+                <option value="escritorio">Escritório</option>
+                <option value="rede_social">Rede Social</option>
+                <option value="indicacao">Indicação</option>
+                <option value="trafego_pago">Tráfego Pago</option>
+                <option value="outros">Outros</option>
+              </select>
+            </Field>
 
-          {origemTipo === "outros" && (
-            <div className="sm:col-span-2">
-              <Field label="Descreva a origem">
-                <input
-                  type="text"
-                  value={origemTexto}
-                  onChange={(e) => setOrigemTexto(e.target.value)}
-                  placeholder="Ex.: Indicação de parceiro externo, panfleto…"
-                  disabled={isPending}
-                  className={inputClass}
-                />
-              </Field>
-            </div>
-          )}
-
-          {origemTipo === "indicacao" && (
-            <>
+            {origemTipo === "outros" && (
               <div className="sm:col-span-2">
-                <Field label="Colaborador indicador">
+                <Field label="Descreva a origem">
+                  <input
+                    type="text"
+                    value={origemTexto}
+                    onChange={(e) => setOrigemTexto(e.target.value)}
+                    placeholder="Ex.: Indicação de parceiro externo, panfleto…"
+                    disabled={isPending}
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {origemTipo === "indicacao" && (
+              <>
+                <div className="sm:col-span-2">
+                  <Field label="Colaborador indicador">
+                    <select
+                      value={indicadorId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setIndicadorId(id);
+                        const col = colaboradores.find((c) => c.id === id);
+                        setIndicadorCargo(col?.cargo ?? "");
+                        setIndicadorTipoTrabalho("");
+                      }}
+                      disabled={isPending}
+                      className={selectClass}
+                    >
+                      <option value="">— Selecione o colaborador —</option>
+                      {colaboradores.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome} — {CARGO_LABELS[c.cargo] ?? c.cargo}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                {indicadorId && ADVOGADO_CARGOS.has(indicadorCargo) && (
+                  <div className="sm:col-span-2">
+                    <Field label="Tipo de trabalho do indicador">
+                      <select
+                        value={indicadorTipoTrabalho}
+                        onChange={(e) =>
+                          setIndicadorTipoTrabalho(e.target.value)
+                        }
+                        disabled={isPending}
+                        className={selectClass}
+                      >
+                        <option value="">— Selecione —</option>
+                        <option value="administrativo">Administrativo</option>
+                        <option value="judicial">Judicial</option>
+                        <option value="ambos">
+                          Ambos (Administrativo + Judicial)
+                        </option>
+                      </select>
+                    </Field>
+                  </div>
+                )}
+
+                <Field label="Tipo de comissão">
                   <select
-                    value={indicadorId}
+                    value={comissaoTipo}
                     onChange={(e) => {
-                      const id = e.target.value;
-                      setIndicadorId(id);
-                      const col = colaboradores.find((c) => c.id === id);
-                      setIndicadorCargo(col?.cargo ?? "");
-                      setIndicadorTipoTrabalho("");
+                      setComissaoTipo(e.target.value);
+                      setComissaoValor("");
                     }}
                     disabled={isPending}
                     className={selectClass}
                   >
-                    <option value="">— Selecione o colaborador —</option>
-                    {colaboradores.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nome} — {CARGO_LABELS[c.cargo] ?? c.cargo}
-                      </option>
-                    ))}
+                    <option value="">— Selecione —</option>
+                    <option value="percentual">Percentual (%)</option>
+                    <option value="valor">Valor fixo (R$)</option>
                   </select>
                 </Field>
-              </div>
 
-              {indicadorId && ADVOGADO_CARGOS.has(indicadorCargo) && (
-                <div className="sm:col-span-2">
-                  <Field label="Tipo de trabalho do indicador">
-                    <select
-                      value={indicadorTipoTrabalho}
-                      onChange={(e) => setIndicadorTipoTrabalho(e.target.value)}
-                      disabled={isPending}
-                      className={selectClass}
-                    >
-                      <option value="">— Selecione —</option>
-                      <option value="administrativo">Administrativo</option>
-                      <option value="judicial">Judicial</option>
-                      <option value="ambos">
-                        Ambos (Administrativo + Judicial)
-                      </option>
-                    </select>
+                {comissaoTipo === "percentual" && (
+                  <Field label="Percentual (%)">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={comissaoValor}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/[^0-9,]/g, "");
+                          setComissaoValor(v);
+                        }}
+                        placeholder="10,00"
+                        disabled={isPending}
+                        className={`${inputClass} pr-9`}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted">
+                        %
+                      </span>
+                    </div>
                   </Field>
-                </div>
-              )}
+                )}
 
-              <Field label="Tipo de comissão">
-                <select
-                  value={comissaoTipo}
-                  onChange={(e) => {
-                    setComissaoTipo(e.target.value);
-                    setComissaoValor("");
-                  }}
-                  disabled={isPending}
-                  className={selectClass}
-                >
-                  <option value="">— Selecione —</option>
-                  <option value="percentual">Percentual (%)</option>
-                  <option value="valor">Valor fixo (R$)</option>
-                </select>
-              </Field>
-
-              {comissaoTipo === "percentual" && (
-                <Field label="Percentual (%)">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={comissaoValor}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9,]/g, "");
-                        setComissaoValor(v);
-                      }}
-                      placeholder="10,00"
-                      disabled={isPending}
-                      className={`${inputClass} pr-9`}
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted">
-                      %
-                    </span>
-                  </div>
-                </Field>
-              )}
-
-              {comissaoTipo === "valor" && (
-                <Field label="Valor da comissão (R$)">
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted">
-                      R$
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={comissaoValor}
-                      onChange={(e) =>
-                        setComissaoValor(formatMoneyInput(e.target.value))
-                      }
-                      onBlur={(e) =>
-                        setComissaoValor(normalizeMoneyBlur(e.target.value))
-                      }
-                      placeholder="0,00"
-                      disabled={isPending}
-                      className={`${inputClass} pl-10`}
-                    />
-                  </div>
-                </Field>
-              )}
-            </>
-          )}
-        </div>
+                {comissaoTipo === "valor" && (
+                  <Field label="Valor da comissão (R$)">
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-body text-sm font-semibold text-muted">
+                        R$
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={comissaoValor}
+                        onChange={(e) =>
+                          setComissaoValor(formatMoneyInput(e.target.value))
+                        }
+                        onBlur={(e) =>
+                          setComissaoValor(normalizeMoneyBlur(e.target.value))
+                        }
+                        placeholder="0,00"
+                        disabled={isPending}
+                        className={`${inputClass} pl-10`}
+                      />
+                    </div>
+                  </Field>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Observações ── */}

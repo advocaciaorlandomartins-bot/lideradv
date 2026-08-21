@@ -26,6 +26,10 @@ export default async function EditarClientePage({
   ]);
   if (!client) notFound();
 
+  const podeVerIndicador =
+    session.categoria === "Administrador(a)" ||
+    session.categoria === "Sócio(a)";
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -59,7 +63,11 @@ export default async function EditarClientePage({
 
       {/* Form card */}
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:p-8">
-        <EditClientForm client={client} colaboradores={colaboradores} />
+        <EditClientForm
+          client={client}
+          colaboradores={colaboradores}
+          podeVerIndicador={podeVerIndicador}
+        />
       </div>
     </div>
   );

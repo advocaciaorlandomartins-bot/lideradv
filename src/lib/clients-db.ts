@@ -14,6 +14,8 @@ export interface Client {
   since: string;
   lastContact: string;
   processes: number;
+  /** Nome do colaborador que indicou este cliente (origem_tipo = 'indicacao') — null se não veio de indicação. */
+  indicador_nome: string | null;
 }
 
 function formatSince(date: Date): string {
@@ -38,8 +40,10 @@ export async function getAllClients(): Promise<Client[]> {
       c.state,
       c.status,
       c.created_at,
+      col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
+    LEFT JOIN colaboradores col ON col.id = c.indicador_id
     WHERE c.deleted_at IS NULL
     ORDER BY c.created_at DESC
   `;
@@ -58,6 +62,7 @@ export async function getAllClients(): Promise<Client[]> {
     since: formatSince(new Date(r.created_at)),
     lastContact: formatDate(new Date(r.created_at)),
     processes: r.process_count ?? 0,
+    indicador_nome: r.indicador_nome ?? null,
   }));
 }
 
@@ -396,8 +401,10 @@ export async function getClientById(id: string): Promise<Client | null> {
       c.state,
       c.status,
       c.created_at,
+      col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
+    LEFT JOIN colaboradores col ON col.id = c.indicador_id
     WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
   `;
 
@@ -417,5 +424,6 @@ export async function getClientById(id: string): Promise<Client | null> {
     since: formatSince(new Date(r.created_at)),
     lastContact: formatDate(new Date(r.created_at)),
     processes: r.process_count ?? 0,
+    indicador_nome: r.indicador_nome ?? null,
   };
 }

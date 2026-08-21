@@ -83,16 +83,6 @@ export async function createLancamentoAction(
   const valorMensalidade = valorMensalidadeStr
     ? parseFloat(valorMensalidadeStr)
     : 0;
-  const indicadorId =
-    ((formData.get("indicador_id") as string | null) ?? "").trim() || null;
-  const comissaoTipo =
-    ((formData.get("comissao_tipo") as string | null) ?? "").trim() || null;
-  const comissaoValorConfigStr = (
-    (formData.get("comissao_valor_config") as string | null) ?? ""
-  ).trim();
-  const comissaoValorConfig = comissaoValorConfigStr
-    ? parseFloat(comissaoValorConfigStr)
-    : null;
   const comissaoModoPagamento = (
     (formData.get("comissao_modo_pagamento") as string | null) ?? "auto"
   ).trim();
@@ -136,6 +126,29 @@ export async function createLancamentoAction(
     });
     revalidatePath("/dashboard/financeiro");
     redirect(redirectTo);
+  }
+
+  // Config de comissão do indicador vem sempre do cadastro do cliente, nunca
+  // do formulário — os campos indicador_id/comissao_tipo/comissao_valor_config
+  // no form são só hidden inputs de exibição; se fossem aceitos como vieram,
+  // qualquer um com permissão de criar lançamento poderia adulterar o valor
+  // pago ao indicador (ex: via devtools) e desviar dinheiro do escritório.
+  let indicadorId: string | null = null;
+  let comissaoTipo: string | null = null;
+  let comissaoValorConfig: number | null = null;
+  if (clientId) {
+    const [clienteComissao] = await sql`
+      SELECT indicador_id::text, comissao_tipo, comissao_valor
+      FROM clients WHERE id = ${clientId}::uuid LIMIT 1
+    `.catch(() => []);
+    if (clienteComissao) {
+      indicadorId = (clienteComissao.indicador_id as string | null) ?? null;
+      comissaoTipo = (clienteComissao.comissao_tipo as string | null) ?? null;
+      comissaoValorConfig =
+        clienteComissao.comissao_valor != null
+          ? Number(clienteComissao.comissao_valor)
+          : null;
+    }
   }
 
   // Calculate commission if applicable
@@ -750,6 +763,7 @@ export async function markAsPagoAction(id: string): Promise<void> {
       UPDATE lancamentos
       SET status = 'pago', data_pagamento = ${todayBR()}::date
       WHERE id = ${id}::uuid
+        AND status != 'pago'
       RETURNING remuneracao_id, client_id::text, processo_id::text, tipo, valor
     `;
     const lan = rows[0] as

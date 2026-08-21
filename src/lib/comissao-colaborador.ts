@@ -219,26 +219,39 @@ export async function gerarComissaoAutomaticaPorPagamento(
             : "administrativo";
       const descricao = `Comissão automática — ${p.tipo_acao ?? "processo"}${p.numero ? ` (${p.numero})` : ""} — ${faseLabel} (${pct}%)`;
 
-      const remRows = await sql`
-        INSERT INTO remuneracoes (
-          colaborador_id, tipo, valor, competencia, status, descricao,
-          processo_id, client_id, origem_lancamento_id
-        ) VALUES (
-          ${colaboradorId}::uuid, 'comissao', ${valorComissao}::numeric,
-          CURRENT_DATE, 'pendente', ${descricao},
-          ${processoId}::uuid, ${p.client_id}::uuid, ${lancamentoId}::uuid
-        )
-        RETURNING id::text
-      `;
-      const remuneracaoId = remRows[0].id as string;
+      try {
+        // Índice único (origem_lancamento_id, colaborador_id) é a garantia
+        // real contra pagamento duplicado — a checagem "jaExiste" acima é
+        // só uma saída rápida no caso comum; sob concorrência (double-click,
+        // retry) duas chamadas podem passar por ela antes de qualquer uma
+        // inserir, então o banco precisa recusar a segunda tentativa aqui.
+        const remRows = await sql`
+          INSERT INTO remuneracoes (
+            colaborador_id, tipo, valor, competencia, status, descricao,
+            processo_id, client_id, origem_lancamento_id
+          ) VALUES (
+            ${colaboradorId}::uuid, 'comissao', ${valorComissao}::numeric,
+            CURRENT_DATE, 'pendente', ${descricao},
+            ${processoId}::uuid, ${p.client_id}::uuid, ${lancamentoId}::uuid
+          )
+          RETURNING id::text
+        `;
+        const remuneracaoId = remRows[0].id as string;
 
-      await sql`
-        INSERT INTO lancamentos (tipo, categoria, descricao, valor, status, data_vencimento, remuneracao_id)
-        VALUES (
-          'saida', 'Pessoal', ${`${descricao} — ${colab.nome}`},
-          ${valorComissao}::numeric, 'pendente', CURRENT_DATE, ${remuneracaoId}::uuid
-        )
-      `;
+        await sql`
+          INSERT INTO lancamentos (tipo, categoria, descricao, valor, status, data_vencimento, remuneracao_id)
+          VALUES (
+            'saida', 'Pessoal', ${`${descricao} — ${colab.nome}`},
+            ${valorComissao}::numeric, 'pendente', CURRENT_DATE, ${remuneracaoId}::uuid
+          )
+        `;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("unique") || msg.includes("duplicate")) {
+          continue; // já processado por uma chamada concorrente — ok, ignora
+        }
+        throw err;
+      }
     }
   } catch (err) {
     console.error(

@@ -336,6 +336,7 @@ function HeaderCompacto({ config, logoData }: HeaderProps) {
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           {logoData && (
+            // eslint-disable-next-line jsx-a11y/alt-text -- Image do @react-pdf/renderer, não é <img> do DOM
             <Image
               src={logoData}
               style={{

@@ -87,7 +87,6 @@ export async function POST(req: NextRequest) {
     const context = doc.context;
 
     let imagesProcessed = 0;
-    let bytesSaved = 0;
 
     for (const [, obj] of context.enumerateIndirectObjects()) {
       if (!(obj instanceof PDFRawStream)) continue;
@@ -130,7 +129,6 @@ export async function POST(req: NextRequest) {
         if (cs === "/DeviceRGB" && bpc === 8) {
           const result = await flatToJpeg(originalData, width, height, 3, dict);
           if (result && result.jpeg.length < originalData.length) {
-            bytesSaved += originalData.length - result.jpeg.length;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (obj as any).contents = new Uint8Array(result.jpeg);
             dict.set(PDFName.of("Length"), PDFNumber.of(result.jpeg.length));

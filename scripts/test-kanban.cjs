@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- .cjs script, require() is correct here
 const { chromium } = require("playwright");
 
 const BASE = "http://localhost:3000";

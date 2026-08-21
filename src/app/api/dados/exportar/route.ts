@@ -7,7 +7,6 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { hasPermission } from "@/lib/permissoes";
 import { logAction } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";

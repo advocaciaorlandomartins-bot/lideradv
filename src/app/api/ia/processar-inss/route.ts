@@ -14,6 +14,7 @@ const ALLOWED_TYPES = new Set([
 ]);
 const MAX_MB = 10;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- usado só via typeof abaixo
 const TIPOS_INSS = [
   "agendamento_avaliacao_social",
   "agendamento_pericia_medica",

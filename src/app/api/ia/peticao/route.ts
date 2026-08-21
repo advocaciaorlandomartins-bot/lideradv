@@ -8,7 +8,6 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { gerarPeticaoStream, SKILLS, type SkillId } from "@/lib/ai-juridico";
-import { buildContextoTexto } from "@/lib/ai-juridico";
 import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";

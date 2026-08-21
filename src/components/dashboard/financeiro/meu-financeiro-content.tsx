@@ -319,8 +319,11 @@ export default function MeuFinanceiroContent({
 
   // 6 meses: 3 antes + atual + 2 à frente
   const fluxoData = useMemo(() => {
+    const [anoStr, mesStr] = mesHojeISO.split("-");
+    const anoHoje = parseInt(anoStr, 10);
+    const mesHoje = parseInt(mesStr, 10) - 1;
     return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(hoje.getFullYear(), hoje.getMonth() - 3 + i, 1);
+      const d = new Date(anoHoje, mesHoje - 3 + i, 1);
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const doI = lancamentos.filter((l) => l.data.startsWith(iso));
       return {
@@ -334,7 +337,7 @@ export default function MeuFinanceiroContent({
           .reduce((s, l) => s + l.valor, 0),
       };
     });
-  }, [lancamentos]);
+  }, [lancamentos, mesHojeISO]);
 
   const projecaoMeses = useMemo(() => {
     const [anoStr, mesStr] = mesHojeISO.split("-");

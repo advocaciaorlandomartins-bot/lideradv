@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useTransition } from "react";
 import Image from "next/image";
 import {
-  ScalesIcon,
   HomeIcon,
   UsersIcon,
   FolderOpenIcon,

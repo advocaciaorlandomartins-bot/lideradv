@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import sql from "@/lib/db";
 import { agendarNotificacoesCompromisso } from "@/lib/lembretes";
-import { agendarLembretesInss } from "@/lib/lembretes";
 
 export const dynamic = "force-dynamic";
 

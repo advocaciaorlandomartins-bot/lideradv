@@ -107,4 +107,6 @@ export interface ProcessoProducao {
   tarefas_pendentes: number;
   responsavel_id: string | null;
   responsavel_nome: string | null;
+  protocolo_inss: string | null;
+  data_distribuicao_iso: string | null;
 }

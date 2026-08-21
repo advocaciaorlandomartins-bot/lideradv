@@ -147,6 +147,8 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 ## PRODUÇÃO (menu: Negócios → Produção)
 - Kanban de processos em andamento com colunas: Análise · Produção · Administrativo · Judicial · Arquivado
 - Não há botão de criação aqui — processos entram via botão "Mover para Produção" no detalhe de cada processo
+- Cada card mostra uma faixa "Próxima ação" (ou "Aguardando", em azul, quando a entrada já foi dada e só falta o resultado) — evita que um card pareça pendência infinita quando na verdade já está andando
+- Direto no card: "Registrar Protocolo" (administrativo, quando ainda não tem protocolo do INSS) e "Registrar Distribuição" (judicial, quando ainda não foi distribuída) marcam que a entrada foi dada, sem precisar abrir o processo
 - Visualização do andamento de todos os casos do escritório
 
 ## FINANCEIRO (menu: Negócios → Financeiro)

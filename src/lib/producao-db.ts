@@ -87,6 +87,8 @@ function mapRow(r: any): ProcessoProducao {
     tarefas_pendentes: Number(r.tarefas_pendentes ?? 0),
     responsavel_id: r.responsavel_id ?? null,
     responsavel_nome: r.responsavel_nome ?? null,
+    protocolo_inss: r.protocolo_inss ?? null,
+    data_distribuicao_iso: r.data_distribuicao_iso ?? null,
   };
 }
 
@@ -106,6 +108,8 @@ export async function getAllProcessosProducao(): Promise<ProcessoProducao[]> {
       p.created_at,
       p.responsavel_id::text,
       resp.nome AS responsavel_nome,
+      p.protocolo_inss,
+      to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao_iso,
       COUNT(t.id) FILTER (WHERE t.status IN ('Pendente', 'Em andamento'))::int AS tarefas_pendentes
     FROM processos p
     JOIN clients c ON c.id = p.client_id

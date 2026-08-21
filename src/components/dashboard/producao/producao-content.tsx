@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   SpinnerIcon,
@@ -22,10 +23,13 @@ import {
   moverParaAdministrativoAction,
   registrarResultadoAdminAction,
   registrarResultadoJudicialAction,
+  registrarProtocoloAdminAction,
+  registrarDistribuicaoJudicialAction,
   arquivarProcessoAction,
   reabrirProcessoAction,
   voltarEstagioAction,
 } from "@/lib/producao-actions";
+import { getProximaAcaoProcesso } from "@/lib/processo-fases";
 
 // Estágios lineares (arquivado é ponto final, não entra no stepper)
 const PIPELINE = ["analise", "producao", "administrativo", "judicial"] as const;
@@ -130,6 +134,8 @@ function DiasBadge({ dias }: { dias: number }) {
 
 function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
   const [showForm, setShowForm] = useState(false);
+  const [showFormProtocolo, setShowFormProtocolo] = useState(false);
+  const [showFormDistribuicao, setShowFormDistribuicao] = useState(false);
   const [resultadoAdmin, setResultadoAdmin] = useState<"concedido" | "negado">(
     "concedido"
   );
@@ -139,11 +145,48 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
   const [resultadoJudicial, setResultadoJudicial] = useState<
     "procedente" | "improcedente" | "parcial"
   >("procedente");
+  const hoje = new Date().toISOString().slice(0, 10);
+  const [protocoloNumero, setProtocoloNumero] = useState("");
+  const [protocoloData, setProtocoloData] = useState(hoje);
+  const [distribuicaoData, setDistribuicaoData] = useState(hoje);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const estagio = processo.estagio_producao;
   const inputClass =
     "w-full rounded-lg border border-border bg-white px-2.5 py-1.5 font-body text-sm text-fg focus:border-primary focus:outline-none";
+
+  const proximaAcao = getProximaAcaoProcesso({
+    estagio_producao: processo.estagio_producao,
+    resultado_administrativo: processo.resultado_administrativo,
+    resultado_judicial: processo.resultado_judicial,
+    protocolo_inss: processo.protocolo_inss,
+    data_distribuicao: processo.data_distribuicao_iso,
+  });
+
+  function registrarProtocolo() {
+    startTransition(async () => {
+      await registrarProtocoloAdminAction(
+        processo.id,
+        protocoloNumero,
+        protocoloData
+      );
+      setShowFormProtocolo(false);
+      router.refresh();
+    });
+  }
+
+  function registrarDistribuicao() {
+    startTransition(async () => {
+      await registrarDistribuicaoJudicialAction(
+        processo.id,
+        "",
+        distribuicaoData
+      );
+      setShowFormDistribuicao(false);
+      router.refresh();
+    });
+  }
 
   function avancarAdmin() {
     startTransition(async () => {
@@ -151,6 +194,7 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
         resultadoAdmin === "concedido" ? "arquivado" : proximoAdmin;
       await registrarResultadoAdminAction(processo.id, resultadoAdmin, proximo);
       setShowForm(false);
+      router.refresh();
     });
   }
 
@@ -158,6 +202,7 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
     startTransition(async () => {
       await registrarResultadoJudicialAction(processo.id, resultadoJudicial);
       setShowForm(false);
+      router.refresh();
     });
   }
 
@@ -191,6 +236,43 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
         </div>
         <DiasBadge dias={processo.dias_no_estagio} />
       </div>
+
+      {/* Próxima ação — mostra se já deu entrada e só falta o resultado, ou
+          se ainda precisa dar entrada, pra não ficar parecendo pendência
+          infinita quando na verdade já está andando */}
+      {proximaAcao && (
+        <div
+          className={`mb-2 flex items-start gap-1.5 rounded-lg px-2 py-1.5 ${
+            proximaAcao.urgente
+              ? "bg-red-50"
+              : proximaAcao.aguardando
+                ? "bg-blue-50"
+                : "bg-slate-50"
+          }`}
+        >
+          <span
+            className={`mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+              proximaAcao.urgente
+                ? "bg-red-500"
+                : proximaAcao.aguardando
+                  ? "bg-blue-500"
+                  : "bg-slate-400"
+            }`}
+          />
+          <p
+            className={`font-body text-[11px] font-semibold leading-tight ${
+              proximaAcao.urgente
+                ? "text-red-700"
+                : proximaAcao.aguardando
+                  ? "text-blue-700"
+                  : "text-slate-600"
+            }`}
+          >
+            {proximaAcao.aguardando ? "Aguardando: " : ""}
+            {proximaAcao.label}
+          </p>
+        </div>
+      )}
 
       {/* Tarefas pendentes badge */}
       {processo.tarefas_pendentes > 0 && (
@@ -245,7 +327,7 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
       )}
 
       {/* ── Ações de progressão ── */}
-      {!showForm && (
+      {!showForm && !showFormProtocolo && !showFormDistribuicao && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
           <Link
             href={`/dashboard/processos/${processo.id}`}
@@ -259,7 +341,10 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
           {["producao", "administrativo", "judicial"].includes(estagio) && (
             <button
               onClick={() =>
-                startTransition(() => voltarEstagioAction(processo.id))
+                startTransition(async () => {
+                  await voltarEstagioAction(processo.id);
+                  router.refresh();
+                })
               }
               disabled={isPending}
               className="flex items-center gap-1 rounded px-1.5 py-1 font-body text-[11px] text-muted transition-colors hover:text-fg disabled:opacity-50"
@@ -289,7 +374,10 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
           {estagio === "analise" && (
             <button
               onClick={() =>
-                startTransition(() => moverParaProducaoAction(processo.id))
+                startTransition(async () => {
+                  await moverParaProducaoAction(processo.id);
+                  router.refresh();
+                })
               }
               disabled={isPending}
               className={`${nextBtnBase} border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100`}
@@ -307,9 +395,10 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
           {estagio === "producao" && (
             <button
               onClick={() =>
-                startTransition(() =>
-                  moverParaAdministrativoAction(processo.id)
-                )
+                startTransition(async () => {
+                  await moverParaAdministrativoAction(processo.id);
+                  router.refresh();
+                })
               }
               disabled={isPending}
               className={`${nextBtnBase} border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100`}
@@ -323,6 +412,17 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
             </button>
           )}
 
+          {/* Administrativo, ainda sem protocolo → dar entrada */}
+          {estagio === "administrativo" && !processo.protocolo_inss && (
+            <button
+              onClick={() => setShowFormProtocolo(true)}
+              className={`${nextBtnBase} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
+            >
+              <ChevronRightIcon className="h-3 w-3" />
+              Registrar Protocolo
+            </button>
+          )}
+
           {/* Administrativo → resultado (concedido → arquivo / negado → judicial ou arquivo) */}
           {estagio === "administrativo" && (
             <button
@@ -331,6 +431,17 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
             >
               <ChevronRightIcon className="h-3 w-3" />
               Registrar Resultado
+            </button>
+          )}
+
+          {/* Judicial, ainda sem distribuição → dar entrada na ação */}
+          {estagio === "judicial" && !processo.data_distribuicao_iso && (
+            <button
+              onClick={() => setShowFormDistribuicao(true)}
+              className={`${nextBtnBase} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
+            >
+              <ChevronRightIcon className="h-3 w-3" />
+              Registrar Distribuição
             </button>
           )}
 
@@ -349,7 +460,10 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
           {estagio === "arquivado" && (
             <button
               onClick={() =>
-                startTransition(() => reabrirProcessoAction(processo.id))
+                startTransition(async () => {
+                  await reabrirProcessoAction(processo.id);
+                  router.refresh();
+                })
               }
               disabled={isPending}
               className="flex items-center gap-1 rounded px-1.5 py-1 font-body text-[11px] text-muted transition-colors hover:text-primary disabled:opacity-50"
@@ -369,8 +483,9 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
                   )
                 )
                   return;
-                startTransition(() => {
-                  void arquivarProcessoAction(processo.id);
+                startTransition(async () => {
+                  await arquivarProcessoAction(processo.id);
+                  router.refresh();
                 });
               }}
               disabled={isPending}
@@ -488,6 +603,75 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
             </button>
             <button
               onClick={() => setShowForm(false)}
+              className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Form inline — Protocolo Administrativo ── */}
+      {showFormProtocolo && (
+        <div className="mt-2 space-y-2.5 border-t border-border pt-2.5">
+          <p className="font-body text-xs font-semibold text-fg">
+            Protocolo do Requerimento Administrativo
+          </p>
+          <input
+            type="text"
+            value={protocoloNumero}
+            onChange={(e) => setProtocoloNumero(e.target.value)}
+            placeholder="Número do protocolo (opcional)"
+            className={inputClass}
+          />
+          <input
+            type="date"
+            value={protocoloData}
+            onChange={(e) => setProtocoloData(e.target.value)}
+            className={inputClass}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={registrarProtocolo}
+              disabled={isPending}
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-body text-xs font-semibold text-white disabled:opacity-60"
+            >
+              {isPending && <SpinnerIcon className="h-3 w-3" />}
+              Confirmar
+            </button>
+            <button
+              onClick={() => setShowFormProtocolo(false)}
+              className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Form inline — Distribuição Judicial ── */}
+      {showFormDistribuicao && (
+        <div className="mt-2 space-y-2.5 border-t border-border pt-2.5">
+          <p className="font-body text-xs font-semibold text-fg">
+            Distribuição da Ação Judicial
+          </p>
+          <input
+            type="date"
+            value={distribuicaoData}
+            onChange={(e) => setDistribuicaoData(e.target.value)}
+            className={inputClass}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={registrarDistribuicao}
+              disabled={isPending}
+              className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-body text-xs font-semibold text-white disabled:opacity-60"
+            >
+              {isPending && <SpinnerIcon className="h-3 w-3" />}
+              Confirmar
+            </button>
+            <button
+              onClick={() => setShowFormDistribuicao(false)}
               className="rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted hover:text-fg"
             >
               Cancelar

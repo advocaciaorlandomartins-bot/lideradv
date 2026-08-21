@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Publicacao, OabMonitorada } from "@/lib/publicacoes-db";
 import { calcularPrazos } from "@/lib/publicacoes-datas";
@@ -97,6 +98,7 @@ function PublicacaoCard({ pub }: { pub: Publicacao }) {
   const [isPending, startTransition] = useTransition();
   const [action, setAction] = useState<string | null>(null);
   const loading = isPending && action !== null;
+  const router = useRouter();
 
   const ri = pub.resumo_ia;
   const diasRestantes =
@@ -110,6 +112,7 @@ function PublicacaoCard({ pub }: { pub: Publicacao }) {
     startTransition(async () => {
       await marcarComoTratadaAction(pub.id);
       setAction(null);
+      router.refresh();
     });
   }
   function handleDesfazer() {
@@ -117,6 +120,7 @@ function PublicacaoCard({ pub }: { pub: Publicacao }) {
     startTransition(async () => {
       await marcarComoNaoLidaAction(pub.id);
       setAction(null);
+      router.refresh();
     });
   }
 
@@ -361,6 +365,7 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("nao_lida");
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const isAutomatica = (origem: string) =>
     origem === "automatica" || origem === "tramitasign";
@@ -399,7 +404,10 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
       )
     )
       return;
-    startTransition(() => marcarTodasComoTratadasAction());
+    startTransition(async () => {
+      await marcarTodasComoTratadasAction();
+      router.refresh();
+    });
   }
 
   return (
@@ -496,6 +504,7 @@ function TabManual({ publicacoes }: { publicacoes: Publicacao[] }) {
   const [buscou, setBuscou] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(
     null
   );
@@ -543,6 +552,7 @@ function TabManual({ publicacoes }: { publicacoes: Publicacao[] }) {
           disponibilizacao: new Date().toISOString().slice(0, 10),
           conteudo: "",
         });
+        router.refresh();
       }
     });
   }
@@ -802,6 +812,7 @@ function TabOabs({ oabs }: { oabs: OabMonitorada[] }) {
   const [nome, setNome] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [erro, setErro] = useState("");
+  const router = useRouter();
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -815,16 +826,23 @@ function TabOabs({ oabs }: { oabs: OabMonitorada[] }) {
       setNumero("");
       setNome("");
       setShowForm(false);
+      router.refresh();
     });
   }
 
   function handleToggle(id: string, ativa: boolean) {
-    startTransition(() => toggleOabAction(id, !ativa));
+    startTransition(async () => {
+      await toggleOabAction(id, !ativa);
+      router.refresh();
+    });
   }
 
   function handleRemover(id: string, num: string) {
     if (!confirm(`Remover OAB ${num} do monitoramento?`)) return;
-    startTransition(() => removerOabAction(id));
+    startTransition(async () => {
+      await removerOabAction(id);
+      router.refresh();
+    });
   }
 
   return (

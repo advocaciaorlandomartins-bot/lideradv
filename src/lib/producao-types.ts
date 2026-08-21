@@ -108,5 +108,6 @@ export interface ProcessoProducao {
   responsavel_id: string | null;
   responsavel_nome: string | null;
   protocolo_inss: string | null;
+  data_protocolo_inss_iso: string | null;
   data_distribuicao_iso: string | null;
 }

@@ -148,6 +148,7 @@ function ProducaoBar({
     resultado_administrativo: processo.resultado_administrativo,
     resultado_judicial: processo.resultado_judicial,
     protocolo_inss: processo.protocolo_inss,
+    data_protocolo_inss: processo.data_protocolo_inss,
     data_distribuicao: processo.data_distribuicao_iso,
   });
 
@@ -372,7 +373,7 @@ function ProducaoBar({
                 Protocolar Adm.
               </button>
             )}
-            {estagio === "administrativo" && !processo.protocolo_inss && (
+            {estagio === "administrativo" && !processo.data_protocolo_inss && (
               <button
                 onClick={() => setShowFormProtocolo(true)}
                 className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1 font-body text-xs font-semibold text-red-700 hover:bg-red-100"

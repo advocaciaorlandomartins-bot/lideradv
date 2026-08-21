@@ -22,7 +22,10 @@ export interface ProcessoFaseInput {
   estagio_producao: string | null;
   resultado_administrativo: string | null;
   resultado_judicial: string | null;
+  /** Número do protocolo — opcional, nem sempre disponível na hora de dar entrada. */
   protocolo_inss?: string | null;
+  /** Data em que a entrada foi de fato dada — este é o sinal real de "já entrou", não o número. */
+  data_protocolo_inss?: string | null;
   data_distribuicao?: string | null;
 }
 
@@ -58,7 +61,7 @@ export function getProximaAcaoProcesso(
   }
 
   if (estagio === "administrativo") {
-    if (!p.protocolo_inss) {
+    if (!p.data_protocolo_inss) {
       return {
         label: "Dar entrada no requerimento administrativo (INSS)",
         urgente: true,

@@ -161,6 +161,7 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
     resultado_administrativo: processo.resultado_administrativo,
     resultado_judicial: processo.resultado_judicial,
     protocolo_inss: processo.protocolo_inss,
+    data_protocolo_inss: processo.data_protocolo_inss_iso,
     data_distribuicao: processo.data_distribuicao_iso,
   });
 
@@ -413,15 +414,16 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
           )}
 
           {/* Administrativo, ainda sem protocolo → dar entrada */}
-          {estagio === "administrativo" && !processo.protocolo_inss && (
-            <button
-              onClick={() => setShowFormProtocolo(true)}
-              className={`${nextBtnBase} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
-            >
-              <ChevronRightIcon className="h-3 w-3" />
-              Registrar Protocolo
-            </button>
-          )}
+          {estagio === "administrativo" &&
+            !processo.data_protocolo_inss_iso && (
+              <button
+                onClick={() => setShowFormProtocolo(true)}
+                className={`${nextBtnBase} border-red-200 bg-red-50 text-red-700 hover:bg-red-100`}
+              >
+                <ChevronRightIcon className="h-3 w-3" />
+                Registrar Protocolo
+              </button>
+            )}
 
           {/* Administrativo → resultado (concedido → arquivo / negado → judicial ou arquivo) */}
           {estagio === "administrativo" && (

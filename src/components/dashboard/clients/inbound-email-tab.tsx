@@ -63,13 +63,18 @@ function EmailCard({
   onRead: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function handleOpen() {
     setOpen((v) => !v);
     if (!email.lida) {
       startTransition(async () => {
-        await marcarLidoAction(email.id, clientId);
+        const result = await marcarLidoAction(email.id, clientId);
+        if (result && "error" in result && result.error) {
+          setError(result.error);
+          return;
+        }
         onRead(email.id);
       });
     }
@@ -110,6 +115,11 @@ function EmailCard({
 
       {open && (
         <div className="border-t border-border px-4 pb-4 pt-3 space-y-3">
+          {error && (
+            <p className="font-body text-xs font-semibold text-red-600">
+              {error}
+            </p>
+          )}
           {email.ai_summary && (
             <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5">
               <p className="mb-1 font-body text-[10px] font-bold uppercase tracking-wider text-blue-500">

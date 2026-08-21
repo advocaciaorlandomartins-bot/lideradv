@@ -95,7 +95,11 @@ export default function DiscResultado({ teste }: { teste: Teste }) {
     if (!confirm(`Excluir teste de ${teste.nome_candidato}?`)) return;
     setDeletando(true);
     try {
-      await fetch(`/api/disc/${teste.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/disc/${teste.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        alert("Erro ao excluir teste. Tente novamente.");
+        return;
+      }
       router.push("/dashboard/disc");
       router.refresh();
     } finally {

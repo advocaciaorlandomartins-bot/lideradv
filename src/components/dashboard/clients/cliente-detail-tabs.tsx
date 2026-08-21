@@ -49,40 +49,50 @@ function BloquearMensagensToggle({
 }) {
   const [bloqueado, setBloqueado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   async function toggle() {
     setCarregando(true);
+    setErro(null);
     const novoValor = !bloqueado;
     const res = await toggleBloquearMensagensAction(clientId, novoValor);
-    if (!res.error) setBloqueado(novoValor);
+    if (res.error) setErro(res.error);
+    else setBloqueado(novoValor);
     setCarregando(false);
   }
 
   return (
-    <div
-      className={`flex items-center justify-between rounded-xl border px-4 py-3 ${bloqueado ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}
-    >
-      <div className="min-w-0">
-        <p className="font-body text-sm font-medium text-slate-800">
-          Mensagens automáticas por WhatsApp
-        </p>
-        <p className="font-body text-xs text-muted">
-          {bloqueado
-            ? "Bloqueado — nenhuma mensagem será enviada a este cliente"
-            : "Ativo — lembretes de cobrança e INSS serão enviados normalmente"}
-        </p>
-      </div>
-      <button
-        onClick={toggle}
-        disabled={carregando}
-        className={`relative ml-4 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-60 ${bloqueado ? "bg-amber-400" : "bg-emerald-500"}`}
-        role="switch"
-        aria-checked={!bloqueado}
+    <div>
+      <div
+        className={`flex items-center justify-between rounded-xl border px-4 py-3 ${bloqueado ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}
       >
-        <span
-          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${bloqueado ? "translate-x-0" : "translate-x-5"}`}
-        />
-      </button>
+        <div className="min-w-0">
+          <p className="font-body text-sm font-medium text-slate-800">
+            Mensagens automáticas por WhatsApp
+          </p>
+          <p className="font-body text-xs text-muted">
+            {bloqueado
+              ? "Bloqueado — nenhuma mensagem será enviada a este cliente"
+              : "Ativo — lembretes de cobrança e INSS serão enviados normalmente"}
+          </p>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={carregando}
+          className={`relative ml-4 inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-60 ${bloqueado ? "bg-amber-400" : "bg-emerald-500"}`}
+          role="switch"
+          aria-checked={!bloqueado}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${bloqueado ? "translate-x-0" : "translate-x-5"}`}
+          />
+        </button>
+      </div>
+      {erro && (
+        <p className="mt-1.5 font-body text-xs font-semibold text-red-600">
+          {erro}
+        </p>
+      )}
     </div>
   );
 }

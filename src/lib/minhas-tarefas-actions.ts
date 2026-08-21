@@ -8,6 +8,16 @@ export async function darBaixaControleAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session) return { error: "Sem permissão." };
+  // "Minhas Tarefas" é autoatendimento — não exige a permissão ampla de
+  // "controles: editar" (que um Colaborador(a) pode nem ter), mas só deixa
+  // dar baixa em algo que é seu (ou sem responsável definido).
+  const ownerCheck = await sql`
+    SELECT c.id FROM controles c
+    LEFT JOIN usuarios u ON u.id = c.responsavel_id
+    WHERE c.id = ${id}::uuid
+      AND (u.login = ${session.login} OR c.responsavel_id IS NULL)
+  `;
+  if (ownerCheck.length === 0) return { error: "Sem permissão." };
   await sql`UPDATE controles SET status = 'concluido' WHERE id = ${id}::uuid`;
   revalidatePath("/dashboard/minhas-tarefas");
   revalidatePath("/dashboard");
@@ -19,6 +29,15 @@ export async function darBaixaTarefaAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session) return { error: "Sem permissão." };
+
+  const ownerCheck = await sql`
+    SELECT t.id FROM tarefas_processo t
+    LEFT JOIN usuarios u ON u.login = ${session.login}
+    LEFT JOIN colaboradores c ON c.id = u.colaborador_id
+    WHERE t.id = ${id}::uuid
+      AND (t.responsavel = ${session.nome} OR t.responsavel = c.nome)
+  `;
+  if (ownerCheck.length === 0) return { error: "Sem permissão." };
 
   // Mark tarefa as done
   await sql`UPDATE tarefas_processo SET status = 'Concluída' WHERE id = ${id}::uuid`;
@@ -62,6 +81,13 @@ export async function reabrirControleAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session) return { error: "Sem permissão." };
+  const ownerCheck = await sql`
+    SELECT c.id FROM controles c
+    LEFT JOIN usuarios u ON u.id = c.responsavel_id
+    WHERE c.id = ${id}::uuid
+      AND (u.login = ${session.login} OR c.responsavel_id IS NULL)
+  `;
+  if (ownerCheck.length === 0) return { error: "Sem permissão." };
   await sql`UPDATE controles SET status = NULL WHERE id = ${id}::uuid`;
   revalidatePath("/dashboard/minhas-tarefas");
   revalidatePath("/dashboard");
@@ -73,6 +99,14 @@ export async function reabrirTarefaAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session) return { error: "Sem permissão." };
+  const ownerCheck = await sql`
+    SELECT t.id FROM tarefas_processo t
+    LEFT JOIN usuarios u ON u.login = ${session.login}
+    LEFT JOIN colaboradores c ON c.id = u.colaborador_id
+    WHERE t.id = ${id}::uuid
+      AND (t.responsavel = ${session.nome} OR t.responsavel = c.nome)
+  `;
+  if (ownerCheck.length === 0) return { error: "Sem permissão." };
   await sql`UPDATE tarefas_processo SET status = 'Pendente' WHERE id = ${id}::uuid`;
   const rows =
     await sql`SELECT processo_id::text FROM tarefas_processo WHERE id = ${id}::uuid`;

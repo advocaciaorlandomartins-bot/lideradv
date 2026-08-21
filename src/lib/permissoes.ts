@@ -28,16 +28,6 @@ export const MODULOS = [
     parent: null,
   },
   { key: "financeiro", label: "Financeiro", parent: null },
-  {
-    key: "financeiro_entradas",
-    label: "Receitas / Honorários",
-    parent: "financeiro",
-  },
-  {
-    key: "financeiro_saidas",
-    label: "Despesas / Saídas",
-    parent: "financeiro",
-  },
   { key: "publicacoes", label: "Publicações", parent: null },
   { key: "controles", label: "Controles", parent: null },
   { key: "colaboradores", label: "Colaboradores", parent: null },

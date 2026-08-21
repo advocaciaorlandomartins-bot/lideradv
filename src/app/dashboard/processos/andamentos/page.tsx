@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import sql from "@/lib/db";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import AndamentosClient, {
   type AndamentoDisplay,
 } from "@/components/dashboard/processos/andamentos-client";
@@ -6,6 +9,9 @@ import AndamentosClient, {
 export const dynamic = "force-dynamic";
 
 export default async function AndamentosPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "ver")) notFound();
+
   let andamentos: AndamentoDisplay[] = [];
 
   try {

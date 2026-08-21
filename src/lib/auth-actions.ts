@@ -8,7 +8,11 @@ import { createSession, destroySession, getSession } from "./session";
 import { resolvePermissoes } from "./permissoes";
 import { logAction } from "./audit";
 import { enviarEmailResetSenha } from "./email";
-import { registroRateLimitExcedido } from "./rate-limit";
+import {
+  registroRateLimitExcedido,
+  loginRateLimitExcedido,
+  registrarLoginFalho,
+} from "./rate-limit";
 
 export type LoginState = { error: string } | null;
 
@@ -39,7 +43,16 @@ function verifyPassword(input: string, stored: string): boolean {
       .createHash("sha256")
       .update(input + salt)
       .digest("hex");
-    return check === hash;
+    try {
+      const checkBuf = Buffer.from(check, "hex");
+      const hashBuf = Buffer.from(hash, "hex");
+      return (
+        checkBuf.length === hashBuf.length &&
+        crypto.timingSafeEqual(checkBuf, hashBuf)
+      );
+    } catch {
+      return false;
+    }
   }
   return false;
 }
@@ -57,6 +70,12 @@ export async function loginAction(
     return { error: "Preencha o login e a senha para continuar." };
   }
 
+  if (await loginRateLimitExcedido(login)) {
+    return {
+      error: "Muitas tentativas de login. Tente novamente em alguns minutos.",
+    };
+  }
+
   const rows = await sql`
     SELECT id::text, login, nome, categoria, senha_hash, ativo, validade, permissoes
     FROM usuarios
@@ -66,7 +85,10 @@ export async function loginAction(
 
   const user = rows[0];
 
-  if (!user) return { error: "Login ou senha incorretos." };
+  if (!user) {
+    await registrarLoginFalho(login);
+    return { error: "Login ou senha incorretos." };
+  }
   if (!user.ativo)
     return { error: "Usuário inativo. Contate o administrador." };
 
@@ -79,6 +101,7 @@ export async function loginAction(
   }
 
   if (!verifyPassword(senha, String(user.senha_hash))) {
+    await registrarLoginFalho(login);
     return { error: "Login ou senha incorretos." };
   }
 
@@ -197,11 +220,11 @@ export async function registerAction(
   try {
     const rows = await sql`
       INSERT INTO usuarios (login, nome, senha_hash, categoria)
-      VALUES (${login}, ${name}, ${senhaHash}, 'advogado')
+      VALUES (${login}, ${name}, ${senhaHash}, 'Advogado(a)')
       RETURNING id::text, login, categoria
     `;
     const user = rows[0];
-    const permissoes = resolvePermissoes("advogado", null);
+    const permissoes = resolvePermissoes("Advogado(a)", null);
     await createSession({
       id: String(user.id),
       login: String(user.login),
@@ -214,7 +237,7 @@ export async function registerAction(
       entidade: "usuario",
       descricao: `Registro de nova conta — ${login}`,
       _login: login,
-      _cat: "advogado",
+      _cat: "Advogado(a)",
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "";

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSession } from "./session";
+import { hasPermission } from "./permissoes";
 import {
   criarCompromisso,
   atualizarCompromisso,
@@ -35,7 +36,8 @@ export async function criarCompromissoAction(
   data: CompromissoData
 ): Promise<{ id: string }> {
   const session = await getSession();
-  if (!session) throw new Error("Não autenticado");
+  if (!session || !hasPermission(session, "controles", "criar"))
+    throw new Error("Não autenticado");
 
   const id = await criarCompromisso({ ...data, criadoPor: session.login });
 
@@ -154,7 +156,8 @@ export async function atualizarCompromissoAction(
   data: CompromissoData
 ): Promise<void> {
   const session = await getSession();
-  if (!session) throw new Error("Não autenticado");
+  if (!session || !hasPermission(session, "controles", "editar"))
+    throw new Error("Não autenticado");
 
   await atualizarCompromisso(id, data);
 
@@ -164,7 +167,8 @@ export async function atualizarCompromissoAction(
 
 export async function deletarCompromissoAction(id: string): Promise<void> {
   const session = await getSession();
-  if (!session) throw new Error("Não autenticado");
+  if (!session || !hasPermission(session, "controles", "excluir"))
+    throw new Error("Não autenticado");
 
   await deletarCompromisso(id);
 

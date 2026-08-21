@@ -327,7 +327,8 @@ export async function darBaixaTarefaProcessoAction(
   processoId: string
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session) return { error: "Sem permissão." };
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   await sql`UPDATE tarefas_processo SET status = 'Concluída' WHERE id = ${id}::uuid`;
 
   // Auto-avanço: se todas as tarefas do processo estão concluídas e está em analise → producao
@@ -356,7 +357,8 @@ export async function reabrirTarefaProcessoAction(
   processoId: string
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session) return { error: "Sem permissão." };
+  if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
   await sql`UPDATE tarefas_processo SET status = 'Pendente' WHERE id = ${id}::uuid`;
   revalidatePath(`/dashboard/processos/${processoId}`);
   revalidatePath("/dashboard/minhas-tarefas");

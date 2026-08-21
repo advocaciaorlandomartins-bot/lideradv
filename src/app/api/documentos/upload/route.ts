@@ -12,6 +12,33 @@ const UUID_RE =
 const VALID_ENTITY_TYPES = ["processo", "cliente", "pericia"] as const;
 type EntityType = (typeof VALID_ENTITY_TYPES)[number];
 
+// Tipos aceitos para documentos do escritório — bloqueia HTML/SVG/executáveis
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.oasis.opendocument.text",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/plain",
+]);
+const ALLOWED_EXTENSIONS = new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "odt",
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "txt",
+]);
+
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "criar")) {
@@ -56,7 +83,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "entityId inválido." }, { status: 400 });
   }
 
-  const ext = file.name.split(".").pop() ?? "bin";
+  const ext = (file.name.split(".").pop() ?? "bin").toLowerCase();
+  if (
+    !ALLOWED_EXTENSIONS.has(ext) ||
+    (file.type && !ALLOWED_MIME_TYPES.has(file.type))
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Tipo de arquivo não permitido. Aceitos: PDF, Word, Excel, ODT, imagens (JPG/PNG/WEBP) e TXT.",
+      },
+      { status: 400 }
+    );
+  }
+
   const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const blobPath = `documentos/${entityType}s/${entityId}/${uniqueName}`;
 

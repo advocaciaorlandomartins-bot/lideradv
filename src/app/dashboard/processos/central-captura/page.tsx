@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import sql from "@/lib/db";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import CentralCapturaClient, {
   type ProcessoCaptura,
 } from "@/components/dashboard/processos/central-captura-client";
@@ -6,6 +9,9 @@ import CentralCapturaClient, {
 export const dynamic = "force-dynamic";
 
 export default async function CentralCapturaPage() {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "ver")) notFound();
+
   let processos: ProcessoCaptura[] = [];
 
   try {

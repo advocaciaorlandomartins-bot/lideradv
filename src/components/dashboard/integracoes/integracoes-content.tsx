@@ -784,11 +784,19 @@ export default function IntegracoesContent({
       ? D
       : never
   ) {
-    await fetch("/api/integracoes/asaas", {
+    const res = await fetch("/api/integracoes/asaas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setMsg({
+        type: "err",
+        text: body.error || "Erro ao salvar configuração do Asaas.",
+      });
+      return;
+    }
     const updated = await fetch("/api/integracoes/asaas").then((r) => r.json());
     setAsaasConfig(updated);
     setMsg({ type: "ok", text: "Configuração do Asaas salva com sucesso!" });
@@ -796,9 +804,15 @@ export default function IntegracoesContent({
 
   async function handleGoogleDisconnect() {
     setGoogleLoading(true);
-    await fetch("/api/agenda/google/disconnect", { method: "POST" });
-    setGoogleStatus((s) => (s ? { ...s, connected: false, email: null } : s));
+    const res = await fetch("/api/agenda/google/disconnect", {
+      method: "POST",
+    });
     setGoogleLoading(false);
+    if (!res.ok) {
+      setMsg({ type: "err", text: "Erro ao desconectar Google Calendar." });
+      return;
+    }
+    setGoogleStatus((s) => (s ? { ...s, connected: false, email: null } : s));
     setMsg({ type: "ok", text: "Google Calendar desconectado." });
   }
 

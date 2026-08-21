@@ -583,9 +583,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const { messages } = (await req.json()) as {
-    messages: Anthropic.MessageParam[];
-  };
+  let messages: Anthropic.MessageParam[];
+  try {
+    ({ messages } = (await req.json()) as {
+      messages: Anthropic.MessageParam[];
+    });
+  } catch {
+    return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
+  }
   if (!messages?.length)
     return NextResponse.json(
       { error: "Mensagens inválidas." },
@@ -594,45 +599,56 @@ export async function POST(req: NextRequest) {
 
   const currentMessages = [...messages];
 
-  for (let i = 0; i < 6; i++) {
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      system: SYSTEM,
-      tools: TOOLS,
-      messages: currentMessages,
-    });
+  try {
+    for (let i = 0; i < 6; i++) {
+      const response = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        system: SYSTEM,
+        tools: TOOLS,
+        messages: currentMessages,
+      });
 
-    if (response.stop_reason === "end_turn") {
-      const text = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
-        .join("\n");
-      return NextResponse.json({ reply: text });
-    }
-
-    if (response.stop_reason === "tool_use") {
-      currentMessages.push({ role: "assistant", content: response.content });
-
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
-      for (const block of response.content) {
-        if (block.type === "tool_use") {
-          const result = await executarFerramenta(
-            block.name,
-            block.input as Record<string, string>
-          );
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: result,
-          });
-        }
+      if (response.stop_reason === "end_turn") {
+        const text = response.content
+          .filter((b) => b.type === "text")
+          .map((b) => (b as { type: "text"; text: string }).text)
+          .join("\n");
+        return NextResponse.json({ reply: text });
       }
-      currentMessages.push({ role: "user", content: toolResults });
-      continue;
-    }
 
-    break;
+      if (response.stop_reason === "tool_use") {
+        currentMessages.push({
+          role: "assistant",
+          content: response.content,
+        });
+
+        const toolResults: Anthropic.ToolResultBlockParam[] = [];
+        for (const block of response.content) {
+          if (block.type === "tool_use") {
+            const result = await executarFerramenta(
+              block.name,
+              block.input as Record<string, string>
+            );
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: result,
+            });
+          }
+        }
+        currentMessages.push({ role: "user", content: toolResults });
+        continue;
+      }
+
+      break;
+    }
+  } catch (err) {
+    console.error("[sistema/agente] Erro na execução do agente:", err);
+    return NextResponse.json(
+      { error: "Erro ao processar a solicitação. Tente novamente." },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({

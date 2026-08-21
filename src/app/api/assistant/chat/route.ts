@@ -284,7 +284,12 @@ export async function POST(req: NextRequest) {
       { status: 429 }
     );
 
-  const { messages }: { messages: Message[] } = await req.json();
+  let messages: Message[];
+  try {
+    ({ messages } = await req.json());
+  } catch {
+    return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
+  }
   if (!messages?.length) {
     return NextResponse.json(
       { error: "Mensagens inválidas." },
@@ -294,16 +299,24 @@ export async function POST(req: NextRequest) {
 
   const recentMessages = messages.slice(-20);
 
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 512,
-    temperature: 0,
-    system: SYSTEM_PROMPT,
-    messages: recentMessages,
-  });
+  try {
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      temperature: 0,
+      system: SYSTEM_PROMPT,
+      messages: recentMessages,
+    });
 
-  const reply =
-    response.content[0].type === "text" ? response.content[0].text : "";
+    const reply =
+      response.content[0].type === "text" ? response.content[0].text : "";
 
-  return NextResponse.json({ reply });
+    return NextResponse.json({ reply });
+  } catch (err) {
+    console.error("[assistant/chat] Anthropic API error:", err);
+    return NextResponse.json(
+      { error: "Erro ao gerar resposta. Tente novamente." },
+      { status: 500 }
+    );
+  }
 }

@@ -6,6 +6,9 @@ const IA_LIMIT_POR_HORA = 60;
 // Máximo de cadastros por IP em 24 horas
 const REGISTRO_LIMIT_24H = 5;
 
+// Máximo de tentativas de login malsucedidas por login em 15 minutos
+const LOGIN_LIMIT_15MIN = 8;
+
 /**
  * Verifica se o usuário excedeu o limite de chamadas de IA.
  * Usa a tabela `ia_usage_log` para contar chamadas na última hora.
@@ -63,5 +66,36 @@ export async function registroRateLimitExcedido(ip: string): Promise<boolean> {
     return false;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Verifica se um login excedeu o limite de tentativas malsucedidas
+ * (8 em 15 minutos) — proteção contra força bruta/credential stuffing.
+ * Não registra nada; use `registrarLoginFalho` após uma senha incorreta.
+ */
+export async function loginRateLimitExcedido(login: string): Promise<boolean> {
+  try {
+    const [row] = await sql`
+      SELECT COUNT(*)::int AS total
+      FROM login_tentativas
+      WHERE login = ${login}
+        AND criado_em >= NOW() - INTERVAL '15 minutes'
+    `;
+    return (row.total as number) >= LOGIN_LIMIT_15MIN;
+  } catch {
+    return false;
+  }
+}
+
+/** Registra uma tentativa de login malsucedida para o rate limit acima. */
+export async function registrarLoginFalho(login: string): Promise<void> {
+  try {
+    await sql`INSERT INTO login_tentativas (login) VALUES (${login})`;
+    sql`DELETE FROM login_tentativas WHERE criado_em < NOW() - INTERVAL '48 hours'`.catch(
+      () => {}
+    );
+  } catch {
+    // Em caso de erro no DB, não bloqueia o fluxo de login
   }
 }

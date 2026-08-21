@@ -248,6 +248,9 @@ function MarcarLidaButton({ id }: { id: string }) {
     <form
       action={async () => {
         "use server";
+        const { getSession: getSessionServer } = await import("@/lib/session");
+        const sessionServer = await getSessionServer();
+        if (!sessionServer) return;
         const { default: sqlServer } = await import("@/lib/db");
         await sqlServer`UPDATE atualizacoes_legais SET lida = TRUE WHERE id = ${id}`;
       }}

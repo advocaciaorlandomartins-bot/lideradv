@@ -137,7 +137,11 @@ export default function DiscList({ testes }: Props) {
     if (!confirm(`Excluir teste de ${nome}?`)) return;
     setDeletingId(id);
     try {
-      await fetch(`/api/disc/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/disc/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        alert("Erro ao excluir teste. Tente novamente.");
+        return;
+      }
       router.refresh();
     } finally {
       setDeletingId(null);

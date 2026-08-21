@@ -128,7 +128,7 @@ export async function gerarPeticaoStream(
 
   const stream = client.messages.stream(
     {
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-5",
       max_tokens: 3000,
       system: [
         {
@@ -536,7 +536,7 @@ export async function corrigirPeticao(
   const ctxTexto = params.contexto ? buildContextoTexto(params.contexto) : "";
 
   const res = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: "claude-sonnet-5",
     max_tokens: 3000,
     system: SKILLS[params.skill].systemPrompt,
     messages: [
@@ -584,7 +584,7 @@ export async function estrategiaProcessual(
   const ctxTexto = buildContextoTexto(params.contexto);
 
   const res = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: "claude-sonnet-5",
     max_tokens: 1500,
     system: skill.systemPrompt,
     messages: [

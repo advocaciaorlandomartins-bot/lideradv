@@ -49,7 +49,15 @@ export async function getSession(): Promise<SessionUser | null> {
   const payload = token.slice(0, dot);
   const sig = token.slice(dot + 1);
 
-  if (sign(payload) !== sig) return null;
+  const expected = sign(payload);
+  const sigBuf = Buffer.from(sig, "hex");
+  const expectedBuf = Buffer.from(expected, "hex");
+  if (
+    sigBuf.length !== expectedBuf.length ||
+    !crypto.timingSafeEqual(sigBuf, expectedBuf)
+  ) {
+    return null;
+  }
 
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());

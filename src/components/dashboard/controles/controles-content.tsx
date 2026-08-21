@@ -170,10 +170,12 @@ const STATUS_OPTIONS: { key: StatusControle | "todos"; label: string }[] = [
 
 function RowActions({ controle }: { controle: Controle }) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleStatus(next: StatusControle) {
     startTransition(async () => {
       await updateStatusControleAction(controle.id, next);
+      router.refresh();
     });
   }
 
@@ -182,6 +184,7 @@ function RowActions({ controle }: { controle: Controle }) {
       return;
     startTransition(async () => {
       await deleteControleAction(controle.id);
+      router.refresh();
     });
   }
 

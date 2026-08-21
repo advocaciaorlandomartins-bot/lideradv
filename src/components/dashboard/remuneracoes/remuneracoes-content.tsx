@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Remuneracao, RemuneracaoKpis } from "@/lib/remuneracoes-db";
 import { TIPO_LABELS, TIPO_COLORS } from "@/lib/remuneracoes-types";
@@ -78,9 +79,15 @@ function StatusBadge({ status }: { status: "pendente" | "pago" }) {
 
 function MarkPagaButton({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   return (
     <button
-      onClick={() => startTransition(() => markRemuneracaoPagaAction(id))}
+      onClick={() =>
+        startTransition(async () => {
+          await markRemuneracaoPagaAction(id);
+          router.refresh();
+        })
+      }
       disabled={isPending}
       title="Marcar como pago"
       className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 text-emerald-600 transition-colors duration-150 hover:bg-emerald-50 disabled:opacity-50 cursor-pointer"
@@ -92,11 +99,15 @@ function MarkPagaButton({ id }: { id: string }) {
 
 function DeleteButton({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   return (
     <button
       onClick={() => {
         if (!confirm("Excluir este lançamento?")) return;
-        startTransition(() => deleteRemuneracaoAction(id));
+        startTransition(async () => {
+          await deleteRemuneracaoAction(id);
+          router.refresh();
+        });
       }}
       disabled={isPending}
       title="Excluir"

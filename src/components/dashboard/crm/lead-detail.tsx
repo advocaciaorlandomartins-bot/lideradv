@@ -131,12 +131,14 @@ const PIPELINE_ESTAGIO: Estagio[] = [
 
 function EstagioBar({ lead }: { lead: Lead }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const currentIdx = PIPELINE_ESTAGIO.indexOf(lead.estagio);
   const isPerdido = lead.estagio === "perdido";
 
   function mover(alvo: Estagio) {
     startTransition(async () => {
       await moveLeadEstagioAction(lead.id, alvo);
+      router.refresh();
     });
   }
 
@@ -534,6 +536,7 @@ function AtividadesTab({
 }) {
   const [showForm, setShowForm] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   return (
     <div className="space-y-3">
@@ -584,9 +587,10 @@ function AtividadesTab({
                   </div>
                   <button
                     onClick={() =>
-                      startTransition(() =>
-                        deleteAtividadeAction(a.id, lead.id)
-                      )
+                      startTransition(async () => {
+                        await deleteAtividadeAction(a.id, lead.id);
+                        router.refresh();
+                      })
                     }
                     disabled={isPending}
                     className="rounded-lg p-1 text-muted transition-colors hover:text-red-600 disabled:opacity-40"
@@ -800,6 +804,7 @@ function TarefaRow({
     !tarefa.concluida &&
     tarefa.data_vencimento &&
     tarefa.data_vencimento < today;
+  const router = useRouter();
 
   return (
     <div
@@ -807,9 +812,10 @@ function TarefaRow({
     >
       <button
         onClick={() =>
-          startTransition(() =>
-            toggleTarefaAction(tarefa.id, lead.id, !tarefa.concluida)
-          )
+          startTransition(async () => {
+            await toggleTarefaAction(tarefa.id, lead.id, !tarefa.concluida);
+            router.refresh();
+          })
         }
         disabled={isPending}
         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors disabled:opacity-40 ${
@@ -860,7 +866,10 @@ function TarefaRow({
       </div>
       <button
         onClick={() =>
-          startTransition(() => deleteTarefaAction(tarefa.id, lead.id))
+          startTransition(async () => {
+            await deleteTarefaAction(tarefa.id, lead.id);
+            router.refresh();
+          })
         }
         disabled={isPending}
         className="rounded-lg p-1 text-muted transition-colors hover:text-red-600 disabled:opacity-40"

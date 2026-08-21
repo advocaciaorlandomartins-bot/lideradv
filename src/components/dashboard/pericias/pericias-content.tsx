@@ -83,9 +83,15 @@ function ResultadoBadge({ resultado }: { resultado: Pericia["resultado"] }) {
 
 function MarkRealizadoButton({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   return (
     <button
-      onClick={() => startTransition(() => markPericiaRealizadaAction(id))}
+      onClick={() =>
+        startTransition(async () => {
+          await markPericiaRealizadaAction(id);
+          router.refresh();
+        })
+      }
       disabled={isPending}
       title="Marcar como realizada"
       className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 text-emerald-600 transition-colors duration-150 hover:bg-emerald-50 disabled:opacity-50 cursor-pointer"

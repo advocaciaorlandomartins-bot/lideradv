@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { deleteUsuarioAction } from "@/lib/usuarios-actions";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 
 export default function DeleteUsuarioButton({ id, login }: Props) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleDelete() {
     if (
@@ -18,6 +20,7 @@ export default function DeleteUsuarioButton({ id, login }: Props) {
       return;
     startTransition(async () => {
       await deleteUsuarioAction(id);
+      router.refresh();
     });
   }
 

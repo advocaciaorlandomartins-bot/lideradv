@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
   MinhaItem,
@@ -165,6 +166,8 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
 
 function ItemCard({ item, isConcluida = false }: ItemCardProps) {
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   if (item.source === "processo") {
     return <AcaoProcessoCard item={item} />;
@@ -214,22 +217,30 @@ function ItemCard({ item, isConcluida = false }: ItemCardProps) {
         : "bg-slate-100 text-slate-500";
 
   function handleDarBaixa() {
+    setError(null);
     startTransition(async () => {
-      if (isControle) {
-        await darBaixaControleAction(item.id);
-      } else {
-        await darBaixaTarefaAction(item.id);
+      const result = isControle
+        ? await darBaixaControleAction(item.id)
+        : await darBaixaTarefaAction(item.id);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      router.refresh();
     });
   }
 
   function handleReabrir() {
+    setError(null);
     startTransition(async () => {
-      if (isControle) {
-        await reabrirControleAction(item.id);
-      } else {
-        await reabrirTarefaAction(item.id);
+      const result = isControle
+        ? await reabrirControleAction(item.id)
+        : await reabrirTarefaAction(item.id);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      router.refresh();
     });
   }
 
@@ -315,6 +326,12 @@ function ItemCard({ item, isConcluida = false }: ItemCardProps) {
               </span>
             )}
           </div>
+        )}
+
+        {error && (
+          <p className="mt-2 font-body text-xs font-semibold text-red-600">
+            {error}
+          </p>
         )}
       </div>
 

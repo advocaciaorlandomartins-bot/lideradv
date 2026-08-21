@@ -1,11 +1,13 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { deleteProcessoAction } from "@/lib/processo-actions";
 import { SpinnerIcon } from "@/components/icons";
 
 export default function DeleteProcessoButton({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleDelete() {
     if (
@@ -14,8 +16,11 @@ export default function DeleteProcessoButton({ id }: { id: string }) {
       )
     )
       return;
+    // Botão fica na página de detalhe — depois de excluir, navega pra lista
+    // em vez de só dar refresh (que tentaria recarregar um registro apagado).
     startTransition(async () => {
       await deleteProcessoAction(id);
+      router.push("/dashboard/processos");
     });
   }
 

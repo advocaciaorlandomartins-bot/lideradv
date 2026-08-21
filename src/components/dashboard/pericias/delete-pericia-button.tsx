@@ -1,11 +1,13 @@
 "use client";
 
 import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { deletePericiaAction } from "@/lib/pericia-actions";
 import { SpinnerIcon } from "@/components/icons";
 
 export default function DeletePericiaButton({ id }: { id: string }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleDelete() {
     if (
@@ -14,8 +16,12 @@ export default function DeletePericiaButton({ id }: { id: string }) {
       )
     )
       return;
+    // Botão fica na página de detalhe — depois de excluir, o registro não
+    // existe mais, então navega pra lista em vez de só dar refresh (que
+    // tentaria recarregar um registro já apagado).
     startTransition(async () => {
       await deletePericiaAction(id);
+      router.push("/dashboard/pericias");
     });
   }
 

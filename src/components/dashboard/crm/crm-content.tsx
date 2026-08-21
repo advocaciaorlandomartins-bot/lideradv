@@ -127,6 +127,7 @@ function KanbanCard({ lead }: { lead: Lead }) {
     e.stopPropagation();
     startTransition(async () => {
       await moveLeadEstagioAction(lead.id, alvo);
+      router.refresh();
     });
   }
 
@@ -242,6 +243,7 @@ function KanbanCard({ lead }: { lead: Lead }) {
               e.stopPropagation();
               startTransition(async () => {
                 await moveLeadEstagioAction(lead.id, "perdido");
+                router.refresh();
               });
             }}
             disabled={isPending}
@@ -352,6 +354,7 @@ function FunilTab({ leads }: { leads: Lead[] }) {
 
 function MoveEstagioButton({ lead }: { lead: Lead }) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const currentIdx = ESTAGIOS.indexOf(lead.estagio);
   const nextEstagio = ESTAGIOS[currentIdx + 1] as Estagio | undefined;
 
@@ -364,7 +367,10 @@ function MoveEstagioButton({ lead }: { lead: Lead }) {
     <button
       onClick={(e) => {
         e.stopPropagation();
-        startTransition(() => moveLeadEstagioAction(lead.id, nextEstagio));
+        startTransition(async () => {
+          await moveLeadEstagioAction(lead.id, nextEstagio);
+          router.refresh();
+        });
       }}
       disabled={isPending}
       title={`Mover para: ${nextMeta.label}`}

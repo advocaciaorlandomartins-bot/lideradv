@@ -118,14 +118,16 @@ export default async function ProcessoDetailPage({
       />
 
       {/* Perigo */}
-      <div className="rounded-xl border border-red-200 bg-red-50 p-5">
-        <h3 className="font-heading text-sm font-semibold text-red-700 mb-3">
-          Zona de risco
-        </h3>
-        <div className="flex flex-wrap gap-3">
-          <DeleteProcessoButton id={processo.id} />
+      {hasPermission(session, "processos", "excluir") && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5">
+          <h3 className="font-heading text-sm font-semibold text-red-700 mb-3">
+            Zona de risco
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            <DeleteProcessoButton id={processo.id} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

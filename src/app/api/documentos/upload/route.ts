@@ -12,6 +12,16 @@ const UUID_RE =
 const VALID_ENTITY_TYPES = ["processo", "cliente", "pericia"] as const;
 type EntityType = (typeof VALID_ENTITY_TYPES)[number];
 
+// Cada tipo de entidade é dono de um módulo de permissão diferente — usar
+// "processos" fixo pra tudo deixava um Advogado(a) sem "clientes:criar"
+// enviar documento em qualquer cliente, e travava quem só tinha
+// "clientes" (sem "processos") de anexar documento de cliente.
+const MODULO_POR_ENTITY_TYPE: Record<EntityType, string> = {
+  processo: "processos",
+  cliente: "clientes",
+  pericia: "controles",
+};
+
 // Tipos aceitos para documentos do escritório — bloqueia HTML/SVG/executáveis
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -41,7 +51,7 @@ const ALLOWED_EXTENSIONS = new Set([
 
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session || !hasPermission(session, "processos", "criar")) {
+  if (!session) {
     return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
@@ -63,19 +73,29 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!VALID_ENTITY_TYPES.includes(entityType as EntityType)) {
+    return NextResponse.json(
+      { error: "entityType inválido." },
+      { status: 400 }
+    );
+  }
+
+  if (
+    !hasPermission(
+      session,
+      MODULO_POR_ENTITY_TYPE[entityType as EntityType],
+      "criar"
+    )
+  ) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  }
+
   if (file.size > MAX_FILE_BYTES) {
     return NextResponse.json(
       {
         error: `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB). Limite: 5 MB.`,
       },
       { status: 413 }
-    );
-  }
-
-  if (!VALID_ENTITY_TYPES.includes(entityType as EntityType)) {
-    return NextResponse.json(
-      { error: "entityType inválido." },
-      { status: 400 }
     );
   }
 

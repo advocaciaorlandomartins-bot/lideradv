@@ -6,6 +6,7 @@ import { logAction } from "./audit";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { notificarPrevBot } from "./prevbot-outbound";
+import { podeEditarProcesso } from "./processo-ownership";
 
 export type ProcessoFormState = { error: string } | null;
 
@@ -104,8 +105,12 @@ export async function createProcessoAction(
     return { error: "Erro ao salvar processo. Tente novamente." };
   }
 
-  const rawRedirect = ((formData.get("redirect_to") as string | null) ?? "").trim();
-  const redirectTo = rawRedirect.startsWith("/") ? rawRedirect : "/dashboard/processos";
+  const rawRedirect = (
+    (formData.get("redirect_to") as string | null) ?? ""
+  ).trim();
+  const redirectTo = rawRedirect.startsWith("/")
+    ? rawRedirect
+    : "/dashboard/processos";
 
   await logAction({
     acao: "criar",
@@ -124,6 +129,8 @@ export async function updateProcessoAction(
 ): Promise<ProcessoFormState> {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
+  if (!(await podeEditarProcesso(session, id)))
     return { error: "Sem permissão." };
 
   const clientId = ((formData.get("client_id") as string | null) ?? "").trim();
@@ -271,21 +278,30 @@ export async function updateProcessoAction(
   redirect(`/dashboard/processos/${id}`);
 }
 
-export async function deleteProcessoAction(id: string): Promise<void> {
+export async function deleteProcessoAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "processos", "excluir")) return;
+  if (!session || !hasPermission(session, "processos", "excluir"))
+    return { error: "Sem permissão." };
+  if (!(await podeEditarProcesso(session, id)))
+    return { error: "Sem permissão." };
 
   try {
     await sql`UPDATE processos SET deleted_at = NOW() WHERE id = ${id}::uuid AND deleted_at IS NULL`;
   } catch (err) {
     console.error("deleteProcessoAction DB error:", err);
-    return;
+    return { error: "Erro ao excluir processo. Tente novamente." };
   }
-  await logAction({
-    acao: "excluir",
-    entidade: "processo",
-    entidadeId: id,
-    descricao: "Excluiu processo",
-  });
+  try {
+    await logAction({
+      acao: "excluir",
+      entidade: "processo",
+      entidadeId: id,
+      descricao: "Excluiu processo",
+    });
+  } catch (err) {
+    console.error("deleteProcessoAction logAction error:", err);
+  }
   redirect("/dashboard/processos");
 }

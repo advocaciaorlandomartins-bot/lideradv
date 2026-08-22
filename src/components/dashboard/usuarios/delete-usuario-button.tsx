@@ -19,7 +19,11 @@ export default function DeleteUsuarioButton({ id, login }: Props) {
     )
       return;
     startTransition(async () => {
-      await deleteUsuarioAction(id);
+      const result = await deleteUsuarioAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }

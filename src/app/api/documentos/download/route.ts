@@ -9,9 +9,15 @@ export const dynamic = "force-dynamic";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const MODULO_POR_ENTITY_TYPE: Record<string, string> = {
+  processo: "processos",
+  cliente: "clientes",
+  pericia: "controles",
+};
+
 export async function GET(request: Request) {
   const session = await getSession();
-  if (!session || !hasPermission(session, "processos", "ver")) {
+  if (!session) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
@@ -24,7 +30,7 @@ export async function GET(request: Request) {
 
   // Verifica que o documento existe e pertence a uma entidade ativa do sistema
   const rows = await sql`
-    SELECT d.url, d.nome
+    SELECT d.url, d.nome, d.entity_type
     FROM documentos d
     WHERE d.id = ${id}::uuid
       AND (
@@ -56,7 +62,16 @@ export async function GET(request: Request) {
     );
   }
 
-  const { url } = rows[0] as { url: string; nome: string };
+  const { url, entity_type } = rows[0] as {
+    url: string;
+    nome: string;
+    entity_type: string;
+  };
+
+  const modulo = MODULO_POR_ENTITY_TYPE[entity_type];
+  if (!modulo || !hasPermission(session, modulo, "ver")) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  }
 
   try {
     // Para blobs privados, head() retorna um downloadUrl assinado

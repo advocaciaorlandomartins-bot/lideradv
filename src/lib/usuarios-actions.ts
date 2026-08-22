@@ -54,6 +54,15 @@ export async function createUsuarioAction(
     return { error: "A senha deve ter pelo menos 8 caracteres." };
   if (senha !== senhaConf) return { error: "As senhas não coincidem." };
   if (!categoria) return { error: "Selecione uma categoria." };
+  // Só um Administrador(a) pode criar outro Administrador(a) — sem isso,
+  // qualquer pessoa com a permissão "usuarios:criar" (ex: RH, recepção)
+  // conseguia criar uma segunda conta própria já com categoria máxima.
+  if (
+    categoria === "Administrador(a)" &&
+    session.categoria !== "Administrador(a)"
+  ) {
+    return { error: "Apenas administradores podem criar outro administrador." };
+  }
 
   try {
     const senhaHash = hashPassword(senha);
@@ -119,6 +128,21 @@ export async function updateUsuarioAction(
   if (senha && senha !== senhaConf)
     return { error: "As senhas não coincidem." };
   if (!categoria) return { error: "Selecione uma categoria." };
+  // Só um Administrador(a) pode conceder a categoria Administrador(a) a
+  // alguém — sem isso, qualquer um com "usuarios:editar" (ex: RH) podia
+  // promover qualquer conta, inclusive a própria, a admin.
+  if (
+    categoria === "Administrador(a)" &&
+    session.categoria !== "Administrador(a)"
+  ) {
+    return { error: "Apenas administradores podem conceder essa categoria." };
+  }
+  // Ninguém pode alterar a própria categoria/permissões — fecha o caminho de
+  // "editar meu próprio usuário pra virar admin" mesmo sem a checagem acima
+  // (ex: um admin normal tentando se conceder um módulo que não tinha).
+  // Nome, senha, validade e status continuam editáveis normalmente.
+  const editandoProprioUsuario = id === session.id;
+  let categoriaFinal = categoria;
 
   try {
     let senhaHash: string;
@@ -128,7 +152,16 @@ export async function updateUsuarioAction(
       senhaHash = (await getSenhaHash(id)) ?? "";
     }
 
-    const permissoes = parsePermissoes(formData);
+    let permissoes = parsePermissoes(formData);
+    if (editandoProprioUsuario) {
+      const [current] = await sql`
+        SELECT categoria, permissoes FROM usuarios WHERE id = ${id}::uuid
+      `;
+      if (current) {
+        categoriaFinal = String(current.categoria);
+        permissoes = (current.permissoes as Permissoes) ?? {};
+      }
+    }
 
     if (colaboradorId) {
       await sql`
@@ -136,7 +169,7 @@ export async function updateUsuarioAction(
           login          = ${login},
           nome           = ${nome},
           senha_hash     = ${senhaHash},
-          categoria      = ${categoria},
+          categoria      = ${categoriaFinal},
           validade       = ${validade},
           ativo          = ${ativo},
           colaborador_id = ${colaboradorId}::uuid,
@@ -150,7 +183,7 @@ export async function updateUsuarioAction(
           login          = ${login},
           nome           = ${nome},
           senha_hash     = ${senhaHash},
-          categoria      = ${categoria},
+          categoria      = ${categoriaFinal},
           validade       = ${validade},
           ativo          = ${ativo},
           colaborador_id = NULL,
@@ -172,16 +205,43 @@ export async function updateUsuarioAction(
     acao: "editar",
     entidade: "usuario",
     entidadeId: id,
-    descricao: `Editou usuário: ${login} (${categoria})`,
+    descricao: `Editou usuário: ${login} (${categoriaFinal})`,
     detalhes: { ativo },
   });
   revalidatePath("/dashboard/usuarios");
   return { success: true };
 }
 
-export async function deleteUsuarioAction(id: string): Promise<void> {
+export async function deleteUsuarioAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "usuarios", "excluir")) return;
+  if (!session || !hasPermission(session, "usuarios", "excluir"))
+    return { error: "Sem permissão." };
+
+  if (id === session.id)
+    return { error: "Você não pode excluir sua própria conta." };
+
+  const [alvo] =
+    await sql`SELECT categoria FROM usuarios WHERE id = ${id}::uuid`;
+  if (alvo?.categoria === "Administrador(a)") {
+    const [{ total }] = await sql`
+      SELECT COUNT(*)::int AS total FROM usuarios
+      WHERE categoria = 'Administrador(a)' AND ativo = true
+    `;
+    if (Number(total) <= 1) {
+      return {
+        error: "Não é possível excluir o único administrador do sistema.",
+      };
+    }
+  }
+
+  try {
+    await sql`DELETE FROM usuarios WHERE id = ${id}::uuid`;
+  } catch (err) {
+    console.error("deleteUsuarioAction DB error:", err);
+    return { error: "Erro ao excluir usuário. Tente novamente." };
+  }
 
   await logAction({
     acao: "excluir",
@@ -189,6 +249,6 @@ export async function deleteUsuarioAction(id: string): Promise<void> {
     entidadeId: id,
     descricao: "Excluiu usuário",
   });
-  await sql`DELETE FROM usuarios WHERE id = ${id}::uuid`;
   revalidatePath("/dashboard/usuarios");
+  return {};
 }

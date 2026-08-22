@@ -19,7 +19,11 @@ export default function DeleteProcessoButton({ id }: { id: string }) {
     // Botão fica na página de detalhe — depois de excluir, navega pra lista
     // em vez de só dar refresh (que tentaria recarregar um registro apagado).
     startTransition(async () => {
-      await deleteProcessoAction(id);
+      const result = await deleteProcessoAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.push("/dashboard/processos");
     });
   }

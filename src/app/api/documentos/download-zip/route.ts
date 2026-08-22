@@ -13,6 +13,11 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_ENTITY_TYPES = ["processo", "cliente", "pericia"] as const;
 type EntityType = (typeof VALID_ENTITY_TYPES)[number];
+const MODULO_POR_ENTITY_TYPE: Record<EntityType, string> = {
+  processo: "processos",
+  cliente: "clientes",
+  pericia: "controles",
+};
 
 async function entidadeAtiva(
   entityType: EntityType,
@@ -53,7 +58,7 @@ function nomeUnico(base: string, usados: Set<string>): string {
 
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session || !hasPermission(session, "processos", "ver")) {
+  if (!session) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
@@ -76,6 +81,16 @@ export async function POST(request: Request) {
       { error: "Parâmetros inválidos." },
       { status: 400 }
     );
+  }
+
+  if (
+    !hasPermission(
+      session,
+      MODULO_POR_ENTITY_TYPE[entityType as EntityType],
+      "ver"
+    )
+  ) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   if (!(await entidadeAtiva(entityType as EntityType, entityId))) {

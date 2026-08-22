@@ -5,12 +5,19 @@ import { getDocumentosByEntityId } from "@/lib/documents-db";
 
 export const dynamic = "force-dynamic";
 
+const MODULO_POR_ENTITY_TYPE: Record<
+  "processo" | "cliente" | "pericia",
+  string
+> = {
+  processo: "processos",
+  cliente: "clientes",
+  pericia: "controles",
+};
+
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session)
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  if (!hasPermission(session, "processos", "ver"))
-    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
   const entityType = searchParams.get("entityType") as
@@ -33,6 +40,9 @@ export async function GET(request: Request) {
       { status: 400 }
     );
   }
+
+  if (!hasPermission(session, MODULO_POR_ENTITY_TYPE[entityType], "ver"))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

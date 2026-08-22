@@ -14,16 +14,30 @@ export async function GET(req: Request) {
   }
 
   try {
+    // Reivindica o lote numa única instrução atômica (CTE + FOR UPDATE SKIP
+    // LOCKED + UPDATE já incrementando tentativas) — antes era um SELECT
+    // solto seguido de UPDATE só depois de enviar, então duas execuções do
+    // cron rodando ao mesmo tempo (ex: um trigger manual em cima do
+    // agendado, ou uma reexecução por timeout) liam os MESMOS lembretes
+    // pendentes e mandavam a mesma cobrança duas vezes pro cliente.
     const pendentes = await sql`
-      SELECT l.id::text, l.destinatario_telefone, l.destinatario_nome, l.mensagem, l.tipo
-      FROM lembretes_agendados l
-      LEFT JOIN clients c ON c.id = l.cliente_id
-      WHERE NOT l.enviado
-        AND l.enviar_em <= NOW()
-        AND l.tentativas < 3
-        AND (c.id IS NULL OR c.bloquear_mensagens IS NOT TRUE)
-      ORDER BY l.enviar_em ASC
-      LIMIT ${BATCH}
+      WITH claimed AS (
+        SELECT l.id
+        FROM lembretes_agendados l
+        LEFT JOIN clients c ON c.id = l.cliente_id
+        WHERE NOT l.enviado
+          AND l.enviar_em <= NOW()
+          AND l.tentativas < 3
+          AND (c.id IS NULL OR c.bloquear_mensagens IS NOT TRUE)
+        ORDER BY l.enviar_em ASC
+        LIMIT ${BATCH}
+        FOR UPDATE OF l SKIP LOCKED
+      )
+      UPDATE lembretes_agendados l2
+      SET tentativas = tentativas + 1
+      FROM claimed
+      WHERE l2.id = claimed.id
+      RETURNING l2.id::text, l2.destinatario_telefone, l2.destinatario_nome, l2.mensagem, l2.tipo
     `;
 
     let enviados = 0;
@@ -48,14 +62,14 @@ export async function GET(req: Request) {
       if (resultado.ok) {
         await sql`
           UPDATE lembretes_agendados
-          SET enviado = TRUE, enviado_em = NOW(), tentativas = tentativas + 1
+          SET enviado = TRUE, enviado_em = NOW()
           WHERE id = ${id}::uuid
         `;
         enviados++;
       } else {
         await sql`
           UPDATE lembretes_agendados
-          SET tentativas = tentativas + 1, erro = ${resultado.error ?? "erro desconhecido"}
+          SET erro = ${resultado.error ?? "erro desconhecido"}
           WHERE id = ${id}::uuid
         `;
         erros++;

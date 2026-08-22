@@ -16,6 +16,56 @@ import { gerarComissaoAutomaticaPorPagamento } from "./comissao-colaborador";
 
 export type LancamentoFormState = { error: string } | null;
 
+// Cancela os lembretes de cobrança já agendados pro lançamento e — se ele
+// ainda estiver ativo (pendente, com data real) — agenda de novo com o
+// valor/data atuais. Sem isso, editar o valor ou a data de um lançamento
+// deixava os lembretes antigos com o valor/data ERRADOS ainda na fila pra
+// enviar ao cliente; excluir/cancelar deixava o lembrete antigo sendo
+// enviado para uma cobrança que não existe mais.
+async function reagendarLembretesHonorarioLancamento(
+  lancamentoId: string,
+  clientId: string | null,
+  valor: number,
+  dataVencimentoISO: string,
+  descricao: string
+): Promise<void> {
+  await cancelarLembretesLancamento(lancamentoId).catch(() => null);
+  if (!clientId) return;
+  try {
+    const clienteRows = await sql`
+      SELECT name, phone, menor_incapaz, responsavel_nome, responsavel_telefone
+      FROM clients WHERE id = ${clientId}::uuid LIMIT 1
+    `;
+    if (clienteRows.length === 0) return;
+    if (!clienteRows[0].phone && !clienteRows[0].responsavel_telefone) return;
+
+    const clienteNome = String(clienteRows[0].name);
+    const telefone = clienteRows[0].phone ? String(clienteRows[0].phone) : null;
+    const responsavel =
+      clienteRows[0].menor_incapaz &&
+      clienteRows[0].responsavel_nome &&
+      clienteRows[0].responsavel_telefone
+        ? {
+            nome: String(clienteRows[0].responsavel_nome),
+            telefone: String(clienteRows[0].responsavel_telefone),
+          }
+        : null;
+
+    await agendarLembretesHonorario({
+      lancamentoId,
+      clienteId: clientId,
+      clienteNome,
+      telefone,
+      responsavel,
+      valor,
+      dataVencimento: new Date(`${dataVencimentoISO}T12:00:00`),
+      descricao,
+    });
+  } catch {
+    // lembretes são não-críticos, não falha a operação principal
+  }
+}
+
 // Returns today's date as YYYY-MM-DD in the Brazil/Brasília timezone (UTC-3).
 // Using CURRENT_DATE in PostgreSQL would return the UTC date, which can be
 // one day ahead for users in Brazil after 21h local time.
@@ -93,7 +143,8 @@ export async function createLancamentoAction(
     ? parseFloat(comissaoValorCustomStr)
     : null;
 
-  if (valorStr && isNaN(valor)) return { error: "Informe um valor válido." };
+  if (!valorStr || isNaN(valor) || valor <= 0)
+    return { error: "Informe um valor válido." };
 
   // ── Caminho especial: aguardando resultado ────────────────────────────────
   // Ignora modo de pagamento e cria sempre uma entrada única com data sentinela.
@@ -173,6 +224,10 @@ export async function createLancamentoAction(
     let entradaLancamentoId: string | null = null;
     // For parcelado: track each parcela ID so commission is split per installment
     const parcelaLancamentoIds: string[] = [];
+    // Valor real gravado em cada parcela (a última absorve os centavos
+    // restantes) — usado depois pro lembrete de cobrança não divergir do
+    // valor de verdade da parcela.
+    const parcelaValores: number[] = [];
 
     if (recorrente) {
       const grupoRecorrente = crypto.randomUUID();
@@ -263,6 +318,7 @@ export async function createLancamentoAction(
         `;
         if (!firstLancamentoId) firstLancamentoId = rows[0].id as string;
         parcelaLancamentoIds.push(rows[0].id as string);
+        parcelaValores.push(valorParcela);
       }
     } else if (!parcelado) {
       // aguardando_resultado: usa data sentinela 9999-12-31 (data real será definida quando sair o resultado)
@@ -337,6 +393,7 @@ export async function createLancamentoAction(
         `;
         if (!firstLancamentoId) firstLancamentoId = rows[0].id as string;
         parcelaLancamentoIds.push(rows[0].id as string);
+        parcelaValores.push(valorParcela);
       }
     }
 
@@ -367,13 +424,6 @@ export async function createLancamentoAction(
         parcelaLancamentoIds.length > 0 &&
         !comissaoAvista
       ) {
-        // Per-installment commission: proportional to each component's value
-        const valorParcela = mensalidade
-          ? valorMensalidade
-          : totalParcelas > 0
-            ? Math.round(((valor - valorEntrada) / totalParcelas) * 100) / 100
-            : 0;
-
         const calcComm = (componentValue: number) =>
           comissaoTipo === "percentual"
             ? Math.round(componentValue * (comissaoValorConfig! / 100) * 100) /
@@ -407,15 +457,19 @@ export async function createLancamentoAction(
           }
         }
 
-        // Commission per parcela
-        const commParcela = calcComm(valorParcela);
-        if (commParcela > 0) {
-          for (let i = 0; i < parcelaLancamentoIds.length; i++) {
-            const descParc =
-              parcelaLancamentoIds.length > 1
-                ? `${descComissao} (${i + 1}/${parcelaLancamentoIds.length})`
-                : descComissao;
-            const remRows = await sql`
+        // Commission per parcela — calculada a partir do valor REAL de cada
+        // parcela (parcelaValores[i], que já inclui o ajuste de centavos da
+        // última parcela), não de um valor médio recalculado à parte. Antes,
+        // usar o mesmo valor médio pra todas fazia a soma das comissões
+        // fechar alguns centavos abaixo do valor configurado.
+        for (let i = 0; i < parcelaLancamentoIds.length; i++) {
+          const commParcela = calcComm(parcelaValores[i] ?? 0);
+          if (commParcela <= 0) continue;
+          const descParc =
+            parcelaLancamentoIds.length > 1
+              ? `${descComissao} (${i + 1}/${parcelaLancamentoIds.length})`
+              : descComissao;
+          const remRows = await sql`
               INSERT INTO remuneracoes
                 (colaborador_id, tipo, valor, status, descricao, processo_id, client_id)
               VALUES
@@ -425,12 +479,11 @@ export async function createLancamentoAction(
                  ${clientId ? clientId : null}::uuid)
               RETURNING id
             `;
-            const remuneracaoId = remRows[0].id as string;
-            await sql`
+          const remuneracaoId = remRows[0].id as string;
+          await sql`
               UPDATE lancamentos SET remuneracao_id = ${remuneracaoId}::uuid
               WHERE id = ${parcelaLancamentoIds[i]}::uuid
             `;
-          }
         }
       } else if (firstLancamentoId) {
         // Single à vista commission (all non-parcelado modes, or when user chose à vista)
@@ -499,11 +552,10 @@ export async function createLancamentoAction(
 
           if (parcelaLancamentoIds.length > 0) {
             const baseDate = new Date(`${baseDateStr}T12:00:00`);
-            const valParcela = mensalidade
-              ? valorMensalidade
-              : Math.round(
-                  ((valor - valorEntrada) / Math.max(totalParcelas, 1)) * 100
-                ) / 100;
+            // Usa o valor real de cada parcela (parcelaValores[i], já com o
+            // ajuste de centavos da última) em vez de recalcular uma média —
+            // senão a mensagem de cobrança da última parcela podia informar
+            // um valor diferente do que está de fato gravado/cobrado.
             for (let i = 0; i < parcelaLancamentoIds.length; i++) {
               const parcDate = new Date(baseDate);
               parcDate.setMonth(
@@ -512,7 +564,7 @@ export async function createLancamentoAction(
               toSchedule.push({
                 id: parcelaLancamentoIds[i],
                 dataStr: parcDate.toISOString().split("T")[0],
-                val: valParcela,
+                val: parcelaValores[i] ?? 0,
               });
             }
           } else if (firstLancamentoId && !recorrente) {
@@ -625,6 +677,16 @@ export async function updateLancamentoAction(
     // ── Edição em lote: todas as parcelas do grupo ────────────────────────────
     if (aplicarGrupo && grupoParcelas) {
       isBulk = true;
+
+      // Parcelas que já estavam pago/cancelado antes desta edição — o CASE
+      // abaixo as preserva intactas, então não devem disparar de novo os
+      // efeitos colaterais (comissão, notificação, lembrete) depois.
+      const jaFinalizadas = await sql`
+        SELECT id::text FROM lancamentos
+        WHERE grupo_parcelas = ${grupoParcelas}::uuid AND status IN ('pago', 'cancelado')
+      `;
+      const jaFinalizadasIds = new Set(jaFinalizadas.map((r) => String(r.id)));
+
       // O delta em dias é calculado diretamente no SQL (date - date = integer).
       // Parcelas já pagas ou canceladas mantêm status e data de pagamento.
       // Parcelas pendentes têm as datas deslocadas proporcionalmente.
@@ -654,8 +716,78 @@ export async function updateLancamentoAction(
           END
         WHERE grupo_parcelas = ${grupoParcelas}::uuid
       `;
+
+      // Aplica pra cada parcela REALMENTE afetada os mesmos efeitos colaterais
+      // que a edição individual já tinha — sem isso, marcar o grupo inteiro
+      // como pago de uma vez pulava comissão do colaborador, notificação
+      // PrevBot e cancelamento dos lembretes de cobrança dessas parcelas.
+      const afetadas = await sql`
+        SELECT id::text, valor, remuneracao_id, processo_id::text, client_id::text,
+               to_char(data_vencimento, 'YYYY-MM-DD') AS data_vencimento_iso
+        FROM lancamentos
+        WHERE grupo_parcelas = ${grupoParcelas}::uuid
+      `;
+
+      for (const row of afetadas) {
+        const rowId = String(row.id);
+        if (jaFinalizadasIds.has(rowId)) continue;
+        const rowValor = Number(row.valor);
+        const rowRemId = row.remuneracao_id as string | null;
+        const rowProcessoId = row.processo_id as string | null;
+        const rowClientId = row.client_id as string | null;
+
+        if (status === "pago") {
+          if (rowRemId) {
+            await sql`
+              UPDATE remuneracoes SET
+                status = 'pago', data_pagamento = ${hoje}::date, updated_at = NOW()
+              WHERE id = ${rowRemId}::uuid
+            `;
+          }
+          if (tipo === "entrada") {
+            await notificarPrevBot({
+              evento: "honorario_pago",
+              processoId: rowProcessoId,
+              clientId: rowClientId,
+              dados: { valor_honorario: rowValor },
+            }).catch(() => null);
+            if (rowProcessoId) {
+              await gerarComissaoAutomaticaPorPagamento(
+                rowId,
+                rowProcessoId,
+                rowValor
+              ).catch(() => null);
+            }
+          }
+          await cancelarLembretesLancamento(rowId).catch(() => null);
+        } else if (status === "cancelado") {
+          if (rowRemId) {
+            await sql`
+              DELETE FROM remuneracoes WHERE id = ${rowRemId}::uuid AND status = 'pendente'
+            `.catch(() => null);
+          }
+          await cancelarLembretesLancamento(rowId).catch(() => null);
+        } else {
+          if (rowRemId) {
+            await sql`
+              UPDATE remuneracoes SET
+                status = 'pendente', data_pagamento = NULL, updated_at = NOW()
+              WHERE id = ${rowRemId}::uuid
+            `;
+          }
+          if (tipo === "entrada") {
+            await reagendarLembretesHonorarioLancamento(
+              rowId,
+              rowClientId,
+              rowValor,
+              (row.data_vencimento_iso as string | null) ?? dataVencFinal,
+              descricao
+            );
+          }
+        }
+      }
     } else {
-      // ── Edição individual: comportamento original ─────────────────────────
+      // ── Edição individual ──────────────────────────────────────────────────
       if (status === "pago" && oldStatus !== "pago") {
         await sql`
           UPDATE lancamentos SET
@@ -667,6 +799,13 @@ export async function updateLancamentoAction(
             data_pagamento = ${hoje}::date, observacoes = ${observacoes}
           WHERE id = ${id}::uuid
         `;
+        if (remuneracaoId) {
+          await sql`
+            UPDATE remuneracoes SET
+              status = 'pago', data_pagamento = ${hoje}::date, updated_at = NOW()
+            WHERE id = ${remuneracaoId}::uuid
+          `;
+        }
         if (tipo === "entrada") {
           await notificarPrevBot({
             evento: "honorario_pago",
@@ -674,7 +813,32 @@ export async function updateLancamentoAction(
             clientId: clientId || null,
             dados: { valor_honorario: valor },
           });
+          if (processoId) {
+            await gerarComissaoAutomaticaPorPagamento(
+              id,
+              processoId,
+              valor
+            ).catch(() => null);
+          }
         }
+        await cancelarLembretesLancamento(id).catch(() => null);
+      } else if (status === "cancelado" && oldStatus !== "cancelado") {
+        await sql`
+          UPDATE lancamentos SET
+            tipo = ${tipo}, categoria = ${categoria}, descricao = ${descricao},
+            valor = ${valor},
+            client_id = ${clientId ? clientId : null}::uuid,
+            processo_id = ${processoId ? processoId : null}::uuid,
+            status = ${status}, data_vencimento = ${dataVencFinal}::date,
+            data_pagamento = NULL, observacoes = ${observacoes}
+          WHERE id = ${id}::uuid
+        `;
+        if (remuneracaoId) {
+          await sql`
+            DELETE FROM remuneracoes WHERE id = ${remuneracaoId}::uuid AND status = 'pendente'
+          `.catch(() => null);
+        }
+        await cancelarLembretesLancamento(id).catch(() => null);
       } else if (status !== "pago") {
         await sql`
           UPDATE lancamentos SET
@@ -686,6 +850,24 @@ export async function updateLancamentoAction(
             data_pagamento = NULL, observacoes = ${observacoes}
           WHERE id = ${id}::uuid
         `;
+        if (remuneracaoId && status !== oldStatus) {
+          await sql`
+            UPDATE remuneracoes SET
+              status = 'pendente', data_pagamento = NULL, updated_at = NOW()
+            WHERE id = ${remuneracaoId}::uuid
+          `;
+        }
+        // Valor ou data podem ter mudado — atualiza os lembretes de cobrança
+        // já agendados pra não ficarem com informação desatualizada/errada.
+        if (tipo === "entrada") {
+          await reagendarLembretesHonorarioLancamento(
+            id,
+            clientId,
+            valor,
+            dataVencFinal,
+            descricao
+          );
+        }
       } else {
         await sql`
           UPDATE lancamentos SET
@@ -697,22 +879,6 @@ export async function updateLancamentoAction(
             observacoes = ${observacoes}
           WHERE id = ${id}::uuid
         `;
-      }
-
-      if (remuneracaoId && status !== oldStatus) {
-        if (status === "pago") {
-          await sql`
-            UPDATE remuneracoes SET
-              status = ${status}, data_pagamento = ${hoje}::date, updated_at = NOW()
-            WHERE id = ${remuneracaoId}::uuid
-          `;
-        } else {
-          await sql`
-            UPDATE remuneracoes SET
-              status = ${status}, data_pagamento = NULL, updated_at = NOW()
-            WHERE id = ${remuneracaoId}::uuid
-          `;
-        }
       }
     }
   } catch (err) {
@@ -744,11 +910,29 @@ export async function reagendarLancamentoAction(
   if (!session || !hasPermission(session, "financeiro", "editar")) return;
   if (!novaData) return;
   try {
-    await sql`
+    const rows = await sql`
       UPDATE lancamentos
       SET data_vencimento = ${novaData}::date
-      WHERE id = ${id}::uuid
+      WHERE id = ${id}::uuid AND status NOT IN ('pago', 'cancelado')
+      RETURNING tipo, valor, client_id::text, descricao
     `;
+    const row = rows[0] as
+      | {
+          tipo: string;
+          valor: number;
+          client_id: string | null;
+          descricao: string;
+        }
+      | undefined;
+    if (row?.tipo === "entrada") {
+      await reagendarLembretesHonorarioLancamento(
+        id,
+        row.client_id,
+        Number(row.valor),
+        novaData,
+        row.descricao
+      );
+    }
   } catch (err) {
     console.error("reagendarLancamentoAction DB error:", err);
   }
@@ -826,7 +1010,7 @@ export async function markAsPagoAction(id: string): Promise<void> {
           clienteNome: String(clienteRows[0].name),
           telefone: clienteRows[0].phone ? String(clienteRows[0].phone) : null,
           responsavel: respLegal,
-          valorPago: lan.valor,
+          valorPago: Number(lan.valor),
           dataPagamento: new Date(),
           saldoRestante: saldo,
         }).catch(() => null);
@@ -966,12 +1150,27 @@ export async function pagamentoParcialAction(opts: {
       const itemValor = Number(row.valor);
 
       if (remaining >= itemValor) {
-        await sql`
+        // Guarda "AND status != 'pago'" + RETURNING é o que garante que, sob
+        // concorrência (double-click, duas abas), só a chamada que realmente
+        // conseguiu marcar a linha como paga processa o efeito colateral —
+        // sem isso, duas chamadas paralelas liam a mesma linha "pendente" e
+        // cada uma abatia o valor do "remaining" e criava sua própria linha
+        // de "saldo restante", duplicando a dívida do cliente.
+        const upd = await sql`
           UPDATE lancamentos
           SET status = 'pago', data_pagamento = ${todayBR()}::date
-          WHERE id = ${row.id}::uuid
+          WHERE id = ${row.id}::uuid AND status != 'pago'
+          RETURNING remuneracao_id
         `;
+        if (upd.length === 0) continue;
         paidIds.push(String(row.id));
+        if (upd[0].remuneracao_id) {
+          await sql`
+            UPDATE remuneracoes
+            SET status = 'pago', data_pagamento = ${todayBR()}::date, updated_at = NOW()
+            WHERE id = ${upd[0].remuneracao_id}::uuid
+          `;
+        }
         if (row.tipo === "entrada" && row.processo_id) {
           await gerarComissaoAutomaticaPorPagamento(
             String(row.id),
@@ -985,12 +1184,21 @@ export async function pagamentoParcialAction(opts: {
         const paidPortion = Math.round(remaining * 100) / 100;
         const restante = Math.round((itemValor - paidPortion) * 100) / 100;
 
-        await sql`
+        const upd = await sql`
           UPDATE lancamentos
           SET valor = ${paidPortion}, status = 'pago', data_pagamento = ${todayBR()}::date
-          WHERE id = ${row.id}::uuid
+          WHERE id = ${row.id}::uuid AND status != 'pago'
+          RETURNING remuneracao_id
         `;
+        if (upd.length === 0) continue;
         paidIds.push(String(row.id));
+        if (upd[0].remuneracao_id) {
+          await sql`
+            UPDATE remuneracoes
+            SET status = 'pago', data_pagamento = ${todayBR()}::date, updated_at = NOW()
+            WHERE id = ${upd[0].remuneracao_id}::uuid
+          `;
+        }
         if (row.tipo === "entrada" && row.processo_id) {
           await gerarComissaoAutomaticaPorPagamento(
             String(row.id),
@@ -1069,25 +1277,48 @@ export async function deleteLancamentoAction(id: string): Promise<void> {
   try {
     const rows = await sql`
       DELETE FROM lancamentos WHERE id = ${id}::uuid
-      RETURNING remuneracao_id
+      RETURNING remuneracao_id, valor, descricao, tipo, status
     `;
-    const remuneracaoId = rows[0]?.remuneracao_id as string | null;
-    if (remuneracaoId) {
+    const lan = rows[0] as
+      | {
+          remuneracao_id: string | null;
+          valor: number;
+          descricao: string;
+          tipo: string;
+          status: string;
+        }
+      | undefined;
+    if (lan?.remuneracao_id) {
       // Deleting the remuneração would normally cascade back, but the lancamento
       // is already gone — so we just clean up the remuneração record directly.
-      await sql`DELETE FROM remuneracoes WHERE id = ${remuneracaoId}::uuid`;
+      await sql`DELETE FROM remuneracoes WHERE id = ${lan.remuneracao_id}::uuid`;
     }
+    // Excluir o lançamento não apaga automaticamente lembretes de cobrança
+    // já agendados — sem isso, o cliente recebia cobrança do WhatsApp de uma
+    // dívida que já não existe mais no sistema.
+    await cancelarLembretesLancamento(id).catch(() => null);
+
+    await logAction({
+      acao: "excluir",
+      entidade: "lancamento",
+      entidadeId: id,
+      descricao: lan
+        ? `Excluiu lançamento — ${lan.descricao} (R$ ${Number(lan.valor).toFixed(2)}, ${lan.status})`
+        : "Excluiu lançamento",
+      detalhes: lan
+        ? {
+            valor: Number(lan.valor),
+            descricao: lan.descricao,
+            tipo: lan.tipo,
+            status: lan.status,
+          }
+        : undefined,
+      _login: session?.login ?? "sistema",
+      _cat: session?.categoria ? String(session.categoria) : undefined,
+    });
   } catch (err) {
     console.error("deleteLancamentoAction DB error:", err);
   }
-  await logAction({
-    acao: "excluir",
-    entidade: "lancamento",
-    entidadeId: id,
-    descricao: "Excluiu lançamento",
-    _login: session?.login ?? "sistema",
-    _cat: session?.categoria ? String(session.categoria) : undefined,
-  });
   revalidatePath("/dashboard/financeiro");
 }
 
@@ -1141,11 +1372,32 @@ export async function ativarLancamentoAction(
   if (!dataVencimento)
     return { ok: false, erro: "Informe a data de vencimento." };
   try {
-    await sql`
+    const rows = await sql`
       UPDATE lancamentos
       SET status = 'pendente', data_vencimento = ${dataVencimento}::date
       WHERE id = ${id}::uuid AND status = 'aguardando_resultado'
+      RETURNING tipo, valor, client_id::text, descricao
     `;
+    // Enquanto "aguardando resultado" o lançamento nunca teve lembrete de
+    // cobrança agendado (não tinha data real) — agora que a data foi
+    // definida, é a primeira vez que dá pra agendar.
+    const row = rows[0] as
+      | {
+          tipo: string;
+          valor: number;
+          client_id: string | null;
+          descricao: string;
+        }
+      | undefined;
+    if (row?.tipo === "entrada") {
+      await reagendarLembretesHonorarioLancamento(
+        id,
+        row.client_id,
+        Number(row.valor),
+        dataVencimento,
+        row.descricao
+      );
+    }
   } catch (err) {
     console.error("ativarLancamentoAction DB error:", err);
     return { ok: false, erro: "Erro ao ativar lançamento." };
@@ -1179,8 +1431,24 @@ export async function cancelarParcelasAction(
     SET status = 'cancelado'
     WHERE id = ANY(${validIds}::uuid[])
       AND status = 'pendente'
-    RETURNING id
+    RETURNING id::text, remuneracao_id
   `;
+
+  // Parcela cancelada não vai gerar receita nenhuma — a comissão de
+  // indicador vinculada a ela (se ainda não foi paga) deixa de fazer
+  // sentido, senão o escritório acaba pagando comissão de um pagamento
+  // que o cliente nunca fez. E cancela o lembrete de cobrança pendente.
+  for (const row of rows) {
+    const rowId = String(row.id);
+    const remId = row.remuneracao_id as string | null;
+    if (remId) {
+      await sql`
+        DELETE FROM remuneracoes WHERE id = ${remId}::uuid AND status = 'pendente'
+      `.catch(() => null);
+    }
+    await cancelarLembretesLancamento(rowId).catch(() => null);
+  }
+
   revalidatePath("/dashboard/financeiro");
   return { ok: true, cancelados: rows.length };
 }
@@ -1192,10 +1460,41 @@ export async function deleteGrupoAction(grupoParcelas: string): Promise<void> {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!UUID_RE_DG.test(grupoParcelas)) return;
   try {
-    await sql`
+    const rows = await sql`
       DELETE FROM lancamentos
       WHERE grupo_parcelas = ${grupoParcelas}::uuid
+      RETURNING id::text, remuneracao_id, valor, status
     `;
+
+    // Mesmo tratamento de deleteLancamentoAction, só que pra cada parcela do
+    // grupo inteiro: limpa a comissão de indicador vinculada (senão fica
+    // órfã, pendente pra sempre) e cancela os lembretes de cobrança de cada
+    // parcela apagada.
+    let totalExcluido = 0;
+    for (const row of rows) {
+      const remId = row.remuneracao_id as string | null;
+      if (remId) {
+        await sql`DELETE FROM remuneracoes WHERE id = ${remId}::uuid`.catch(
+          () => null
+        );
+      }
+      await cancelarLembretesLancamento(String(row.id)).catch(() => null);
+      totalExcluido += Number(row.valor);
+    }
+
+    await logAction({
+      acao: "excluir",
+      entidade: "lancamento",
+      entidadeId: grupoParcelas,
+      descricao: `Excluiu grupo de parcelas (${rows.length} lançamento${rows.length === 1 ? "" : "s"}, total R$ ${totalExcluido.toFixed(2)})`,
+      detalhes: {
+        grupoParcelas,
+        quantidade: rows.length,
+        total: totalExcluido,
+      },
+      _login: session?.login ?? "sistema",
+      _cat: session?.categoria ? String(session.categoria) : undefined,
+    });
   } catch (err) {
     console.error("deleteGrupoAction DB error:", err);
   }

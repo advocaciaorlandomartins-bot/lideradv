@@ -20,6 +20,25 @@ export default async function MeuFinanceiroPage() {
     session.categoria === "Administrador(a)" ||
     session.categoria === "Sócio(a)";
 
+  // O comentário original já dizia a intenção: só admin/sócio vê o valor
+  // total do honorário do cliente, pro colaborador mostra só a comissão
+  // dele. Mas "podeVerHonorarioTotal" só controlava a RENDERIZAÇÃO — os
+  // dados completos (honorario_estimado, valor_honorario, valor_causa, e o
+  // valor cheio de cada lançamento aguardando resultado) já iam inteiros no
+  // payload do client component pra qualquer colaborador, visível via
+  // devtools. Redação tem que acontecer aqui, na origem, não só na tela.
+  const processosHonorarios = podeVerHonorarioTotal
+    ? dados.processosHonorarios
+    : dados.processosHonorarios.map((p) => ({
+        ...p,
+        honorario_estimado: 0,
+        valor_honorario: null,
+        valor_causa: null,
+      }));
+  const aguardandoResultado = podeVerHonorarioTotal
+    ? dados.aguardandoResultado
+    : dados.aguardandoResultado.map((l) => ({ ...l, valor: 0 }));
+
   return (
     <div className="space-y-6">
       <div>
@@ -33,10 +52,10 @@ export default async function MeuFinanceiroPage() {
       <MeuFinanceiroContent
         lancamentos={dados.lancamentos}
         honorariosEscritorio={dados.honorariosEscritorio}
-        processosHonorarios={dados.processosHonorarios}
+        processosHonorarios={processosHonorarios}
         escritorioMes={dados.escritorioMes}
         fluxoEscritorio={dados.fluxoEscritorio}
-        aguardandoResultado={dados.aguardandoResultado}
+        aguardandoResultado={aguardandoResultado}
         aguardandoResultadoTotal={dados.aguardandoResultadoTotal}
         fluxoHonorarios={dados.fluxoHonorarios}
         processosAtivosCount={dados.processosAtivosCount}

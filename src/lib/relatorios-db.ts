@@ -9,6 +9,7 @@ export interface RelatorioLancamento {
   status: string;
   data_vencimento: string;
   data_pagamento: string | null;
+  client_id: string | null;
   client_name: string | null;
   processo_tipo: string | null;
   remuneracao_id: string | null;
@@ -65,6 +66,7 @@ export async function getRelatorioLancamentos(filters: {
       l.status,
       to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
       to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento,
+      l.client_id::text,
       c.name  AS client_name,
       p.tipo_acao AS processo_tipo,
       l.remuneracao_id::text,
@@ -88,6 +90,7 @@ export async function getRelatorioLancamentos(filters: {
     status: r.status,
     data_vencimento: r.data_vencimento,
     data_pagamento: r.data_pagamento ?? null,
+    client_id: r.client_id ?? null,
     client_name: r.client_name ?? null,
     processo_tipo: r.processo_tipo ?? null,
     remuneracao_id: r.remuneracao_id ?? null,
@@ -108,6 +111,7 @@ export async function getRelatorioByCliente(
       l.status,
       to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
       to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento,
+      l.client_id::text,
       c.name  AS client_name,
       p.tipo_acao AS processo_tipo,
       l.remuneracao_id::text,
@@ -128,6 +132,7 @@ export async function getRelatorioByCliente(
     status: r.status,
     data_vencimento: r.data_vencimento,
     data_pagamento: r.data_pagamento ?? null,
+    client_id: r.client_id ?? null,
     client_name: r.client_name ?? null,
     processo_tipo: r.processo_tipo ?? null,
     remuneracao_id: r.remuneracao_id ?? null,

@@ -26,29 +26,38 @@ export async function GET(req: Request) {
   let processados = 0;
 
   try {
+    // Reivindica o lote atomicamente (mesmo padrão de cron/lembretes) —
+    // duas execuções concorrentes não pegam mais a mesma linha "pendente".
     const pendentes = await sql`
-      SELECT id::text, payload, tentativas
-      FROM prevbot_webhook_log
-      WHERE status     = 'pendente'
-        AND tentativas < 3
-      ORDER BY created_at ASC
-      LIMIT 20
+      WITH claimed AS (
+        SELECT id FROM prevbot_webhook_log
+        WHERE status = 'pendente' AND tentativas < 3
+        ORDER BY created_at ASC
+        LIMIT 20
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE prevbot_webhook_log w
+      SET tentativas = tentativas + 1
+      FROM claimed
+      WHERE w.id = claimed.id
+      RETURNING w.id::text, w.payload, w.tentativas
     `;
 
     processados = pendentes.length;
 
     for (const row of pendentes) {
       const logId = String((row as { id: string }).id);
-      const tentativas = Number((row as { tentativas: number }).tentativas);
+      const novasTentativas = Number(
+        (row as { tentativas: number }).tentativas
+      );
       const payload = (row as { payload: Record<string, unknown> }).payload;
 
       const resultado = await _enviarWebhook(webhookKey, payload);
-      const novasTentativas = tentativas + 1;
 
       if (resultado.ok) {
         await sql`
           UPDATE prevbot_webhook_log
-          SET status = 'enviado', tentativas = ${novasTentativas}, enviado_em = NOW()
+          SET status = 'enviado', enviado_em = NOW()
           WHERE id = ${logId}::uuid
         `;
         enviados++;

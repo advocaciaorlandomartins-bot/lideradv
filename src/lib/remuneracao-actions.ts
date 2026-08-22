@@ -122,11 +122,13 @@ export async function markRemuneracaoPagaAction(id: string): Promise<void> {
   if (!session || !hasPermission(session, "remuneracoes", "editar")) return;
 
   try {
-    await sql`
+    const rows = await sql`
       UPDATE remuneracoes
       SET status = 'pago', data_pagamento = CURRENT_DATE, updated_at = NOW()
-      WHERE id = ${id}::uuid
+      WHERE id = ${id}::uuid AND status != 'pago'
+      RETURNING id
     `;
+    if (rows.length === 0) return;
     // Sync linked lancamento
     await sql`
       UPDATE lancamentos

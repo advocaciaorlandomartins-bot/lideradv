@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { encryptSecret } from "@/lib/crypto-secrets";
 
 export interface AsaasConfig {
   ambiente: "prod" | "sandbox";
@@ -13,6 +14,12 @@ export interface AsaasConfig {
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({}, { status: 401 });
+  if (session.categoria !== "Administrador(a)") {
+    return NextResponse.json(
+      { error: "Acesso restrito a administradores." },
+      { status: 403 }
+    );
+  }
 
   const rows = await sql`
     SELECT valor FROM integracoes_config WHERE chave = 'asaas' LIMIT 1
@@ -66,7 +73,9 @@ export async function POST(req: NextRequest) {
     : null;
 
   const novoValor = {
-    token: token?.trim() ? token.trim() : existingToken,
+    // Criptografado em repouso — token de API do Asaas dá acesso a cobrança
+    // real, não deveria ficar legível direto num dump/backup do banco.
+    token: token?.trim() ? encryptSecret(token.trim()) : existingToken,
     ambiente,
     juros,
     multa,

@@ -20,6 +20,18 @@ export default async function RelatoriosPage() {
   const session = await getSession();
   if (!session || !hasPermission(session, "relatorios", "ver")) notFound();
 
+  // A checagem de permissão por aba (canSeeTab) em relatorios-content.tsx só
+  // decide qual botão aparece — como é um client component, qualquer dado
+  // passado como prop já vai serializado no payload pro navegador de quem
+  // abrir a página, mesmo sem a sub-permissão daquela aba específica. Folha
+  // de pagamento (salário/comissão de cada colaborador) e dados de clientes
+  // usados no recibo precisam ser filtrados AQUI, na origem, não só na
+  // renderização.
+  const podeVerFolha = hasPermission(session, "relatorios_folha", "ver");
+  const podeVerClientes =
+    hasPermission(session, "relatorios_clientes", "ver") ||
+    hasPermission(session, "relatorios_recibo", "ver");
+
   const [
     lancamentos,
     resumo,
@@ -32,11 +44,11 @@ export default async function RelatoriosPage() {
   ] = await Promise.all([
     getRelatorioLancamentos({}),
     getRelatorioResumo({}),
-    getRelatorioRemuneracoes({}),
+    podeVerFolha ? getRelatorioRemuneracoes({}) : Promise.resolve([]),
     getFluxoMensal(12),
     getColaboradoresParaRelatorio(),
     getEscritorioConfig(),
-    getClientesParaRecibo(),
+    podeVerClientes ? getClientesParaRecibo() : Promise.resolve([]),
     getRelatorioJuridico(),
   ]);
 

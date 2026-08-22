@@ -654,13 +654,13 @@ function ClientesTab({
     const [d, m, y] = br.split("/");
     return new Date(`${y}-${m}-${d}T12:00:00`);
   }, []);
-  const clienteSelecionado = clientesComDados.find(
-    (c) => c.id === filtroCliente
-  );
   const filtered = useMemo(() => {
     if (!filtroCliente) return [];
     return lancamentos.filter((r) => {
-      if (r.client_name !== clienteSelecionado?.name) return false;
+      // Filtra por ID, não por nome — dois clientes com o mesmo nome
+      // (pai/filho, homônimos) não podem ter o extrato/recibo de um
+      // aparecendo no do outro.
+      if (r.client_id !== filtroCliente) return false;
       if (filtroStatus && r.status !== filtroStatus) return false;
       if (filtroInicio) {
         const d = parseDate(r.data_vencimento);
@@ -678,7 +678,6 @@ function ClientesTab({
     filtroStatus,
     filtroInicio,
     filtroFim,
-    clienteSelecionado,
     parseDate,
   ]);
   return (
@@ -1713,7 +1712,9 @@ function ReciboTab({
   const filtered = useMemo(() => {
     if (!clienteId || !cliente) return [];
     return lancamentos.filter((r) => {
-      if (r.client_name !== cliente.name) return false;
+      // Por ID, não por nome — evita misturar lançamentos de clientes
+      // homônimos no mesmo recibo.
+      if (r.client_id !== clienteId) return false;
       if (periodoTipo === "mes") {
         const [y, m] = mesRef.split("-");
         const d = parseDate(r.data_vencimento);

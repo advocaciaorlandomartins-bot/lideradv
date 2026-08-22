@@ -49,6 +49,12 @@ async function flatToJpeg(
     const decoded = await flateDecode(data);
     // Expected: width * height * components bytes
     if (decoded.length < width * height * 3) return null;
+    // width/height vêm direto do dicionário do XObject dentro do PDF —
+    // sem esse teto, um PDF pequeno cujo FlateDecode descomprime pra um
+    // volume grande (mas plausível o bastante pra passar no check acima)
+    // conseguia forçar uma alocação desproporcional aqui.
+    const MAX_PIXELS = 50_000_000; // ~50MP, bem acima de qualquer imagem real de PDF
+    if (width * height > MAX_PIXELS) return null;
     const rgba = Buffer.alloc(width * height * 4);
     for (let i = 0; i < width * height; i++) {
       rgba[i * 4] = decoded[i * 3];

@@ -88,7 +88,8 @@ function MarkRealizadoButton({ id }: { id: string }) {
     <button
       onClick={() =>
         startTransition(async () => {
-          await markPericiaRealizadaAction(id);
+          const result = await markPericiaRealizadaAction(id);
+          if (result?.error) alert(result.error);
           router.refresh();
         })
       }

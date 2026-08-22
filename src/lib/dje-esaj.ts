@@ -396,14 +396,21 @@ export async function buscarPublicacoesDjeEsaj(
       item.snippet ||
       (itensBr === null ? await fetchTextoCompleto(item.url, cookie) : "");
 
+    // O scraper de DJe/eSAJ (monitoramento por OAB) não extrai o nome do
+    // cliente do texto da publicação — só o nome do advogado monitorado.
+    // Antes esse nome ia pra "destinatario" (campo que a UI rotula como
+    // "Destinatário/Cliente"), confundindo o advogado com o cliente dele.
+    // O nome certo do advogado vai em "advogados" (mesma coluna que o
+    // capture do DJEN já usa) e "destinatario" fica como desconhecido.
     const inserted = await sql`
       INSERT INTO publicacoes (
-        processo, tipo, destinatario, orgao, tribunal,
+        processo, tipo, destinatario, advogados, orgao, tribunal,
         disponibilizacao, status, origem, conteudo, conteudo_completo
       ) VALUES (
         ${item.processo ?? ""},
         ${item.tipo},
-        ${oab.nome_advogado ?? ""},
+        ${"—"},
+        ${JSON.stringify(oab.nome_advogado ? [oab.nome_advogado] : [])},
         ${item.orgao},
         ${"TJ" + oab.estado},
         ${item.data}::date,

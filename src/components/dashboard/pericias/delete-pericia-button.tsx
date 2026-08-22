@@ -20,7 +20,11 @@ export default function DeletePericiaButton({ id }: { id: string }) {
     // existe mais, então navega pra lista em vez de só dar refresh (que
     // tentaria recarregar um registro já apagado).
     startTransition(async () => {
-      await deletePericiaAction(id);
+      const result = await deletePericiaAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.push("/dashboard/pericias");
     });
   }

@@ -188,14 +188,21 @@ export async function updateColaboradorAction(
   redirect(`/dashboard/colaboradores/${id}`);
 }
 
-export async function deleteColaboradorAction(id: string): Promise<void> {
+export async function deleteColaboradorAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "colaboradores", "excluir")) return;
+  if (!session || !hasPermission(session, "colaboradores", "excluir"))
+    return { error: "Sem permissão." };
 
   try {
     await sql`DELETE FROM colaboradores WHERE id = ${id}::uuid`;
   } catch (err) {
     console.error("deleteColaboradorAction DB error:", err);
+    return {
+      error:
+        "Erro ao excluir colaborador. Ele pode ter processos, remunerações ou compromissos vinculados.",
+    };
   }
   await logAction({
     acao: "excluir",

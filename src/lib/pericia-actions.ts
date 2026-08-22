@@ -140,9 +140,12 @@ export async function updatePericiaAction(
   redirect(`/dashboard/pericias/${id}`);
 }
 
-export async function markPericiaRealizadaAction(id: string): Promise<void> {
+export async function markPericiaRealizadaAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "controles", "editar")) return;
+  if (!session || !hasPermission(session, "controles", "editar"))
+    return { error: "Sem permissão." };
 
   try {
     await sql`
@@ -151,6 +154,7 @@ export async function markPericiaRealizadaAction(id: string): Promise<void> {
     `;
   } catch (err) {
     console.error("markPericiaRealizadaAction DB error:", err);
+    return { error: "Erro ao marcar perícia como realizada." };
   }
   await logAction({
     acao: "editar",
@@ -159,16 +163,21 @@ export async function markPericiaRealizadaAction(id: string): Promise<void> {
     descricao: "Marcou perícia como realizada",
   });
   revalidatePath("/dashboard/pericias");
+  return {};
 }
 
-export async function deletePericiaAction(id: string): Promise<void> {
+export async function deletePericiaAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "controles", "excluir")) return;
+  if (!session || !hasPermission(session, "controles", "excluir"))
+    return { error: "Sem permissão." };
 
   try {
     await sql`DELETE FROM pericias WHERE id = ${id}::uuid`;
   } catch (err) {
     console.error("deletePericiaAction DB error:", err);
+    return { error: "Erro ao excluir perícia. Tente novamente." };
   }
   redirect("/dashboard/pericias");
 }

@@ -22,7 +22,11 @@ export default function ClientDebitsSection({ clientId, debito }: Props) {
 
   function handleBaixa(id: string) {
     startTransition(async () => {
-      await markAsPagoAction(id);
+      const result = await markAsPagoAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }

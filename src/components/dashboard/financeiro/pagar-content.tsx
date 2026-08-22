@@ -201,14 +201,22 @@ export default function PagarContent({ despesas, canEdit }: Props) {
 
   function handleBaixa(id: string) {
     startTransition(async () => {
-      await markAsPagoAction(id);
+      const result = await markAsPagoAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
 
   function handleDesfazer(id: string) {
     startTransition(async () => {
-      await revertParaPendenteAction(id);
+      const result = await revertParaPendenteAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }

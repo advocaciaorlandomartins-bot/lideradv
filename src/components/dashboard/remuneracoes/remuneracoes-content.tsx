@@ -84,7 +84,11 @@ function MarkPagaButton({ id }: { id: string }) {
     <button
       onClick={() =>
         startTransition(async () => {
-          await markRemuneracaoPagaAction(id);
+          const result = await markRemuneracaoPagaAction(id);
+          if (result?.error) {
+            alert(result.error);
+            return;
+          }
           router.refresh();
         })
       }
@@ -105,7 +109,11 @@ function DeleteButton({ id }: { id: string }) {
       onClick={() => {
         if (!confirm("Excluir este lançamento?")) return;
         startTransition(async () => {
-          await deleteRemuneracaoAction(id);
+          const result = await deleteRemuneracaoAction(id);
+          if (result?.error) {
+            alert(result.error);
+            return;
+          }
           router.refresh();
         });
       }}

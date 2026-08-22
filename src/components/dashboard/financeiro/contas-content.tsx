@@ -358,7 +358,11 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
 
   function handleBaixaLancamento(id: string) {
     startTransition(async () => {
-      await markAsPagoAction(id);
+      const result = await markAsPagoAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -370,7 +374,11 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
 
   function handleBaixaRemuneracao(id: string) {
     startTransition(async () => {
-      await markRemuneracaoPagaAction(id);
+      const result = await markRemuneracaoPagaAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -378,7 +386,11 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
   function handleBaixaMultipla() {
     const ids = Array.from(selectedIds);
     startTransition(async () => {
-      await markMultiplePagoAction(ids);
+      const result = await markMultiplePagoAction(ids);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       setSelectedIds(new Set());
       router.refresh();
     });
@@ -390,7 +402,15 @@ export default function ContasContent({ contasReceber, contasPagar }: Props) {
     clienteId: string
   ) {
     startTransition(async () => {
-      await pagamentoParcialAction({ ids, valorPago, clientId: clienteId });
+      const result = await pagamentoParcialAction({
+        ids,
+        valorPago,
+        clientId: clienteId,
+      });
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       setPartialModal(null);
       setSelectedIds(new Set());
       router.refresh();

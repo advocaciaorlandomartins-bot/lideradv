@@ -117,9 +117,12 @@ export async function createRemuneracaoAction(
   redirect("/dashboard/financeiro?tab=remuneracoes");
 }
 
-export async function markRemuneracaoPagaAction(id: string): Promise<void> {
+export async function markRemuneracaoPagaAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "remuneracoes", "editar")) return;
+  if (!session || !hasPermission(session, "remuneracoes", "editar"))
+    return { error: "Sem permissão." };
 
   try {
     const rows = await sql`
@@ -128,7 +131,7 @@ export async function markRemuneracaoPagaAction(id: string): Promise<void> {
       WHERE id = ${id}::uuid AND status != 'pago'
       RETURNING id
     `;
-    if (rows.length === 0) return;
+    if (rows.length === 0) return {};
     // Sync linked lancamento
     await sql`
       UPDATE lancamentos
@@ -137,6 +140,7 @@ export async function markRemuneracaoPagaAction(id: string): Promise<void> {
     `;
   } catch (err) {
     console.error("markRemuneracaoPagaAction DB error:", err);
+    return { error: "Erro ao marcar como paga. Tente novamente." };
   }
   await logAction({
     acao: "editar",
@@ -145,17 +149,22 @@ export async function markRemuneracaoPagaAction(id: string): Promise<void> {
     descricao: "Marcou remuneração como paga",
   });
   revalidatePath("/dashboard/financeiro");
+  return {};
 }
 
-export async function deleteRemuneracaoAction(id: string): Promise<void> {
+export async function deleteRemuneracaoAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "remuneracoes", "excluir")) return;
+  if (!session || !hasPermission(session, "remuneracoes", "excluir"))
+    return { error: "Sem permissão." };
 
   try {
     // ON DELETE CASCADE automatically removes the linked lancamento
     await sql`DELETE FROM remuneracoes WHERE id = ${id}::uuid`;
   } catch (err) {
     console.error("deleteRemuneracaoAction DB error:", err);
+    return { error: "Erro ao excluir remuneração. Tente novamente." };
   }
   await logAction({
     acao: "excluir",
@@ -164,4 +173,5 @@ export async function deleteRemuneracaoAction(id: string): Promise<void> {
     descricao: "Excluiu remuneração",
   });
   revalidatePath("/dashboard/financeiro");
+  return {};
 }

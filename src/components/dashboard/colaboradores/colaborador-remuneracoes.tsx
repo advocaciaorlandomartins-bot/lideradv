@@ -40,7 +40,11 @@ export default function ColaboradorRemuneracoes({
 
   function handleBaixa(id: string) {
     startTransition(async () => {
-      await markRemuneracaoPagaAction(id);
+      const result = await markRemuneracaoPagaAction(id);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }

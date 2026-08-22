@@ -905,10 +905,11 @@ export async function updateLancamentoAction(
 export async function reagendarLancamentoAction(
   id: string,
   novaData: string
-): Promise<void> {
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "financeiro", "editar")) return;
-  if (!novaData) return;
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { error: "Sem permissão." };
+  if (!novaData) return { error: "Informe a nova data." };
   try {
     const rows = await sql`
       UPDATE lancamentos
@@ -935,13 +936,18 @@ export async function reagendarLancamentoAction(
     }
   } catch (err) {
     console.error("reagendarLancamentoAction DB error:", err);
+    return { error: "Erro ao reagendar. Tente novamente." };
   }
   revalidatePath("/dashboard/financeiro");
+  return {};
 }
 
-export async function markAsPagoAction(id: string): Promise<void> {
+export async function markAsPagoAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "financeiro", "editar")) return;
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { error: "Sem permissão." };
   try {
     const rows = await sql`
       UPDATE lancamentos
@@ -1018,6 +1024,7 @@ export async function markAsPagoAction(id: string): Promise<void> {
     }
   } catch (err) {
     console.error("markAsPagoAction DB error:", err);
+    return { error: "Erro ao marcar como pago. Tente novamente." };
   }
   await logAction({
     acao: "pagar",
@@ -1028,14 +1035,18 @@ export async function markAsPagoAction(id: string): Promise<void> {
     _cat: session?.categoria ? String(session.categoria) : undefined,
   });
   revalidatePath("/dashboard/financeiro");
+  return {};
 }
 
 // ── Baixa em lote ─────────────────────────────────────────────────────────────
 
-export async function markMultiplePagoAction(ids: string[]): Promise<void> {
+export async function markMultiplePagoAction(
+  ids: string[]
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "financeiro", "editar")) return;
-  if (ids.length === 0) return;
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { error: "Sem permissão." };
+  if (ids.length === 0) return {};
 
   try {
     const rows = await sql`
@@ -1112,9 +1123,11 @@ export async function markMultiplePagoAction(ids: string[]): Promise<void> {
     }
   } catch (err) {
     console.error("markMultiplePagoAction DB error:", err);
+    return { error: "Erro ao marcar como pago. Tente novamente." };
   }
 
   revalidatePath("/dashboard/financeiro");
+  return {};
 }
 
 // ── Pagamento parcial ─────────────────────────────────────────────────────────
@@ -1127,10 +1140,12 @@ export async function pagamentoParcialAction(opts: {
   ids: string[];
   valorPago: number;
   clientId: string;
-}): Promise<void> {
+}): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "financeiro", "editar")) return;
-  if (opts.ids.length === 0 || opts.valorPago <= 0) return;
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { error: "Sem permissão." };
+  if (opts.ids.length === 0 || opts.valorPago <= 0)
+    return { error: "Informe um valor válido." };
 
   try {
     const rows = await sql`
@@ -1266,14 +1281,19 @@ export async function pagamentoParcialAction(opts: {
     }
   } catch (err) {
     console.error("pagamentoParcialAction DB error:", err);
+    return { error: "Erro ao registrar pagamento. Tente novamente." };
   }
 
   revalidatePath("/dashboard/financeiro");
+  return {};
 }
 
-export async function deleteLancamentoAction(id: string): Promise<void> {
+export async function deleteLancamentoAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "financeiro", "excluir")) return;
+  if (!session || !hasPermission(session, "financeiro", "excluir"))
+    return { error: "Sem permissão." };
   try {
     const rows = await sql`
       DELETE FROM lancamentos WHERE id = ${id}::uuid
@@ -1318,13 +1338,18 @@ export async function deleteLancamentoAction(id: string): Promise<void> {
     });
   } catch (err) {
     console.error("deleteLancamentoAction DB error:", err);
+    return { error: "Erro ao excluir lançamento. Tente novamente." };
   }
   revalidatePath("/dashboard/financeiro");
+  return {};
 }
 
-export async function revertParaPendenteAction(id: string): Promise<void> {
+export async function revertParaPendenteAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "financeiro", "editar")) return;
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { error: "Sem permissão." };
   try {
     const rows = await sql`
       UPDATE lancamentos
@@ -1350,6 +1375,7 @@ export async function revertParaPendenteAction(id: string): Promise<void> {
     `;
   } catch (err) {
     console.error("revertParaPendenteAction DB error:", err);
+    return { error: "Erro ao reverter lançamento. Tente novamente." };
   }
   await logAction({
     acao: "reverter",
@@ -1360,6 +1386,7 @@ export async function revertParaPendenteAction(id: string): Promise<void> {
     _cat: session?.categoria ? String(session.categoria) : undefined,
   });
   revalidatePath("/dashboard/financeiro");
+  return {};
 }
 
 export async function ativarLancamentoAction(
@@ -1453,12 +1480,15 @@ export async function cancelarParcelasAction(
   return { ok: true, cancelados: rows.length };
 }
 
-export async function deleteGrupoAction(grupoParcelas: string): Promise<void> {
+export async function deleteGrupoAction(
+  grupoParcelas: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "financeiro", "excluir")) return;
+  if (!session || !hasPermission(session, "financeiro", "excluir"))
+    return { error: "Sem permissão." };
   const UUID_RE_DG =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!UUID_RE_DG.test(grupoParcelas)) return;
+  if (!UUID_RE_DG.test(grupoParcelas)) return { error: "ID inválido." };
   try {
     const rows = await sql`
       DELETE FROM lancamentos
@@ -1497,6 +1527,8 @@ export async function deleteGrupoAction(grupoParcelas: string): Promise<void> {
     });
   } catch (err) {
     console.error("deleteGrupoAction DB error:", err);
+    return { error: "Erro ao excluir grupo de parcelas. Tente novamente." };
   }
   revalidatePath("/dashboard/financeiro");
+  return {};
 }

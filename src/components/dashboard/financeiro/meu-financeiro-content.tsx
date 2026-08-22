@@ -558,10 +558,15 @@ export default function MeuFinanceiroContent({
   async function deletar(id: string) {
     if (!confirm("Excluir este lançamento?")) return;
     setDeletando(id);
+    setErro("");
     try {
-      await fetch(`/api/meu-financeiro/lancamentos/${id}`, {
+      const res = await fetch(`/api/meu-financeiro/lancamentos/${id}`, {
         method: "DELETE",
       });
+      if (!res.ok) {
+        setErro("Erro ao excluir lançamento. Tente novamente.");
+        return;
+      }
       setLancamentos((prev) => prev.filter((l) => l.id !== id));
     } finally {
       setDeletando(null);

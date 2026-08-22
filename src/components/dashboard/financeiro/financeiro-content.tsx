@@ -311,9 +311,13 @@ function RowActions({
     setMenuOpen(false);
     setAction("pago");
     startTransition(async () => {
-      await markAsPagoAction(lancamento.id);
-      router.refresh();
+      const result = await markAsPagoAction(lancamento.id);
       setAction(null);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
 
@@ -321,9 +325,13 @@ function RowActions({
     setMenuOpen(false);
     setAction("desfazer");
     startTransition(async () => {
-      await revertParaPendenteAction(lancamento.id);
-      router.refresh();
+      const result = await revertParaPendenteAction(lancamento.id);
       setAction(null);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
 
@@ -331,10 +339,14 @@ function RowActions({
     if (!novaData) return;
     setAction("reagendar");
     startTransition(async () => {
-      await reagendarLancamentoAction(lancamento.id, novaData);
-      router.refresh();
+      const result = await reagendarLancamentoAction(lancamento.id, novaData);
       setAction(null);
       setReagendando(false);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
 
@@ -347,9 +359,13 @@ function RowActions({
       if (choice) {
         setAction("del");
         startTransition(async () => {
-          await deleteGrupoAction(lancamento.grupo_parcelas!);
-          router.refresh();
+          const result = await deleteGrupoAction(lancamento.grupo_parcelas!);
           setAction(null);
+          if (result?.error) {
+            alert(result.error);
+            return;
+          }
+          router.refresh();
         });
         return;
       }
@@ -361,9 +377,13 @@ function RowActions({
     }
     setAction("del");
     startTransition(async () => {
-      await deleteLancamentoAction(lancamento.id);
-      router.refresh();
+      const result = await deleteLancamentoAction(lancamento.id);
       setAction(null);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
 
@@ -750,9 +770,13 @@ function AguardandoSection({
     if (!confirm("Excluir este lançamento aguardando resultado?")) return;
     setDeletingId(id);
     startTransition(async () => {
-      await deleteLancamentoAction(id);
-      router.refresh();
+      const result = await deleteLancamentoAction(id);
       setDeletingId(null);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
   const visible = expanded ? lista : lista.slice(0, AGUARDANDO_LIMIT);

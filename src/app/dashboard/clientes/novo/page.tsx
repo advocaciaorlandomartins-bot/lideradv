@@ -17,6 +17,9 @@ export default async function NovoClientePage() {
   if (!session || !hasPermission(session, "clientes", "criar")) notFound();
 
   const colaboradores = await getAllColaboradores();
+  const podeVerIndicador =
+    session.categoria === "Administrador(a)" ||
+    session.categoria === "Sócio(a)";
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -43,7 +46,10 @@ export default async function NovoClientePage() {
 
       {/* Form card */}
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:p-8">
-        <NewClientForm colaboradores={colaboradores} />
+        <NewClientForm
+          colaboradores={colaboradores}
+          podeVerIndicador={podeVerIndicador}
+        />
       </div>
     </div>
   );

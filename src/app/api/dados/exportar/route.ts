@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { logAction } from "@/lib/audit";
+import { getDocumentosAllByClientId } from "@/lib/documents-db";
 
 export const dynamic = "force-dynamic";
 
@@ -75,14 +76,12 @@ export async function GET(req: Request) {
           ORDER BY received_at DESC
           LIMIT 200
         `,
-        sql`
-          SELECT
-            id::text, nome, tipo, criado_em
-          FROM documentos
-          WHERE client_id = ${clienteId}::uuid
-          ORDER BY criado_em DESC
-          LIMIT 200
-        `,
+        // A query antiga usava client_id/criado_em, colunas que não existem
+        // na tabela documentos (o schema real é entity_type/entity_id/
+        // created_at) — o SELECT sempre rejeitava (erro 42703), engolido
+        // pelo allSettled, então a exportação LGPD nunca trazia nenhum
+        // documento do cliente, mesmo quando ele tinha arquivos anexados.
+        getDocumentosAllByClientId(clienteId),
       ]);
 
     const cliente =
@@ -95,6 +94,20 @@ export async function GET(req: Request) {
         { error: "Cliente não encontrado." },
         { status: 404 }
       );
+    }
+
+    // Loga qualquer consulta que falhou em vez de devolver [] em silêncio —
+    // é exatamente esse padrão que escondeu o bug de documentos por tanto
+    // tempo (Promise.allSettled engolindo o erro sem deixar rastro).
+    for (const [nome, r] of Object.entries({
+      processos,
+      lancamentos,
+      emails,
+      documentos,
+    })) {
+      if (r.status === "rejected") {
+        console.error(`[lgpd/exportar] falha ao buscar ${nome}:`, r.reason);
+      }
     }
 
     await logAction({

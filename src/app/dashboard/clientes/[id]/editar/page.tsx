@@ -30,6 +30,20 @@ export default async function EditarClientePage({
     session.categoria === "Administrador(a)" ||
     session.categoria === "Sócio(a)";
 
+  // Mesma regra da listagem de clientes: a comissão/indicador só pode ficar
+  // visível a Administrador(a)/Sócio(a) — redigido AQUI, antes de virar prop
+  // do client component, e não só escondido pela UI (que já tinha o gate
+  // {podeVerIndicador && (...)}, mas os campos hidden do formulário
+  // carregavam o valor real de qualquer forma, visível via devtools).
+  const clientParaForm = podeVerIndicador
+    ? client
+    : {
+        ...client,
+        indicador_id: null,
+        comissao_tipo: null,
+        comissao_valor: null,
+      };
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -64,7 +78,7 @@ export default async function EditarClientePage({
       {/* Form card */}
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm lg:p-8">
         <EditClientForm
-          client={client}
+          client={clientParaForm}
           colaboradores={colaboradores}
           podeVerIndicador={podeVerIndicador}
         />

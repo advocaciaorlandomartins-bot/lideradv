@@ -63,45 +63,59 @@ export async function POST(req: Request) {
     }
 
     // 1. Anonimiza dados pessoais do cliente
+    // Nomes de coluna corrigidos — a versão anterior usava
+    // nome_responsavel/cpf_responsavel/etc. (colunas que não existem; o
+    // schema real é responsavel_nome/responsavel_cpf/etc., confirmado em
+    // clients-db.ts), então o UPDATE inteiro falhava (erro 42703 do
+    // Postgres) e caía sempre no catch — a anonimização nunca funcionou
+    // desde que foi escrita. Também não define mais deleted_at: o próprio
+    // objetivo documentado aqui é preservar processos/lançamentos ligados
+    // ao cliente por obrigação legal, mas soft-deletar o cliente o fazia
+    // sumir de toda consulta (getClientFull/getAllClients filtram por
+    // deleted_at IS NULL), órfãos exatamente do jeito que o comentário
+    // dizia que não devia acontecer.
     await sql`
       UPDATE clients SET
-        name                  = '[ANONIMIZADO]',
-        doc                   = '',
-        email                 = '',
-        phone                 = '',
-        rg                    = NULL,
-        rg_orgao              = NULL,
-        cep                   = '',
-        street                = '',
-        addr_number           = '',
-        complement            = NULL,
-        neighborhood          = '',
-        city                  = '',
-        state                 = '',
-        birth_date            = NULL,
-        estado_civil          = NULL,
-        genero                = NULL,
-        profissao             = NULL,
-        nacionalidade         = NULL,
-        naturalidade_cidade   = NULL,
-        naturalidade_estado   = NULL,
-        filiacao_mae          = NULL,
-        filiacao_pai          = NULL,
-        nis                   = NULL,
-        num_beneficio         = NULL,
-        cid_principal         = NULL,
-        tipo_incapacidade     = NULL,
-        data_diagnostico      = NULL,
-        data_afastamento      = NULL,
-        atividade_anterior    = NULL,
-        nome_responsavel      = NULL,
-        cpf_responsavel       = NULL,
-        rg_responsavel        = NULL,
-        telefone_responsavel  = NULL,
-        email_responsavel     = NULL,
-        notes                 = NULL,
-        deleted_at            = NOW(),
-        updated_at            = NOW()
+        name                    = '[ANONIMIZADO]',
+        trade_name              = NULL,
+        doc                     = '',
+        email                   = '',
+        phone                   = '',
+        rg                      = NULL,
+        rg_orgao                = NULL,
+        cep                     = '',
+        street                  = '',
+        addr_number             = '',
+        complement              = NULL,
+        neighborhood            = '',
+        city                    = '',
+        state                   = '',
+        birth_date              = NULL,
+        estado_civil            = NULL,
+        genero                  = NULL,
+        profissao               = NULL,
+        nacionalidade           = NULL,
+        naturalidade_cidade     = NULL,
+        naturalidade_estado     = NULL,
+        filiacao_mae            = NULL,
+        filiacao_pai            = NULL,
+        nis                     = NULL,
+        num_beneficio           = NULL,
+        cid_principal           = NULL,
+        tipo_incapacidade       = NULL,
+        data_diagnostico        = NULL,
+        data_afastamento        = NULL,
+        atividade_anterior      = NULL,
+        senha_cliente           = NULL,
+        senha_inss              = NULL,
+        responsavel_nome        = NULL,
+        responsavel_cpf         = NULL,
+        responsavel_rg          = NULL,
+        responsavel_rg_orgao    = NULL,
+        responsavel_telefone    = NULL,
+        responsavel_email       = NULL,
+        responsavel_parentesco  = NULL,
+        notes                   = NULL
       WHERE id = ${clienteId}::uuid
     `;
 
@@ -112,8 +126,7 @@ export async function POST(req: Request) {
         from_address = 'anonimizado@removido.lgpd',
         body_text   = '[Conteúdo removido a pedido do titular — LGPD art. 18]',
         body_html   = '<p>[Conteúdo removido a pedido do titular — LGPD art. 18]</p>',
-        ai_summary  = NULL,
-        updated_at  = NOW()
+        ai_summary  = NULL
       WHERE client_id = ${clienteId}::uuid
     `;
 

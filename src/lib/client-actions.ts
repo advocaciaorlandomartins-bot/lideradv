@@ -16,6 +16,9 @@ export async function createClientAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "criar"))
     return { error: "Sem permissão." };
+  const podeDefinirIndicador =
+    session.categoria === "Administrador(a)" ||
+    session.categoria === "Sócio(a)";
 
   const type = formData.get("type") as string;
   const name = ((formData.get("name") as string | null) ?? "").trim();
@@ -55,17 +58,22 @@ export async function createClientAction(
     ((formData.get("origem_tipo") as string | null) ?? "").trim() || null;
   const origemTexto =
     ((formData.get("origem_texto") as string | null) ?? "").trim() || null;
-  const indicadorId =
+  let indicadorId =
     ((formData.get("indicador_id") as string | null) ?? "").trim() || null;
   const indicadorTipoTrabalho =
     ((formData.get("indicador_tipo_trabalho") as string | null) ?? "").trim() ||
     null;
-  const comissaoTipo =
+  let comissaoTipo =
     ((formData.get("comissao_tipo") as string | null) ?? "").trim() || null;
   const comissaoValorRaw = (
     (formData.get("comissao_valor") as string | null) ?? ""
   ).trim();
-  const comissaoValor = comissaoValorRaw ? comissaoValorRaw : null;
+  let comissaoValor = comissaoValorRaw ? comissaoValorRaw : null;
+  if (!podeDefinirIndicador) {
+    indicadorId = null;
+    comissaoTipo = null;
+    comissaoValor = null;
+  }
   const menorIncapaz = formData.get("menor_incapaz") === "true";
   const responsavelNome =
     ((formData.get("responsavel_nome") as string | null) ?? "").trim() || null;
@@ -264,6 +272,9 @@ export async function updateClientAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "editar"))
     return { error: "Sem permissão." };
+  const podeDefinirIndicador =
+    session.categoria === "Administrador(a)" ||
+    session.categoria === "Sócio(a)";
 
   const type = formData.get("type") as string;
   const name = ((formData.get("name") as string | null) ?? "").trim();
@@ -304,17 +315,27 @@ export async function updateClientAction(
     ((formData.get("origem_tipo") as string | null) ?? "").trim() || null;
   const origemTexto =
     ((formData.get("origem_texto") as string | null) ?? "").trim() || null;
-  const indicadorId =
+  let indicadorId =
     ((formData.get("indicador_id") as string | null) ?? "").trim() || null;
   const indicadorTipoTrabalho =
     ((formData.get("indicador_tipo_trabalho") as string | null) ?? "").trim() ||
     null;
-  const comissaoTipo =
+  let comissaoTipo =
     ((formData.get("comissao_tipo") as string | null) ?? "").trim() || null;
   const comissaoValorRaw = (
     (formData.get("comissao_valor") as string | null) ?? ""
   ).trim();
-  const comissaoValor = comissaoValorRaw ? comissaoValorRaw : null;
+  let comissaoValor = comissaoValorRaw ? comissaoValorRaw : null;
+  if (!podeDefinirIndicador) {
+    const [atual] = await sql`
+      SELECT indicador_id::text, comissao_tipo, comissao_valor
+      FROM clients WHERE id = ${id}::uuid
+    `.catch(() => []);
+    indicadorId = (atual?.indicador_id as string | null) ?? null;
+    comissaoTipo = (atual?.comissao_tipo as string | null) ?? null;
+    comissaoValor =
+      atual?.comissao_valor != null ? String(atual.comissao_valor) : null;
+  }
   const menorIncapaz = formData.get("menor_incapaz") === "true";
   const responsavelNome =
     ((formData.get("responsavel_nome") as string | null) ?? "").trim() || null;

@@ -22,8 +22,9 @@ export interface AssinanteInput {
 }
 
 export interface DocumentoInput {
+  modeloId: string;
   nome: string;
-  tamanhoBytes: number;
+  htmlContent: string;
   ordem: number;
 }
 
@@ -57,6 +58,84 @@ export async function listarEnvelopes(
   }));
 }
 
+export interface EnvelopeDetalhe {
+  id: string;
+  nome: string;
+  prazo: string | null;
+  status: string;
+  criado_por: string;
+  criado_em: string;
+  cliente_nome: string | null;
+  documentos: {
+    id: string;
+    nome: string;
+    htmlContent: string;
+    ordem: number;
+  }[];
+  assinantes: {
+    id: string;
+    tipo: string;
+    nome: string;
+    email: string;
+    papel: string;
+    status: string;
+    ordem: number;
+  }[];
+}
+
+export async function getEnvelopeById(
+  id: string
+): Promise<EnvelopeDetalhe | null> {
+  const [env] = await sql`
+    SELECT e.id::text, e.nome, e.prazo, e.status, e.criado_por, e.criado_em,
+           c.name AS cliente_nome
+    FROM envelopes e
+    LEFT JOIN clients c ON c.id = e.client_id
+    WHERE e.id = ${id}::uuid
+  `;
+  if (!env) return null;
+
+  const [documentos, assinantes] = await Promise.all([
+    sql`
+      SELECT id::text, nome, html_content, ordem
+      FROM envelope_documentos
+      WHERE envelope_id = ${id}::uuid
+      ORDER BY ordem
+    `,
+    sql`
+      SELECT id::text, tipo, nome, email, papel, status, ordem
+      FROM envelope_assinantes
+      WHERE envelope_id = ${id}::uuid
+      ORDER BY ordem
+    `,
+  ]);
+
+  return {
+    id: env.id,
+    nome: env.nome,
+    prazo: env.prazo ? String(env.prazo) : null,
+    status: env.status,
+    criado_por: env.criado_por,
+    criado_em: String(env.criado_em),
+    cliente_nome: env.cliente_nome ?? null,
+    documentos: documentos.map((d) => ({
+      id: d.id,
+      nome: d.nome,
+      htmlContent: d.html_content ?? "",
+      ordem: d.ordem,
+    })),
+    assinantes: assinantes.map((a) => ({
+      id: a.id,
+      tipo: a.tipo,
+      nome: a.nome,
+      email: a.email,
+      papel: a.papel,
+      status: a.status,
+      ordem: a.ordem,
+    })),
+  };
+}
+
 export async function criarEnvelope(data: {
   nome: string;
   prazo: string | null;
@@ -65,16 +144,17 @@ export async function criarEnvelope(data: {
   notifCriador: boolean;
   notifEscritorio: boolean;
   criadoPor: string;
+  clienteId: string;
   assinantes: AssinanteInput[];
   documentos: DocumentoInput[];
 }): Promise<string> {
   const [env] = await sql`
     INSERT INTO envelopes
-      (nome, prazo, status, notif_assinantes, notif_criador, notif_escritorio, criado_por)
+      (nome, prazo, status, notif_assinantes, notif_criador, notif_escritorio, criado_por, client_id)
     VALUES
       (${data.nome}, ${data.prazo ?? null}, ${data.status},
        ${data.notifAssinantes}, ${data.notifCriador}, ${data.notifEscritorio},
-       ${data.criadoPor})
+       ${data.criadoPor}, ${data.clienteId}::uuid)
     RETURNING id::text
   `;
   const envId = env.id as string;
@@ -82,8 +162,8 @@ export async function criarEnvelope(data: {
   if (data.documentos.length > 0) {
     for (const doc of data.documentos) {
       await sql`
-        INSERT INTO envelope_documentos (envelope_id, nome, tamanho_bytes, ordem)
-        VALUES (${envId}::uuid, ${doc.nome}, ${doc.tamanhoBytes}, ${doc.ordem})
+        INSERT INTO envelope_documentos (envelope_id, nome, modelo_id, html_content, ordem)
+        VALUES (${envId}::uuid, ${doc.nome}, ${doc.modeloId}::uuid, ${doc.htmlContent}, ${doc.ordem})
       `;
     }
   }

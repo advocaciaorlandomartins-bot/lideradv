@@ -137,6 +137,100 @@ export function flattenBlocksToText(blocks: Block[]): string {
     .join("\n\n");
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+}
+
+function spanToHtml(s: TextSpan): string {
+  let inner = escapeHtml(s.text);
+  const styles: string[] = [];
+  if (s.color) styles.push(`color:${s.color}`);
+  if (s.highlight) styles.push(`background-color:${s.highlight}`);
+  if (s.font) styles.push(`font-family:${s.font}`);
+  if (styles.length > 0)
+    inner = `<span style="${styles.join(";")}">${inner}</span>`;
+  if (s.underline) inner = `<u>${inner}</u>`;
+  if (s.italic) inner = `<em>${inner}</em>`;
+  if (s.bold) inner = `<strong>${inner}</strong>`;
+  return inner;
+}
+
+function spansToHtml(spans: TextSpan[]): string {
+  return spans.map(spanToHtml).join("");
+}
+
+/** Fallback pra modelos antigos sem conteudo_blocks — só texto puro. */
+export function textToHtml(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((par) => `<p>${escapeHtml(par)}</p>`)
+    .join("\n");
+}
+
+/**
+ * Converte os blocos estruturados do modelo em HTML simples — usado para
+ * enviar o documento ao TramitaSign (a API dele recebe content_html, não
+ * PDF), separado do renderer de PDF (modelo-pdf.tsx) que serve pra download.
+ */
+export function blocksToHtml(blocks: Block[]): string {
+  return blocks
+    .map((b): string => {
+      switch (b.type) {
+        case "paragraph": {
+          const style = b.align ? ` style="text-align:${b.align}"` : "";
+          return `<p${style}>${spansToHtml(b.spans) || "&nbsp;"}</p>`;
+        }
+        case "heading": {
+          const styleParts = [
+            b.align ? `text-align:${b.align}` : null,
+            b.color ? `color:${b.color}` : null,
+          ].filter((v): v is string => v != null);
+          const style = styleParts.length
+            ? ` style="${styleParts.join(";")}"`
+            : "";
+          return `<h${b.level}${style}>${spansToHtml(b.spans)}</h${b.level}>`;
+        }
+        case "list": {
+          const tag = b.ordered ? "ol" : "ul";
+          const items = b.items
+            .map((item) => `<li>${spansToHtml(item)}</li>`)
+            .join("");
+          return `<${tag}>${items}</${tag}>`;
+        }
+        case "divider":
+          return "<hr>";
+        case "table": {
+          const rows = b.rows
+            .map(
+              (row) =>
+                `<tr>${row
+                  .map(
+                    (cell) =>
+                      `<td style="border:1px solid #ccc;padding:4px 8px">${spansToHtml(cell)}</td>`
+                  )
+                  .join("")}</tr>`
+            )
+            .join("");
+          return `<table style="border-collapse:collapse;width:100%">${rows}</table>`;
+        }
+        case "callout": {
+          const bg = b.color ?? "#f3f4f6";
+          const title = b.title
+            ? `<strong>${escapeHtml(b.title)}</strong><br>`
+            : "";
+          return `<div style="background:${bg};padding:10px 14px;border-radius:6px">${title}${spansToHtml(b.spans)}</div>`;
+        }
+        case "signatureLine":
+          return `<p style="margin-top:32px">_________________________________<br>${escapeHtml(b.label)}</p>`;
+      }
+    })
+    .join("\n");
+}
+
 /**
  * Substitui {{variavel}} pelo valor correspondente em cada TextSpan,
  * retornando uma cópia dos blocos (não muta o original).

@@ -1,14 +1,12 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { salvarEnvelopeAction } from "@/lib/assinaturas-actions";
 import {
   CheckIcon,
   PlusIcon,
   TrashIcon,
-  UploadIcon,
-  XMarkIcon,
   ChevronRightIcon,
 } from "@/components/icons";
 
@@ -29,15 +27,17 @@ interface Assinante {
   refId?: string;
 }
 
-interface DocFile {
-  key: string;
-  file: File;
+interface ModeloOpt {
+  id: string;
+  titulo: string;
+  categoria: string | null;
 }
 
 interface Props {
   userLogin: string;
   colaboradores: { id: string; nome: string; email: string }[];
   clientes: { id: string; nome: string; email: string }[];
+  modelos: ModeloOpt[];
 }
 
 /* ─── helpers ─── */
@@ -92,6 +92,7 @@ export default function NovoEnvelope({
   userLogin,
   colaboradores,
   clientes,
+  modelos,
 }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -101,10 +102,11 @@ export default function NovoEnvelope({
   // Step 1
   const [nome, setNome] = useState("");
   const [prazo, setPrazo] = useState("");
+  const [clienteId, setClienteId] = useState("");
 
   // Step 2
-  const [docs, setDocs] = useState<DocFile[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [modelosSelecionados, setModelosSelecionados] = useState<string[]>([]);
+  const [buscaModelo, setBuscaModelo] = useState("");
 
   // Step 3
   const [assinantes, setAssinantes] = useState<Assinante[]>([]);
@@ -122,19 +124,15 @@ export default function NovoEnvelope({
   const [notifCriador, setNotifCriador] = useState(true);
   const [notifEscritorio, setNotifEscritorio] = useState(false);
 
-  /* ─── file drop ─── */
-  const handleFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
-    const pdfs = Array.from(files).filter((f) => f.type === "application/pdf");
-    setDocs((prev) => [...prev, ...pdfs.map((f) => ({ key: uid(), file: f }))]);
-  }, []);
+  /* ─── seleção de modelos ─── */
+  function toggleModelo(id: string) {
+    setModelosSelecionados((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      handleFiles(e.dataTransfer.files);
-    },
-    [handleFiles]
+  const modelosFiltrados = modelos.filter((m) =>
+    m.titulo.toLowerCase().includes(buscaModelo.trim().toLowerCase())
   );
 
   /* ─── add signer ─── */
@@ -191,6 +189,7 @@ export default function NovoEnvelope({
       const fd = new FormData();
       fd.set("nome", nome.trim());
       fd.set("prazo", prazo);
+      fd.set("cliente_id", clienteId);
       fd.set("enviar", enviar ? "1" : "0");
       fd.set("notif_assinantes", notifAssinantes ? "1" : "0");
       fd.set("notif_criador", notifCriador ? "1" : "0");
@@ -211,11 +210,10 @@ export default function NovoEnvelope({
         )
       );
       fd.set(
-        "documentos",
+        "modelos",
         JSON.stringify(
-          docs.map((d, i) => ({
-            nome: d.file.name,
-            tamanhoBytes: d.file.size,
+          modelosSelecionados.map((modeloId, i) => ({
+            modeloId,
             ordem: i + 1,
           }))
         )
@@ -256,6 +254,27 @@ export default function NovoEnvelope({
             </div>
             <div>
               <label className="block font-body text-sm font-medium text-fg mb-1">
+                Cliente <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={clienteId}
+                onChange={(e) => setClienteId(e.target.value)}
+                className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">Selecione o cliente…</option>
+                {clientes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 font-body text-xs text-muted">
+                Usado para preencher as variáveis dos modelos ({"{{nome}}"},{" "}
+                {"{{cpf_cnpj}}"} etc.)
+              </p>
+            </div>
+            <div>
+              <label className="block font-body text-sm font-medium text-fg mb-1">
                 Prazo para assinatura
               </label>
               <input
@@ -272,9 +291,9 @@ export default function NovoEnvelope({
           <div className="pt-2 flex justify-end">
             <button
               onClick={() => {
-                if (nome.trim()) setStep(2);
+                if (nome.trim() && clienteId) setStep(2);
               }}
-              disabled={!nome.trim()}
+              disabled={!nome.trim() || !clienteId}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 font-body text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-40"
             >
               Próximo <ChevronRightIcon className="h-4 w-4" />
@@ -289,56 +308,62 @@ export default function NovoEnvelope({
           <h2 className="font-heading text-lg font-semibold text-fg">
             Documentos para assinar
           </h2>
+          <p className="font-body text-sm text-muted -mt-3">
+            Selecione um ou mais modelos — as variáveis são preenchidas
+            automaticamente com os dados do cliente escolhido.
+          </p>
 
-          <div
-            onDrop={onDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border bg-slate-50 py-12 cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5"
-          >
-            <UploadIcon className="h-10 w-10 text-muted/40" />
-            <div className="text-center">
-              <p className="font-body text-sm font-semibold text-fg">
-                Arraste PDFs aqui ou clique para selecionar
-              </p>
-              <p className="font-body text-xs text-muted mt-0.5">
-                Apenas arquivos PDF são aceitos
-              </p>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-          </div>
+          <input
+            type="text"
+            value={buscaModelo}
+            onChange={(e) => setBuscaModelo(e.target.value)}
+            placeholder="Buscar modelo…"
+            className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
 
-          {docs.length > 0 && (
-            <ul className="space-y-2">
-              {docs.map((d) => (
-                <li
-                  key={d.key}
-                  className="flex items-center gap-3 rounded-lg border border-border bg-white px-4 py-2.5"
-                >
-                  <span className="flex-1 font-body text-sm text-fg truncate">
-                    {d.file.name}
-                  </span>
-                  <span className="font-body text-xs text-muted whitespace-nowrap">
-                    {(d.file.size / 1024).toFixed(0)} KB
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDocs((prev) => prev.filter((x) => x.key !== d.key))
-                    }
-                    className="rounded p-1 text-muted transition-colors hover:bg-red-50 hover:text-red-500"
-                  >
-                    <XMarkIcon className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
+          {modelosFiltrados.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border bg-slate-50 px-4 py-8 text-center font-body text-sm text-muted">
+              Nenhum modelo encontrado. Cadastre modelos em Documentos →
+              Modelos.
+            </p>
+          ) : (
+            <ul className="max-h-96 space-y-1.5 overflow-y-auto">
+              {modelosFiltrados.map((m) => {
+                const checked = modelosSelecionados.includes(m.id);
+                return (
+                  <li key={m.id}>
+                    <label
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors ${
+                        checked
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-white hover:border-primary/30"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleModelo(m.id)}
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-body text-sm font-semibold text-fg truncate">
+                          {m.titulo}
+                        </p>
+                        {m.categoria && (
+                          <p className="font-body text-xs text-muted">
+                            {m.categoria}
+                          </p>
+                        )}
+                      </div>
+                      {checked && (
+                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary text-white">
+                          <CheckIcon className="h-3 w-3" />
+                        </span>
+                      )}
+                    </label>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
@@ -351,9 +376,9 @@ export default function NovoEnvelope({
             </button>
             <button
               onClick={() => {
-                if (docs.length > 0) setStep(3);
+                if (modelosSelecionados.length > 0) setStep(3);
               }}
-              disabled={docs.length === 0}
+              disabled={modelosSelecionados.length === 0}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 font-body text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-40"
             >
               Próximo <ChevronRightIcon className="h-4 w-4" />
@@ -695,6 +720,14 @@ export default function NovoEnvelope({
             </div>
             <div className="flex gap-3">
               <dt className="w-32 flex-shrink-0 font-semibold text-muted">
+                Cliente
+              </dt>
+              <dd className="text-fg">
+                {clientes.find((c) => c.id === clienteId)?.nome ?? "—"}
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 flex-shrink-0 font-semibold text-muted">
                 Prazo
               </dt>
               <dd className="text-fg">
@@ -708,7 +741,13 @@ export default function NovoEnvelope({
                 Documentos
               </dt>
               <dd className="text-fg">
-                {docs.length} PDF{docs.length !== 1 ? "s" : ""}
+                <ul className="space-y-0.5">
+                  {modelosSelecionados.map((id) => (
+                    <li key={id}>
+                      {modelos.find((m) => m.id === id)?.titulo ?? id}
+                    </li>
+                  ))}
+                </ul>
               </dd>
             </div>
             <div className="flex gap-3">

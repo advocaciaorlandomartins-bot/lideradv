@@ -108,7 +108,14 @@ export default async function AssinaturasPage() {
                   key={env.id}
                   className="transition-colors hover:bg-slate-50/60"
                 >
-                  <td className="px-4 py-3 font-medium text-fg">{env.nome}</td>
+                  <td className="px-4 py-3 font-medium text-fg">
+                    <Link
+                      href={`/dashboard/assinaturas/${env.id}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {env.nome}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_CLASS[env.status] ?? "bg-slate-100 text-slate-600"}`}

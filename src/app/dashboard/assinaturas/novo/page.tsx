@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { notFound, redirect } from "next/navigation";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
 import { getAllClients } from "@/lib/clients-db";
+import { getModelosAtivos } from "@/lib/modelos-db";
 import NovoEnvelope from "@/components/dashboard/assinaturas/novo-envelope";
 import { ChevronRightIcon } from "@/components/icons";
 
@@ -15,10 +16,17 @@ export default async function NovoEnvelopePage() {
   if (!session) redirect("/login");
   if (!hasPermission(session, "assinaturas", "criar")) notFound();
 
-  const [colaboradores, clientes] = await Promise.all([
+  const [colaboradores, clientes, modelos] = await Promise.all([
     getAllColaboradores(),
     getAllClients(),
+    getModelosAtivos(),
   ]);
+
+  const modelosOpts = modelos.map((m) => ({
+    id: m.id,
+    titulo: m.titulo,
+    categoria: m.categoria,
+  }));
 
   const colaboradoresOpts = colaboradores
     .filter((c) => c.status === "ativo")
@@ -56,6 +64,7 @@ export default async function NovoEnvelopePage() {
         userLogin={session.login}
         colaboradores={colaboradoresOpts}
         clientes={clientesOpts}
+        modelos={modelosOpts}
       />
     </div>
   );

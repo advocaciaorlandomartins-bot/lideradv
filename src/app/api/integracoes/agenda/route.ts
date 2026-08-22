@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Filtra compromissos do colaborador pelo JOIN usuarios → criado_por
+  // Filtra compromissos do colaborador pelo JOIN usuarios → criado_por.
+  // Exige ativo = true, igual ao POST abaixo — sem isso, o JWT de 30 dias
+  // de um colaborador desligado continuava lendo a agenda dele mesmo depois
+  // da conta ser desativada.
   const rows = await sql`
     SELECT
       c.id::text,
@@ -42,6 +45,7 @@ export async function GET(req: NextRequest) {
     FROM compromissos c
     JOIN usuarios u ON u.login = c.criado_por
     WHERE u.colaborador_id = ${colaboradorId}::uuid
+      AND u.ativo = true
       AND c.data_inicio = ${data}::date
     ORDER BY c.hora_inicio NULLS LAST
   `;

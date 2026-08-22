@@ -55,7 +55,16 @@ export default async function AuditoriaPage({
   searchParams: Promise<Record<string, string>>;
 }) {
   const user = await getSession();
-  if (!user || !hasPermission(user, "gerenciador", "ver")) notFound();
+  // O log de auditoria é o histórico completo de ações de TODOS os usuários
+  // — gerenciador:ver sozinho (VER por padrão para Advogado(a)) deixava
+  // qualquer advogado ler a atividade de todos os colegas. Restrito a
+  // Admin/Sócio, mesmo padrão usado para outros dados sensíveis de escritório.
+  if (
+    !user ||
+    !hasPermission(user, "gerenciador", "ver") ||
+    (user.categoria !== "Administrador(a)" && user.categoria !== "Sócio(a)")
+  )
+    notFound();
 
   const sp = await searchParams;
   const filters = {

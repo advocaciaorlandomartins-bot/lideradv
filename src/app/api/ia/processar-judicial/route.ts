@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
+import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
 
 export const dynamic = "force-dynamic";
@@ -49,8 +51,18 @@ export interface DocumentoJudicialExtraido {
 
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session) {
+  if (!session || !hasPermission(session, "processos", "ver")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  }
+
+  if (await iaRateLimitExcedido(session.login)) {
+    return NextResponse.json(
+      {
+        error:
+          "Limite de requisições de IA excedido. Tente novamente em 1 hora.",
+      },
+      { status: 429 }
+    );
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {

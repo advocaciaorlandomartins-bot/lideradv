@@ -67,6 +67,30 @@ export default function RegisterForm() {
 
   const strength = getStrength(password);
 
+  if (state && "success" in state) {
+    return (
+      <div className="w-full max-w-md text-center">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
+          <span style={{ fontSize: 32 }}>⏳</span>
+        </div>
+        <h1 className="font-heading text-3xl font-semibold text-fg mb-3">
+          Conta criada com sucesso
+        </h1>
+        <p className="font-body text-base text-muted leading-relaxed mb-6">
+          Sua conta foi cadastrada e está aguardando aprovação de um
+          administrador do escritório. Você receberá acesso assim que ela for
+          liberada.
+        </p>
+        <Link
+          href="/login"
+          className="font-semibold text-primary hover:text-primary-dark transition-colors duration-150"
+        >
+          ← Voltar para o login
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-md">
       {/* Mobile brand header */}

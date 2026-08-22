@@ -20,55 +20,16 @@ function Icone() {
   );
 }
 
-function ExtraFields() {
-  return (
-    <div>
-      <label
-        style={{
-          display: "block",
-          fontSize: 12,
-          fontWeight: 600,
-          color: "#555",
-          marginBottom: 6,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        Senha atual do PDF (se houver)
-      </label>
-      <input
-        name="senha"
-        type="password"
-        placeholder="Deixe em branco se não souber"
-        style={{
-          width: "100%",
-          height: 40,
-          borderRadius: 10,
-          border: "1px solid #e8e4df",
-          background: "white",
-          padding: "0 12px",
-          fontSize: 14,
-          color: "#2d2d2d",
-          outline: "none",
-          boxSizing: "border-box",
-        }}
-      />
-    </div>
-  );
-}
-
 export default function RemoverSenhaPage() {
   return (
     <PdfToolPage
       titulo="Remover senha de PDFs"
-      descricao="Remova a proteção por senha de PDFs protegidos"
+      descricao="Remove a proteção de PDFs sem senha de abertura (ex.: bloqueados só contra edição). PDFs que pedem senha para abrir não são suportados."
       icone={<Icone />}
-      extraFields={<ExtraFields />}
       endpoint="/api/pdf/remover-senha"
-      buildFormData={(files, extras) => {
+      buildFormData={(files) => {
         const fd = new FormData();
         fd.append("file", files[0]);
-        fd.append("senha", extras.senha || "");
         return fd;
       }}
     />

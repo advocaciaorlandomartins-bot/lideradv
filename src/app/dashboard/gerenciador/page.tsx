@@ -10,7 +10,17 @@ export const metadata = {
 
 export default async function GerenciadorPage() {
   const user = await getSession();
-  if (!user || !hasPermission(user, "gerenciador", "ver")) notFound();
+  // O Gerenciador expõe KPIs financeiros de todo o escritório (recebido/
+  // pago, top clientes por receita, inadimplência) como props de client
+  // component — precisa do mesmo gate mais restrito que o dashboard
+  // principal usa para essa mesma classe de dado (financeiro +
+  // dashboard_financeiro), não só gerenciador:ver.
+  if (
+    !user ||
+    !hasPermission(user, "gerenciador", "ver") ||
+    !hasPermission(user, "dashboard_financeiro", "ver")
+  )
+    notFound();
 
   const data = await getGerenciadorData();
 

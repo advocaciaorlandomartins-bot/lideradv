@@ -17,6 +17,10 @@ export async function GET(request: Request) {
   const apenasAprovadas = searchParams.get("aprovadas") === "1";
   const limit = Math.min(Number(searchParams.get("limit") ?? "20"), 50);
 
+  // Só mostra petições próprias ou já aprovadas (referência global) — sem
+  // isso, qualquer usuário via GET /api/ia/banco lia rascunhos/petições
+  // ainda não aprovadas de qualquer colega, diferente de banco/[id] que já
+  // filtra corretamente por created_by.
   const rows = await sql`
     SELECT
       id::text,
@@ -34,6 +38,7 @@ export async function GET(request: Request) {
       AND (${clienteId}::text IS NULL OR cliente_id = ${clienteId}::uuid)
       AND (${area}::text IS NULL OR area = ${area})
       AND (NOT ${apenasAprovadas} OR aprovada = TRUE)
+      AND (created_by = ${session.id}::uuid OR aprovada = TRUE)
     ORDER BY created_at DESC
     LIMIT ${limit}
   `;

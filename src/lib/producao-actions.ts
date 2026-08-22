@@ -11,26 +11,42 @@ function revalidate(id?: string) {
   if (id) revalidatePath(`/dashboard/processos/${id}`);
 }
 
-export async function moverParaProducaoAction(id: string): Promise<void> {
+export async function moverParaProducaoAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "producao", "editar")) return;
-  await sql`
-    UPDATE processos
-    SET estagio_producao = 'producao', data_estagio_at = NOW()
-    WHERE id = ${id}::uuid
-  `;
-  revalidate(id);
+  if (!session || !hasPermission(session, "producao", "editar"))
+    return { error: "Sem permissão." };
+  try {
+    await sql`
+      UPDATE processos
+      SET estagio_producao = 'producao', data_estagio_at = NOW()
+      WHERE id = ${id}::uuid
+    `;
+    revalidate(id);
+    return {};
+  } catch {
+    return { error: "Erro ao mover processo para produção." };
+  }
 }
 
-export async function moverParaAdministrativoAction(id: string): Promise<void> {
+export async function moverParaAdministrativoAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "producao", "editar")) return;
-  await sql`
-    UPDATE processos
-    SET estagio_producao = 'administrativo', data_estagio_at = NOW()
-    WHERE id = ${id}::uuid
-  `;
-  revalidate(id);
+  if (!session || !hasPermission(session, "producao", "editar"))
+    return { error: "Sem permissão." };
+  try {
+    await sql`
+      UPDATE processos
+      SET estagio_producao = 'administrativo', data_estagio_at = NOW()
+      WHERE id = ${id}::uuid
+    `;
+    revalidate(id);
+    return {};
+  } catch {
+    return { error: "Erro ao mover processo para administrativo." };
+  }
 }
 
 export async function registrarResultadoAdminAction(
@@ -176,41 +192,58 @@ const PREV_ESTAGIO: Record<string, string> = {
   judicial: "administrativo",
 };
 
-export async function voltarEstagioAction(id: string): Promise<void> {
+export async function voltarEstagioAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "producao", "editar")) return;
-  const rows =
-    await sql`SELECT estagio_producao FROM processos WHERE id = ${id}::uuid`;
-  const atual = String(rows[0]?.estagio_producao ?? "");
-  const anterior = PREV_ESTAGIO[atual];
-  if (!anterior) return;
+  if (!session || !hasPermission(session, "producao", "editar"))
+    return { error: "Sem permissão." };
+  try {
+    const rows =
+      await sql`SELECT estagio_producao FROM processos WHERE id = ${id}::uuid`;
+    const atual = String(rows[0]?.estagio_producao ?? "");
+    const anterior = PREV_ESTAGIO[atual];
+    if (!anterior)
+      return { error: "Este processo não pode retroceder de estágio." };
 
-  await sql`
-    UPDATE processos
-    SET estagio_producao          = ${anterior},
-        resultado_administrativo  = NULL,
-        resultado_judicial        = NULL,
-        data_estagio_at           = NOW()
-    WHERE id = ${id}::uuid
-  `;
-  revalidate(id);
+    await sql`
+      UPDATE processos
+      SET estagio_producao          = ${anterior},
+          resultado_administrativo  = NULL,
+          resultado_judicial        = NULL,
+          data_estagio_at           = NOW()
+      WHERE id = ${id}::uuid
+    `;
+    revalidate(id);
+    return {};
+  } catch {
+    return { error: "Erro ao retroceder estágio do processo." };
+  }
 }
 
-export async function reabrirProcessoAction(id: string): Promise<void> {
+export async function reabrirProcessoAction(
+  id: string
+): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "producao", "editar")) return;
-  await sql`
-    UPDATE processos
-    SET estagio_producao              = 'analise',
-        resultado_administrativo      = NULL,
-        resultado_judicial            = NULL,
-        status                        = 'ativo',
-        fase_workflow                 = 'elaboracao',
-        resultado                     = NULL,
-        responsavel_administrativo_id = NULL,
-        responsavel_judicial_id       = NULL,
-        data_estagio_at               = NOW()
-    WHERE id = ${id}::uuid
-  `;
-  revalidate(id);
+  if (!session || !hasPermission(session, "producao", "editar"))
+    return { error: "Sem permissão." };
+  try {
+    await sql`
+      UPDATE processos
+      SET estagio_producao              = 'analise',
+          resultado_administrativo      = NULL,
+          resultado_judicial            = NULL,
+          status                        = 'ativo',
+          fase_workflow                 = 'elaboracao',
+          resultado                     = NULL,
+          responsavel_administrativo_id = NULL,
+          responsavel_judicial_id       = NULL,
+          data_estagio_at               = NOW()
+      WHERE id = ${id}::uuid
+    `;
+    revalidate(id);
+    return {};
+  } catch {
+    return { error: "Erro ao reabrir processo." };
+  }
 }

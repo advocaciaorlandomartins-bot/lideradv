@@ -97,9 +97,20 @@ export async function PATCH(
   }
 
   if (body.aprovada !== undefined) {
+    // Aprovar é ação de admin (alimenta o corpus de referência usado pelo
+    // Cérebro Jurídico para todo o escritório) — sem essa checagem, um
+    // usuário comum conseguia aprovar a própria petição por aqui, já que a
+    // query abaixo é filtrada por created_by = ele mesmo, contornando o
+    // gate admin-only que PATCH /api/ia/banco aplica corretamente.
+    if (session.categoria !== "Administrador(a)") {
+      return NextResponse.json(
+        { error: "Apenas administradores podem aprovar petições." },
+        { status: 403 }
+      );
+    }
     await sql`
       UPDATE ia_peticoes SET aprovada = ${body.aprovada}
-      WHERE id = ${id}::uuid AND created_by = ${session.id}::uuid
+      WHERE id = ${id}::uuid
     `;
   }
 

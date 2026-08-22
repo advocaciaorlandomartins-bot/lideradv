@@ -14,8 +14,25 @@ export default async function ColaboradoresPage() {
   const session = await getSession();
   if (!session || !hasPermission(session, "colaboradores", "ver")) notFound();
 
-  const colaboradores = await getAllColaboradores();
-  const ativos = colaboradores.filter((c) => c.status === "ativo").length;
+  const colaboradoresRaw = await getAllColaboradores();
+  const ativos = colaboradoresRaw.filter((c) => c.status === "ativo").length;
+
+  // Salário e percentuais de comissão são dados sensíveis de RH — vazavam
+  // para qualquer usuário com colaboradores:ver (Advogado(a)/Estagiário(a)/
+  // Colaborador(a) por padrão, ou seja, quase todo mundo) via props do
+  // client component, mesmo a tabela nunca exibindo essas colunas.
+  const podeVerRemuneracao =
+    session.categoria === "Administrador(a)" ||
+    session.categoria === "Sócio(a)";
+  const colaboradores = podeVerRemuneracao
+    ? colaboradoresRaw
+    : colaboradoresRaw.map((c) => ({
+        ...c,
+        salario_mensal: null,
+        comissao_administrativo_pct: null,
+        comissao_judicial_pct: null,
+        comissao_ambos_pct: null,
+      }));
 
   return (
     <div className="space-y-6">

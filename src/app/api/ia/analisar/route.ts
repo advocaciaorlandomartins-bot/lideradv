@@ -9,6 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { analisarDocumentoExtendido } from "@/lib/ai-juridico";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { getClientFull } from "@/lib/clients-db";
@@ -61,7 +62,7 @@ const MAX_MB = 20;
 
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session) {
+  if (!session || !hasPermission(session, "processos", "ver")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

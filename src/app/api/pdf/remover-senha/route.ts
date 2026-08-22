@@ -10,7 +10,6 @@ export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;
-    const _senha = (form.get("senha") as string) || "";
 
     if (!file)
       return NextResponse.json(
@@ -25,9 +24,17 @@ export async function POST(req: NextRequest) {
 
     const buf = await file.arrayBuffer();
 
+    // Sem ignoreEncryption: quando o PDF está realmente protegido por senha,
+    // isso precisa lançar EncryptedPDFError para cair no branch abaixo. A
+    // versão anterior usava ignoreEncryption: true, que suprime esse erro e
+    // deixa o load "funcionar" sobre a estrutura ainda criptografada — o
+    // resultado salvo continuava corrompido/protegido, mas a rota respondia
+    // 200 como se tivesse removido a senha com sucesso (pdf-lib não
+    // implementa nenhum algoritmo de decriptação, só a opção de ignorar o
+    // erro e tentar ler mesmo assim).
     let doc: PDFDocument;
     try {
-      doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+      doc = await PDFDocument.load(buf);
     } catch (err) {
       if (
         err instanceof EncryptedPDFError ||
@@ -36,7 +43,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "Não foi possível processar este PDF protegido. O pdf-lib não suporta descriptografia de PDFs com senha.",
+              "Este PDF está protegido por senha e não pode ser processado: nossa ferramenta não suporta remoção de senha de PDFs criptografados no momento.",
           },
           { status: 400 }
         );

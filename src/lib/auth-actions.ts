@@ -154,7 +154,10 @@ export async function logoutAction(): Promise<void> {
   redirect("/login");
 }
 
-export type RegisterState = { error: string } | { success: true } | null;
+export type RegisterState =
+  | { error: string }
+  | { success: true; pendingApproval: true }
+  | null;
 
 export async function registerAction(
   _prevState: RegisterState,
@@ -218,24 +221,21 @@ export async function registerAction(
   const senhaHash = hashPassword(password);
 
   try {
-    const rows = await sql`
-      INSERT INTO usuarios (login, nome, senha_hash, categoria)
-      VALUES (${login}, ${name}, ${senhaHash}, 'Advogado(a)')
+    // Conta criada inativa (ativo = false) e SEM sessão automática: o
+    // cadastro público não pode mais conceder acesso imediato ao sistema
+    // (era possível ler/editar clientes, processos, CRM e financeiro reais
+    // em segundos, já que o banco é single-tenant). Um administrador
+    // precisa ativar a conta manualmente em Usuários antes do primeiro
+    // login — loginAction já rejeita ativo = false.
+    await sql`
+      INSERT INTO usuarios (login, nome, senha_hash, categoria, ativo)
+      VALUES (${login}, ${name}, ${senhaHash}, 'Advogado(a)', false)
       RETURNING id::text, login, categoria
     `;
-    const user = rows[0];
-    const permissoes = resolvePermissoes("Advogado(a)", null);
-    await createSession({
-      id: String(user.id),
-      login: String(user.login),
-      nome: name,
-      categoria: String(user.categoria),
-      permissoes,
-    });
     await logAction({
       acao: "criar",
       entidade: "usuario",
-      descricao: `Registro de nova conta — ${login}`,
+      descricao: `Cadastro público recebido, aguardando aprovação — ${login}`,
       _login: login,
       _cat: "Advogado(a)",
     });
@@ -248,7 +248,7 @@ export async function registerAction(
     return { error: "Erro ao criar conta. Tente novamente." };
   }
 
-  redirect("/dashboard");
+  return { success: true, pendingApproval: true };
 }
 
 export type ResetRequestState = { error: string } | { success: true } | null;

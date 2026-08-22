@@ -306,7 +306,8 @@ function ProducaoBar({
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    await voltarEstagioAction(processo.id);
+                    const r = await voltarEstagioAction(processo.id);
+                    if (r?.error) alert(r.error);
                     router.refresh();
                   })
                 }
@@ -339,7 +340,8 @@ function ProducaoBar({
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    await moverParaProducaoAction(processo.id);
+                    const r = await moverParaProducaoAction(processo.id);
+                    if (r?.error) alert(r.error);
                     router.refresh();
                   })
                 }
@@ -358,7 +360,8 @@ function ProducaoBar({
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    await moverParaAdministrativoAction(processo.id);
+                    const r = await moverParaAdministrativoAction(processo.id);
+                    if (r?.error) alert(r.error);
                     router.refresh();
                   })
                 }
@@ -413,7 +416,8 @@ function ProducaoBar({
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    await reabrirProcessoAction(processo.id);
+                    const r = await reabrirProcessoAction(processo.id);
+                    if (r?.error) alert(r.error);
                     router.refresh();
                   })
                 }

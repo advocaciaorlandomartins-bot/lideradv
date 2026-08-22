@@ -1,5 +1,10 @@
 import { google } from "googleapis";
 import sql from "./db";
+import {
+  encryptSecret,
+  decryptSecret,
+  isEncryptedSecret,
+} from "./crypto-secrets";
 
 // ── OAuth2 client factory ──────────────────────────────────────────────────────
 
@@ -18,6 +23,11 @@ export const GOOGLE_SCOPES = [
 
 // ── Token persistence ──────────────────────────────────────────────────────────
 
+// access_token/refresh_token são credenciais reais de acesso ao Google
+// Calendar do usuário — guardadas em texto puro até aqui, mesma classe de
+// risco do token do Asaas (dump/backup do Postgres expunha tudo). Segue o
+// mesmo esquema de crypto-secrets.ts; isEncryptedSecret() no read cobre
+// linhas antigas gravadas antes desta migração, sem precisar de backfill.
 export async function getStoredToken(userId: string) {
   const rows = await sql`
     SELECT access_token, refresh_token, token_expiry, google_email
@@ -25,7 +35,18 @@ export async function getStoredToken(userId: string) {
     WHERE usuario_id = ${userId}::uuid
     LIMIT 1
   `;
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    access_token: isEncryptedSecret(row.access_token)
+      ? decryptSecret(row.access_token)
+      : row.access_token,
+    refresh_token: isEncryptedSecret(row.refresh_token)
+      ? decryptSecret(row.refresh_token)
+      : row.refresh_token,
+    token_expiry: row.token_expiry,
+    google_email: row.google_email,
+  };
 }
 
 export async function saveToken(
@@ -36,9 +57,11 @@ export async function saveToken(
   email: string | null
 ) {
   const expiry = expiryDate ? new Date(expiryDate).toISOString() : null;
+  const accessTokenEnc = encryptSecret(accessToken);
+  const refreshTokenEnc = refreshToken ? encryptSecret(refreshToken) : null;
   await sql`
     INSERT INTO google_tokens (usuario_id, access_token, refresh_token, token_expiry, google_email, updated_at)
-    VALUES (${userId}::uuid, ${accessToken}, ${refreshToken ?? null}, ${expiry}, ${email}, now())
+    VALUES (${userId}::uuid, ${accessTokenEnc}, ${refreshTokenEnc}, ${expiry}, ${email}, now())
     ON CONFLICT (usuario_id) DO UPDATE
       SET access_token  = EXCLUDED.access_token,
           refresh_token = COALESCE(EXCLUDED.refresh_token, google_tokens.refresh_token),

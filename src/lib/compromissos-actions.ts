@@ -151,6 +151,15 @@ export async function criarCompromissoAction(
   return { id };
 }
 
+// Compromissos são a agenda PESSOAL de cada colaborador (listarCompromissos*
+// já filtra por criado_por) — só o dono do compromisso ou um Admin/Sócio
+// pode editar/excluir. Sem isso, qualquer usuário com controles:editar
+// (Advogado(a)/Estagiário(a) por padrão) conseguia alterar/apagar a agenda
+// de qualquer colega só sabendo o UUID.
+function podeGerenciarTodosCompromissos(categoria: string): boolean {
+  return categoria === "Administrador(a)" || categoria === "Sócio(a)";
+}
+
 export async function atualizarCompromissoAction(
   id: string,
   data: CompromissoData
@@ -158,6 +167,15 @@ export async function atualizarCompromissoAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "editar"))
     throw new Error("Não autenticado");
+
+  if (!podeGerenciarTodosCompromissos(session.categoria)) {
+    const [row] = await sql`
+      SELECT criado_por FROM compromissos WHERE id = ${id}::uuid
+    `;
+    if (!row || row.criado_por !== session.login) {
+      throw new Error("Sem permissão para editar este compromisso.");
+    }
+  }
 
   await atualizarCompromisso(id, data);
 
@@ -169,6 +187,15 @@ export async function deletarCompromissoAction(id: string): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "excluir"))
     throw new Error("Não autenticado");
+
+  if (!podeGerenciarTodosCompromissos(session.categoria)) {
+    const [row] = await sql`
+      SELECT criado_por FROM compromissos WHERE id = ${id}::uuid
+    `;
+    if (!row || row.criado_por !== session.login) {
+      throw new Error("Sem permissão para excluir este compromisso.");
+    }
+  }
 
   await deletarCompromisso(id);
 

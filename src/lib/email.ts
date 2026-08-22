@@ -200,6 +200,112 @@ export async function notificarEmailRecebido({
   });
 }
 
+export async function enviarEmailEnvelopeEnviado({
+  para,
+  envelopeNome,
+  clienteNome,
+  envelopeUrl,
+  assinantes,
+  tramitaSignAtivo,
+}: {
+  para: string;
+  envelopeNome: string;
+  clienteNome: string;
+  envelopeUrl: string;
+  assinantes: { nome: string; email: string; link: string | null }[];
+  tramitaSignAtivo: boolean;
+}) {
+  const resend = getResend();
+  if (!resend) {
+    console.warn(
+      "[email] RESEND_API_KEY não configurada — notificação de envelope ignorada."
+    );
+    return;
+  }
+
+  const linhas = assinantes
+    .map(
+      (a) => `
+      <tr><td style="padding:4px 32px;">
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #005DFF;border-radius:8px;margin-bottom:8px;">
+          <tr><td style="padding:12px 14px;">
+            <p style="margin:0 0 2px;font-size:13px;font-weight:700;color:#0f172a;">${a.nome}</p>
+            <p style="margin:0;font-size:12px;color:#334155;">${a.email}</p>
+            ${
+              a.link
+                ? `<a href="${a.link}" style="display:inline-block;margin-top:8px;font-size:12px;color:#005DFF;font-weight:600;">Link de assinatura →</a>`
+                : ""
+            }
+          </td></tr>
+        </table>
+      </td></tr>`
+    )
+    .join("");
+
+  const aviso = tramitaSignAtivo
+    ? ""
+    : `<tr><td style="padding:0 32px 12px;">
+         <p style="margin:0;font-size:12px;color:#92400e;background:#fef3c7;border-radius:8px;padding:10px 14px;">
+           ⚠ Integração com TramitaSign não está configurada — os links de assinatura não foram gerados automaticamente.
+         </p>
+       </td></tr>`;
+
+  await resend.emails.send({
+    from: "LiderAdv <onboarding@resend.dev>",
+    to: para,
+    subject: `[LiderAdv] Envelope enviado — ${envelopeNome}`,
+    html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr>
+          <td style="background:linear-gradient(135deg,#000D25,#001848,#003080);padding:28px 32px;border-radius:14px 14px 0 0;">
+            <p style="margin:0;color:#8FBEFF;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">Sistema Jurídico</p>
+            <h1 style="margin:6px 0 0;color:#ffffff;font-size:22px;font-weight:700;">✍️ Envelope enviado para assinatura</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;padding:20px 32px 4px;border:1px solid #e2e8f0;border-top:none;">
+            <p style="margin:0 0 4px;font-size:14px;color:#334155;"><strong>${envelopeNome}</strong></p>
+            <p style="margin:0;font-size:13px;color:#64748b;">Cliente: ${clienteNome}</p>
+          </td>
+        </tr>
+        <tr><td style="background:#ffffff;padding:16px 0 0;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;"></td></tr>
+        ${aviso}
+        <tr>
+          <td style="background:#ffffff;padding:0;border:1px solid #e2e8f0;border-top:none;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              ${linhas}
+              <tr><td style="padding:16px 32px 20px;">
+                <div style="text-align:center;">
+                  <a href="${envelopeUrl}"
+                     style="display:inline-block;background:#005DFF;color:#ffffff;padding:13px 28px;border-radius:50px;text-decoration:none;font-weight:700;font-size:14px;">
+                    Ver envelope no sistema →
+                  </a>
+                </div>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8fafc;padding:14px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;text-align:center;">
+            <p style="margin:0;color:#94a3b8;font-size:11px;">LiderAdv — Sistema Jurídico &nbsp;|&nbsp; Notificação automática</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    text: `[LiderAdv] Envelope enviado — ${envelopeNome}\n\nCliente: ${clienteNome}\n\n${assinantes.map((a) => `${a.nome} (${a.email})${a.link ? ` — ${a.link}` : ""}`).join("\n")}\n\nVer no sistema: ${envelopeUrl}`,
+  });
+}
+
 export async function enviarEmailNovaPublicacao({
   para,
   publicacoes,

@@ -8,6 +8,8 @@ import {
   PlusIcon,
   TrashIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
 } from "@/components/icons";
 
 /* ─── types ─── */
@@ -129,6 +131,16 @@ export default function NovoEnvelope({
     setModelosSelecionados((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+  }
+
+  function moveModelo(index: number, dir: -1 | 1) {
+    setModelosSelecionados((prev) => {
+      const target = index + dir;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
 
   const modelosFiltrados = modelos.filter((m) =>
@@ -365,6 +377,55 @@ export default function NovoEnvelope({
                 );
               })}
             </ul>
+          )}
+
+          {modelosSelecionados.length > 0 && (
+            <div>
+              <p className="mb-2 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                Ordem de envio ({modelosSelecionados.length})
+              </p>
+              <ul className="space-y-1.5">
+                {modelosSelecionados.map((id, i) => {
+                  const m = modelos.find((x) => x.id === id);
+                  return (
+                    <li
+                      key={id}
+                      className="flex items-center gap-2 rounded-lg border border-border bg-slate-50 px-3 py-2"
+                    >
+                      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-body text-[11px] font-bold text-primary">
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-body text-sm text-fg">
+                        {m?.titulo ?? id}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => moveModelo(i, -1)}
+                        disabled={i === 0}
+                        className="rounded p-1 text-muted transition-colors hover:bg-white hover:text-fg disabled:opacity-30"
+                      >
+                        <ChevronUpIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveModelo(i, 1)}
+                        disabled={i === modelosSelecionados.length - 1}
+                        className="rounded p-1 text-muted transition-colors hover:bg-white hover:text-fg disabled:opacity-30"
+                      >
+                        <ChevronDownIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleModelo(id)}
+                        className="rounded p-1 text-muted transition-colors hover:bg-red-50 hover:text-red-500"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
 
           <div className="flex justify-between pt-2">

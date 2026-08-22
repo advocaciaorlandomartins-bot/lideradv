@@ -80,6 +80,7 @@ export interface EnvelopeDetalhe {
     papel: string;
     status: string;
     ordem: number;
+    tramitasignLink: string | null;
   }[];
 }
 
@@ -103,7 +104,7 @@ export async function getEnvelopeById(
       ORDER BY ordem
     `,
     sql`
-      SELECT id::text, tipo, nome, email, papel, status, ordem
+      SELECT id::text, tipo, nome, email, papel, status, ordem, tramitasign_link
       FROM envelope_assinantes
       WHERE envelope_id = ${id}::uuid
       ORDER BY ordem
@@ -132,8 +133,17 @@ export async function getEnvelopeById(
       papel: a.papel,
       status: a.status,
       ordem: a.ordem,
+      tramitasignLink: a.tramitasign_link ?? null,
     })),
   };
+}
+
+export interface AssinanteCriado {
+  id: string;
+  tipo: string;
+  nome: string;
+  email: string;
+  papel: string;
 }
 
 export async function criarEnvelope(data: {
@@ -147,7 +157,7 @@ export async function criarEnvelope(data: {
   clienteId: string;
   assinantes: AssinanteInput[];
   documentos: DocumentoInput[];
-}): Promise<string> {
+}): Promise<{ id: string; assinantes: AssinanteCriado[] }> {
   const [env] = await sql`
     INSERT INTO envelopes
       (nome, prazo, status, notif_assinantes, notif_criador, notif_escritorio, criado_por, client_id)
@@ -168,17 +178,37 @@ export async function criarEnvelope(data: {
     }
   }
 
+  const assinantesCriados: AssinanteCriado[] = [];
   if (data.assinantes.length > 0) {
     for (const a of data.assinantes) {
-      await sql`
+      const [row] = await sql`
         INSERT INTO envelope_assinantes
           (envelope_id, tipo, nome, email, papel, val_email, val_selfie, val_documento, ordem)
         VALUES
           (${envId}::uuid, ${a.tipo}, ${a.nome}, ${a.email}, ${a.papel},
            ${a.valEmail}, ${a.valSelfie}, ${a.valDocumento}, ${a.ordem})
+        RETURNING id::text
       `;
+      assinantesCriados.push({
+        id: row.id as string,
+        tipo: a.tipo,
+        nome: a.nome,
+        email: a.email,
+        papel: a.papel,
+      });
     }
   }
 
-  return envId;
+  return { id: envId, assinantes: assinantesCriados };
+}
+
+export async function atualizarAssinanteTramitaSign(
+  assinanteId: string,
+  data: { documentoId: string | null; link: string | null }
+): Promise<void> {
+  await sql`
+    UPDATE envelope_assinantes
+    SET tramitasign_documento_id = ${data.documentoId}, tramitasign_link = ${data.link}
+    WHERE id = ${assinanteId}::uuid
+  `;
 }

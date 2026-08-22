@@ -4,8 +4,10 @@ import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import {
   criarEnvelope,
+  atualizarAssinanteTramitaSign,
   type DocumentoInput,
   type AssinanteInput,
+  type AssinanteCriado,
 } from "./assinaturas-db";
 import { getClientFull } from "./clients-db";
 import { getModeloById } from "./modelos-db";
@@ -16,6 +18,7 @@ import {
   textToHtml,
   substituteVariablesInBlocks,
 } from "./modelo-blocks";
+import { enviarEmailEnvelopeEnviado } from "./email";
 import { revalidatePath } from "next/cache";
 import {
   tramitaSignAtivo,
@@ -68,6 +71,8 @@ export async function salvarEnvelopeAction(
   });
   const vars = buildModeloVars(client, escritorioConfig, date);
 
+  // A ordem de seleção no wizard já é a ordem de envio — só respeitamos o
+  // "ordem" enviado por cada item, sem reordenar aqui.
   const documentos: DocumentoInput[] = [];
   for (const m of modelosSelecionados) {
     const modelo = await getModeloById(m.modeloId);
@@ -96,7 +101,7 @@ export async function salvarEnvelopeAction(
   if (documentos.length === 0)
     throw new Error("Nenhum dos modelos selecionados foi encontrado.");
 
-  const id = await criarEnvelope({
+  const { id, assinantes: assinantesCriados } = await criarEnvelope({
     nome,
     prazo,
     status: enviar ? "aguardando" : "rascunho",
@@ -109,8 +114,7 @@ export async function salvarEnvelopeAction(
     documentos,
   });
 
-  // Sincroniza com TramitaSign quando envelope é enviado para assinatura
-  if (enviar && tramitaSignAtivo() && assinantes.length > 0) {
+  if (enviar && assinantesCriados.length > 0) {
     const documentoHtmlCombinado = documentos
       .sort((a, b) => a.ordem - b.ordem)
       .map(
@@ -119,8 +123,19 @@ export async function salvarEnvelopeAction(
       )
       .join("\n");
 
-    sincronizarTramitaSign(nome, assinantes, documentoHtmlCombinado).catch(
-      (e) => console.error("[TramitaSign] sincronização falhou:", e)
+    processarEnvioEnvelope({
+      envelopeId: id,
+      envelopeNome: nome,
+      clienteNome: client.name,
+      assinantesCriados,
+      documentoHtml: documentoHtmlCombinado,
+      notifAssinantes,
+      notifCriador,
+      notifEscritorio,
+      criadorEmail: session.login,
+      escritorioEmail: escritorioConfig.email,
+    }).catch((e) =>
+      console.error("[assinaturas] processarEnvioEnvelope falhou:", e)
     );
   }
 
@@ -128,42 +143,101 @@ export async function salvarEnvelopeAction(
   return { id };
 }
 
-async function sincronizarTramitaSign(
-  nomeEnvelope: string,
-  assinantes: Array<{
-    nome: string;
-    email: string;
-    papel: string;
-    tipo: string;
-  }>,
-  documentoHtml: string
-) {
-  try {
-    const userId = await tramitaObterUserId();
-    if (!userId) return;
+async function processarEnvioEnvelope(params: {
+  envelopeId: string;
+  envelopeNome: string;
+  clienteNome: string;
+  assinantesCriados: AssinanteCriado[];
+  documentoHtml: string;
+  notifAssinantes: boolean;
+  notifCriador: boolean;
+  notifEscritorio: boolean;
+  criadorEmail: string;
+  escritorioEmail: string | null;
+}) {
+  const {
+    envelopeId,
+    envelopeNome,
+    clienteNome,
+    assinantesCriados,
+    documentoHtml,
+    notifAssinantes,
+    notifCriador,
+    notifEscritorio,
+    criadorEmail,
+    escritorioEmail,
+  } = params;
 
-    // Envia o documento combinado pra cada assinante externo (não "eu_mesmo")
-    for (const a of assinantes) {
-      if (a.tipo === "eu_mesmo") continue;
+  const ativo = tramitaSignAtivo();
+  const resultados: { nome: string; email: string; link: string | null }[] = [];
 
-      const cliente = await tramitaCriarCliente({
-        nome: a.nome,
-        email: a.email || null,
-        telefone: null,
-        cpf: null,
-      });
-      if (!cliente?.id) continue;
+  if (ativo) {
+    try {
+      const userId = await tramitaObterUserId();
 
-      await tramitaEnviarDocumento({
-        clienteId: cliente.id,
-        userId,
-        titulo: nomeEnvelope,
-        htmlContent: documentoHtml,
-        email: a.email || null,
-        telefone: null,
-      });
+      for (const a of assinantesCriados) {
+        if (a.tipo === "eu_mesmo") continue;
+
+        const cliente = userId
+          ? await tramitaCriarCliente({
+              nome: a.nome,
+              email: a.email || null,
+              telefone: null,
+              cpf: null,
+            })
+          : null;
+
+        let link: string | null = null;
+        let documentoId: string | null = null;
+        if (cliente?.id && userId) {
+          const doc = await tramitaEnviarDocumento({
+            clienteId: cliente.id,
+            userId,
+            titulo: envelopeNome,
+            htmlContent: documentoHtml,
+            // Só pede ao TramitaSign pra notificar automaticamente
+            // (email/WhatsApp) se "Notificar assinantes" estiver marcado —
+            // o link continua sendo gerado e salvo de qualquer forma, pra
+            // poder ser copiado manualmente na tela do envelope.
+            email: notifAssinantes ? a.email || null : null,
+            telefone: null,
+          });
+          link = doc?.link ?? null;
+          documentoId = doc?.id ?? null;
+        }
+
+        await atualizarAssinanteTramitaSign(a.id, {
+          documentoId,
+          link,
+        });
+        resultados.push({ nome: a.nome, email: a.email, link });
+      }
+    } catch (e) {
+      console.error("[TramitaSign] processarEnvioEnvelope error:", e);
     }
-  } catch (e) {
-    console.error("[TramitaSign] sincronizarTramitaSign error:", e);
+  } else {
+    for (const a of assinantesCriados) {
+      if (a.tipo === "eu_mesmo") continue;
+      resultados.push({ nome: a.nome, email: a.email, link: null });
+    }
+  }
+
+  if (!notifCriador && !notifEscritorio) return;
+
+  const envelopeUrl = `https://lideradv.vercel.app/dashboard/assinaturas/${envelopeId}`;
+  const destinatarios = [
+    notifCriador ? criadorEmail : null,
+    notifEscritorio ? escritorioEmail : null,
+  ].filter((v, i, arr): v is string => v != null && arr.indexOf(v) === i);
+
+  for (const para of destinatarios) {
+    await enviarEmailEnvelopeEnviado({
+      para,
+      envelopeNome,
+      clienteNome,
+      envelopeUrl,
+      assinantes: resultados,
+      tramitaSignAtivo: ativo,
+    }).catch((e) => console.error("[email] envelope enviado falhou:", e));
   }
 }

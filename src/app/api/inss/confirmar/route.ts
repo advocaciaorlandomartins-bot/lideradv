@@ -183,7 +183,10 @@ export async function POST(req: NextRequest) {
            ${localCompleto},
            'agendado',
            ${protocolo ? `Protocolo INSS: ${protocolo}` : null})
-      `.catch(() => null);
+      `.catch((e) => {
+        console.error("[inss/confirmar] falha ao inserir pericia:", e);
+        return null;
+      });
 
       await sql`
         INSERT INTO controles
@@ -197,7 +200,13 @@ export async function POST(req: NextRequest) {
            ${session.id}::uuid,
            ${tipoServico},
            'alta')
-      `.catch(() => null);
+      `.catch((e) => {
+        console.error(
+          "[inss/confirmar] falha ao inserir controle de pericia:",
+          e
+        );
+        return null;
+      });
     }
 
     // RPV → controles como alvará
@@ -223,7 +232,10 @@ export async function POST(req: NextRequest) {
            ${tipoServico},
            'alta',
            ${valor ? JSON.stringify({ valor }) : null}::jsonb)
-      `.catch(() => null);
+      `.catch((e) => {
+        console.error("[inss/confirmar] falha ao inserir controle de RPV:", e);
+        return null;
+      });
     }
 
     // Comprovante de pagamento → implantados
@@ -249,7 +261,13 @@ export async function POST(req: NextRequest) {
            ${tipoServico},
            'alta',
            ${valor ? JSON.stringify({ valor }) : null}::jsonb)
-      `.catch(() => null);
+      `.catch((e) => {
+        console.error(
+          "[inss/confirmar] falha ao inserir controle de implantado:",
+          e
+        );
+        return null;
+      });
     }
 
     // Resultado de perícia → controles pericias
@@ -266,7 +284,13 @@ export async function POST(req: NextRequest) {
            ${session.id}::uuid,
            ${tipoServico},
            'alta')
-      `.catch(() => null);
+      `.catch((e) => {
+        console.error(
+          "[inss/confirmar] falha ao inserir controle de resultado de pericia:",
+          e
+        );
+        return null;
+      });
     }
 
     // Salva protocolo no processo se informado
@@ -275,7 +299,13 @@ export async function POST(req: NextRequest) {
         UPDATE processos
         SET protocolo_inss = ${protocolo}, updated_at = NOW()
         WHERE id = ${processoId}::uuid AND deleted_at IS NULL
-      `.catch(() => null);
+      `.catch((e) => {
+        console.error(
+          "[inss/confirmar] falha ao atualizar protocolo_inss do processo:",
+          e
+        );
+        return null;
+      });
     }
 
     // Agenda lembretes (apenas para agendamentos)

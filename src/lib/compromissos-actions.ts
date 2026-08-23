@@ -114,7 +114,13 @@ export async function criarCompromissoAction(
         colaborador,
         cliente,
         clienteResponsavel,
-      }).catch(() => null);
+      }).catch((e) => {
+        console.error(
+          "[criarCompromissoAction] falha ao agendar notificações:",
+          e
+        );
+        return null;
+      });
 
       // Cria entrada em controles → aparece em Minhas Tarefas do colaborador
       if (usuarioRows.length > 0) {
@@ -141,7 +147,13 @@ export async function criarCompromissoAction(
              ${data.clienteId ? sql`${data.clienteId}::uuid` : sql`NULL`},
              ${data.titulo},
              'normal')
-        `.catch(() => null);
+        `.catch((e) => {
+          console.error(
+            "[criarCompromissoAction] falha ao inserir controle/tarefa:",
+            e
+          );
+          return null;
+        });
       }
     }
   }

@@ -692,7 +692,10 @@ export async function agendarNotificacoesCompromisso(opts: {
            ${row.clienteId}::uuid, ${row.clienteNome},
            ${row.destinatarioTipo}, ${row.destinatarioTelefone}, ${row.destinatarioNome},
            ${row.mensagem}, ${row.enviarEm.toISOString()})
-      `.catch(() => null);
+      `.catch((e) => {
+        console.error("[lembretes] falha ao inserir lembrete agendado:", e);
+        return null;
+      });
     } else {
       await sql`
         INSERT INTO lembretes_agendados
@@ -704,7 +707,10 @@ export async function agendarNotificacoesCompromisso(opts: {
            NULL, ${row.clienteNome},
            ${row.destinatarioTipo}, ${row.destinatarioTelefone}, ${row.destinatarioNome},
            ${row.mensagem}, ${row.enviarEm.toISOString()})
-      `.catch(() => null);
+      `.catch((e) => {
+        console.error("[lembretes] falha ao inserir lembrete agendado:", e);
+        return null;
+      });
     }
   };
 

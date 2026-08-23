@@ -201,6 +201,8 @@ async function processarEnvioEnvelope(params: {
             // poder ser copiado manualmente na tela do envelope.
             email: notifAssinantes ? a.email || null : null,
             telefone: null,
+            requireSelfie: a.valSelfie,
+            requireDocument: a.valDocumento,
           });
           link = doc?.link ?? null;
           documentoId = doc?.id ?? null;

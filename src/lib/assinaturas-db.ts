@@ -144,6 +144,8 @@ export interface AssinanteCriado {
   nome: string;
   email: string;
   papel: string;
+  valSelfie: boolean;
+  valDocumento: boolean;
 }
 
 export async function criarEnvelope(data: {
@@ -195,6 +197,8 @@ export async function criarEnvelope(data: {
         nome: a.nome,
         email: a.email,
         papel: a.papel,
+        valSelfie: a.valSelfie,
+        valDocumento: a.valDocumento,
       });
     }
   }

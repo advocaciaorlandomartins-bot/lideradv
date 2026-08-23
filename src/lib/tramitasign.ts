@@ -232,6 +232,8 @@ export async function tramitaEnviarDocumento(params: {
   htmlContent: string;
   email?: string | null;
   telefone?: string | null;
+  requireSelfie?: boolean;
+  requireDocument?: boolean;
 }): Promise<{ id: string; link?: string } | null> {
   try {
     const res = await fetch(`${baseUrl()}/documentos`, {
@@ -248,6 +250,18 @@ export async function tramitaEnviarDocumento(params: {
           phone_mobile: params.telefone?.replace(/\D/g, "") ?? null,
           email: params.email ?? null,
           require_signature: true,
+          // Nomes inferidos pelo padrão já usado nos campos acima
+          // (require_signature) — a API do TramitaSign não tem
+          // documentação pública acessível pra confirmar. Enviar só
+          // quando marcado (omite quando false) é o comportamento mais
+          // seguro caso o nome do campo esteja errado: na pior hipótese a
+          // API ignora um campo desconhecido, igual ao comportamento
+          // anterior (nunca era enviado). Se a validação de
+          // selfie/documento não estiver realmente sendo exigida no link
+          // de assinatura, confirmar o nome certo com o suporte do
+          // TramitaSign e ajustar aqui.
+          ...(params.requireSelfie ? { require_selfie: true } : {}),
+          ...(params.requireDocument ? { require_document: true } : {}),
         },
       }),
     });

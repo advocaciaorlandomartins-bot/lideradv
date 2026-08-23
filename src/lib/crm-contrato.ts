@@ -3,6 +3,7 @@
  * Usada pelo webhook do TramitaSign e pelo endpoint do PrevBot.
  */
 
+import crypto from "crypto";
 import sql from "./db";
 
 export async function converterLeadAssinado(
@@ -35,15 +36,32 @@ export async function converterLeadAssinado(
 
   const urlContrato = contratoUrl || lead.contrato_url;
 
-  // 1. Cria cliente se ainda não existe
+  // 1. Cria cliente se ainda não existe. Provedores de webhook (TramitaSign
+  // incluso) reenviam o mesmo evento em timeout/resposta não-2xx — duas
+  // execuções concorrentes que leem client_id como NULL antes de qualquer
+  // UPDATE gravar criavam duas fichas de cliente/processo duplicadas
+  // silenciosamente. Sem suporte a transação neste driver, a forma de
+  // tornar "verificar + criar" atômico é um único statement: o UPDATE em
+  // crm_leads (com WHERE client_id IS NULL) só "ganha" pra uma das
+  // execuções concorrentes, e o INSERT em clients só roda quando esse
+  // UPDATE realmente afetou a linha (via WHERE EXISTS na CTE) — id gerado
+  // no app pra poder referenciá-lo nos dois lugares da mesma query.
   let clientId: string = lead.client_id ?? "";
   if (!clientId) {
+    const novoClientId = crypto.randomUUID();
     const cr = await sql`
+      WITH claim AS (
+        UPDATE crm_leads SET client_id = ${novoClientId}::uuid
+        WHERE id = ${leadId}::uuid AND client_id IS NULL
+        RETURNING client_id
+      )
       INSERT INTO clients (
-        type, name, doc, email, phone,
+        id, type, name, doc, email, phone,
         cep, street, addr_number, neighborhood, city, state,
         status, notes
-      ) VALUES (
+      )
+      SELECT
+        ${novoClientId}::uuid,
         ${lead.tipo ?? "PF"},
         ${lead.nome},
         '',
@@ -52,22 +70,38 @@ export async function converterLeadAssinado(
         '', '', '', '', '', '',
         'ativo',
         ${lead.empresa ? `Empresa: ${lead.empresa}` : null}
-      )
+      WHERE EXISTS (SELECT 1 FROM claim)
       RETURNING id::text
     `;
-    clientId = cr[0].id as string;
-    await sql`UPDATE crm_leads SET client_id = ${clientId}::uuid WHERE id = ${leadId}::uuid`;
+    if (cr.length > 0) {
+      clientId = cr[0].id as string;
+    } else {
+      // Perdeu a corrida — outra execução concorrente já criou e vinculou
+      // o cliente; lê o que ela gravou.
+      const [atual] =
+        await sql`SELECT client_id::text FROM crm_leads WHERE id = ${leadId}::uuid`;
+      clientId = String(atual?.client_id ?? "");
+    }
   }
 
-  // 2. Cria processo em Análise se ainda não existe
+  // 2. Cria processo em Análise se ainda não existe — mesma técnica do
+  // passo 1, pra fechar a mesma corrida na criação do processo.
   let processoId: string = lead.processo_id ?? "";
-  if (!processoId) {
+  if (!processoId && clientId) {
     const area = (lead.area_interesse as string | null) ?? "Previdenciário";
+    const novoProcessoId = crypto.randomUUID();
     const pr = await sql`
+      WITH claim AS (
+        UPDATE crm_leads SET processo_id = ${novoProcessoId}::uuid
+        WHERE id = ${leadId}::uuid AND processo_id IS NULL
+        RETURNING processo_id
+      )
       INSERT INTO processos (
-        client_id, lead_id, tipo_acao, area,
+        id, client_id, lead_id, tipo_acao, area,
         status, estagio_producao, data_estagio_at
-      ) VALUES (
+      )
+      SELECT
+        ${novoProcessoId}::uuid,
         ${clientId}::uuid,
         ${leadId}::uuid,
         ${area},
@@ -75,11 +109,16 @@ export async function converterLeadAssinado(
         'ativo',
         'analise',
         NOW()
-      )
+      WHERE EXISTS (SELECT 1 FROM claim)
       RETURNING id::text
     `;
-    processoId = pr[0].id as string;
-    await sql`UPDATE crm_leads SET processo_id = ${processoId}::uuid WHERE id = ${leadId}::uuid`;
+    if (pr.length > 0) {
+      processoId = pr[0].id as string;
+    } else {
+      const [atual] =
+        await sql`SELECT processo_id::text FROM crm_leads WHERE id = ${leadId}::uuid`;
+      processoId = String(atual?.processo_id ?? "");
+    }
   }
 
   // 3. Salva contrato em documentos vinculado ao cliente (idempotente)

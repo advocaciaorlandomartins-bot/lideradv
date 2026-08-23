@@ -420,21 +420,28 @@ export interface RelatorioJuridico {
 export async function getRelatorioJuridico(): Promise<RelatorioJuridico> {
   const [areaRows, controleRows, statusRows, totaisRows] = await Promise.all([
     sql`
+      -- "resultado" é texto livre digitado ao arquivar (ex: "Deferido") — não
+      -- é o campo estruturado de resultado. O real é resultado_administrativo
+      -- ('concedido'|'negado') e resultado_judicial ('procedente'|
+      -- 'improcedente'|'parcial'), preenchidos por registrarResultadoAdminAction/
+      -- registrarResultadoJudicialAction (produção-actions.ts). A versão
+      -- anterior comparava contra valores ('ganho','procedente_parcial', etc.)
+      -- que nunca existiram nessas colunas — taxa de êxito sempre dava 0,
+      -- confirmado contra produção (9 processos reais, sempre 0/0/0 antes).
       SELECT
         COALESCE(area, 'Não definida') AS area,
         COUNT(*)                        AS total,
         COUNT(*) FILTER (WHERE status = 'ativo')  AS ativos,
         COUNT(*) FILTER (
-          WHERE resultado IN ('ganho','procedente','procedente_parcial','favoravel')
-             OR resultado_judicial IN ('ganho','procedente','procedente_parcial','favoravel')
+          WHERE resultado_administrativo = 'concedido'
+             OR resultado_judicial = 'procedente'
         ) AS ganhos,
         COUNT(*) FILTER (
-          WHERE resultado IN ('perda','improcedente','desfavoravel')
-             OR resultado_judicial IN ('perda','improcedente','desfavoravel')
+          WHERE resultado_administrativo = 'negado'
+             OR resultado_judicial = 'improcedente'
         ) AS perdidos,
         COUNT(*) FILTER (
-          WHERE resultado IN ('acordo','homologado')
-             OR resultado_judicial IN ('acordo','homologado')
+          WHERE resultado_judicial = 'parcial'
         ) AS acordo
       FROM processos
       WHERE deleted_at IS NULL

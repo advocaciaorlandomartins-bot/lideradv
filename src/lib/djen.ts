@@ -136,6 +136,17 @@ export async function sincronizarDJEN(diasAtras = 7): Promise<number> {
         ? await gerarResumoIA(conteudo, item.tipoComunicacao)
         : null;
 
+      // "advogados" é text[] no banco — passar JSON.stringify(advogados)
+      // (formato "[...]") faz o Postgres rejeitar com "malformed array
+      // literal" (o formato de array do Postgres é "{...}"), o que
+      // derrubava esse INSERT inteiro. Como o único catch fica lá em cima
+      // no cron (sincronizarDJEN(...).catch(...)), o erro nunca aparecia
+      // pra ninguém: a captura de publicações via DJEN nunca tinha
+      // conseguido inserir uma linha sequer, silenciosamente, desde que
+      // foi implementada (confirmado: zero linhas com djen_id preenchido
+      // na tabela). O driver do neon serializa um array JS nativo pro
+      // formato de array do Postgres automaticamente — só passar
+      // "advogados" direto, sem JSON.stringify.
       await sql`
         INSERT INTO publicacoes
           (processo, tipo, destinatario, advogados, orgao, tribunal,
@@ -145,7 +156,7 @@ export async function sincronizarDJEN(diasAtras = 7): Promise<number> {
           ${item.numeroprocessocommascara || numero},
           ${item.tipoComunicacao || "Comunicação"},
           ${destinatario},
-          ${JSON.stringify(advogados)},
+          ${advogados},
           ${item.nomeOrgao || "TRF5"},
           ${"TRF5"},
           ${item.data_disponibilizacao}::date,

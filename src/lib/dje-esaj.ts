@@ -386,6 +386,11 @@ export async function buscarPublicacoesDjeEsaj(
   const cookie = itensBr !== null ? "" : await obterSessaoEsaj(baseUrl);
 
   for (const item of itens) {
+    // Checagem rápida pra não buscar o texto completo (fetch de rede) de
+    // uma publicação que quase certamente já existe — o INSERT abaixo é
+    // quem garante a exclusividade de fato (não há UNIQUE constraint em
+    // "conteudo", então esse SELECT sozinho não fecharia a corrida entre
+    // o cron e um clique manual de "Verificar publicações" rodando junto).
     const existe = await sql`
       SELECT 1 FROM publicacoes WHERE conteudo = ${item.url} LIMIT 1
     `;
@@ -402,15 +407,20 @@ export async function buscarPublicacoesDjeEsaj(
     // "Destinatário/Cliente"), confundindo o advogado com o cliente dele.
     // O nome certo do advogado vai em "advogados" (mesma coluna que o
     // capture do DJEN já usa) e "destinatario" fica como desconhecido.
+    // INSERT ... SELECT ... WHERE NOT EXISTS: sem UNIQUE constraint em
+    // "conteudo" pra usar ON CONFLICT, isso fecha a corrida entre o SELECT
+    // acima e o INSERT como um único statement atômico, sem precisar de
+    // migração nem mexer nas linhas já existentes.
     const inserted = await sql`
       INSERT INTO publicacoes (
         processo, tipo, destinatario, advogados, orgao, tribunal,
         disponibilizacao, status, origem, conteudo, conteudo_completo
-      ) VALUES (
+      )
+      SELECT
         ${item.processo ?? ""},
         ${item.tipo},
         ${"—"},
-        ${JSON.stringify(oab.nome_advogado ? [oab.nome_advogado] : [])},
+        ${oab.nome_advogado ? [oab.nome_advogado] : []},
         ${item.orgao},
         ${"TJ" + oab.estado},
         ${item.data}::date,
@@ -418,6 +428,8 @@ export async function buscarPublicacoesDjeEsaj(
         'automatica',
         ${item.url},
         ${textoParaResumo || null}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM publicacoes WHERE conteudo = ${item.url}
       )
       RETURNING id
     `;
@@ -433,7 +445,7 @@ export async function buscarPublicacoesDjeEsaj(
       );
     }
 
-    inseridos++;
+    if (newId) inseridos++;
   }
 
   return inseridos;

@@ -286,17 +286,33 @@ async function inserirPublicacoes(
       continue;
     }
 
-    await sql`
+    // INSERT ... SELECT ... WHERE NOT EXISTS: não existe UNIQUE constraint
+    // em (processo, tipo, disponibilizacao) pra usar ON CONFLICT (há
+    // duplicatas legadas que bloqueariam criar essa constraint agora), mas
+    // isso fecha a corrida entre o SELECT acima e o INSERT como um único
+    // statement atômico — o cron e um clique manual de "Verificar
+    // publicações" rodando ao mesmo tempo não duplicam mais a linha.
+    const inserted = await sql`
       INSERT INTO publicacoes
         (processo, tipo, destinatario, advogados, orgao, tribunal,
          disponibilizacao, status, origem, conteudo, conteudo_completo)
-      VALUES (
+      SELECT
         ${processo}, ${tipo}, ${destinatario}, ${advogados},
         ${orgao}, ${tribunal}, ${disponibilizacao}::date,
         'nao_lida', 'tramitasign', ${link}, ${conteudoCompleto}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM publicacoes
+        WHERE processo = ${processo}
+          AND tipo = ${tipo}
+          AND disponibilizacao = ${disponibilizacao}::date
       )
+      RETURNING id
     `;
-    inseridos++;
+    if (inserted.length > 0) {
+      inseridos++;
+    } else {
+      pulados++;
+    }
   }
 
   return { inseridos, pulados };

@@ -9,6 +9,11 @@ const REGISTRO_LIMIT_24H = 5;
 // Máximo de tentativas de login malsucedidas por login em 15 minutos
 const LOGIN_LIMIT_15MIN = 8;
 
+// Máximo de tentativas de login malsucedidas por IP em 15 minutos — mais
+// alto que o limite por login porque um IP de escritório legítimo pode ter
+// vários usuários reais errando a senha ao mesmo tempo.
+const LOGIN_IP_LIMIT_15MIN = 30;
+
 /**
  * Verifica se o usuário excedeu o limite de chamadas de IA.
  * Usa a tabela `ia_usage_log` para contar chamadas na última hora.
@@ -70,11 +75,17 @@ export async function registroRateLimitExcedido(ip: string): Promise<boolean> {
 }
 
 /**
- * Verifica se um login excedeu o limite de tentativas malsucedidas
- * (8 em 15 minutos) — proteção contra força bruta/credential stuffing.
+ * Verifica se um login OU o IP de origem excedeu o limite de tentativas
+ * malsucedidas — proteção contra força bruta/credential stuffing E contra
+ * password spraying (mesma senha testada contra muitos logins diferentes
+ * a partir do mesmo IP, que sozinho o limite por login não detecta, já
+ * que cada login tem contador independente).
  * Não registra nada; use `registrarLoginFalho` após uma senha incorreta.
  */
-export async function loginRateLimitExcedido(login: string): Promise<boolean> {
+export async function loginRateLimitExcedido(
+  login: string,
+  ip: string | null
+): Promise<boolean> {
   try {
     const [row] = await sql`
       SELECT COUNT(*)::int AS total
@@ -82,16 +93,31 @@ export async function loginRateLimitExcedido(login: string): Promise<boolean> {
       WHERE login = ${login}
         AND criado_em >= NOW() - INTERVAL '15 minutes'
     `;
-    return (row.total as number) >= LOGIN_LIMIT_15MIN;
+    if ((row.total as number) >= LOGIN_LIMIT_15MIN) return true;
+
+    if (ip) {
+      const [rowIp] = await sql`
+        SELECT COUNT(*)::int AS total
+        FROM login_tentativas
+        WHERE ip = ${ip}
+          AND criado_em >= NOW() - INTERVAL '15 minutes'
+      `;
+      if ((rowIp.total as number) >= LOGIN_IP_LIMIT_15MIN) return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
 }
 
 /** Registra uma tentativa de login malsucedida para o rate limit acima. */
-export async function registrarLoginFalho(login: string): Promise<void> {
+export async function registrarLoginFalho(
+  login: string,
+  ip: string | null
+): Promise<void> {
   try {
-    await sql`INSERT INTO login_tentativas (login) VALUES (${login})`;
+    await sql`INSERT INTO login_tentativas (login, ip) VALUES (${login}, ${ip})`;
     sql`DELETE FROM login_tentativas WHERE criado_em < NOW() - INTERVAL '48 hours'`.catch(
       () => {}
     );

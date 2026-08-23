@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
+import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import {
   extractPdfContent,
   isSupportedImage,
@@ -71,8 +73,18 @@ function parseJson(raw: string): AiExtractedData | null {
 
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session)
+  if (!session || !hasPermission(session, "clientes", "criar"))
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
+  if (await iaRateLimitExcedido(session.login)) {
+    return NextResponse.json(
+      {
+        error:
+          "Limite de requisições de IA excedido. Tente novamente em 1 hora.",
+      },
+      { status: 429 }
+    );
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {

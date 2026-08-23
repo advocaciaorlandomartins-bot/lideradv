@@ -54,6 +54,17 @@ export default async function EnvelopeDetalhePage({
   const envelope = await getEnvelopeById(id);
   if (!envelope) notFound();
 
+  // A listagem (listarEnvelopes) já restringe cada usuário aos envelopes
+  // que ele mesmo criou — a página de detalhe era a única exceção, e sem
+  // esse filtro qualquer usuário com assinaturas:ver conseguia abrir o
+  // envelope de outro colega só sabendo o UUID, incluindo o link de
+  // assinatura do TramitaSign (potencialmente assinando no lugar de
+  // outra pessoa). Admin/Sócio mantêm visão de todos por supervisão.
+  const podeVerTodos =
+    session.categoria === "Administrador(a)" ||
+    session.categoria === "Sócio(a)";
+  if (!podeVerTodos && envelope.criado_por !== session.login) notFound();
+
   return (
     <div className="space-y-6">
       <nav className="flex items-center gap-1.5 font-body text-sm text-muted">

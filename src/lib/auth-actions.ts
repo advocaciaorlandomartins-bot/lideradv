@@ -70,7 +70,13 @@ export async function loginAction(
     return { error: "Preencha o login e a senha para continuar." };
   }
 
-  if (await loginRateLimitExcedido(login)) {
+  const hdrs = await headers();
+  const ip =
+    hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    hdrs.get("x-real-ip") ||
+    null;
+
+  if (await loginRateLimitExcedido(login, ip)) {
     return {
       error: "Muitas tentativas de login. Tente novamente em alguns minutos.",
     };
@@ -86,7 +92,7 @@ export async function loginAction(
   const user = rows[0];
 
   if (!user) {
-    await registrarLoginFalho(login);
+    await registrarLoginFalho(login, ip);
     return { error: "Login ou senha incorretos." };
   }
   if (!user.ativo)
@@ -101,7 +107,7 @@ export async function loginAction(
   }
 
   if (!verifyPassword(senha, String(user.senha_hash))) {
-    await registrarLoginFalho(login);
+    await registrarLoginFalho(login, ip);
     return { error: "Login ou senha incorretos." };
   }
 

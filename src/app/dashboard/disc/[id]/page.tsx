@@ -12,10 +12,19 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props) {
+  // Mesma checagem de sessão/dono da página — sem isso o <title> vazava o
+  // nome do candidato pra qualquer um que soubesse o UUID, mesmo sem
+  // permissão nenhuma pra ver o corpo da página.
+  const session = await getSession();
+  if (!session || !hasPermission(session, "disc", "ver"))
+    return { title: "Não encontrado" };
+
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { title: "Não encontrado" };
-  const [t] =
-    await sql`SELECT nome_candidato FROM testes_comportamentais WHERE id = ${id}`;
+  const [t] = await sql`
+    SELECT nome_candidato FROM testes_comportamentais
+    WHERE id = ${id}::uuid AND created_by = ${session.id}::uuid
+  `;
   return {
     title: t ? `DISC — ${t.nome_candidato} — LiderAdv` : "Não encontrado",
   };
@@ -28,8 +37,15 @@ export default async function DiscDetailPage({ params }: Props) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
-  const [teste] =
-    await sql`SELECT * FROM testes_comportamentais WHERE id = ${id}`;
+  // Cada colaborador só vê os testes que ele mesmo aplicou — mesmo
+  // critério já usado em /api/disc (listagem) e /api/disc/[id] (API). A
+  // página de detalhe era a única exceção: sem esse filtro, qualquer
+  // usuário com disc:ver conseguia abrir o teste comportamental de
+  // qualquer colega só sabendo o UUID.
+  const [teste] = await sql`
+    SELECT * FROM testes_comportamentais
+    WHERE id = ${id}::uuid AND created_by = ${session.id}::uuid
+  `;
   if (!teste) notFound();
 
   return (

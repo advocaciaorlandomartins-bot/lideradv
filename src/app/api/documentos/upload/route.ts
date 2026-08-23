@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarEntidade } from "@/lib/acesso";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -102,6 +103,12 @@ export async function POST(request: Request) {
   if (!UUID_RE.test(entityId)) {
     return NextResponse.json({ error: "entityId inválido." }, { status: 400 });
   }
+
+  // hasPermission acima só checa o módulo em geral — sem isto, um usuário
+  // sem "processos_ver_todos" anexava documento em QUALQUER processo do
+  // escritório, não só nos que ele é responsável.
+  if (!(await podeAcessarEntidade(session, entityType as EntityType, entityId)))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const ext = (file.name.split(".").pop() ?? "bin").toLowerCase();
   if (

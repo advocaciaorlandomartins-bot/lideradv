@@ -94,7 +94,7 @@ export async function getAtividadesByLead(
     FROM crm_atividades a
     LEFT JOIN colaboradores col ON col.id = a.responsavel_id
     WHERE a.lead_id = ${leadId}::uuid
-    ORDER BY a.data_hora DESC
+    ORDER BY COALESCE(a.data_hora, a.created_at) DESC
   `;
   return rows.map((r) => ({
     id: r.id,
@@ -102,7 +102,9 @@ export async function getAtividadesByLead(
     tipo: r.tipo,
     titulo: r.titulo,
     descricao: r.descricao ?? null,
-    data_hora: new Date(r.data_hora).toLocaleString("pt-BR", {
+    // data_hora é opcional (createAtividadeAction insere sem ela) — sem o
+    // fallback, virava "Invalid Date" na timeline e ordenava para o topo.
+    data_hora: new Date(r.data_hora ?? r.created_at).toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",

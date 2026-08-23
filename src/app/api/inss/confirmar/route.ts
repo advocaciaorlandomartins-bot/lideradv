@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarCliente } from "@/lib/acesso";
 import sql from "@/lib/db";
 import { agendarLembretesInss } from "@/lib/lembretes";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
@@ -13,18 +15,28 @@ const TIPOS_AGENDAMENTO = new Set([
   "agendamento_generico",
 ]);
 
+const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function texto(v: unknown, max: number): string | null {
+  const s = typeof v === "string" ? v.trim().slice(0, max) : "";
+  return s || null;
+}
+
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  // Esta rota EXECUTA ações reais: cria compromisso/perícia/controle e
+  // dispara WhatsApp em nome do escritório — exige permissão de escrita.
+  if (!session || !hasPermission(session, "controles", "criar")) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
   }
 
   let body: {
     clienteId: string;
+    // clienteNome é usado só como fallback se o cliente não for encontrado
+    // no banco (não deveria acontecer); telefone e nome de contato SEMPRE
+    // vêm do banco — ver comentário mais abaixo.
     clienteNome: string;
-    telefoneCliente?: string | null;
-    telefoneResponsavel?: string | null;
-    nomeResponsavel?: string | null;
     tipoDocumento?: string | null;
     tipoServico: string;
     dataAgendamento?: string | null;
@@ -47,9 +59,6 @@ export async function POST(req: NextRequest) {
   const {
     clienteId,
     clienteNome,
-    telefoneCliente,
-    telefoneResponsavel,
-    nomeResponsavel,
     tipoDocumento,
     tipoServico,
     dataAgendamento,
@@ -81,23 +90,49 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  if (!(await podeAcessarCliente(session, clienteId))) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  }
+  if (processoId) {
+    const [proc] = await sql`
+      SELECT 1 FROM processos
+      WHERE id = ${processoId}::uuid AND client_id = ${clienteId}::uuid AND deleted_at IS NULL
+      LIMIT 1
+    `;
+    if (!proc)
+      return NextResponse.json(
+        { error: "processoId não pertence a este cliente." },
+        { status: 400 }
+      );
+  }
 
   const ehAgendamento = TIPOS_AGENDAMENTO.has(tipoDocumento ?? "");
-  const dataRef =
+  const dataRefRaw =
     dataAgendamento ?? dataEventoRaw ?? new Date().toISOString().split("T")[0];
-  const hora = horaAgendamento ?? "09:00";
-  const localCompleto = [localNome ?? "INSS", localEndereco]
-    .filter(Boolean)
-    .join(" — ");
+  const dataRef = DATA_RE.test(dataRefRaw)
+    ? dataRefRaw
+    : new Date().toISOString().split("T")[0];
+  const horaRaw = horaAgendamento ?? "09:00";
+  const hora = HORA_RE.test(horaRaw) ? horaRaw : "09:00";
+  const tipoServicoSeguro = texto(tipoServico, 200) ?? "Serviço INSS";
+  const localCompleto =
+    [texto(localNome, 150) ?? "INSS", texto(localEndereco, 300)]
+      .filter(Boolean)
+      .join(" — ") || "INSS";
+  const protocoloSeguro = texto(protocolo, 100);
 
   try {
     const escritorio = await getEscritorioConfig().catch(() => null);
     const nomeEscritorio = escritorio?.nome ?? "nosso escritório";
 
-    // Se o PrevBot não enviou o telefone do cliente, busca do banco de dados
-    let telefoneClienteEfetivo = telefoneCliente ?? null;
-    let telefoneResponsavelEfetivo = telefoneResponsavel ?? null;
-    let nomeResponsavelEfetivo = nomeResponsavel ?? null;
+    // Telefones e nome do cliente vêm SEMPRE do banco, nunca do corpo da
+    // requisição: qualquer usuário logado podia informar telefoneCliente/
+    // clienteNome arbitrários e usar esta rota como primitivo de phishing/
+    // spam via WhatsApp em nome do escritório.
+    let telefoneClienteEfetivo: string | null = null;
+    let telefoneResponsavelEfetivo: string | null = null;
+    let nomeResponsavelEfetivo: string | null = null;
+    let clienteNomeDb: string | null = null;
     // Responsável legal do cliente (menor/incapaz) — substitui contato do cliente
     let guardianTelefone: string | null = null;
     let guardianNome: string | null = null;
@@ -105,6 +140,7 @@ export async function POST(req: NextRequest) {
     {
       const dbRows = await sql`
         SELECT
+          cl.name                 AS cliente_nome,
           cl.phone                AS cliente_telefone,
           cl.responsavel_telefone AS guardian_telefone,
           cl.responsavel_nome     AS guardian_nome,
@@ -126,22 +162,28 @@ export async function POST(req: NextRequest) {
       `.catch(() => [] as Record<string, unknown>[]);
 
       const row = dbRows[0];
-      if (row) {
-        if (!telefoneClienteEfetivo && row.cliente_telefone)
-          telefoneClienteEfetivo = String(row.cliente_telefone);
-        if (!telefoneResponsavelEfetivo && row.resp_telefone)
-          telefoneResponsavelEfetivo = String(row.resp_telefone);
-        if (!nomeResponsavelEfetivo && row.resp_nome)
-          nomeResponsavelEfetivo = String(row.resp_nome);
-        // Guardião legal: substitui o telefone do cliente nos lembretes
-        if (row.guardian_telefone) {
-          guardianTelefone = String(row.guardian_telefone);
-          guardianNome = row.guardian_nome ? String(row.guardian_nome) : null;
-          // Não enviar para o menor — usar o guardião como destinatário do cliente
-          telefoneClienteEfetivo = null;
-        }
+      if (!row) {
+        return NextResponse.json(
+          { error: "Cliente não encontrado." },
+          { status: 404 }
+        );
+      }
+      clienteNomeDb = String(row.cliente_nome ?? "Cliente");
+      if (row.cliente_telefone)
+        telefoneClienteEfetivo = String(row.cliente_telefone);
+      if (row.resp_telefone)
+        telefoneResponsavelEfetivo = String(row.resp_telefone);
+      if (row.resp_nome) nomeResponsavelEfetivo = String(row.resp_nome);
+      // Guardião legal: substitui o telefone do cliente nos lembretes
+      if (row.guardian_telefone) {
+        guardianTelefone = String(row.guardian_telefone);
+        guardianNome = row.guardian_nome ? String(row.guardian_nome) : null;
+        // Não enviar para o menor — usar o guardião como destinatário do cliente
+        telefoneClienteEfetivo = null;
       }
     }
+    const clienteNomeSeguro =
+      clienteNomeDb ?? texto(clienteNome, 150) ?? "Cliente";
 
     let compromissoId: string | null = null;
 
@@ -151,12 +193,12 @@ export async function POST(req: NextRequest) {
         INSERT INTO compromissos
           (titulo, tipo, data_inicio, hora_inicio, local_link, descricao, criado_por, cliente_id)
         VALUES
-          (${tipoServico},
+          (${tipoServicoSeguro},
            'consulta',
            ${dataRef}::date,
            ${hora},
            ${localCompleto},
-           ${protocolo ? `Protocolo: ${protocolo}` : null},
+           ${protocoloSeguro ? `Protocolo: ${protocoloSeguro}` : null},
            ${session.login},
            ${clienteId}::uuid)
         RETURNING id::text
@@ -182,7 +224,7 @@ export async function POST(req: NextRequest) {
            ${hora}::time,
            ${localCompleto},
            'agendado',
-           ${protocolo ? `Protocolo INSS: ${protocolo}` : null})
+           ${protocoloSeguro ? `Protocolo INSS: ${protocoloSeguro}` : null})
       `.catch((e) => {
         console.error("[inss/confirmar] falha ao inserir pericia:", e);
         return null;
@@ -194,11 +236,11 @@ export async function POST(req: NextRequest) {
         VALUES
           ('pericias',
            ${dataRef}::date,
-           ${tipoServico},
+           ${tipoServicoSeguro},
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
            ${session.id}::uuid,
-           ${tipoServico},
+           ${tipoServicoSeguro},
            'alta')
       `.catch((e) => {
         console.error(
@@ -229,7 +271,7 @@ export async function POST(req: NextRequest) {
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
            ${session.id}::uuid,
-           ${tipoServico},
+           ${tipoServicoSeguro},
            'alta',
            ${valor ? JSON.stringify({ valor }) : null}::jsonb)
       `.catch((e) => {
@@ -258,7 +300,7 @@ export async function POST(req: NextRequest) {
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
            ${session.id}::uuid,
-           ${tipoServico},
+           ${tipoServicoSeguro},
            'alta',
            ${valor ? JSON.stringify({ valor }) : null}::jsonb)
       `.catch((e) => {
@@ -278,11 +320,11 @@ export async function POST(req: NextRequest) {
         VALUES
           ('pericias',
            ${dataRef}::date,
-           ${tipoServico},
+           ${tipoServicoSeguro},
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
            ${session.id}::uuid,
-           ${tipoServico},
+           ${tipoServicoSeguro},
            'alta')
       `.catch((e) => {
         console.error(
@@ -294,10 +336,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Salva protocolo no processo se informado
-    if (processoId && protocolo) {
+    if (processoId && protocoloSeguro) {
       await sql`
         UPDATE processos
-        SET protocolo_inss = ${protocolo}, updated_at = NOW()
+        SET protocolo_inss = ${protocoloSeguro}, updated_at = NOW()
         WHERE id = ${processoId}::uuid AND deleted_at IS NULL
       `.catch((e) => {
         console.error(
@@ -314,7 +356,7 @@ export async function POST(req: NextRequest) {
       await agendarLembretesInss({
         compromissoId,
         clienteId,
-        clienteNome,
+        clienteNome: clienteNomeSeguro,
         telefoneCliente: telefoneClienteEfetivo,
         telefoneResponsavel: telefoneResponsavelEfetivo,
         nomeResponsavel: nomeResponsavelEfetivo,
@@ -325,9 +367,9 @@ export async function POST(req: NextRequest) {
             : null,
         dataEvento: dataEventoDate,
         horaEvento: hora,
-        tipoServico,
+        tipoServico: tipoServicoSeguro,
         local: localCompleto,
-        protocolo: protocolo ?? undefined,
+        protocolo: protocoloSeguro ?? undefined,
         escritorio: nomeEscritorio,
       });
 
@@ -341,16 +383,18 @@ export async function POST(req: NextRequest) {
       // Determina o destinatário: guardião (menor/incapaz) ou cliente
       const destTelefone = guardianTelefone ?? telefoneClienteEfetivo;
       const destPrimeiroNome =
-        (guardianNome ?? clienteNome).split(" ")[0] ?? "";
+        (guardianNome ?? clienteNomeSeguro).split(" ")[0] ?? "";
 
       if (destTelefone) {
         const prefixo = guardianTelefone
-          ? `*Agendamento de: ${clienteNome}*\n\n`
+          ? `*Agendamento de: ${clienteNomeSeguro}*\n\n`
           : "";
-        const linhaProtocolo = protocolo ? `\n🔢 Protocolo: ${protocolo}` : "";
+        const linhaProtocolo = protocoloSeguro
+          ? `\n🔢 Protocolo: ${protocoloSeguro}`
+          : "";
         const mensagem =
           `${prefixo}Olá ${destPrimeiroNome}! 👋 O ${nomeEscritorio} acabou de registrar um agendamento no INSS.\n\n` +
-          `*${tipoServico}*\n\n` +
+          `*${tipoServicoSeguro}*\n\n` +
           `📅 Data: ${dataFormatada}\n` +
           `🕐 Hora: ${hora}\n` +
           `📍 Local: ${localCompleto}` +

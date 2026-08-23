@@ -28,7 +28,13 @@ export async function GET(req: Request) {
         WHERE NOT l.enviado
           AND l.enviar_em <= NOW()
           AND l.tentativas < 3
-          AND (c.id IS NULL OR c.bloquear_mensagens IS NOT TRUE)
+          -- deleted_at: clientes excluídos (soft delete) continuavam
+          -- recebendo cobrança e lembretes automáticos, porque a exclusão
+          -- não baixava os lembretes já agendados.
+          AND (
+            c.id IS NULL
+            OR (c.bloquear_mensagens IS NOT TRUE AND c.deleted_at IS NULL)
+          )
         ORDER BY l.enviar_em ASC
         LIMIT ${BATCH}
         FOR UPDATE OF l SKIP LOCKED

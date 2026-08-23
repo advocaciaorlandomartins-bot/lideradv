@@ -331,7 +331,18 @@ async function executarFerramenta(
     }
 
     case "adicionar_oab": {
-      const { numero, estado, nome_advogado } = input;
+      const numero = String(input.numero ?? "").replace(/\D/g, "");
+      const estado = String(input.estado ?? "")
+        .toUpperCase()
+        .slice(0, 2);
+      const nome_advogado = input.nome_advogado
+        ? String(input.nome_advogado).trim().slice(0, 120)
+        : null;
+      if (!numero || !/^[A-Z]{2}$/.test(estado))
+        return JSON.stringify({
+          ok: false,
+          mensagem: "Número da OAB ou UF inválidos.",
+        });
       const existe =
         await sql`SELECT id FROM oabs_monitoradas WHERE numero = ${numero} AND estado = ${estado}`;
       if (existe.length > 0)
@@ -360,7 +371,10 @@ async function executarFerramenta(
     }
 
     case "atualizar_escritorio": {
-      const { campo, valor } = input;
+      const campo = String(input.campo ?? "");
+      const valor = String(input.valor ?? "")
+        .trim()
+        .slice(0, 300);
       switch (campo) {
         case "telefone":
           await sql`UPDATE escritorio_config SET telefone = ${valor}`;
@@ -405,8 +419,23 @@ async function executarFerramenta(
     }
 
     case "testar_whatsapp": {
-      const { telefone, mensagem } = input;
-      const resultado = await enviarMensagemDireta({ telefone, mensagem });
+      // Os argumentos vêm do modelo, que por sua vez é guiado por texto do
+      // usuário — valida formato e tamanho antes de disparar de verdade.
+      const digitos = String(input.telefone ?? "").replace(/\D/g, "");
+      if (digitos.length < 10 || digitos.length > 13)
+        return JSON.stringify({
+          ok: false,
+          error: "Telefone inválido (informe DDD + número).",
+        });
+      const mensagem = String(input.mensagem ?? "")
+        .trim()
+        .slice(0, 1000);
+      if (!mensagem)
+        return JSON.stringify({ ok: false, error: "Mensagem vazia." });
+      const resultado = await enviarMensagemDireta({
+        telefone: digitos,
+        mensagem,
+      });
       return JSON.stringify(resultado);
     }
 
@@ -559,6 +588,46 @@ async function executarFerramenta(
   }
 }
 
+const MAX_MENSAGENS = 30;
+const MAX_CHARS_TEXTO = 8000;
+
+/**
+ * O cliente envia o histórico inteiro. Aceitamos apenas texto simples em turnos
+ * user/assistant: blocos `tool_use`/`tool_result` forjados deixariam o chamador
+ * inventar resultados de ferramentas (ex: fingir que uma checagem passou) e
+ * conduzir o agente a executar ações reais com premissas falsas.
+ */
+function sanitizarHistorico(raw: unknown): Anthropic.MessageParam[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: Anthropic.MessageParam[] = [];
+  for (const m of raw.slice(-MAX_MENSAGENS)) {
+    if (!m || typeof m !== "object") continue;
+    const { role, content } = m as { role?: unknown; content?: unknown };
+    if (role !== "user" && role !== "assistant") continue;
+
+    let texto = "";
+    if (typeof content === "string") texto = content;
+    else if (Array.isArray(content))
+      texto = content
+        .filter(
+          (b): b is { type: "text"; text: string } =>
+            !!b &&
+            typeof b === "object" &&
+            (b as { type?: unknown }).type === "text" &&
+            typeof (b as { text?: unknown }).text === "string"
+        )
+        .map((b) => b.text)
+        .join("\n");
+
+    texto = texto.trim().slice(0, MAX_CHARS_TEXTO);
+    if (!texto) continue;
+    out.push({ role, content: texto });
+  }
+  // A API exige que a conversa comece com um turno de usuário.
+  while (out.length && out[0].role !== "user") out.shift();
+  return out.length ? out : null;
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 const SYSTEM = `Você é o Agente do Sistema LiderAdv — um assistente com poderes para executar ações reais no sistema jurídico.
@@ -580,11 +649,13 @@ Seja conciso e direto. Confirme o que foi feito.`;
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session || !hasPermission(session, "configuracoes", "ver")) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  // O agente EXECUTA ações destrutivas (remove OABs, altera dados do
+  // escritório, dispara WhatsApp) — exige permissão de escrita, não de leitura.
+  if (!session || !hasPermission(session, "configuracoes", "editar")) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
   }
 
-  if (await iaRateLimitExcedido(session.login)) {
+  if (await iaRateLimitExcedido(session.login))
     return NextResponse.json(
       {
         error:
@@ -592,23 +663,17 @@ export async function POST(req: NextRequest) {
       },
       { status: 429 }
     );
-  }
 
-  let messages: Anthropic.MessageParam[];
-  try {
-    ({ messages } = (await req.json()) as {
-      messages: Anthropic.MessageParam[];
-    });
-  } catch {
-    return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
-  }
-  if (!messages?.length)
+  const body = (await req.json().catch(() => null)) as {
+    messages?: unknown;
+  } | null;
+
+  const currentMessages = sanitizarHistorico(body?.messages);
+  if (!currentMessages)
     return NextResponse.json(
       { error: "Mensagens inválidas." },
       { status: 400 }
     );
-
-  const currentMessages = [...messages];
 
   try {
     for (let i = 0; i < 6; i++) {

@@ -65,11 +65,13 @@ export async function getEstagioSnapshotByResponsavel(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapRow(r: any): ProcessoProducao {
-  const dataEstagio = new Date(r.data_estagio_at);
-  const dias = Math.max(
-    0,
-    Math.floor((Date.now() - dataEstagio.getTime()) / (1000 * 60 * 60 * 24))
+  // Processos anteriores à Linha de Produção não têm data_estagio_at —
+  // sem o fallback, o card mostrava "NaN dias".
+  const dataEstagio = new Date(r.data_estagio_at ?? r.created_at ?? Date.now());
+  const diasCalc = Math.floor(
+    (Date.now() - dataEstagio.getTime()) / (1000 * 60 * 60 * 24)
   );
+  const dias = Number.isFinite(diasCalc) ? Math.max(0, diasCalc) : 0;
   return {
     id: r.id,
     client_id: r.client_id,

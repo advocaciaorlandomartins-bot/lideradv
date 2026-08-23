@@ -3,6 +3,7 @@ import { head } from "@vercel/blob";
 import JSZip from "jszip";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarEntidade } from "@/lib/acesso";
 import sql from "@/lib/db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 
@@ -99,6 +100,12 @@ export async function POST(request: Request) {
       { status: 404 }
     );
   }
+
+  // hasPermission acima só checa o módulo em geral — sem isto, um usuário
+  // sem "processos_ver_todos" baixava em lote os documentos de QUALQUER
+  // processo do escritório, não só dos que ele é responsável.
+  if (!(await podeAcessarEntidade(session, entityType as EntityType, entityId)))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const todos = await getDocumentosByEntityId(
     entityType as EntityType,

@@ -31,6 +31,13 @@ export default async function RelatoriosPage() {
   const podeVerClientes =
     hasPermission(session, "relatorios_clientes", "ver") ||
     hasPermission(session, "relatorios_recibo", "ver");
+  const podeVerExtrato = hasPermission(session, "relatorios_extrato", "ver");
+  const podeVerFluxo = hasPermission(session, "relatorios_fluxo", "ver");
+  // O extrato completo (lançamentos individuais, com descrição e cliente)
+  // também alimenta as abas Por Cliente e Recibo, além do Painel (prévia
+  // de 8 itens) — então precisa ficar disponível se qualquer uma dessas
+  // sub-permissões estiver ligada, não só relatorios_extrato isoladamente.
+  const podeVerLancamentos = podeVerExtrato || podeVerClientes;
 
   const [
     lancamentos,
@@ -42,10 +49,10 @@ export default async function RelatoriosPage() {
     clientesComDados,
     juridico,
   ] = await Promise.all([
-    getRelatorioLancamentos({}),
+    podeVerLancamentos ? getRelatorioLancamentos({}) : Promise.resolve([]),
     getRelatorioResumo({}),
     podeVerFolha ? getRelatorioRemuneracoes({}) : Promise.resolve([]),
-    getFluxoMensal(12),
+    podeVerFluxo ? getFluxoMensal(12) : Promise.resolve([]),
     getColaboradoresParaRelatorio(),
     getEscritorioConfig(),
     podeVerClientes ? getClientesParaRecibo() : Promise.resolve([]),

@@ -34,6 +34,23 @@ function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// buildReciboHtml monta o recibo via document.write numa janela same-origin
+// (tem acesso a cookies não-HttpOnly, window.opener, fetch autenticado) —
+// nome/CPF/telefone/cidade do cliente e descrição do lançamento vêm de
+// dados editáveis por qualquer usuário com clientes:editar ou
+// financeiro:criar/editar, então precisam ser escapados antes de entrar no
+// HTML, senão viram XSS armazenado disparado quando outro usuário emite o
+// recibo desse cliente.
+function escapeHtml(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const STATUS_LABELS: Record<string, string> = {
   pendente: "Pendente",
   pago: "Pago",
@@ -1413,7 +1430,7 @@ function buildReciboHtml(
         <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;">
           <span style="background:${isEntrada ? "#dcfce7" : "#fee2e2"};color:${isEntrada ? "#166534" : "#991b1b"};padding:2px 6px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:0.3px;">${isEntrada ? "Honorário" : "Despesa"}</span>
         </td>
-        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:#0f172a;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.descricao}${r.processo_tipo ? ` <span style="color:#64748b;font-size:9px;">(${r.processo_tipo})</span>` : ""}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;color:#0f172a;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.descricao)}${r.processo_tipo ? ` <span style="color:#64748b;font-size:9px;">(${escapeHtml(r.processo_tipo)})</span>` : ""}</td>
         <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:700;text-align:right;color:${valorColor};">${isEntrada ? "" : "−"}${fmt(r.valor)}</td>
         <td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;text-align:center;">
           <span style="background:${isPago ? "#dcfce7" : "#fef3c7"};color:${isPago ? "#166534" : "#92400e"};padding:2px 6px;border-radius:20px;font-size:8px;font-weight:700;">${isPago ? "Pago" : "Pendente"}</span>
@@ -1433,7 +1450,7 @@ function buildReciboHtml(
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Demonstrativo — ${cliente.name}</title>
+  <title>Demonstrativo — ${escapeHtml(cliente.name)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Times New Roman', Times, serif; color: #1e293b; }
@@ -1505,10 +1522,10 @@ function buildReciboHtml(
     <div style="display:flex;gap:10px;margin-bottom:10px;">
       <div style="flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:8px 10px;">
         <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:1px;margin-bottom:4px;">Dados do Cliente</div>
-        <div style="font-size:13px;font-weight:700;color:#0f172a;">${cliente.name}</div>
-        <div style="font-size:10px;color:#374151;margin-top:1px;">${cliente.type === "PF" ? "CPF" : "CNPJ"}: ${cliente.doc}</div>
-        ${cliente.phone ? `<div style="font-size:10px;color:#374151;">${cliente.phone}</div>` : ""}
-        ${cliente.city ? `<div style="font-size:10px;color:#374151;">${cliente.city}${cliente.state ? `/${cliente.state}` : ""}</div>` : ""}
+        <div style="font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(cliente.name)}</div>
+        <div style="font-size:10px;color:#374151;margin-top:1px;">${cliente.type === "PF" ? "CPF" : "CNPJ"}: ${escapeHtml(cliente.doc)}</div>
+        ${cliente.phone ? `<div style="font-size:10px;color:#374151;">${escapeHtml(cliente.phone)}</div>` : ""}
+        ${cliente.city ? `<div style="font-size:10px;color:#374151;">${escapeHtml(cliente.city)}${cliente.state ? `/${escapeHtml(cliente.state)}` : ""}</div>` : ""}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;">
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:7px 12px;text-align:center;">

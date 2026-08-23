@@ -21,17 +21,20 @@ const LOGIN_IP_LIMIT_15MIN = 30;
  */
 export async function iaRateLimitExcedido(userLogin: string): Promise<boolean> {
   try {
-    const [row] = await sql`
-      SELECT COUNT(*)::int AS total
-      FROM ia_usage_log
-      WHERE user_login = ${userLogin}
-        AND criado_em  >= NOW() - INTERVAL '1 hour'
-    `;
-
-    if ((row.total as number) >= IA_LIMIT_POR_HORA) return true;
-
-    await sql`
-      INSERT INTO ia_usage_log (user_login) VALUES (${userLogin})
+    // INSERT ... WHERE (contagem) < limite, atômico num único statement —
+    // a versão anterior fazia SELECT COUNT depois INSERT em dois round
+    // trips separados; requisições simultâneas do mesmo usuário liam a
+    // mesma contagem antes de qualquer uma gravar, deixando passar um
+    // pouco além do limite exato sob concorrência.
+    const inserted = await sql`
+      INSERT INTO ia_usage_log (user_login)
+      SELECT ${userLogin}
+      WHERE (
+        SELECT COUNT(*) FROM ia_usage_log
+        WHERE user_login = ${userLogin}
+          AND criado_em  >= NOW() - INTERVAL '1 hour'
+      ) < ${IA_LIMIT_POR_HORA}
+      RETURNING id
     `;
 
     // Limpa registros antigos (> 2 horas) para não crescer indefinidamente
@@ -39,7 +42,7 @@ export async function iaRateLimitExcedido(userLogin: string): Promise<boolean> {
       () => {}
     );
 
-    return false;
+    return inserted.length === 0;
   } catch {
     // Em caso de erro no DB, deixa passar para não bloquear o serviço
     return false;
@@ -52,23 +55,24 @@ export async function iaRateLimitExcedido(userLogin: string): Promise<boolean> {
  */
 export async function registroRateLimitExcedido(ip: string): Promise<boolean> {
   try {
-    const [row] = await sql`
-      SELECT COUNT(*)::int AS total
-      FROM registro_tentativas
-      WHERE ip = ${ip}
-        AND criado_em >= NOW() - INTERVAL '24 hours'
+    // Mesmo padrão atômico de iaRateLimitExcedido acima.
+    const inserted = await sql`
+      INSERT INTO registro_tentativas (ip)
+      SELECT ${ip}
+      WHERE (
+        SELECT COUNT(*) FROM registro_tentativas
+        WHERE ip = ${ip}
+          AND criado_em >= NOW() - INTERVAL '24 hours'
+      ) < ${REGISTRO_LIMIT_24H}
+      RETURNING id
     `;
-
-    if ((row.total as number) >= REGISTRO_LIMIT_24H) return true;
-
-    await sql`INSERT INTO registro_tentativas (ip) VALUES (${ip})`;
 
     // Limpeza assíncrona de registros antigos (> 48h)
     sql`DELETE FROM registro_tentativas WHERE criado_em < NOW() - INTERVAL '48 hours'`.catch(
       () => {}
     );
 
-    return false;
+    return inserted.length === 0;
   } catch {
     return false;
   }

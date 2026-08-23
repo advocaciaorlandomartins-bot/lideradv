@@ -317,6 +317,13 @@ export interface FluxoMensal {
 }
 
 export async function getFluxoMensal(meses = 12): Promise<FluxoMensal[]> {
+  // Sem teto superior, isso trazia lançamentos vencendo anos no futuro
+  // (parcelamentos longos) e, principalmente, as linhas de "aguardando
+  // resultado" que usam 9999-12-31 como data_vencimento sentinela (ver
+  // lancamento-actions.ts) — confirmado contra produção: a query sem
+  // limite superior retornava dados de 2026 até 2030 mais um "mês"
+  // 9999-12, quando o rótulo na tela promete "Últimos N meses". Limitado
+  // ao fim do mês corrente.
   const rows = await sql`
     SELECT
       to_char(data_vencimento, 'YYYY-MM')   AS mes_iso,
@@ -328,6 +335,7 @@ export async function getFluxoMensal(meses = 12): Promise<FluxoMensal[]> {
     FROM lancamentos
     WHERE status != 'cancelado'
       AND data_vencimento >= (NOW() - (${meses} || ' months')::interval)::date
+      AND data_vencimento <  (date_trunc('month', NOW()) + INTERVAL '1 month')
     GROUP BY mes_iso, mes_label
     ORDER BY mes_iso ASC
   `;

@@ -11,6 +11,9 @@ import LeadForm from "@/components/dashboard/crm/lead-form";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface Props {
   params: Promise<{ id: string }>;
 }
@@ -20,6 +23,8 @@ export default async function EditarLeadPage({ params }: Props) {
   if (!session || !hasPermission(session, "crm", "editar")) notFound();
 
   const { id } = await params;
+  if (!UUID_RE.test(id)) notFound();
+
   const [lead, colaboradores] = await Promise.all([
     getLeadById(id),
     getAllColaboradores(),

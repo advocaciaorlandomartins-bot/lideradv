@@ -9,6 +9,9 @@ import { podeGerenciarLead } from "./crm-ownership";
 
 export type CrmFormState = { error?: string; success?: boolean } | null;
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // ── Leads ─────────────────────────────────────────────────────────────────────
 
 export async function createLeadAction(
@@ -86,7 +89,7 @@ export async function updateLeadAction(
     ((formData.get("responsavel_id") as string) ?? "").trim() || null;
   const notas = ((formData.get("notas") as string) ?? "").trim() || null;
 
-  if (!id) return { error: "ID inválido." };
+  if (!id || !UUID_RE.test(id)) return { error: "ID inválido." };
   if (!nome) return { error: "Nome é obrigatório." };
   if (!(await podeGerenciarLead(session, id)))
     return { error: "Este lead está atribuído a outro colaborador." };
@@ -186,6 +189,7 @@ export async function moveLeadEstagioAction(
 ): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "crm", "editar")) return;
+  if (!UUID_RE.test(id)) return;
   if (!(await podeGerenciarLead(session, id))) return;
 
   await sql`
@@ -203,6 +207,7 @@ export async function moveLeadEstagioAction(
 export async function deleteLeadAction(id: string): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "crm", "excluir")) return;
+  if (!UUID_RE.test(id)) return;
   if (!(await podeGerenciarLead(session, id))) return;
 
   await sql`DELETE FROM crm_leads WHERE id = ${id}::uuid`;
@@ -221,6 +226,7 @@ export async function convertLeadToClientAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "crm", "editar"))
     return { error: "Sem permissão." };
+  if (!UUID_RE.test(leadId)) return { error: "ID inválido." };
   if (!(await podeGerenciarLead(session, leadId)))
     return { error: "Este lead está atribuído a outro colaborador." };
 
@@ -300,6 +306,7 @@ export async function deleteAtividadeAction(
 ): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "crm", "excluir")) return;
+  if (!UUID_RE.test(id) || !UUID_RE.test(leadId)) return;
   if (!(await podeGerenciarLead(session, leadId))) return;
 
   await sql`DELETE FROM crm_atividades WHERE id = ${id}::uuid`;
@@ -366,6 +373,7 @@ export async function toggleTarefaAction(
 ): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "crm", "editar")) return;
+  if (!UUID_RE.test(id) || !UUID_RE.test(leadId)) return;
   if (!(await podeGerenciarLead(session, leadId))) return;
 
   await sql`
@@ -382,6 +390,7 @@ export async function deleteTarefaAction(
 ): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "crm", "excluir")) return;
+  if (!UUID_RE.test(id) || !UUID_RE.test(leadId)) return;
   if (!(await podeGerenciarLead(session, leadId))) return;
 
   await sql`DELETE FROM crm_tarefas WHERE id = ${id}::uuid`;

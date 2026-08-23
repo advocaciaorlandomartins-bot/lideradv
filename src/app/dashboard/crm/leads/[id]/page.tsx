@@ -15,6 +15,9 @@ import LeadDetail from "@/components/dashboard/crm/lead-detail";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface Props {
   params: Promise<{ id: string }>;
 }
@@ -24,6 +27,8 @@ export default async function LeadDetailPage({ params }: Props) {
   if (!session || !hasPermission(session, "crm", "ver")) notFound();
 
   const { id } = await params;
+  if (!UUID_RE.test(id)) notFound();
+
   const [lead, atividades, tarefas, colaboradores] = await Promise.all([
     getLeadById(id),
     getAtividadesByLead(id),

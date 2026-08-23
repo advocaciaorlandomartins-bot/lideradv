@@ -52,7 +52,8 @@ interface PubNormalizada {
   orgao: string;
   link: string | null;
   disponibilizacao: string;
-  destinatario: string | null;
+  destinatario: string;
+  advogados: string[];
   conteudoCompleto: string | null;
   resumo: string | null;
   prazo: number | null;
@@ -104,7 +105,16 @@ function normalizarV2(pub: PublicacaoTramitaV2): PubNormalizada | null {
     orgao: pub.nomeOrgao ?? "—",
     link: pub.link ?? null,
     disponibilizacao,
-    destinatario: pub.destinatarios?.[0]?.nome ?? null,
+    // "destinatario" é NOT NULL no banco — publicações de edital/despacho
+    // genérico sem parte nomeada chegam sem destinatarios[], e mandar null
+    // aqui derrubava o INSERT inteiro (constraint violation) sem try/catch
+    // ao redor, perdendo a publicação (e as seguintes do mesmo lote, já
+    // que o erro subia cru e abortava o handler). Mesmo fallback "—" já
+    // usado em dje-esaj.ts pro mesmo caso.
+    destinatario: pub.destinatarios?.[0]?.nome ?? "—",
+    // V2 não traz destinatarioadvogados (só existe no formato v1) — não dá
+    // pra inventar esse dado.
+    advogados: [],
     conteudoCompleto: pub.texto ?? null,
     resumo: null,
     prazo: null,
@@ -124,7 +134,10 @@ function normalizarV1(pub: PublicacaoTramitaV1): PubNormalizada | null {
     orgao: pub.data?.nomeOrgao ?? "—",
     link: pub.data?.link ?? null,
     disponibilizacao: disponibilizacao.slice(0, 10),
-    destinatario: pub.data?.destinatarios?.[0]?.nome ?? null,
+    destinatario: pub.data?.destinatarios?.[0]?.nome ?? "—",
+    advogados: (pub.data?.destinatarioadvogados ?? [])
+      .map((d) => d.advogado?.nome)
+      .filter((n): n is string => !!n),
     conteudoCompleto: pub.sanitized_text ?? null,
     resumo: pub.summary?.resumo ?? null,
     prazo: pub.summary?.prazo ?? null,
@@ -224,43 +237,55 @@ export async function POST(request: Request) {
       link,
       disponibilizacao,
       destinatario,
+      advogados,
       conteudoCompleto,
       resumo,
       prazo,
       acaoNecessaria,
     } = pub;
 
-    const existe = await sql`
-      SELECT 1 FROM publicacoes
-      WHERE processo = ${processo}
-        AND tipo = ${tipo}
-        AND disponibilizacao = ${disponibilizacao}::date
-      LIMIT 1
-    `;
-    if (existe.length > 0) continue;
+    // Uma publicação com erro (ex: violação de constraint) não pode
+    // derrubar o lote inteiro — webhooks costumam vir em batch, e antes
+    // uma exceção aqui subia crua e abortava as publicações restantes do
+    // mesmo request sem inserir nenhuma delas.
+    let newId: number | undefined;
+    try {
+      // INSERT ... SELECT ... WHERE NOT EXISTS: fecha a corrida entre
+      // reentregas do mesmo webhook (o provedor reenvia em timeout/não-2xx)
+      // como um único statement atômico, sem precisar de UNIQUE constraint.
+      const rows = await sql`
+        INSERT INTO publicacoes
+          (processo, tipo, destinatario, advogados, orgao, tribunal,
+           disponibilizacao, status, origem, conteudo, conteudo_completo)
+        SELECT
+          ${processo},
+          ${tipo},
+          ${destinatario},
+          ${advogados},
+          ${orgao},
+          ${tribunal},
+          ${disponibilizacao}::date,
+          'nao_lida',
+          'tramitasign',
+          ${link},
+          ${conteudoCompleto}
+        WHERE NOT EXISTS (
+          SELECT 1 FROM publicacoes
+          WHERE processo = ${processo}
+            AND tipo = ${tipo}
+            AND disponibilizacao = ${disponibilizacao}::date
+        )
+        RETURNING id
+      `;
+      newId = rows[0]?.id as number | undefined;
+    } catch (err) {
+      console.error("[webhook/tramitasign] erro ao inserir publicação:", err);
+      continue;
+    }
 
-    const rows = await sql`
-      INSERT INTO publicacoes
-        (processo, tipo, destinatario, advogados, orgao, tribunal,
-         disponibilizacao, status, origem, conteudo, conteudo_completo)
-      VALUES (
-        ${processo},
-        ${tipo},
-        ${destinatario},
-        ${[] as string[]},
-        ${orgao},
-        ${tribunal},
-        ${disponibilizacao}::date,
-        'nao_lida',
-        'tramitasign',
-        ${link},
-        ${conteudoCompleto}
-      )
-      RETURNING id
-    `;
-    const newId = rows[0]?.id;
+    if (!newId) continue; // já existia (WHERE NOT EXISTS não inseriu)
 
-    if (newId && resumo) {
+    if (resumo) {
       const resumoIa = JSON.stringify({
         texto: resumo,
         prazo_dias: prazo,

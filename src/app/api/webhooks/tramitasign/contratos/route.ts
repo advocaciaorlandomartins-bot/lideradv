@@ -33,10 +33,7 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const sig = request.headers.get("x-webhook-signature") ?? "";
   if (!verificarAssinatura(rawBody, sig, secret)) {
-    return NextResponse.json(
-      { error: "Assinatura inválida" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Assinatura inválida" }, { status: 401 });
   }
 
   let payload: Record<string, unknown>;
@@ -87,10 +84,49 @@ export async function POST(request: Request) {
   `;
 
   if (updated.length === 0) {
-    return NextResponse.json(
-      { ok: false, message: `Nenhum lead com contrato_id '${contratoId}'` },
-      { status: 404 }
-    );
+    // Mesmo evento "documento assinado" do TramitaSign também é usado pelo
+    // fluxo de Assinaturas (envelopes) — os dois recursos criam documento
+    // via tramitaEnviarDocumento e recebem o callback aqui. Sem este
+    // branch, nenhum envelope_assinantes/envelopes jamais saía do status
+    // inicial ('pendente'/'aguardando'): não havia UPDATE de status em
+    // lugar nenhum do código pra esse caso, e o painel de Assinaturas
+    // ficava mostrando "aguardando" pra sempre, mesmo já assinado.
+    const assinanteAtualizado = await sql`
+      UPDATE envelope_assinantes
+      SET status = 'assinado', assinado_em = COALESCE(assinado_em, now())
+      WHERE tramitasign_documento_id = ${String(contratoId)}
+      RETURNING id::text, envelope_id::text
+    `;
+
+    if (assinanteAtualizado.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `Nenhum lead ou assinante com contrato_id '${contratoId}'`,
+        },
+        { status: 404 }
+      );
+    }
+
+    const envelopeId = assinanteAtualizado[0].envelope_id as string;
+    const pendentes = await sql`
+      SELECT COUNT(*)::int AS c FROM envelope_assinantes
+      WHERE envelope_id = ${envelopeId}::uuid AND status != 'assinado'
+    `;
+
+    if (Number(pendentes[0]?.c ?? 1) === 0) {
+      await sql`
+        UPDATE envelopes SET status = 'concluido', atualizado_em = now()
+        WHERE id = ${envelopeId}::uuid AND status != 'concluido'
+      `;
+    }
+
+    return NextResponse.json({
+      ok: true,
+      envelope_id: envelopeId,
+      assinante_id: assinanteAtualizado[0].id,
+      pendentes: Number(pendentes[0]?.c ?? 0),
+    });
   }
 
   const lead = updated[0] as {

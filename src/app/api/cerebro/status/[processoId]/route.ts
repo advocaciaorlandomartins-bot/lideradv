@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { calcularCompletudeLive } from "@/lib/cerebroJuridico";
+import { podeAcessarProcesso } from "@/lib/acesso";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,9 @@ export async function GET(
 
   if (!UUID_RE.test(processoId)) {
     return NextResponse.json({ analises: [], completude_atual: null });
+  }
+  if (!(await podeAcessarProcesso(session, processoId))) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   try {

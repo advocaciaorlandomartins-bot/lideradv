@@ -104,7 +104,10 @@ export function ProcuracaoDoc({
   const tipoDoc = client.type === "PF" ? "CPF" : "CNPJ";
   const qualificacao =
     client.type === "PF"
-      ? `pessoa física, portador(a) do CPF nº ${client.doc}${client.birth_date ? `, nascido(a) em ${new Date(client.birth_date).toLocaleDateString("pt-BR")}` : ""}`
+      ? // birth_date é "YYYY-MM-DD" (sem hora) — o Date parseia como UTC
+        // meia-noite; formatar sem timeZone:"UTC" retrocede um dia em
+        // qualquer ambiente a oeste de Greenwich (inclusive dev no Brasil).
+        `pessoa física, portador(a) do CPF nº ${client.doc}${client.birth_date ? `, nascido(a) em ${new Date(client.birth_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}` : ""}`
       : `pessoa jurídica, inscrita no CNPJ sob o nº ${client.doc}`;
 
   return (

@@ -15,6 +15,35 @@ const CRONS = [
   "/api/cerebro/scheduler",
 ];
 
+/**
+ * Base URL das chamadas internas.
+ *
+ * ATENÇÃO: antes isto era derivado do header `Host` da requisição. Como o
+ * CRON_SECRET vai no header Authorization dessas chamadas, um `Host`
+ * forjado fazia o servidor entregar o segredo a um host arbitrário (SSRF +
+ * vazamento de credencial). Agora só usamos variáveis de ambiente do deploy.
+ */
+function baseUrlInterna(): string | null {
+  const explicito = (
+    process.env.APP_BASE_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    ""
+  ).trim();
+  if (explicito) return explicito.replace(/\/+$/, "");
+
+  const vercel = (
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ??
+    process.env.VERCEL_URL ??
+    ""
+  ).trim();
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
+
+  if (process.env.NODE_ENV !== "production") {
+    return `http://localhost:${process.env.PORT ?? 3000}`;
+  }
+  return null;
+}
+
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
@@ -22,14 +51,20 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  // Deriva a base URL a partir do header Host da requisição
-  const host = req.headers.get("host") ?? "";
-  const proto = host.startsWith("localhost") ? "http" : "https";
-  const base = `${proto}://${host}`;
+  const base = baseUrlInterna();
+  if (!base) {
+    return NextResponse.json(
+      {
+        error:
+          "Base URL não configurada. Defina APP_BASE_URL (ou VERCEL_URL) no ambiente.",
+      },
+      { status: 503 }
+    );
+  }
 
-  const authHeader: Record<string, string> = secret
-    ? { Authorization: `Bearer ${secret}` }
-    : {};
+  const authHeader: Record<string, string> = {
+    Authorization: `Bearer ${secret}`,
+  };
 
   const resultados: Record<string, unknown> = {};
 

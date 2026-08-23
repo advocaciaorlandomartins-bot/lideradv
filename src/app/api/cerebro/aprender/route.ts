@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
+import { podeAcessarProcesso } from "@/lib/acesso";
 import { aprenderComResultado } from "@/lib/cerebroJuridico";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest) {
         { error: "processo_id obrigatório e deve ser UUID válido" },
         { status: 400 }
       );
+    if (!(await podeAcessarProcesso(session, processo_id)))
+      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
     const ok = await aprenderComResultado(processo_id);
     return NextResponse.json({
       ok,

@@ -75,6 +75,20 @@ function todayBR(): string {
   });
 }
 
+// Soma `meses` a uma data YYYY-MM-DD sem o "estouro" de Date.setMonth().
+// Date.setMonth() em 31/01 + 1 mês devolve 03/03 (fevereiro não tem dia 31),
+// o que fazia a cobrança de qualquer cliente com vencimento em 29/30/31
+// pular um mês inteiro. Aqui o dia é limitado ao último dia do mês destino.
+function addMonthsISO(baseISO: string, meses: number): string {
+  const [y, m, d] = baseISO.split("-").map(Number);
+  const alvoMes = m - 1 + meses;
+  const anoAlvo = y + Math.floor(alvoMes / 12);
+  const mesAlvo = ((alvoMes % 12) + 12) % 12;
+  const ultimoDia = new Date(Date.UTC(anoAlvo, mesAlvo + 1, 0)).getUTCDate();
+  const dia = Math.min(d, ultimoDia);
+  return `${anoAlvo}-${String(mesAlvo + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
 export async function createLancamentoAction(
   _prev: LancamentoFormState,
   formData: FormData
@@ -231,15 +245,17 @@ export async function createLancamentoAction(
 
     if (recorrente) {
       const grupoRecorrente = crypto.randomUUID();
-      const baseDate = new Date(`${baseDateStr}T12:00:00`);
       for (let i = 0; i < numRecorrencias; i++) {
-        const entryDate = new Date(baseDate);
-        if (periodicidade === "semanal")
-          entryDate.setDate(entryDate.getDate() + 7 * i);
-        else if (periodicidade === "anual")
-          entryDate.setFullYear(entryDate.getFullYear() + i);
-        else entryDate.setMonth(entryDate.getMonth() + i);
-        const entryDateStr = entryDate.toISOString().split("T")[0];
+        let entryDateStr: string;
+        if (periodicidade === "semanal") {
+          const d = new Date(`${baseDateStr}T12:00:00`);
+          d.setDate(d.getDate() + 7 * i);
+          entryDateStr = d.toISOString().split("T")[0];
+        } else if (periodicidade === "anual") {
+          entryDateStr = addMonthsISO(baseDateStr, 12 * i);
+        } else {
+          entryDateStr = addMonthsISO(baseDateStr, i);
+        }
         const descEntry =
           i === 0 ? descricao : `${descricao} (${i + 1}/${numRecorrencias})`;
         const entryStatus = i === 0 ? status : "pendente";
@@ -270,7 +286,6 @@ export async function createLancamentoAction(
           : valorParcelar > 0
             ? 1
             : 0;
-      const baseDate = new Date(`${baseDateStr}T12:00:00`);
 
       if (valorEntrada > 0) {
         const descEntrada = `${descricao} — Entrada`;
@@ -292,9 +307,10 @@ export async function createLancamentoAction(
       }
 
       for (let i = 1; i <= numParcelas; i++) {
-        const parcDate = new Date(baseDate);
-        parcDate.setMonth(parcDate.getMonth() + (valorEntrada > 0 ? i : i - 1));
-        const parcDateStr = parcDate.toISOString().split("T")[0];
+        const parcDateStr = addMonthsISO(
+          baseDateStr,
+          valorEntrada > 0 ? i : i - 1
+        );
         const descParcela = `${descricao} — Parcela ${i}/${numParcelas}`;
         // Última parcela absorve os centavos restantes para o total fechar exato
         const valorParcela =
@@ -366,11 +382,11 @@ export async function createLancamentoAction(
       }
 
       // Parcelas mensais — última parcela absorve centavos para o total fechar exato
-      const baseDate = new Date(`${baseDateStr}T12:00:00`);
       for (let i = 1; i <= totalParcelas; i++) {
-        const parcDate = new Date(baseDate);
-        parcDate.setMonth(parcDate.getMonth() + (valorEntrada > 0 ? i : i - 1));
-        const parcDateStr = parcDate.toISOString().split("T")[0];
+        const parcDateStr = addMonthsISO(
+          baseDateStr,
+          valorEntrada > 0 ? i : i - 1
+        );
         const descParcela = `${descricao} — Parcela ${i}/${totalParcelas}`;
         const valorParcela =
           i === totalParcelas
@@ -551,19 +567,18 @@ export async function createLancamentoAction(
           }
 
           if (parcelaLancamentoIds.length > 0) {
-            const baseDate = new Date(`${baseDateStr}T12:00:00`);
             // Usa o valor real de cada parcela (parcelaValores[i], já com o
             // ajuste de centavos da última) em vez de recalcular uma média —
             // senão a mensagem de cobrança da última parcela podia informar
             // um valor diferente do que está de fato gravado/cobrado.
             for (let i = 0; i < parcelaLancamentoIds.length; i++) {
-              const parcDate = new Date(baseDate);
-              parcDate.setMonth(
-                parcDate.getMonth() + (entradaLancamentoId ? i + 1 : i)
+              const parcDateStr = addMonthsISO(
+                baseDateStr,
+                entradaLancamentoId ? i + 1 : i
               );
               toSchedule.push({
                 id: parcelaLancamentoIds[i],
-                dataStr: parcDate.toISOString().split("T")[0],
+                dataStr: parcDateStr,
                 val: parcelaValores[i] ?? 0,
               });
             }

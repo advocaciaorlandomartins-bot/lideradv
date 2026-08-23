@@ -44,8 +44,10 @@ Telefone: ${ctx.escritorio.telefone ?? "—"}`);
 
   if (ctx.cliente) {
     const c = ctx.cliente;
+    // birth_date é "YYYY-MM-DD" — sem timeZone:"UTC" retrocede um dia em
+    // ambientes a oeste de Greenwich.
     const dataNasc = c.birth_date
-      ? new Date(c.birth_date).toLocaleDateString("pt-BR")
+      ? new Date(c.birth_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })
       : null;
     parts.push(`
 === CLIENTE ===

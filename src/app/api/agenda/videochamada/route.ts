@@ -10,15 +10,39 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
+const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// O link vira parte de uma mensagem de WhatsApp enviada ao cliente em nome
+// do escritório — sem allowlist, qualquer usuário com "controles:criar"
+// tinha um primitivo de phishing (link arbitrário assinado pelo escritório).
+const DOMINIOS_LINK_PERMITIDOS = [
+  "meet.google.com",
+  "teams.microsoft.com",
+  "teams.live.com",
+  "zoom.us",
+  "whereby.com",
+  "wa.me",
+];
+
+function linkPermitido(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return false;
+    return DOMINIOS_LINK_PERMITIDOS.some(
+      (d) => u.hostname === d || u.hostname.endsWith(`.${d}`)
+    );
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "criar"))
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
-  const { clienteId, titulo, data, hora, link, tipoReuniao } = (await req
-    .json()
-    .catch(() => ({}))) as {
+  const body = (await req.json().catch(() => ({}))) as {
     clienteId?: string;
     titulo?: string;
     data?: string;
@@ -27,17 +51,33 @@ export async function POST(req: NextRequest) {
     tipoReuniao?: "meet" | "whatsapp";
   };
 
-  const isMeet = (tipoReuniao ?? "meet") === "meet";
+  const clienteId = body.clienteId;
+  const data = body.data;
+  const hora = body.hora;
+  const titulo = body.titulo ? String(body.titulo).trim().slice(0, 150) : "";
+  const link = body.link ? String(body.link).trim().slice(0, 500) : "";
+  const isMeet = (body.tipoReuniao ?? "meet") === "meet";
 
-  if (!clienteId || !UUID_RE.test(clienteId) || !data || !hora) {
+  if (
+    !clienteId ||
+    !UUID_RE.test(clienteId) ||
+    !data ||
+    !DATA_RE.test(data) ||
+    !hora ||
+    !HORA_RE.test(hora)
+  ) {
     return NextResponse.json(
-      { error: "clienteId, data e hora são obrigatórios." },
+      {
+        error: "clienteId, data (YYYY-MM-DD) e hora (HH:MM) são obrigatórios.",
+      },
       { status: 400 }
     );
   }
-  if (isMeet && !link) {
+  if (isMeet && !linkPermitido(link)) {
     return NextResponse.json(
-      { error: "Informe o link do Google Meet." },
+      {
+        error: "Link inválido. Use Google Meet, Teams, Zoom, Whereby ou wa.me.",
+      },
       { status: 400 }
     );
   }
@@ -80,7 +120,7 @@ export async function POST(req: NextRequest) {
     dataInicio: data,
     horaInicio: hora,
     horaFim: null,
-    localLink: isMeet ? (link ?? null) : "WhatsApp",
+    localLink: isMeet ? link || null : "WhatsApp",
     descricao: null,
     cor: isMeet ? "#7c3aed" : "#25d366",
     criadoPor: session.login,

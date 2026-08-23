@@ -257,7 +257,13 @@ export function substituteVariablesInBlocks(
       case "heading":
         return { ...b, spans: replaceInSpans(b.spans) };
       case "callout":
-        return { ...b, spans: replaceInSpans(b.spans) };
+        // b.title também é texto livre (o cabeçalho da caixa destacada) —
+        // sem substituir aqui, {{variável}} saía crua no título do callout.
+        return {
+          ...b,
+          title: b.title ? replaceInText(b.title) : b.title,
+          spans: replaceInSpans(b.spans),
+        };
       case "list":
         return { ...b, items: b.items.map(replaceInSpans) };
       case "table":

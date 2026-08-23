@@ -80,7 +80,10 @@ export async function GET(
       ? await fetchLogoAsDataUri(escritorioConfig.logo_url)
       : null;
 
+  // Sem timeZone explícito, o servidor (UTC) data o documento um dia à
+  // frente para gerações após as 21h no horário de Brasília.
   const date = new Date().toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     day: "2-digit",
     month: "long",
     year: "numeric",

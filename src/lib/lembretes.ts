@@ -576,6 +576,25 @@ export async function cancelarLembretesLancamento(
   `;
 }
 
+/**
+ * Baixa os lembretes pendentes de um compromisso (avisos ao colaborador/
+ * cliente e lembretes de agendamento INSS, que também usam referencia_tipo
+ * 'compromisso'). Sem isso, remarcar um compromisso mandava o aviso com a
+ * data/hora antigas, e excluí-lo não impedia o disparo do lembrete.
+ */
+export async function cancelarLembretesCompromisso(
+  compromissoId: string,
+  motivo: string
+): Promise<void> {
+  await sql`
+    UPDATE lembretes_agendados
+    SET enviado = TRUE, enviado_em = NOW(), erro = ${motivo}
+    WHERE referencia_tipo = 'compromisso'
+      AND referencia_id = ${compromissoId}::uuid
+      AND NOT enviado
+  `;
+}
+
 // ── Lembretes de compromisso para colaborador (criado via PrevBot) ────────────
 
 export async function agendarLembretesCompromissoPrevBot(opts: {

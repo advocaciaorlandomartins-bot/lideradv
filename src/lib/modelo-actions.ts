@@ -13,15 +13,26 @@ import {
 
 export type ModeloFormState = { error: string } | null;
 
-/** Lê e valida o campo hidden "conteudo_blocks" (JSON) do formulário. */
-function parseBlocksField(formData: FormData): Block[] | null {
+/**
+ * Lê e valida o campo hidden "conteudo_blocks" (JSON) do formulário.
+ *
+ * "Não veio nada" (campo vazio) e "veio algo corrompido" (JSON quebrado ou
+ * shape inválido) precisam ser distinguidos: no segundo caso o modelo era
+ * salvo só com o texto puro, e toda a formatação — negrito, cores, tabelas,
+ * callouts, linha de assinatura — sumia sem nenhum aviso ao usuário.
+ */
+function parseBlocksField(formData: FormData): {
+  blocks: Block[] | null;
+  corrompido: boolean;
+} {
   const raw = (formData.get("conteudo_blocks") as string) ?? "";
-  if (!raw.trim()) return null;
+  if (!raw.trim()) return { blocks: null, corrompido: false };
   try {
     const parsed = JSON.parse(raw);
-    return isValidBlocks(parsed) ? parsed : null;
+    if (isValidBlocks(parsed)) return { blocks: parsed, corrompido: false };
+    return { blocks: null, corrompido: true };
   } catch {
-    return null;
+    return { blocks: null, corrompido: true };
   }
 }
 
@@ -39,7 +50,12 @@ export async function createModeloAction(
   const descricao =
     ((formData.get("descricao") as string) ?? "").trim() || null;
   const usarTimbrado = formData.get("usar_timbrado") === "true";
-  const blocks = parseBlocksField(formData);
+  const { blocks, corrompido } = parseBlocksField(formData);
+  if (corrompido)
+    return {
+      error:
+        "Não foi possível salvar a formatação do editor. Recarregue a página e tente novamente.",
+    };
   const conteudo = blocks
     ? flattenBlocksToText(blocks)
     : ((formData.get("conteudo") as string) ?? "").trim();
@@ -76,7 +92,12 @@ export async function updateModeloAction(
     ((formData.get("descricao") as string) ?? "").trim() || null;
   const ativo = formData.get("ativo") === "true";
   const usarTimbrado = formData.get("usar_timbrado") === "true";
-  const blocks = parseBlocksField(formData);
+  const { blocks, corrompido } = parseBlocksField(formData);
+  if (corrompido)
+    return {
+      error:
+        "Não foi possível salvar a formatação do editor. Recarregue a página e tente novamente.",
+    };
   const conteudo = blocks
     ? flattenBlocksToText(blocks)
     : ((formData.get("conteudo") as string) ?? "").trim();

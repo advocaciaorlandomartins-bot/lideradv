@@ -9,6 +9,15 @@ import { logAction } from "./audit";
 
 export type RemuneracaoFormState = { error: string } | null;
 
+// CURRENT_DATE (Postgres) e toISOString() retornam a data em UTC, que já é
+// o dia seguinte no Brasil (UTC-3) após as 21h — a remuneração/lançamento
+// ficava registrado num dia à frente do real.
+function todayBR(): string {
+  return new Date().toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
+}
+
 const TIPO_LABEL: Record<string, string> = {
   salario: "Salário",
   comissao: "Comissão",
@@ -84,10 +93,7 @@ export async function createRemuneracaoAction(
     const descFull = f.descricao ? `${descBase} (${f.descricao})` : descBase;
 
     // data_vencimento: pagamento date > competência > today
-    const dataVenc =
-      f.dataPagamento ??
-      f.competencia ??
-      new Date().toISOString().split("T")[0];
+    const dataVenc = f.dataPagamento ?? f.competencia ?? todayBR();
 
     // Mirror as saída in lancamentos
     await sql`
@@ -125,9 +131,10 @@ export async function markRemuneracaoPagaAction(
     return { error: "Sem permissão." };
 
   try {
+    const hoje = todayBR();
     const rows = await sql`
       UPDATE remuneracoes
-      SET status = 'pago', data_pagamento = CURRENT_DATE, updated_at = NOW()
+      SET status = 'pago', data_pagamento = ${hoje}::date, updated_at = NOW()
       WHERE id = ${id}::uuid AND status != 'pago'
       RETURNING id
     `;
@@ -135,7 +142,7 @@ export async function markRemuneracaoPagaAction(
     // Sync linked lancamento
     await sql`
       UPDATE lancamentos
-      SET status = 'pago', data_pagamento = CURRENT_DATE
+      SET status = 'pago', data_pagamento = ${hoje}::date
       WHERE remuneracao_id = ${id}::uuid
     `;
   } catch (err) {

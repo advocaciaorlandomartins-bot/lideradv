@@ -1,5 +1,14 @@
 import sql from "./db";
 
+// CURRENT_DATE (Postgres) roda em UTC, que já é o dia seguinte no Brasil
+// (UTC-3) após as 21h — perto da virada do mês isso gravava a comissão na
+// competência errada.
+function todayBR(): string {
+  return new Date().toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
+}
+
 export interface ComissaoConfig {
   comissao_administrativo_pct: number | null;
   comissao_judicial_pct: number | null;
@@ -225,13 +234,14 @@ export async function gerarComissaoAutomaticaPorPagamento(
         // só uma saída rápida no caso comum; sob concorrência (double-click,
         // retry) duas chamadas podem passar por ela antes de qualquer uma
         // inserir, então o banco precisa recusar a segunda tentativa aqui.
+        const hoje = todayBR();
         const remRows = await sql`
           INSERT INTO remuneracoes (
             colaborador_id, tipo, valor, competencia, status, descricao,
             processo_id, client_id, origem_lancamento_id
           ) VALUES (
             ${colaboradorId}::uuid, 'comissao', ${valorComissao}::numeric,
-            CURRENT_DATE, 'pendente', ${descricao},
+            ${hoje}::date, 'pendente', ${descricao},
             ${processoId}::uuid, ${p.client_id}::uuid, ${lancamentoId}::uuid
           )
           RETURNING id::text
@@ -242,7 +252,7 @@ export async function gerarComissaoAutomaticaPorPagamento(
           INSERT INTO lancamentos (tipo, categoria, descricao, valor, status, data_vencimento, remuneracao_id)
           VALUES (
             'saida', 'Pessoal', ${`${descricao} — ${colab.nome}`},
-            ${valorComissao}::numeric, 'pendente', CURRENT_DATE, ${remuneracaoId}::uuid
+            ${valorComissao}::numeric, 'pendente', ${hoje}::date, ${remuneracaoId}::uuid
           )
         `;
       } catch (err) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import {
   getMensagensConfig,
   saveMensagensConfig,
@@ -11,15 +12,13 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/admin/reset-mensagens-templates
  * Resets only the text templates (not intervals) to the current defaults.
- * Requires admin session.
+ * Requires configuracoes:editar — alinhado com /api/configuracoes/mensagens.
  */
 export async function POST() {
   const session = await getSession();
-  if (!session)
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  if (session.categoria !== "Administrador(a)") {
+  if (!session || !hasPermission(session, "configuracoes", "editar")) {
     return NextResponse.json(
-      { error: "Requer perfil Administrador(a)." },
+      { error: "Requer permissão de edição em Configurações." },
       { status: 403 }
     );
   }

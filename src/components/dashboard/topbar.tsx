@@ -4,6 +4,7 @@ import { useTransition, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/auth-actions";
+import { clearServiceWorkerPageCache } from "@/lib/sw-client";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
@@ -203,6 +204,7 @@ export default function Topbar({
   );
 
   function handleLogout() {
+    clearServiceWorkerPageCache();
     startTransition(async () => {
       await logoutAction();
     });

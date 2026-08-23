@@ -37,6 +37,7 @@ import {
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
 import { logoutAction } from "@/lib/auth-actions";
+import { clearServiceWorkerPageCache } from "@/lib/sw-client";
 import { useTheme } from "@/lib/theme";
 
 const GROUPS: {
@@ -273,6 +274,7 @@ export default function Sidebar({
   };
 
   function handleLogout() {
+    clearServiceWorkerPageCache();
     startTransition(async () => {
       await logoutAction();
     });

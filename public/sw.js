@@ -9,6 +9,25 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
+// Limpa páginas em cache no logout — sem isso, HTML de páginas autenticadas
+// (financeiro, dados de cliente etc.) já renderizado no servidor ficava em
+// disco indefinidamente; em computador compartilhado, se o navegador cair
+// offline depois do logout, essa versão em cache era servida sem checar
+// sessão nenhuma.
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "CLEAR_PAGE_CACHE") return;
+  event.waitUntil(
+    caches.open(PAGE_CACHE).then(async (cache) => {
+      const keys = await cache.keys();
+      await Promise.all(
+        keys
+          .filter((req) => new URL(req.url).pathname !== OFFLINE_URL)
+          .map((req) => cache.delete(req))
+      );
+    })
+  );
+});
+
 self.addEventListener("activate", (event) => {
   const KEEP = [STATIC_CACHE, PAGE_CACHE];
   event.waitUntil(

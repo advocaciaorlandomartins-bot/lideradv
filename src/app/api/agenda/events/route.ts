@@ -170,8 +170,14 @@ export async function GET(req: NextRequest) {
         ORDER BY comp.data_inicio, comp.hora_inicio NULLS LAST
       `,
 
-    // Token Google Calendar
-    getStoredToken(session.id),
+    // Token Google Calendar — sem catch aqui, uma falha de decriptação (ex:
+    // SESSION_SECRET rotacionada) derrubava a agenda inteira (controles,
+    // eventos, lançamentos, aniversários, compromissos) por causa só do
+    // pedaço do Google Calendar, já que estava no mesmo Promise.all.
+    getStoredToken(session.id).catch((e) => {
+      console.error("[agenda/events] falha ao ler token do Google:", e);
+      return null;
+    }),
   ]);
 
   const events: Record<string, unknown>[] = [];

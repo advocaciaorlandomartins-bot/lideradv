@@ -184,7 +184,19 @@ export async function gerarComissaoAutomaticaPorPagamento(
         ].filter((v): v is string => v != null)
       )
     );
-    if (candidatoIds.length === 0) return;
+    if (candidatoIds.length === 0) {
+      // Pagamento real de honorário vinculado a um processo sem NENHUM
+      // responsável (geral/administrativo/judicial) preenchido — comissão
+      // nunca é gerada e não havia nenhum sinal disso em lugar nenhum
+      // (nem log, nem aviso na tela). Confirmado em produção: processo já
+      // arquivado como "concedido", com honorários pagos, responsável_id
+      // nulo — comissão nunca criada, escritório só descobriria se o
+      // colaborador reclamasse. Loga pra pelo menos deixar rastro.
+      console.error(
+        `[comissao-colaborador] pagamento de R$ ${valorPago.toFixed(2)} no processo ${processoId} (lançamento ${lancamentoId}) sem nenhum responsável definido — comissão não gerada.`
+      );
+      return;
+    }
 
     const colabRows = await sql`
       SELECT id::text, nome,

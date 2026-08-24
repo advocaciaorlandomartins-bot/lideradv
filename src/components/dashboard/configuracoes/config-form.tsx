@@ -351,13 +351,12 @@ export default function ConfigForm({ config }: Props) {
   // Address
   const [cep, setCep] = useState(config.cep ?? "");
   const [logradouro, setLogradouro] = useState(config.endereco ?? "");
-  const [numero, setNumero] = useState("");
   const [cidade, setCidade] = useState(config.cidade ?? "");
   const [estado, setEstado] = useState(config.estado ?? "");
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [cepError, setCepError] = useState<string | null>(null);
 
-  const enderecoCompleto = [logradouro, numero].filter(Boolean).join(", ");
+  const enderecoCompleto = logradouro.trim();
 
   // Typography & margins
   const [fontPadrao, setFontPadrao] = useState(config.font_padrao ?? "Times");
@@ -1075,27 +1074,23 @@ export default function ConfigForm({ config }: Props) {
 
           <input type="hidden" name="endereco" value={enderecoCompleto} />
 
-          <div className="sm:col-span-2">
-            <label className={labelCls}>Logradouro</label>
+          {/* Um único campo de "Logradouro" + "Número" separados era
+              impossível de recarregar corretamente: o banco só tem UMA
+              coluna "endereco" (já com o número embutido), então ao reabrir
+              a tela "Número" sempre voltava vazio mesmo já tendo um número
+              salvo — se o usuário, vendo "vazio", preenchesse de novo, o
+              valor final duplicava ("Rua X, 371, 371"). Um campo só,
+              refletindo o que de fato é persistido, elimina o problema. */}
+          <div className="sm:col-span-3">
+            <label className={labelCls}>Endereço</label>
             <input
               type="text"
               value={logradouro}
               onChange={(e) => setLogradouro(e.target.value)}
-              placeholder="Rua / Avenida / Alameda"
+              placeholder="Rua / Avenida / Alameda, número, complemento"
               className={inputCls}
             />
           </div>
-          <div>
-            <label className={labelCls}>Número</label>
-            <input
-              type="text"
-              value={numero}
-              onChange={(e) => setNumero(e.target.value)}
-              placeholder="Ex: 123"
-              className={inputCls}
-            />
-          </div>
-          <div className="hidden sm:block" />
           <div>
             <label className={labelCls}>Cidade</label>
             <input

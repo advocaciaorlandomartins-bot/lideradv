@@ -136,7 +136,9 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
     if (didMount.current) return;
     didMount.current = true;
     carregar().then(() => {
-      if (processoStatus === "Concluída") {
+      // "Concluída" nunca é um valor real de processo.status (é
+      // 'ativo'/'arquivado'/'encerrado') — esse gatilho nunca disparava.
+      if (processoStatus === "arquivado" || processoStatus === "encerrado") {
         fetch("/api/cerebro/aprender", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

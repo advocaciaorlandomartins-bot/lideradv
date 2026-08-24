@@ -80,7 +80,14 @@ export async function POST(req: NextRequest) {
         const claudeStream = client.messages.stream(
           {
             model: "claude-sonnet-5",
-            max_tokens: 1500,
+            // O prompt pede 12 seções (risco, probabilidade de êxito, tese
+            // principal, base legal, próxima ação etc.) — 1500 tokens
+            // (~4800 caracteres em pt-BR) cortava a resposta no meio antes
+            // de chegar nas seções finais em 94% das análises reais já
+            // salvas em produção, fazendo a UI mostrar os valores de
+            // fallback genéricos ("Risco: Médio", "Verificar documentação
+            // com cliente") como se fossem o veredito real da IA.
+            max_tokens: 4096,
             system: [
               {
                 type: "text",

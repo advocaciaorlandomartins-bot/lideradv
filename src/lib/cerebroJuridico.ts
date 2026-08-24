@@ -1994,15 +1994,27 @@ export async function salvarAnalise(
     if (!tarefaExistente) {
       const prioridadeTarefa =
         risco === "alto" ? "Alta" : risco === "medio" ? "Média" : "Normal";
+      // tarefas_processo.responsavel é texto livre (nome do colaborador, sem
+      // FK) — sem preencher, a tarefa nunca batia com o filtro de "Minhas
+      // Tarefas" de ninguém (compara nome, não aceita NULL), mesmo o
+      // processo já tendo um responsável definido.
+      const [resp] = await sql`
+        SELECT col.nome
+        FROM processos p
+        JOIN colaboradores col ON col.id = p.responsavel_id
+        WHERE p.id = ${processoId}::uuid
+      `.catch(() => [] as Record<string, unknown>[]);
+      const responsavelNome = resp?.nome ? String(resp.nome) : null;
       await sql`
         INSERT INTO tarefas_processo
-          (processo_id, client_id, titulo, prioridade, comentarios)
+          (processo_id, client_id, titulo, prioridade, comentarios, responsavel)
         VALUES (
           ${processoId}::uuid,
           ${clientId}::uuid,
           ${proximaAcao.substring(0, 200)},
           ${prioridadeTarefa},
-          ${"✅ Criada automaticamente pelo Cérebro Jurídico em " + new Date().toLocaleDateString("pt-BR")}
+          ${"✅ Criada automaticamente pelo Cérebro Jurídico em " + new Date().toLocaleDateString("pt-BR")},
+          ${responsavelNome}
         )
       `;
       tarefaCriada = true;
@@ -2419,11 +2431,21 @@ export async function aprenderComResultado(
   `;
   if (!processo) return false;
 
+  // "Concluída" nunca é um valor real de processos.status (é só de
+  // tarefas_processo.status) — essa comparação nunca batia, então
+  // aprenderComResultado nunca rodou de verdade em nenhum processo desde
+  // que foi escrita (confirmado: cerebro_juridico/cerebro_teses vazias em
+  // produção mesmo com casos reais já concluídos). resultado_administrativo
+  // também faltava na extração — é o campo que o fluxo atual de Produção
+  // (registrarResultadoAdminAction) realmente grava; os outros três vêm de
+  // um fluxo de edição manual mais antigo/paralelo do processo.
   const resultado =
+    processo.resultado_administrativo ||
     processo.resultado_admin ||
     processo.resultado_judicial ||
     processo.resultado;
-  if (!resultado || processo.status !== "Concluída") return false;
+  if (!resultado || !["arquivado", "encerrado"].includes(processo.status))
+    return false;
 
   const [jaAprendeu] = await sql`
     SELECT id FROM cerebro_juridico WHERE processo_id = ${processoId}::uuid LIMIT 1
@@ -2435,12 +2457,22 @@ export async function aprenderComResultado(
     sql`SELECT texto, tipo, data_referencia FROM historico_registros WHERE processo_id = ${processoId}::uuid ORDER BY data_referencia`,
   ]);
 
+  // resultado pode vir em 3 vocabulários diferentes conforme o campo de
+  // origem: legado livre ("Deferido"/"Indeferido"), resultado_administrativo
+  // ("concedido"/"negado") ou resultado_judicial ("procedente"/
+  // "improcedente"/"parcial") — o classificador original só reconhecia o
+  // primeiro; "concedido"/"procedente" caíam todos em "indeferido" por
+  // não conterem a substring "defer".
   const resultLower = String(resultado).toLowerCase();
-  const resultNorm =
-    resultLower.includes("defer") && !resultLower.includes("indeferid")
-      ? resultLower.includes("parcial")
-        ? "parcialmente_deferido"
-        : "deferido"
+  const ganho =
+    (resultLower.includes("defer") && !resultLower.includes("indefer")) ||
+    resultLower.includes("concedido") ||
+    (resultLower.includes("procedente") &&
+      !resultLower.includes("improcedente"));
+  const resultNorm = resultLower.includes("parcial")
+    ? "parcialmente_deferido"
+    : ganho
+      ? "deferido"
       : "indeferido";
 
   const idadeCliente = processo.data_nascimento

@@ -115,7 +115,14 @@ export async function getMinhasTarefas(
       FROM tarefas_processo t
       JOIN processos p ON p.id = t.processo_id
       LEFT JOIN clients cl ON cl.id = p.client_id
-      WHERE t.responsavel = ANY(${nomes})
+      WHERE (
+        t.responsavel = ANY(${nomes})
+        -- Tarefas criadas sem "responsavel" preenchido (ex: pelo Cérebro
+        -- Jurídico) nunca batiam com ANY(nomes) e ficavam invisíveis pra
+        -- todo mundo, mesmo o processo tendo responsável definido — cai
+        -- pro responsável do processo quando a tarefa em si não tem um.
+        OR (t.responsavel IS NULL AND p.responsavel_id = ${colaboradorId}::uuid)
+      )
         AND t.status != 'Cancelada'
       ORDER BY
         CASE t.prioridade WHEN 'Alta' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,

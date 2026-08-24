@@ -31,8 +31,14 @@ export function buildModeloVars(
     "{{bairro}}": client.neighborhood ?? "",
     "{{cidade}}": client.city,
     "{{estado}}": client.state,
+    // birth_date é "YYYY-MM-DD" (sem hora) — Date parseia como UTC meia-noite;
+    // timeZone: "UTC" explícito evita retroceder um dia em qualquer ambiente
+    // a oeste de Greenwich (mesmo padrão já usado em pdf-templates.tsx e
+    // ai-juridico.ts — aqui dependia implicitamente do runtime rodar em UTC).
     "{{data_nascimento}}": client.birth_date
-      ? new Date(client.birth_date).toLocaleDateString("pt-BR")
+      ? new Date(client.birth_date).toLocaleDateString("pt-BR", {
+          timeZone: "UTC",
+        })
       : "",
     "{{nome_fantasia}}": client.trade_name ?? "",
     "{{rg}}": client.rg ?? "",

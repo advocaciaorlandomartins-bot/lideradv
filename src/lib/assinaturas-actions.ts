@@ -64,10 +64,15 @@ export async function salvarEnvelopeAction(
   const client = await getClientFull(clienteId);
   if (!client) throw new Error("Cliente não encontrado.");
   const escritorioConfig = await getEscritorioConfig();
+  // Sem timeZone explícito, o servidor (UTC) data o documento um dia à
+  // frente pra gerações após as 21h no horário de Brasília — mesmo bug já
+  // corrigido em gerar-modelo/route.ts e clientes/[id]/gerar-documento/route.ts,
+  // só faltava aqui (documento enviado a assinatura eletrônica).
   const date = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: "America/Sao_Paulo",
   });
   const vars = buildModeloVars(client, escritorioConfig, date);
 

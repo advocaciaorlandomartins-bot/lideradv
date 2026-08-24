@@ -2220,7 +2220,15 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
   const aiResp = await getClaudeClient().messages.create(
     {
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1500,
+      // Prompt tem 7 seções (tipo, dados extraídos, relevância, pontos de
+      // atenção, o que comprova, recomendação, CAMPOS_JSON) — o bloco
+      // CAMPOS_JSON vem por último, então um corte no meio (mesmo problema
+      // já confirmado e corrigido em cerebro/analisar/route.ts com 1500
+      // pra um prompt de 12 seções) perderia justamente os dados
+      // estruturados que alimentam o write-back automático em
+      // clients/processos, sem gerar erro nenhum — só ficaria com o JSON
+      // incompleto silenciosamente.
+      max_tokens: 3000,
       messages: [{ role: "user", content }],
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}

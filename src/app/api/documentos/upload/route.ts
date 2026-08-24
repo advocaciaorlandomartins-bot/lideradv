@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { put } from "@vercel/blob";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade } from "@/lib/acesso";
+import { analisarDocumento } from "@/lib/cerebroJuridico";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -157,7 +158,27 @@ export async function POST(request: Request) {
       )
       RETURNING id::text
     `;
-    return NextResponse.json({ id: rows[0].id, url: blobUrl });
+    const documentoId = rows[0].id as string;
+
+    // Análise automática pelo Cérebro Jurídico — roda em segundo plano
+    // depois da resposta já ter sido enviada (after()/waitUntil da Vercel
+    // garante que termina mesmo sem o usuário esperando). Só PDF/imagem
+    // (os únicos formatos que analisarDocumento sabe ler) e só quando
+    // anexado direto a um processo (é o que a função espera receber).
+    const isPdfOrImage =
+      (file.type || "").includes("pdf") ||
+      (file.type || "").startsWith("image/");
+    if (entityType === "processo" && isPdfOrImage) {
+      after(async () => {
+        try {
+          await analisarDocumento(documentoId, entityId);
+        } catch (e) {
+          console.error("[documentos/upload] falha na análise automática:", e);
+        }
+      });
+    }
+
+    return NextResponse.json({ id: documentoId, url: blobUrl });
   } catch (err) {
     console.error("[documentos/upload] DB error:", err);
     return NextResponse.json(

@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { podeEditarProcesso } from "./processo-ownership";
+import { interpretarAndamento } from "./cerebroJuridico";
 
 // ── Fase / Status ──────────────────────────────────────────────
 
@@ -134,7 +136,7 @@ export async function createHistoricoRegistroAction(data: {
     return { error: "Sem permissão." };
   if (!data.texto.trim()) return { error: "O texto é obrigatório." };
   try {
-    await sql`
+    const [row] = await sql`
       INSERT INTO historico_registros
         (processo_id, client_id, texto, tipo, data_referencia, situacao, destaque)
       VALUES
@@ -145,8 +147,46 @@ export async function createHistoricoRegistroAction(data: {
          ${data.dataReferencia ? data.dataReferencia : null}::date,
          ${data.situacao || null},
          ${data.destaque})
+      RETURNING id::text
     `;
     revalidatePath(`/dashboard/processos/${data.processoId}`);
+
+    // Interpretação automática pelo Cérebro Jurídico — roda depois da
+    // resposta já ter sido enviada (after()/waitUntil da Vercel garante que
+    // termina mesmo sem o usuário esperando), sem exigir nenhum clique
+    // extra. Se o andamento for urgente, cria a tarefa automaticamente
+    // (mesmo padrão já usado em salvarAnalise) pra aparecer em Minhas
+    // Tarefas sem precisar de ninguém abrir o painel do Cérebro.
+    const andamentoId = row?.id as string | undefined;
+    if (andamentoId) {
+      after(async () => {
+        try {
+          const { proximaAcao, urgente, prazo } = await interpretarAndamento(
+            andamentoId,
+            data.processoId
+          );
+          if (urgente && proximaAcao) {
+            await sql`
+              INSERT INTO tarefas_processo
+                (processo_id, client_id, titulo, prioridade, comentarios)
+              VALUES (
+                ${data.processoId}::uuid,
+                ${data.clientId}::uuid,
+                ${proximaAcao.substring(0, 200)},
+                'Alta',
+                ${"⚡ Urgente — Cérebro Jurídico" + (prazo ? ` (prazo: ${prazo})` : "")}
+              )
+            `.catch(() => null);
+          }
+        } catch (e) {
+          console.error(
+            "[createHistoricoRegistroAction] falha na interpretação automática:",
+            e
+          );
+        }
+      });
+    }
+
     return {};
   } catch {
     return { error: "Erro ao criar registro." };

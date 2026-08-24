@@ -290,7 +290,18 @@ export async function requestPasswordResetAction(
     process.env.NEXT_PUBLIC_BASE_URL ?? "https://lideradv.vercel.app";
   const resetUrl = `${baseUrl}/reset-senha?token=${token}`;
 
-  await enviarEmailResetSenha({ para: email, resetUrl });
+  // Sem try/catch aqui, uma falha de envio (rate limit do provedor, domínio
+  // não verificado, etc.) derrubava a Server Action com uma exceção não
+  // tratada — diferente do branch de e-mail inexistente acima, que sempre
+  // retorna { success: true } cedo. Isso criava um canal lateral: e-mail
+  // inexistente → tela de sucesso; e-mail existente com envio falho → tela
+  // de erro genérica do Next.js. Ambos os casos agora terminam no mesmo
+  // { success: true }, preservando a garantia de não revelar se o e-mail existe.
+  try {
+    await enviarEmailResetSenha({ para: email, resetUrl });
+  } catch (err) {
+    console.error("requestPasswordResetAction: falha ao enviar e-mail:", err);
+  }
 
   return { success: true };
 }

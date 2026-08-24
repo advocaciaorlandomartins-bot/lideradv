@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import ProcessosSubNav from "@/components/dashboard/processos/processos-sub-nav";
+import { marcarAndamentoLidoAction } from "@/lib/processo-full-actions";
 import {
   ClipboardListIcon,
   CalendarIcon,
@@ -113,22 +114,40 @@ export default function AndamentosClient({
 }) {
   const [filtro, setFiltro] = useState<FiltroAndamento>("todos");
   const [search, setSearch] = useState("");
+  // Marca como lido otimisticamente no clique — sem esperar o
+  // revalidatePath()/refresh do servidor pra sumir o destaque "Novo".
+  const [lidosLocal, setLidosLocal] = useState<Set<string>>(new Set());
+  const [, startTransition] = useTransition();
+
+  const andamentosComLeitura = useMemo(
+    () =>
+      andamentos.map((a) => (lidosLocal.has(a.id) ? { ...a, lido: true } : a)),
+    [andamentos, lidosLocal]
+  );
+
+  function marcarLido(id: string) {
+    if (lidosLocal.has(id)) return;
+    setLidosLocal((prev) => new Set(prev).add(id));
+    startTransition(() => {
+      marcarAndamentoLidoAction(id).catch(() => null);
+    });
+  }
 
   const counts = useMemo(
     () => ({
-      hoje: andamentos.filter((a) => a.hoje).length,
-      nao_lidos: andamentos.filter((a) => !a.lido).length,
-      esta_semana: andamentos.length,
+      hoje: andamentosComLeitura.filter((a) => a.hoje).length,
+      nao_lidos: andamentosComLeitura.filter((a) => !a.lido).length,
+      esta_semana: andamentosComLeitura.length,
       processos: new Set(
-        andamentos.map((a) => a.processo_numero).filter(Boolean)
+        andamentosComLeitura.map((a) => a.processo_numero).filter(Boolean)
       ).size,
     }),
-    [andamentos]
+    [andamentosComLeitura]
   );
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return andamentos.filter((a) => {
+    return andamentosComLeitura.filter((a) => {
       if (filtro === "hoje" && !a.hoje) return false;
       if (filtro === "nao_lidos" && a.lido) return false;
       if (q) {
@@ -142,7 +161,7 @@ export default function AndamentosClient({
       }
       return true;
     });
-  }, [filtro, search, andamentos]);
+  }, [filtro, search, andamentosComLeitura]);
 
   const groups = groupByDate(filtered);
 
@@ -306,7 +325,8 @@ export default function AndamentosClient({
                 {andamentosList.map((and) => (
                   <div
                     key={and.id}
-                    className={`flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-primary/5 sm:flex-row sm:items-start sm:gap-4 ${
+                    onClick={() => marcarLido(and.id)}
+                    className={`flex cursor-pointer flex-col gap-3 px-5 py-4 transition-colors hover:bg-primary/5 sm:flex-row sm:items-start sm:gap-4 ${
                       !and.lido ? "border-l-4 border-primary" : ""
                     }`}
                   >

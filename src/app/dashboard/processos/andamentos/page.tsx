@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import AndamentosClient, {
   type AndamentoDisplay,
 } from "@/components/dashboard/processos/andamentos-client";
@@ -12,6 +13,16 @@ export default async function AndamentosPage() {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "ver")) notFound();
 
+  // Sem "processos_ver_todos": restringe aos andamentos de processos onde o
+  // usuário é responsável — mesma regra já aplicada em
+  // dashboard/processos/page.tsx. Sem isso, qualquer advogado(a) via
+  // Andamentos lia texto de histórico de TODOS os processos do escritório,
+  // não só os próprios (getAllProcessos já tinha essa trava, esta tela não).
+  const verTodos = hasPermission(session, "processos_ver_todos", "ver");
+  const colaboradorId = verTodos
+    ? null
+    : await getColaboradorIdForUser(session.id);
+
   let andamentos: AndamentoDisplay[] = [];
 
   try {
@@ -20,7 +31,7 @@ export default async function AndamentosPage() {
         h.id::text,
         COALESCE(h.texto, '') AS texto,
         COALESCE(h.tipo, 'Registro') AS tipo,
-        h.situacao,
+        h.lido_em,
         h.created_at,
         COALESCE(p.numero, '') AS processo_numero,
         COALESCE(p.tipo_acao, '') AS tipo_acao,
@@ -29,6 +40,7 @@ export default async function AndamentosPage() {
       FROM historico_registros h
       LEFT JOIN processos p ON p.id = h.processo_id
       LEFT JOIN clients c ON c.id = COALESCE(h.client_id, p.client_id)
+      WHERE ${verTodos} OR p.responsavel_id = ${colaboradorId}::uuid
       ORDER BY h.created_at DESC
       LIMIT 100
     `) as Record<string, unknown>[];
@@ -54,7 +66,7 @@ export default async function AndamentosPage() {
         tipo_andamento: r.tipo as string,
         orgao: r.orgao as string,
         responsavel: "",
-        lido: r.situacao === "lido",
+        lido: r.lido_em != null,
         hoje: isToday,
       };
     });

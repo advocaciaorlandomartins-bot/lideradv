@@ -19,10 +19,18 @@ function PageHeader({
   if (config && config.modelo_timbrado_ativo) {
     return <TimbradoHeader config={config} logoData={logoData ?? null} />;
   }
+  // Nome/OAB fixos em "ADVOCACIA ORLANDO MARTINS" mesmo com o timbrado
+  // personalizado desativado — qualquer escritório comprando o sistema e
+  // desativando (ou nunca ativando) o timbrado gerava Procuração, Contrato
+  // de Honorários, Declaração de Hipossuficiência etc. com a identificação
+  // de outro advogado estampada no documento assinado pelo cliente. O
+  // mesmo fallback já existia certo em modelo-pdf.tsx — só faltava aqui.
   return (
     <View fixed>
-      <Text style={s.simpleHeader.firmName}>ADVOCACIA ORLANDO MARTINS</Text>
-      <Text style={s.simpleHeader.firmSub}>OAB/SP — Serviços Advocatícios</Text>
+      <Text style={s.simpleHeader.firmName}>{lawyerName(config)}</Text>
+      <Text style={s.simpleHeader.firmSub}>
+        {lawyerOab(config)} — Serviços Advocatícios
+      </Text>
       <View style={s.simpleHeader.divider} />
     </View>
   );
@@ -38,8 +46,8 @@ function PageFooter({
   }
   return (
     <Text style={s.simpleFooter} fixed>
-      Documento gerado em {date} — Advocacia Orlando Martins · Todos os direitos
-      reservados
+      Documento gerado em {date} — {config?.nome ?? "Advocacia Orlando Martins"}{" "}
+      · Todos os direitos reservados
     </Text>
   );
 }

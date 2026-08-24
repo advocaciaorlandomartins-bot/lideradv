@@ -29,7 +29,17 @@ function diasRestantes(disponibilizacao: string, prazo_dias = 15): number {
 
 function statusDe(pub: Publicacao): "urgente" | "pendente" | "tratada" {
   if (pub.status === "tratada") return "tratada";
-  const dias = pub.resumo_ia?.prazo_dias ?? diasRestantes(pub.disponibilizacao);
+  // resumo_ia.prazo_dias é a DURAÇÃO do prazo (ex: "15 dias úteis"), fixa,
+  // gerada uma vez pela IA — não é "dias restantes até vencer". Usar ela
+  // direto como se fosse dias restantes (padrão antigo: "?? valor fixo")
+  // fazia toda publicação com resumo de IA já pronto mostrar sempre o mesmo
+  // número de dias, sem nunca decrescer nem virar "vencido". O valor certo
+  // é usá-la como o OFFSET dentro de diasRestantes(), igual ao segundo
+  // parâmetro que a própria função já espera.
+  const dias = diasRestantes(
+    pub.disponibilizacao,
+    pub.resumo_ia?.prazo_dias ?? undefined
+  );
   if (dias <= 5) return "urgente";
   return "pendente";
 }
@@ -287,9 +297,10 @@ export default function IntimacoesContent({
           <div className="divide-y divide-border">
             {filtered.map((pub) => {
               const st = statusDe(pub);
-              const dias =
-                pub.resumo_ia?.prazo_dias ??
-                diasRestantes(pub.disponibilizacao);
+              const dias = diasRestantes(
+                pub.disponibilizacao,
+                pub.resumo_ia?.prazo_dias ?? undefined
+              );
               return (
                 <div
                   key={pub.id}

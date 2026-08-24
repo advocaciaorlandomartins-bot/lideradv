@@ -5,6 +5,21 @@ function getResend(): Resend | null {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
+// onboarding@resend.dev é o domínio de teste padrão do Resend — só entrega
+// pro e-mail do dono da conta Resend, a menos que um domínio próprio esteja
+// verificado. Ficava fixo em 4 lugares, sem nenhuma forma de apontar pra um
+// domínio real mesmo que um esteja verificado na conta. Configurável via
+// EMAIL_FROM (ex: "LiderAdv <contato@seudominio.com.br>", precisa do
+// domínio verificado no painel do Resend); mantém o mesmo remetente de
+// antes como padrão pra não mudar comportamento até isso ser configurado.
+function emailFrom(): string {
+  return process.env.EMAIL_FROM || "LiderAdv <onboarding@resend.dev>";
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export async function enviarEmailResetSenha({
   para,
   resetUrl,
@@ -26,7 +41,7 @@ export async function enviarEmailResetSenha({
   }
 
   await resend.emails.send({
-    from: "LiderAdv <onboarding@resend.dev>",
+    from: emailFrom(),
     to: para,
     subject: "[LiderAdv] Redefinição de senha",
     html: `
@@ -110,12 +125,23 @@ export async function notificarEmailRecebido({
     return;
   }
 
-  const remetente = deNome ? `${deNome} &lt;${de}&gt;` : de;
+  // Cabeçalho "subject" não é HTML — usa os valores crus (só o corpo HTML
+  // abaixo precisa de escape).
   const assuntoEmail = assunto ?? "(sem assunto)";
+
+  // "de"/"deNome"/"assunto"/"cliente" vêm (direta ou indiretamente) de
+  // e-mails recebidos de QUALQUER remetente externo (feature de caixa de
+  // entrada por cliente) — sem escapar, um remetente malicioso injetava
+  // HTML no nome de exibição ou assunto, que ia cru pro e-mail de
+  // notificação interna do escritório. textoCorpo já era escapado (linha
+  // abaixo), esses campos tinham ficado de fora.
+  const remetenteHtml = escapeHtml(deNome ? `${deNome} <${de}>` : de);
+  const assuntoHtml = escapeHtml(assuntoEmail);
+  const clienteHtml = escapeHtml(cliente);
   const textoCorpo = corpo ? corpo.slice(0, 1200) : null;
 
   await resend.emails.send({
-    from: "LiderAdv <onboarding@resend.dev>",
+    from: emailFrom(),
     to: para,
     subject: `[LiderAdv] Novo e-mail de ${cliente} — ${assuntoEmail}`,
     html: `
@@ -143,15 +169,15 @@ export async function notificarEmailRecebido({
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;border-collapse:collapse;">
               <tr>
                 <td style="padding:7px 0;color:#64748b;font-size:12px;font-weight:600;width:80px;vertical-align:top;">CLIENTE</td>
-                <td style="padding:7px 0;font-weight:700;color:#0f172a;font-size:14px;">${cliente}</td>
+                <td style="padding:7px 0;font-weight:700;color:#0f172a;font-size:14px;">${clienteHtml}</td>
               </tr>
               <tr>
                 <td style="padding:7px 0;color:#64748b;font-size:12px;font-weight:600;vertical-align:top;">DE</td>
-                <td style="padding:7px 0;color:#334155;font-size:13px;">${remetente}</td>
+                <td style="padding:7px 0;color:#334155;font-size:13px;">${remetenteHtml}</td>
               </tr>
               <tr>
                 <td style="padding:7px 0;color:#64748b;font-size:12px;font-weight:600;vertical-align:top;">ASSUNTO</td>
-                <td style="padding:7px 0;font-weight:600;color:#0f172a;font-size:14px;">${assuntoEmail}</td>
+                <td style="padding:7px 0;font-weight:600;color:#0f172a;font-size:14px;">${assuntoHtml}</td>
               </tr>
             </table>
 
@@ -252,7 +278,7 @@ export async function enviarEmailEnvelopeEnviado({
        </td></tr>`;
 
   await resend.emails.send({
-    from: "LiderAdv <onboarding@resend.dev>",
+    from: emailFrom(),
     to: para,
     subject: `[LiderAdv] Envelope enviado — ${envelopeNome}`,
     html: `
@@ -376,7 +402,7 @@ export async function enviarEmailNovaPublicacao({
     .join("");
 
   await resend.emails.send({
-    from: "LiderAdv <onboarding@resend.dev>",
+    from: emailFrom(),
     to: para,
     subject: `[LiderAdv] 📋 ${titulo}`,
     html: `

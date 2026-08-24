@@ -153,6 +153,24 @@ export async function createHistoricoRegistroAction(data: {
   }
 }
 
+export async function marcarAndamentoLidoAction(
+  id: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "ver"))
+    return { error: "Sem permissão." };
+  try {
+    await sql`
+      UPDATE historico_registros SET lido_em = NOW()
+      WHERE id = ${id}::uuid AND lido_em IS NULL
+    `;
+    revalidatePath("/dashboard/processos/andamentos");
+    return {};
+  } catch {
+    return { error: "Erro ao marcar como lido." };
+  }
+}
+
 export async function deleteHistoricoRegistroAction(
   id: string,
   processoId: string

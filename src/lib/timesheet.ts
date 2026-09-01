@@ -51,6 +51,9 @@ export async function getTimesheetsPorOrigem(
   origemTipo: OrigemTimesheet,
   origemId: string
 ): Promise<TimesheetEntrada[]> {
+  const session = await getSession();
+  if (!session) return [];
+
   const rows = await sql`
     SELECT ts.id::text, ts.descricao, ts.inicio::text, ts.fim::text,
            ts.duracao_min, col.nome AS colaborador_nome

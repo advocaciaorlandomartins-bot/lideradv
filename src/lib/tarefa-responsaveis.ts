@@ -6,51 +6,6 @@ import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { podeEditarProcesso } from "./processo-ownership";
 
-export interface ResponsavelAdicional {
-  colaboradorId: string;
-  nome: string;
-}
-
-export async function getResponsaveisAdicionais(
-  tarefaId: string
-): Promise<ResponsavelAdicional[]> {
-  const rows = await sql`
-    SELECT col.id::text AS colaborador_id, col.nome
-    FROM tarefa_responsaveis_adicionais tra
-    JOIN colaboradores col ON col.id = tra.colaborador_id
-    WHERE tra.tarefa_id = ${tarefaId}::uuid
-    ORDER BY col.nome
-  `;
-  return rows.map((r) => ({
-    colaboradorId: String(r.colaborador_id),
-    nome: String(r.nome),
-  }));
-}
-
-/** Mapa tarefaId → lista de co-responsáveis, para várias tarefas de uma vez. */
-export async function getResponsaveisAdicionaisPorProcesso(
-  processoId: string
-): Promise<Record<string, ResponsavelAdicional[]>> {
-  const rows = await sql`
-    SELECT tra.tarefa_id::text, col.id::text AS colaborador_id, col.nome
-    FROM tarefa_responsaveis_adicionais tra
-    JOIN colaboradores col ON col.id = tra.colaborador_id
-    JOIN tarefas_processo t ON t.id = tra.tarefa_id
-    WHERE t.processo_id = ${processoId}::uuid
-    ORDER BY col.nome
-  `;
-  const map: Record<string, ResponsavelAdicional[]> = {};
-  for (const r of rows) {
-    const tarefaId = String(r.tarefa_id);
-    if (!map[tarefaId]) map[tarefaId] = [];
-    map[tarefaId].push({
-      colaboradorId: String(r.colaborador_id),
-      nome: String(r.nome),
-    });
-  }
-  return map;
-}
-
 export async function adicionarResponsavelAction(
   tarefaId: string,
   colaboradorId: string,

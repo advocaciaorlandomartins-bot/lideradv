@@ -21,7 +21,7 @@ Grupo Jurídico: Agenda · Clientes · Processos · Publicações · Controles (
 Grupo Negócios: CRM · Produção · Financeiro
 Grupo Documentos: Modelos · Assinaturas · PDFs
 Grupo Equipe: Minhas Tarefas · Meu Financeiro · Colaboradores · Teste DISC
-Grupo Sistema: Gerenciador · Auditoria · Relatórios · Integrações · Usuários · Configurações
+Grupo Sistema: Gerenciador · Controladoria · Athena IA · Auditoria · Relatórios · Integrações · Usuários · Configurações
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 MÓDULOS DO SISTEMA
@@ -78,6 +78,7 @@ Abas:
 - Logo abaixo do stepper, uma faixa "Próxima ação" resume em uma frase o que falta fazer no caso (ex: "Dar entrada no requerimento administrativo (INSS)", "INSS indeferiu — ingressar com ação judicial", "Aguardando resultado do INSS") — calculada automaticamente a partir do estágio e dos resultados administrativo/judicial, sem precisar de tarefa manual; fica vermelha quando é urgente
 - Abas: "Dados" · "Relato" · "Linha do tempo"
 - Linha do tempo: adicionar histórico, criar evento de controle, criar tarefa, criar pendência — com botões de baixa, reabertura, exclusão
+- Ao criar uma tarefa do processo: além do responsável principal, dá pra marcar "Colaboradores adicionais" (múltiplos responsáveis) — eles também passam a ver a tarefa em Minhas Tarefas. Depois de criada, dá pra adicionar/remover colaboradores adicionais direto na lista de Tarefas do processo (botão "+ colaborador"). Também dá pra definir um checklist obrigatório (um item por linha) que precisa estar todo marcado antes de dar baixa na tarefa
 - Botões de avanço: "Mover para Produção", "Registrar resultado Administrativo", "Registrar resultado Judicial", "Arquivar", "Reabrir", "Voltar etapa"
 - "Arquivar" abre um formulário pedindo o resultado final (Deferido, Indeferido, Sentença favorável, Desistência, etc.) e observação — existe só essa via de arquivamento no processo, para o estágio da Linha de Produção e o status do processo nunca ficarem dessincronizados
 - Seção IA Jurídica: análise, diagnóstico estratégico, geração de petições
@@ -95,6 +96,9 @@ A seção abre com sub-navegação no topo: "Controles" e "Perícias"
 - Filtros por tipo: Audiências · Prazos Processuais · Perícias e Av. Sociais · Prorrogação (DCB) · Benefícios – Ag. Implantação · Benefícios Implantados (1° Pag.) · Benefícios Implantados · Alvarás/RPVs
 - Status disponíveis: Aguardando · Concluído · Cancelado
 - Botão "Novo {tipo}" (ex: "Nova audiência", "Novo prazo", "Novo alvará") → formulário com data, descrição, cliente, processo, responsável, local, prioridade, observações
+- Ao escolher o responsável, o formulário mostra quantas tarefas/controles abertos cada pessoa já tem (e um aviso ⚠ se tiver algo vencido) — ajuda a não sobrecarregar quem já está no limite
+- Checklist obrigatório (opcional): campo de texto (um item por linha) na criação; na edição do controle, lista com caixinhas de marcar + botão para adicionar/remover itens. Enquanto houver item não marcado, o botão "Dar baixa" fica bloqueado
+- Tempo registrado: na edição do controle, mostra o histórico de cronômetro (ver Minhas Tarefas) somado
 - Criação automática via botão "Processar INSS" na aba Documentos do cliente
 
 ### Aba Perícias (clique em "Perícias" na sub-navegação):
@@ -196,14 +200,18 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 
 ## MINHAS TAREFAS (menu: Equipe → Minhas Tarefas)
 - Kanban pessoal com colunas: "Pendentes" · "Em Andamento" · "Concluídas"
-- Mostra tarefas e controles atribuídos ao usuário logado
+- Mostra tarefas e controles atribuídos ao usuário logado, incluindo tarefas onde ele é "colaborador adicional" (múltiplos responsáveis), não só o responsável principal
 - A coluna "Pendentes" também mostra, automaticamente, uma "ação pendente" para cada processo em que o colaborador é responsável e que precisa de alguma providência — mesmo sem tarefa/controle agendado (ex: "Dar entrada no requerimento administrativo (INSS)" quando o processo está na fase Administrativo sem protocolo ainda, ou "INSS indeferiu — ingressar com ação judicial"). Essas ações vêm direto do estágio do processo (Análise/Produção/Administrativo/Judicial) e ficam marcadas como "Ação urgente" quando fazem parte crítica; clicar em "Ver processo" leva direto ao caso
 - Tarefas/controles explícitos são criados pelos gestores dentro do detalhe de cada processo — as ações derivadas de processo não precisam ser criadas por ninguém
+- Cada card tem um botão "Cronômetro" para registrar o tempo gasto naquela tarefa/controle — inicia e para o cronômetro; se já houver outro cronômetro rodando em outro item, ele é encerrado automaticamente ao iniciar um novo
+- Se o item tiver checklist obrigatório, os itens aparecem no card com caixinha de marcar; o botão "Dar baixa" só libera quando todos estiverem marcados
 
 ## COLABORADORES (menu: Equipe → Colaboradores)
 - Lista de todos os colaboradores do escritório
 - Botão "Novo Colaborador" → formulário com nome, categoria (Administrador, Advogado, Secretária, Estagiário), permissões
 - Cada categoria tem acesso diferente ao sistema
+- Cadastro/edição do colaborador: seção "Comissão por fase do processo" (% administrativo, judicial, ou ambos) e seção "Metas com bônus escalonado" — até 3 faixas (Meta 1/2/3), cada uma com um valor de comissão recebida no mês e um bônus fixo correspondente; vale só o degrau mais alto batido no mês, não soma os três
+- Na página do colaborador: card "Meta do mês" mostra a comissão recebida até agora, se alguma meta foi batida e o valor do bônus; botão "Gerar bônus do mês" (só quando uma meta foi atingida e ainda não gerado) cria uma "Bonificação" pendente em Remunerações, para o admin confirmar o pagamento — geração é sempre manual, nunca automática
 
 ## TESTE DISC (menu: Equipe → Teste DISC)
 - Testes comportamentais para seleção de colaboradores (metodologia DISC)
@@ -214,6 +222,18 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Painel analítico completo do escritório (somente Administradores)
 - KPIs: totais de clientes, processos, colaboradores, receitas mensais, leads CRM
 - Visualização gerencial — sem criação de dados aqui
+
+## CONTROLADORIA (menu: Sistema → Controladoria)
+- Painel de gestão de equipe, com 3 blocos:
+  1. Ranking — pontuação por colaborador (cada tarefa/controle concluído vale pontos configuráveis), com seletor de período (7/30/90 dias)
+  2. Carga da equipe — quantas tarefas/controles abertos cada colaborador tem, com alerta de item vencido; essa mesma informação aparece na hora de escolher responsável em Controles e Tarefas
+  3. Capacidade produtiva — gráfico comparando quantos itens entraram vs. quantos foram concluídos por semana, últimas 8 semanas
+- Visível para todos (cada um vê a própria posição no ranking); dados completos de gestão de equipe
+
+## ATHENA IA (menu: Sistema → Athena IA)
+- Assistente de IA com acesso aos dados reais e atuais do escritório (ranking, carga da equipe, capacidade produtiva, pendências, financeiro) — diferente do Assistente LiderAdv (este aqui só orienta sobre como usar as telas)
+- Pergunte em linguagem natural, ex: "quem está mais sobrecarregado essa semana?", "como está nosso ranking esse mês?", "quantos processos estão aguardando resultado?"
+- Chat de página inteira, separado do balão flutuante
 
 ## AUDITORIA (menu: Sistema → Auditoria)
 - Log de todas as ações realizadas no sistema

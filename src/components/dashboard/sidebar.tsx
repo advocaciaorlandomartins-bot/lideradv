@@ -183,6 +183,12 @@ const GROUPS: {
         modulo: "controladoria",
       },
       {
+        href: "/dashboard/athena",
+        icon: SparklesIcon,
+        label: "Athena IA",
+        modulo: "controladoria",
+      },
+      {
         href: "/dashboard/gerenciador/auditoria",
         icon: ClipboardCheckIcon,
         label: "Auditoria",

@@ -29,6 +29,7 @@ import {
   FileStackIcon,
   PenSignIcon,
   TrophyIcon,
+  SparklesIcon,
 } from "@/components/icons";
 
 // Itens principais do menu (sem Usuários e Configurações)
@@ -131,6 +132,12 @@ const GERENCIADOR_SUBS = [
     href: "/dashboard/controladoria",
     icon: TrophyIcon,
     label: "Controladoria",
+    modulo: "controladoria",
+  },
+  {
+    href: "/dashboard/athena",
+    icon: SparklesIcon,
+    label: "Athena IA",
     modulo: "controladoria",
   },
   {

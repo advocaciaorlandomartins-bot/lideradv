@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import sql from "./db";
-import { getSession } from "./session";
+import { getSession, type SessionUser } from "./session";
 import { hasPermission } from "./permissoes";
 import {
   parseChecklist,
@@ -25,6 +25,40 @@ export async function checklistCompleto(
   return checklist.every((i) => i.feito);
 }
 
+/**
+ * Autoatendimento (mesmo padrão de darBaixaControleAction/darBaixaTarefaAction
+ * em minhas-tarefas-actions.ts): quem tem "controles: editar" pode alternar
+ * qualquer item (uso na tela de edição do Controle); sem essa permissão
+ * ampla — caso comum de Colaborador(a)/Estagiário(a) — só pode alternar
+ * itens de algo que é seu, marcado como responsável (uso nos cards de
+ * Minhas Tarefas). Sem essa checagem, qualquer usuário autenticado
+ * conseguiria marcar/desmarcar checklist de controles/tarefas de outras
+ * pessoas só sabendo o UUID.
+ */
+async function podeAlterarChecklist(
+  session: SessionUser,
+  tabela: string,
+  origemId: string
+): Promise<boolean> {
+  if (hasPermission(session, "controles", "editar")) return true;
+  const ownerCheck =
+    tabela === "controles"
+      ? await sql`
+          SELECT c.id FROM controles c
+          LEFT JOIN usuarios u ON u.id = c.responsavel_id
+          WHERE c.id = ${origemId}::uuid
+            AND (u.login = ${session.login} OR c.responsavel_id IS NULL)
+        `
+      : await sql`
+          SELECT t.id FROM tarefas_processo t
+          LEFT JOIN usuarios u ON u.login = ${session.login}
+          LEFT JOIN colaboradores col ON col.id = u.colaborador_id
+          WHERE t.id = ${origemId}::uuid
+            AND (t.responsavel = ${session.nome} OR t.responsavel = col.nome)
+        `;
+  return ownerCheck.length > 0;
+}
+
 export async function toggleChecklistItemAction(
   origemTipo: OrigemChecklist,
   origemId: string,
@@ -35,6 +69,9 @@ export async function toggleChecklistItemAction(
 
   try {
     const tabela = TABELA_CHECKLIST[origemTipo];
+    if (!(await podeAlterarChecklist(session, tabela, origemId)))
+      return { error: "Sem permissão." };
+
     const [row] =
       tabela === "controles"
         ? await sql`SELECT checklist FROM controles WHERE id = ${origemId}::uuid`

@@ -7,6 +7,7 @@ import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { podeEditarProcesso } from "./processo-ownership";
 import { interpretarAndamento } from "./cerebroJuridico";
+import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 
 // ── Fase / Status ──────────────────────────────────────────────
 
@@ -406,7 +407,12 @@ export async function updateTarefaStatusAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`UPDATE tarefas_processo SET status = ${status} WHERE id = ${id}::uuid`;
+    await sql`UPDATE tarefas_processo SET status = ${status}, updated_at = NOW() WHERE id = ${id}::uuid`;
+    if (status === "Concluída") {
+      await registrarPontosConclusao("tarefa_processo", id);
+    } else {
+      await reverterPontosConclusao("tarefa_processo", id);
+    }
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard/minhas-tarefas");
     revalidatePath("/dashboard/producao");
@@ -427,7 +433,8 @@ export async function darBaixaTarefaProcessoAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`UPDATE tarefas_processo SET status = 'Concluída' WHERE id = ${id}::uuid`;
+    await sql`UPDATE tarefas_processo SET status = 'Concluída', updated_at = NOW() WHERE id = ${id}::uuid`;
+    await registrarPontosConclusao("tarefa_processo", id);
 
     // Auto-avanço: se todas as tarefas do processo estão concluídas e está em analise → producao
     const rows =
@@ -463,7 +470,8 @@ export async function reabrirTarefaProcessoAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`UPDATE tarefas_processo SET status = 'Pendente' WHERE id = ${id}::uuid`;
+    await sql`UPDATE tarefas_processo SET status = 'Pendente', updated_at = NOW() WHERE id = ${id}::uuid`;
+    await reverterPontosConclusao("tarefa_processo", id);
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard/minhas-tarefas");
     revalidatePath("/dashboard");

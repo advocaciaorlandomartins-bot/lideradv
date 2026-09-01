@@ -28,6 +28,7 @@ import {
   InboxArrowDownIcon,
   FileStackIcon,
   PenSignIcon,
+  TrophyIcon,
 } from "@/components/icons";
 
 // Itens principais do menu (sem Usuários e Configurações)
@@ -125,6 +126,12 @@ const GERENCIADOR_SUBS = [
     icon: ClipboardListIcon,
     label: "Log de Auditoria",
     modulo: "gerenciador",
+  },
+  {
+    href: "/dashboard/controladoria",
+    icon: TrophyIcon,
+    label: "Controladoria",
+    modulo: "controladoria",
   },
   {
     href: "/dashboard/relatorios",

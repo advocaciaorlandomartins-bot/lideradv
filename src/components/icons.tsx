@@ -866,6 +866,28 @@ export function ArrowTopRightOnSquareIcon({ className }: IconProps) {
   );
 }
 
+export function TrophyIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+      <path d="M7 4h10v6a5 5 0 0 1-10 0V4Z" />
+      <path d="M17 5h3a2 2 0 0 1-2 4h-1" />
+      <path d="M7 5H4a2 2 0 0 0 2 4h1" />
+    </Icon>
+  );
+}
+
+export function GaugeIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+      <path d="M13.4 10.6 17 7" />
+      <path d="M4.9 19a9 9 0 1 1 14.2 0" />
+    </Icon>
+  );
+}
+
 export function SparklesIcon({ className }: IconProps) {
   return (
     <svg

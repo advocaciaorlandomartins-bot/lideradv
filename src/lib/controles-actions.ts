@@ -5,6 +5,7 @@ import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { logAction } from "./audit";
+import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 
 export type ControleFormState = { error?: string; success?: boolean } | null;
 
@@ -444,6 +445,11 @@ export async function updateStatusControleAction(
 
   const dbStatus = novoStatus === "pendente" ? null : novoStatus;
   await sql`UPDATE controles SET status = ${dbStatus}, updated_at = NOW() WHERE id = ${id}::uuid`;
+  if (novoStatus === "concluido") {
+    await registrarPontosConclusao("controle", id);
+  } else {
+    await reverterPontosConclusao("controle", id);
+  }
   await logAction({
     acao: "editar",
     entidade: "controle",

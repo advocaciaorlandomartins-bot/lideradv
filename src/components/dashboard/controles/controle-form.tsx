@@ -18,6 +18,7 @@ import {
   type UsuarioOption,
   type LocalAudiencia,
 } from "@/lib/controles-types";
+import type { CargaColaborador } from "@/lib/controladoria-db";
 
 function addDays(dateStr: string, days: number): string {
   if (!dateStr) return "";
@@ -40,6 +41,7 @@ interface Props {
   usuarios: UsuarioOption[];
   locais: LocalAudiencia[];
   locaisPericia: LocalAudiencia[];
+  carga?: CargaColaborador[];
 }
 
 export default function ControleForm({
@@ -50,7 +52,18 @@ export default function ControleForm({
   usuarios,
   locais,
   locaisPericia,
+  carga = [],
 }: Props) {
+  // Anota cada usuário com a carga atual do colaborador vinculado — dá
+  // contexto na hora de escolher o responsável (evita empilhar tarefa em
+  // quem já está com prazo vencido).
+  const cargaPorColaborador = new Map(carga.map((c) => [c.colaboradorId, c]));
+  function labelComCarga(u: UsuarioOption): string {
+    const c = u.colaboradorId ? cargaPorColaborador.get(u.colaboradorId) : null;
+    if (!c) return `${u.nome} (${u.login})`;
+    const vencidas = c.totalVencidas > 0 ? ` ⚠${c.totalVencidas}` : "";
+    return `${u.nome} — ${c.totalAbertas} aberta${c.totalAbertas === 1 ? "" : "s"}${vencidas}`;
+  }
   const isEdit = !!controle;
   const router = useRouter();
 
@@ -230,10 +243,16 @@ export default function ControleForm({
               <option value="">— Nenhum —</option>
               {usuarios.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.nome} ({u.login})
+                  {labelComCarga(u)}
                 </option>
               ))}
             </select>
+            {carga.length > 0 && (
+              <p className="mt-1 font-body text-xs text-muted">
+                Número de tarefas/controles abertos de cada um · ⚠ = tem item
+                vencido
+              </p>
+            )}
           </div>
         </div>
       </div>

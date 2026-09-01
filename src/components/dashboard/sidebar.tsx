@@ -33,6 +33,7 @@ import {
   IdentificationIcon,
   BellAlertIcon,
   CurrencyIcon,
+  TrophyIcon,
 } from "@/components/icons";
 import { hasPermission } from "@/lib/permissoes";
 import type { SessionUser } from "@/lib/session";
@@ -174,6 +175,12 @@ const GROUPS: {
         icon: ChartBarIcon,
         label: "Gerenciador",
         modulo: "gerenciador",
+      },
+      {
+        href: "/dashboard/controladoria",
+        icon: TrophyIcon,
+        label: "Controladoria",
+        modulo: "controladoria",
       },
       {
         href: "/dashboard/gerenciador/auditoria",

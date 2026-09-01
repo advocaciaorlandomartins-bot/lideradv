@@ -125,6 +125,7 @@ export interface UsuarioOption {
   id: string;
   login: string;
   nome: string;
+  colaboradorId: string | null;
 }
 
 export function getTipoConfig(tipo: string) {

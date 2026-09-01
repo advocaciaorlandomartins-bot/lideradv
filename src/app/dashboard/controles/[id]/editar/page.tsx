@@ -11,6 +11,7 @@ import {
   getLocaisAudiencia,
   getLocaisPericia,
 } from "@/lib/controles-db";
+import { getCargaColaboradores } from "@/lib/controladoria-db";
 import { getTipoConfig } from "@/lib/controles-types";
 import ControleForm from "@/components/dashboard/controles/controle-form";
 
@@ -27,15 +28,23 @@ export default async function EditarControlePage({
 
   const { id } = await params;
 
-  const [controle, clientes, processos, usuarios, locais, locaisPericia] =
-    await Promise.all([
-      getControleById(id),
-      getClientesForControle(),
-      getProcessosForControle(),
-      getUsuariosForControle(),
-      getLocaisAudiencia(),
-      getLocaisPericia(),
-    ]);
+  const [
+    controle,
+    clientes,
+    processos,
+    usuarios,
+    locais,
+    locaisPericia,
+    carga,
+  ] = await Promise.all([
+    getControleById(id),
+    getClientesForControle(),
+    getProcessosForControle(),
+    getUsuariosForControle(),
+    getLocaisAudiencia(),
+    getLocaisPericia(),
+    getCargaColaboradores(),
+  ]);
 
   if (!controle) notFound();
 
@@ -81,6 +90,7 @@ export default async function EditarControlePage({
         usuarios={usuarios}
         locais={locais}
         locaisPericia={locaisPericia}
+        carga={carga}
       />
     </div>
   );

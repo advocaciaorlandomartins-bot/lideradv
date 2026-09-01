@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { getSession } from "./session";
+import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 
 export async function darBaixaControleAction(
   id: string
@@ -19,6 +20,7 @@ export async function darBaixaControleAction(
   `;
   if (ownerCheck.length === 0) return { error: "Sem permissão." };
   await sql`UPDATE controles SET status = 'concluido' WHERE id = ${id}::uuid`;
+  await registrarPontosConclusao("controle", id);
   revalidatePath("/dashboard/minhas-tarefas");
   revalidatePath("/dashboard");
   return {};
@@ -40,7 +42,8 @@ export async function darBaixaTarefaAction(
   if (ownerCheck.length === 0) return { error: "Sem permissão." };
 
   // Mark tarefa as done
-  await sql`UPDATE tarefas_processo SET status = 'Concluída' WHERE id = ${id}::uuid`;
+  await sql`UPDATE tarefas_processo SET status = 'Concluída', updated_at = NOW() WHERE id = ${id}::uuid`;
+  await registrarPontosConclusao("tarefa_processo", id);
 
   // Check if all pending tasks for this processo are now done — auto-advance analise→producao
   const tarefaRows = await sql`
@@ -89,6 +92,7 @@ export async function reabrirControleAction(
   `;
   if (ownerCheck.length === 0) return { error: "Sem permissão." };
   await sql`UPDATE controles SET status = NULL WHERE id = ${id}::uuid`;
+  await reverterPontosConclusao("controle", id);
   revalidatePath("/dashboard/minhas-tarefas");
   revalidatePath("/dashboard");
   return {};
@@ -107,7 +111,8 @@ export async function reabrirTarefaAction(
       AND (t.responsavel = ${session.nome} OR t.responsavel = c.nome)
   `;
   if (ownerCheck.length === 0) return { error: "Sem permissão." };
-  await sql`UPDATE tarefas_processo SET status = 'Pendente' WHERE id = ${id}::uuid`;
+  await sql`UPDATE tarefas_processo SET status = 'Pendente', updated_at = NOW() WHERE id = ${id}::uuid`;
+  await reverterPontosConclusao("tarefa_processo", id);
   const rows =
     await sql`SELECT processo_id::text FROM tarefas_processo WHERE id = ${id}::uuid`;
   revalidatePath("/dashboard/minhas-tarefas");

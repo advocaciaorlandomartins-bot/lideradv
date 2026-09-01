@@ -10,6 +10,7 @@ import {
   getLocaisAudiencia,
   getLocaisPericia,
 } from "@/lib/controles-db";
+import { getCargaColaboradores } from "@/lib/controladoria-db";
 import { getTipoConfig } from "@/lib/controles-types";
 import ControleForm from "@/components/dashboard/controles/controle-form";
 
@@ -27,13 +28,14 @@ export default async function NovoControlePage({
   const { tipo = "audiencias" } = await searchParams;
   const tipoConfig = getTipoConfig(tipo);
 
-  const [clientes, processos, usuarios, locais, locaisPericia] =
+  const [clientes, processos, usuarios, locais, locaisPericia, carga] =
     await Promise.all([
       getClientesForControle(),
       getProcessosForControle(),
       getUsuariosForControle(),
       getLocaisAudiencia(),
       getLocaisPericia(),
+      getCargaColaboradores(),
     ]);
 
   return (
@@ -75,6 +77,7 @@ export default async function NovoControlePage({
         usuarios={usuarios}
         locais={locais}
         locaisPericia={locaisPericia}
+        carga={carga}
       />
     </div>
   );

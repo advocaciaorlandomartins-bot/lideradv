@@ -169,7 +169,7 @@ export async function getProcessosForControle(): Promise<ProcessoOption[]> {
 
 export async function getUsuariosForControle(): Promise<UsuarioOption[]> {
   const rows = await sql`
-    SELECT id::text, login, nome
+    SELECT id::text, login, nome, colaborador_id::text
     FROM usuarios
     WHERE ativo = TRUE
     ORDER BY nome ASC
@@ -178,6 +178,7 @@ export async function getUsuariosForControle(): Promise<UsuarioOption[]> {
     id: String(r.id),
     login: String(r.login),
     nome: String(r.nome),
+    colaboradorId: r.colaborador_id ? String(r.colaborador_id) : null,
   }));
 }
 

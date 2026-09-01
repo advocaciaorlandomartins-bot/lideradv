@@ -59,6 +59,7 @@ export interface TarefaProcesso {
   prazo: string | null;
   status: string;
   comentarios: string | null;
+  coResponsaveis: { colaboradorId: string; nome: string }[];
 }
 
 export interface PendenciaCliente {
@@ -236,14 +237,23 @@ export async function getTarefasByProcesso(
   processoId: string
 ): Promise<TarefaProcesso[]> {
   const rows = await sql`
-    SELECT id::text, processo_id::text, titulo, responsavel, prioridade,
-           to_char(prazo, 'DD/MM/YYYY') AS prazo, status, comentarios
-    FROM tarefas_processo
-    WHERE processo_id = ${processoId}::uuid
+    SELECT t.id::text, t.processo_id::text, t.titulo, t.responsavel, t.prioridade,
+           to_char(t.prazo, 'DD/MM/YYYY') AS prazo, t.status, t.comentarios,
+           (
+             SELECT COALESCE(
+               json_agg(json_build_object('colaboradorId', col.id::text, 'nome', col.nome) ORDER BY col.nome),
+               '[]'::json
+             )
+             FROM tarefa_responsaveis_adicionais tra
+             JOIN colaboradores col ON col.id = tra.colaborador_id
+             WHERE tra.tarefa_id = t.id
+           ) AS co_responsaveis
+    FROM tarefas_processo t
+    WHERE t.processo_id = ${processoId}::uuid
     ORDER BY
-      CASE prioridade WHEN 'Alta' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,
-      prazo ASC NULLS LAST,
-      created_at DESC
+      CASE t.prioridade WHEN 'Alta' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,
+      t.prazo ASC NULLS LAST,
+      t.created_at DESC
   `;
   return rows.map((r) => ({
     id: r.id,
@@ -254,6 +264,10 @@ export async function getTarefasByProcesso(
     prazo: r.prazo ?? null,
     status: r.status,
     comentarios: r.comentarios ?? null,
+    coResponsaveis:
+      typeof r.co_responsaveis === "string"
+        ? JSON.parse(r.co_responsaveis)
+        : (r.co_responsaveis ?? []),
   }));
 }
 

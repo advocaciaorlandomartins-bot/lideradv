@@ -29,6 +29,7 @@ export interface MinhaTarefa {
   cliente_id: string | null;
   estagio_producao: string | null;
   checklist: ChecklistItem[];
+  coResponsaveis: string[];
   source: "tarefa";
 }
 
@@ -114,7 +115,13 @@ export async function getMinhasTarefas(
         t.status, t.checklist,
         p.id::text AS processo_id, p.numero AS processo_numero,
         p.estagio_producao,
-        cl.id::text AS cliente_id, cl.name AS cliente_nome
+        cl.id::text AS cliente_id, cl.name AS cliente_nome,
+        (
+          SELECT COALESCE(array_agg(col.nome ORDER BY col.nome), ARRAY[]::text[])
+          FROM tarefa_responsaveis_adicionais tra
+          JOIN colaboradores col ON col.id = tra.colaborador_id
+          WHERE tra.tarefa_id = t.id
+        ) AS co_responsaveis
       FROM tarefas_processo t
       JOIN processos p ON p.id = t.processo_id
       LEFT JOIN clients cl ON cl.id = p.client_id
@@ -125,6 +132,11 @@ export async function getMinhasTarefas(
         -- todo mundo, mesmo o processo tendo responsável definido — cai
         -- pro responsável do processo quando a tarefa em si não tem um.
         OR (t.responsavel IS NULL AND p.responsavel_id = ${colaboradorId}::uuid)
+        -- Co-responsável adicionado à tarefa (múltiplos responsáveis).
+        OR (${colaboradorId}::uuid IS NOT NULL AND EXISTS (
+          SELECT 1 FROM tarefa_responsaveis_adicionais tra
+          WHERE tra.tarefa_id = t.id AND tra.colaborador_id = ${colaboradorId}::uuid
+        ))
       )
         AND t.status != 'Cancelada'
       ORDER BY
@@ -181,6 +193,9 @@ export async function getMinhasTarefas(
     cliente_id: r.cliente_id ? String(r.cliente_id) : null,
     estagio_producao: r.estagio_producao ? String(r.estagio_producao) : null,
     checklist: parseChecklist(r.checklist),
+    coResponsaveis: Array.isArray(r.co_responsaveis)
+      ? r.co_responsaveis.map(String)
+      : [],
     source: "tarefa" as const,
   }));
 

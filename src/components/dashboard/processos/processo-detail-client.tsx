@@ -51,6 +51,10 @@ import {
 } from "@/lib/producao-types";
 import { getProximaAcaoProcesso } from "@/lib/processo-fases";
 import {
+  adicionarResponsavelAction,
+  removerResponsavelAction,
+} from "@/lib/tarefa-responsaveis";
+import {
   XMarkIcon,
   SpinnerIcon,
   DocumentTextIcon,
@@ -1501,16 +1505,50 @@ function ResponsavelSection({
 function TarefasSection({
   tarefas,
   processo,
+  colaboradores,
   onNova,
   sessionNome,
 }: {
   tarefas: TarefaProcesso[];
   processo: ProcessoExtended;
+  colaboradores: ColaboradorSimples[];
   onNova: () => void;
   sessionNome?: string;
 }) {
   const [, startTransition] = useTransition();
+  const [pickerAbertoPara, setPickerAbertoPara] = useState<string | null>(null);
   const router = useRouter();
+
+  function handleAdicionarResponsavel(tarefaId: string, colaboradorId: string) {
+    setPickerAbertoPara(null);
+    startTransition(async () => {
+      const result = await adicionarResponsavelAction(
+        tarefaId,
+        colaboradorId,
+        processo.id
+      );
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleRemoverResponsavel(tarefaId: string, colaboradorId: string) {
+    startTransition(async () => {
+      const result = await removerResponsavelAction(
+        tarefaId,
+        colaboradorId,
+        processo.id
+      );
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   const isConcluida = (t: TarefaProcesso) =>
     t.status === "Concluída" || t.status === "concluida";
@@ -1614,6 +1652,63 @@ function TarefasSection({
                       </span>
                     )}
                   </div>
+                  {!done && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      {t.coResponsaveis.map((cr) => (
+                        <span
+                          key={cr.colaboradorId}
+                          className="flex items-center gap-1 rounded-full bg-slate-100 pl-2 pr-1 py-0.5 font-body text-[10px] font-semibold text-slate-600"
+                        >
+                          {cr.nome}
+                          <button
+                            onClick={() =>
+                              handleRemoverResponsavel(t.id, cr.colaboradorId)
+                            }
+                            className="text-slate-400 hover:text-red-600"
+                            title="Remover"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <div className="relative">
+                        <button
+                          onClick={() =>
+                            setPickerAbertoPara(
+                              pickerAbertoPara === t.id ? null : t.id
+                            )
+                          }
+                          className="rounded-full border border-dashed border-border px-1.5 py-0.5 font-body text-[10px] font-semibold text-muted hover:border-primary hover:text-primary"
+                          title="Adicionar colaborador"
+                        >
+                          + colaborador
+                        </button>
+                        {pickerAbertoPara === t.id && (
+                          <div className="absolute z-20 left-0 mt-1 max-h-40 w-44 overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+                            {colaboradores
+                              .filter(
+                                (c) =>
+                                  c.nome !== t.responsavel &&
+                                  !t.coResponsaveis.some(
+                                    (cr) => cr.colaboradorId === c.id
+                                  )
+                              )
+                              .map((c) => (
+                                <button
+                                  key={c.id}
+                                  onClick={() =>
+                                    handleAdicionarResponsavel(t.id, c.id)
+                                  }
+                                  className="block w-full text-left px-2.5 py-1.5 font-body text-xs text-fg hover:bg-slate-50"
+                                >
+                                  {c.nome}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => handleDelete(t.id)}
@@ -2370,9 +2465,16 @@ function NovaTarefaModal({
   const [hora, setHora] = useState("");
   const [comentarios, setComentarios] = useState("");
   const [checklistTexto, setChecklistTexto] = useState("");
+  const [coResponsaveisIds, setCoResponsaveisIds] = useState<string[]>([]);
   const [loading, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  function toggleCoResponsavel(id: string) {
+    setCoResponsaveisIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   function handleCreate() {
     setError(null);
@@ -2387,6 +2489,7 @@ function NovaTarefaModal({
         hora: hora || null,
         comentarios: comentarios || null,
         checklistTexto: checklistTexto || null,
+        coResponsaveisIds,
       });
       if (result.error) {
         setError(result.error);
@@ -2439,6 +2542,34 @@ function NovaTarefaModal({
             </select>
           </div>
         </div>
+        {colaboradores.length > 0 && (
+          <div>
+            <label className={labelCls}>Colaboradores adicionais</label>
+            <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-white p-2">
+              {colaboradores.map((c) => {
+                const checked = coResponsaveisIds.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => toggleCoResponsavel(c.id)}
+                    className={`rounded-full border px-2.5 py-1 font-body text-[11px] font-semibold transition-colors ${
+                      checked
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted hover:border-primary/40"
+                    }`}
+                  >
+                    {c.nome}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 font-body text-xs text-muted">
+              Opcional. Também recebem a tarefa em Minhas Tarefas, além do
+              responsável principal.
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Prazo</label>
@@ -2754,6 +2885,7 @@ export default function ProcessoDetailClient({
           <TarefasSection
             tarefas={tarefas}
             processo={processo}
+            colaboradores={colaboradores}
             onNova={() => setNovaTarefaOpen(true)}
             sessionNome={sessionNome}
           />

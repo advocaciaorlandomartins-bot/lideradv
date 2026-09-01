@@ -408,6 +408,13 @@ function ItemCard({
           </p>
         )}
 
+        {/* Co-responsáveis */}
+        {tarefa && tarefa.coResponsaveis.length > 0 && (
+          <p className="mt-0.5 font-body text-[11px] text-muted truncate">
+            Com {tarefa.coResponsaveis.join(", ")}
+          </p>
+        )}
+
         {/* Número do processo (texto, não link — navegação está no botão Ver) */}
         {processoNumero && (
           <p className="mt-0.5 font-body text-xs text-muted truncate">

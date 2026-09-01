@@ -370,7 +370,8 @@ export async function createTarefaProcessoAction(data: {
   hora: string | null;
   comentarios: string | null;
   checklistTexto?: string | null;
-}): Promise<{ error?: string }> {
+  coResponsaveisIds?: string[];
+}): Promise<{ error?: string; id?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "editar"))
     return { error: "Sem permissão." };
@@ -386,7 +387,7 @@ export async function createTarefaProcessoAction(data: {
       .map((texto) => ({ texto: texto.slice(0, 200), feito: false }))
   );
   try {
-    await sql`
+    const [row] = await sql`
       INSERT INTO tarefas_processo
         (processo_id, client_id, titulo, responsavel, prioridade, prazo, hora, comentarios, checklist)
       VALUES
@@ -399,10 +400,21 @@ export async function createTarefaProcessoAction(data: {
          ${data.hora ? data.hora : null}::time,
          ${data.comentarios || null},
          ${checklistJson}::jsonb)
+      RETURNING id::text
     `;
+    const tarefaId = String(row.id);
+    const coResponsaveis = (data.coResponsaveisIds ?? []).filter(Boolean);
+    for (const colaboradorId of coResponsaveis) {
+      await sql`
+        INSERT INTO tarefa_responsaveis_adicionais (tarefa_id, colaborador_id)
+        VALUES (${tarefaId}::uuid, ${colaboradorId}::uuid)
+        ON CONFLICT (tarefa_id, colaborador_id) DO NOTHING
+      `;
+    }
     revalidatePath(`/dashboard/processos/${data.processoId}`);
-    return {};
-  } catch {
+    return { id: tarefaId };
+  } catch (e) {
+    console.error("[tarefas] falha ao criar:", e);
     return { error: "Erro ao criar tarefa." };
   }
 }

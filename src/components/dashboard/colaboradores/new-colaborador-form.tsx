@@ -311,6 +311,93 @@ export default function NewColaboradorForm() {
         </div>
       </div>
 
+      {/* ── Metas com bônus escalonado ── */}
+      <div className="space-y-4">
+        <SectionTitle>Metas com bônus escalonado</SectionTitle>
+        <p className="font-body text-xs text-muted">
+          Ao bater cada meta de comissão recebida no mês, libera um bônus fixo.
+          Vale só o degrau mais alto atingido — não soma os três. Deixe em
+          branco para não usar metas — pode configurar depois.
+        </p>
+        <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <p className="font-body text-xs font-semibold text-fg">Meta 1</p>
+            <Field label="Comissão no mês (R$)">
+              <input
+                name="meta1_valor"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ex: 5000"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Bônus (R$)">
+              <input
+                name="meta1_bonus"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ex: 300"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <p className="font-body text-xs font-semibold text-fg">Meta 2</p>
+            <Field label="Comissão no mês (R$)">
+              <input
+                name="meta2_valor"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ex: 8000"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Bônus (R$)">
+              <input
+                name="meta2_bonus"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ex: 600"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <div className="rounded-lg border border-border p-3 space-y-2">
+            <p className="font-body text-xs font-semibold text-fg">Meta 3</p>
+            <Field label="Comissão no mês (R$)">
+              <input
+                name="meta3_valor"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ex: 12000"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Bônus (R$)">
+              <input
+                name="meta3_bonus"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ex: 1200"
+                disabled={isPending}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
+
       {/* ── Observações ── */}
       <div>
         <SectionTitle>Observações</SectionTitle>

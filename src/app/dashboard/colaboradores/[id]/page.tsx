@@ -12,11 +12,17 @@ import DeleteColaboradorButton from "@/components/dashboard/colaboradores/delete
 import ColaboradorRemuneracoes from "@/components/dashboard/colaboradores/colaborador-remuneracoes";
 import { getEstagioSnapshotByResponsavel } from "@/lib/producao-db";
 import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
+import { getBonusMetaStatus } from "@/lib/metas-bonus";
+import GerarBonusButton from "@/components/dashboard/colaboradores/gerar-bonus-button";
 import {
   ChevronRightIcon,
   UserPlusIcon,
   CalendarIcon,
 } from "@/components/icons";
+
+function formatBRL(v: number): string {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +46,19 @@ export default async function ColaboradorDetailPage({
   if (!session || !hasPermission(session, "colaboradores", "ver")) notFound();
 
   const { id } = await params;
-  const [colaborador, conta, estagioSnapshot] = await Promise.all([
+  const [colaborador, conta, estagioSnapshot, bonusStatus] = await Promise.all([
     getColaboradorFull(id),
     getColaboradorContaPagar(id),
     getEstagioSnapshotByResponsavel(id),
+    getBonusMetaStatus(id),
   ]);
   if (!colaborador) notFound();
+
+  const temMetas =
+    colaborador.meta1_valor != null ||
+    colaborador.meta2_valor != null ||
+    colaborador.meta3_valor != null;
+  const podeEditar = hasPermission(session, "colaboradores", "editar");
 
   return (
     <div className="space-y-6">
@@ -234,6 +247,53 @@ export default async function ColaboradorDetailPage({
           </>
         )}
       </div>
+
+      {/* Metas com bônus escalonado */}
+      {temMetas && bonusStatus && (
+        <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-heading text-base font-semibold text-fg">
+                Meta do mês ({bonusStatus.competencia})
+              </h2>
+              <p className="mt-1 font-body text-xs text-muted">
+                Comissão recebida no mês:{" "}
+                <strong className="text-fg">
+                  {formatBRL(bonusStatus.comissaoMes)}
+                </strong>
+              </p>
+            </div>
+            {podeEditar && bonusStatus.tierAtingido > 0 && (
+              <>
+                {bonusStatus.jaGerado ? (
+                  <span className="rounded-full bg-emerald-50 px-3 py-1.5 font-body text-xs font-semibold text-emerald-700">
+                    Bônus do mês já gerado
+                  </span>
+                ) : (
+                  <GerarBonusButton colaboradorId={colaborador.id} />
+                )}
+              </>
+            )}
+          </div>
+
+          {bonusStatus.tierAtingido > 0 ? (
+            <p className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 font-body text-sm text-emerald-700">
+              Meta {bonusStatus.tierAtingido} atingida — bônus de{" "}
+              <strong>{formatBRL(bonusStatus.bonusValor)}</strong>
+            </p>
+          ) : (
+            <p className="rounded-lg bg-slate-50 border border-border px-3 py-2 font-body text-sm text-muted">
+              Nenhuma meta atingida ainda neste mês.
+            </p>
+          )}
+          {bonusStatus.proximaMetaValor != null && (
+            <p className="mt-2 font-body text-xs text-muted">
+              Faltam {formatBRL(bonusStatus.faltaParaProxima ?? 0)} para a
+              próxima meta ({formatBRL(bonusStatus.proximaMetaValor)}).
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Remunerações */}
       <ColaboradorRemuneracoes colaboradorId={colaborador.id} conta={conta} />

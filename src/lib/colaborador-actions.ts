@@ -15,6 +15,13 @@ function pctField(formData: FormData, name: string): string | null {
   return !isNaN(n) && n >= 0 && n <= 100 ? String(n) : null;
 }
 
+function valorField(formData: FormData, name: string): string | null {
+  const raw = ((formData.get(name) as string | null) ?? "").trim();
+  if (!raw) return null;
+  const n = Number(raw.replace(",", "."));
+  return !isNaN(n) && n > 0 ? String(n) : null;
+}
+
 function getFields(formData: FormData) {
   const salarioRaw = (
     (formData.get("salario_mensal") as string | null) ?? ""
@@ -42,6 +49,12 @@ function getFields(formData: FormData) {
     ),
     comissaoJudicialPct: pctField(formData, "comissao_judicial_pct"),
     comissaoAmbosPct: pctField(formData, "comissao_ambos_pct"),
+    meta1Valor: valorField(formData, "meta1_valor"),
+    meta1Bonus: valorField(formData, "meta1_bonus"),
+    meta2Valor: valorField(formData, "meta2_valor"),
+    meta2Bonus: valorField(formData, "meta2_bonus"),
+    meta3Valor: valorField(formData, "meta3_valor"),
+    meta3Bonus: valorField(formData, "meta3_bonus"),
   };
 }
 
@@ -77,7 +90,8 @@ export async function createColaboradorAction(
       INSERT INTO colaboradores (
         nome, cargo, email, telefone, oab, salario_mensal, data_admissao,
         data_demissao, status, observacoes,
-        comissao_administrativo_pct, comissao_judicial_pct, comissao_ambos_pct
+        comissao_administrativo_pct, comissao_judicial_pct, comissao_ambos_pct,
+        meta1_valor, meta1_bonus, meta2_valor, meta2_bonus, meta3_valor, meta3_bonus
       )
       VALUES (
         ${f.nome},
@@ -92,7 +106,13 @@ export async function createColaboradorAction(
         ${f.observacoes},
         ${f.comissaoAdministrativoPct}::numeric,
         ${f.comissaoJudicialPct}::numeric,
-        ${f.comissaoAmbosPct}::numeric
+        ${f.comissaoAmbosPct}::numeric,
+        ${f.meta1Valor}::numeric,
+        ${f.meta1Bonus}::numeric,
+        ${f.meta2Valor}::numeric,
+        ${f.meta2Bonus}::numeric,
+        ${f.meta3Valor}::numeric,
+        ${f.meta3Bonus}::numeric
       )
       RETURNING id
     `;
@@ -169,6 +189,12 @@ export async function updateColaboradorAction(
         comissao_administrativo_pct  = ${f.comissaoAdministrativoPct}::numeric,
         comissao_judicial_pct        = ${f.comissaoJudicialPct}::numeric,
         comissao_ambos_pct           = ${f.comissaoAmbosPct}::numeric,
+        meta1_valor                  = ${f.meta1Valor}::numeric,
+        meta1_bonus                  = ${f.meta1Bonus}::numeric,
+        meta2_valor                  = ${f.meta2Valor}::numeric,
+        meta2_bonus                  = ${f.meta2Bonus}::numeric,
+        meta3_valor                  = ${f.meta3Valor}::numeric,
+        meta3_bonus                  = ${f.meta3Bonus}::numeric,
         updated_at                   = NOW()
       WHERE id = ${id}::uuid
     `;

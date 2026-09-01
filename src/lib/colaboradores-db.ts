@@ -22,6 +22,12 @@ export interface Colaborador {
   comissao_judicial_pct: number | null;
   /** % sobre o honorário quando o colaborador atuou nas duas fases. */
   comissao_ambos_pct: number | null;
+  meta1_valor: number | null;
+  meta1_bonus: number | null;
+  meta2_valor: number | null;
+  meta2_bonus: number | null;
+  meta3_valor: number | null;
+  meta3_bonus: number | null;
 }
 
 export interface ColaboradorFull extends Colaborador {
@@ -52,6 +58,12 @@ function mapRow(r: any): Colaborador {
       r.comissao_judicial_pct != null ? Number(r.comissao_judicial_pct) : null,
     comissao_ambos_pct:
       r.comissao_ambos_pct != null ? Number(r.comissao_ambos_pct) : null,
+    meta1_valor: r.meta1_valor != null ? Number(r.meta1_valor) : null,
+    meta1_bonus: r.meta1_bonus != null ? Number(r.meta1_bonus) : null,
+    meta2_valor: r.meta2_valor != null ? Number(r.meta2_valor) : null,
+    meta2_bonus: r.meta2_bonus != null ? Number(r.meta2_bonus) : null,
+    meta3_valor: r.meta3_valor != null ? Number(r.meta3_valor) : null,
+    meta3_bonus: r.meta3_bonus != null ? Number(r.meta3_bonus) : null,
   };
 }
 
@@ -72,6 +84,7 @@ export async function getAllColaboradores(): Promise<Colaborador[]> {
       comissao_administrativo_pct,
       comissao_judicial_pct,
       comissao_ambos_pct,
+      meta1_valor, meta1_bonus, meta2_valor, meta2_bonus, meta3_valor, meta3_bonus,
       created_at
     FROM colaboradores
     ORDER BY nome ASC
@@ -100,6 +113,7 @@ export async function getColaboradorFull(
       comissao_administrativo_pct,
       comissao_judicial_pct,
       comissao_ambos_pct,
+      meta1_valor, meta1_bonus, meta2_valor, meta2_bonus, meta3_valor, meta3_bonus,
       created_at
     FROM colaboradores
     WHERE id = ${id}::uuid

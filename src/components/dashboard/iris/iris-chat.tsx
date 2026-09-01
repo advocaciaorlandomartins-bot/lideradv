@@ -18,7 +18,7 @@ const SUGESTOES = [
   "O que tenho na agenda essa semana?",
   "Quais audiências estão chegando?",
   "Quem está mais sobrecarregado agora?",
-  "Como está o ranking desse mês?",
+  "Quais processos têm risco alto pro Cérebro Jurídico?",
 ];
 
 const ATALHOS_ADMIN = [

@@ -128,6 +128,38 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "listar_processos_risco",
+    description:
+      "Lista processos ativos (não arquivados/encerrados) analisados pelo Cérebro Jurídico, com risco (alto/médio/baixo) e probabilidade de êxito. Use quando o usuário perguntar sobre risco de processos, quais casos precisam de atenção, ou quer uma visão geral das análises do Cérebro Jurídico.",
+    input_schema: {
+      type: "object",
+      properties: {
+        risco: {
+          type: "string",
+          description:
+            "Filtra por 'alto', 'medio' ou 'baixo'. Se omitido, traz todos ordenados do maior risco pro menor.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "consultar_analise_cerebro",
+    description:
+      "Traz a análise mais recente do Cérebro Jurídico (risco, probabilidade de êxito, próxima ação, base legal) para um cliente ou processo específico, pelo nome do cliente ou número do processo.",
+    input_schema: {
+      type: "object",
+      properties: {
+        busca: {
+          type: "string",
+          description:
+            "Nome do cliente (ou parte) ou número do processo (CNJ).",
+        },
+      },
+      required: ["busca"],
+    },
+  },
 ];
 
 /** Ferramentas que executam mudança real no sistema — exigem configuracoes:editar. */
@@ -580,6 +612,79 @@ export async function executarFerramentaIris(
           nome: c.client_name,
           total_pendente: c.totalPendente,
           total_pago: c.totalPago,
+        })),
+      });
+    }
+
+    case "listar_processos_risco": {
+      const riscoFiltro =
+        typeof input.risco === "string" ? input.risco.trim().toLowerCase() : "";
+      const rows = await sql`
+        SELECT DISTINCT ON (ca.processo_id)
+          ca.processo_id::text, ca.risco, ca.probabilidade_sucesso,
+          ca.proxima_acao, ca.created_at::text AS criado_em,
+          p.numero AS processo_numero, cl.name AS cliente_nome
+        FROM cerebro_analises ca
+        JOIN processos p ON p.id = ca.processo_id
+        LEFT JOIN clients cl ON cl.id = p.client_id
+        WHERE ca.tipo = 'inicial'
+          AND ca.risco IS NOT NULL
+          AND p.status NOT IN ('arquivado', 'encerrado')
+          AND p.deleted_at IS NULL
+          AND (${riscoFiltro} = '' OR ca.risco = ${riscoFiltro})
+        ORDER BY ca.processo_id, ca.created_at DESC
+      `;
+      const ordem: Record<string, number> = { alto: 0, medio: 1, baixo: 2 };
+      const ordenado = rows
+        .map((r) => ({
+          processo_numero: r.processo_numero ?? "—",
+          cliente_nome: r.cliente_nome ?? "—",
+          risco: r.risco,
+          probabilidade_sucesso: r.probabilidade_sucesso,
+          proxima_acao: r.proxima_acao,
+        }))
+        .sort(
+          (a, b) =>
+            (ordem[String(a.risco)] ?? 3) - (ordem[String(b.risco)] ?? 3)
+        );
+      return JSON.stringify({
+        total: ordenado.length,
+        processos: ordenado.slice(0, 30),
+      });
+    }
+
+    case "consultar_analise_cerebro": {
+      const busca = String(input.busca ?? "").trim();
+      if (!busca)
+        return JSON.stringify({
+          erro: "Informe um nome de cliente ou número de processo.",
+        });
+      const rows = await sql`
+        SELECT ca.titulo, ca.risco, ca.probabilidade_sucesso, ca.proxima_acao,
+               ca.base_legal, ca.created_at::text AS criado_em,
+               p.numero AS processo_numero, cl.name AS cliente_nome
+        FROM cerebro_analises ca
+        JOIN processos p ON p.id = ca.processo_id
+        LEFT JOIN clients cl ON cl.id = p.client_id
+        WHERE ca.tipo = 'inicial'
+          AND p.deleted_at IS NULL
+          AND (cl.name ILIKE ${"%" + busca + "%"} OR p.numero ILIKE ${"%" + busca + "%"})
+        ORDER BY ca.created_at DESC
+        LIMIT 5
+      `;
+      if (rows.length === 0)
+        return JSON.stringify({
+          mensagem: `Nenhuma análise do Cérebro Jurídico encontrada para "${busca}".`,
+        });
+      return JSON.stringify({
+        analises: rows.map((r) => ({
+          cliente: r.cliente_nome ?? "—",
+          processo: r.processo_numero ?? "—",
+          risco: r.risco,
+          probabilidade_sucesso: r.probabilidade_sucesso,
+          proxima_acao: r.proxima_acao,
+          base_legal: r.base_legal,
+          analisado_em: r.criado_em,
         })),
       });
     }

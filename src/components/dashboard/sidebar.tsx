@@ -183,9 +183,9 @@ const GROUPS: {
         modulo: "controladoria",
       },
       {
-        href: "/dashboard/athena",
+        href: "/dashboard/iris",
         icon: SparklesIcon,
-        label: "Athena IA",
+        label: "Íris IA",
         modulo: "controladoria",
       },
       {

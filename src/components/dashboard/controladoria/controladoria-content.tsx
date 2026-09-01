@@ -25,6 +25,40 @@ function fmtSemana(iso: string): string {
   return `${d}/${m}`;
 }
 
+const AVATAR_CORES = [
+  "bg-blue-100 text-blue-700",
+  "bg-violet-100 text-violet-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-cyan-100 text-cyan-700",
+  "bg-indigo-100 text-indigo-700",
+];
+
+function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  const primeiras = partes[0]?.[0] ?? "";
+  const ultimas =
+    partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? "") : "";
+  return (primeiras + ultimas).toUpperCase();
+}
+
+function corAvatar(nome: string): string {
+  let hash = 0;
+  for (let i = 0; i < nome.length; i++) hash = nome.charCodeAt(i) + hash * 31;
+  return AVATAR_CORES[Math.abs(hash) % AVATAR_CORES.length];
+}
+
+function Avatar({ nome, size = "h-8 w-8" }: { nome: string; size?: string }) {
+  return (
+    <span
+      className={`flex ${size} flex-shrink-0 items-center justify-center rounded-full font-body text-xs font-bold ${corAvatar(nome)}`}
+    >
+      {iniciais(nome)}
+    </span>
+  );
+}
+
 export default function ControladoriaContent({
   ranking: rankingInicial,
   carga,
@@ -90,13 +124,16 @@ export default function ControladoriaContent({
                   key={c.colaboradorId}
                   className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
                 >
-                  <div className="min-w-0">
-                    <p className="font-body text-sm font-semibold text-fg">
-                      {c.nome}
-                    </p>
-                    <p className="font-body text-xs text-muted capitalize">
-                      {c.cargo}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar nome={c.nome} />
+                    <div className="min-w-0">
+                      <p className="font-body text-sm font-semibold text-fg">
+                        {c.nome}
+                      </p>
+                      <p className="font-body text-xs text-muted capitalize">
+                        {c.cargo}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
@@ -184,40 +221,82 @@ export default function ControladoriaContent({
             Nenhum colaborador ativo.
           </p>
         ) : (
-          <div className="divide-y divide-border">
-            {ranking.map((r, idx) => (
-              <div
-                key={r.colaboradorId}
-                className="flex items-center gap-4 px-5 py-3"
-              >
-                <span
-                  className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full font-body text-xs font-bold ${
-                    idx === 0
-                      ? "bg-amber-100 text-amber-700"
-                      : idx === 1
-                        ? "bg-slate-200 text-slate-600"
-                        : idx === 2
-                          ? "bg-orange-100 text-orange-700"
-                          : "bg-slate-50 text-muted"
-                  }`}
-                >
-                  {idx + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-body text-sm font-semibold text-fg">
-                    {r.nome}
-                  </p>
-                  <p className="font-body text-xs text-muted capitalize">
-                    {r.cargo} · {r.entregas} entrega
-                    {r.entregas !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <p className="font-heading text-lg font-bold text-primary">
-                  {r.totalPontos} pts
+          <>
+            <div className="divide-y divide-border">
+              {ranking.map((r, idx) => {
+                const maxPontos = Math.max(1, ranking[0]?.totalPontos ?? 1);
+                return (
+                  <div key={r.colaboradorId} className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-body text-[11px] font-bold ${
+                          idx === 0
+                            ? "bg-amber-100 text-amber-700"
+                            : idx === 1
+                              ? "bg-slate-200 text-slate-600"
+                              : idx === 2
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-slate-50 text-muted"
+                        }`}
+                      >
+                        {idx + 1}
+                      </span>
+                      <Avatar nome={r.nome} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-body text-sm font-semibold text-fg">
+                          {r.nome}
+                        </p>
+                        <p className="font-body text-xs text-muted capitalize">
+                          {r.cargo} · {r.entregas} entrega
+                          {r.entregas !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <p className="font-heading text-lg font-bold text-primary">
+                        {r.totalPontos} pts
+                      </p>
+                    </div>
+                    <div className="mt-2 ml-9 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-primary/70 transition-all duration-500"
+                        style={{
+                          width: `${(r.totalPontos / maxPontos) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-6 border-t border-border px-5 py-3">
+              <div>
+                <p className="font-body text-[11px] text-muted">
+                  Total de pontos
+                </p>
+                <p className="font-heading text-base font-bold text-fg">
+                  {ranking.reduce((s, r) => s + r.totalPontos, 0)}
                 </p>
               </div>
-            ))}
-          </div>
+              <div>
+                <p className="font-body text-[11px] text-muted">
+                  Média por colaborador
+                </p>
+                <p className="font-heading text-base font-bold text-fg">
+                  {(
+                    ranking.reduce((s, r) => s + r.totalPontos, 0) /
+                    ranking.length
+                  ).toFixed(1)}
+                </p>
+              </div>
+              <div>
+                <p className="font-body text-[11px] text-muted">
+                  Total de entregas
+                </p>
+                <p className="font-heading text-base font-bold text-fg">
+                  {ranking.reduce((s, r) => s + r.entregas, 0)}
+                </p>
+              </div>
+            </div>
+          </>
         )}
       </div>
 

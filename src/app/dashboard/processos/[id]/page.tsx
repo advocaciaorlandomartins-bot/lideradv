@@ -16,6 +16,7 @@ import {
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
+import { getCargaColaboradores } from "@/lib/controladoria-db";
 import DeleteProcessoButton from "@/components/dashboard/processos/delete-processo-button";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import ProcessoDetailClient from "@/components/dashboard/processos/processo-detail-client";
@@ -41,6 +42,7 @@ export default async function ProcessoDetailPage({
     pendencias,
     colaboradores,
     modelos,
+    carga,
   ] = await Promise.all([
     getProcessoExtended(id),
     getHistoricoByProcesso(id),
@@ -49,6 +51,7 @@ export default async function ProcessoDetailPage({
     getPendenciasByProcesso(id),
     getColaboradoresAtivos(),
     getModelosAtivos(),
+    getCargaColaboradores(),
   ]);
 
   if (!processo) notFound();
@@ -100,6 +103,7 @@ export default async function ProcessoDetailPage({
         tarefas={tarefas}
         pendencias={pendencias}
         colaboradores={colaboradores}
+        carga={carga}
         modelos={modelos}
         sessionNome={session.nome}
         podeAlterarResponsavel={hasPermission(

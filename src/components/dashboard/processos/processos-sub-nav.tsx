@@ -7,6 +7,7 @@ import {
   InboxArrowDownIcon,
   WifiIcon,
   ClipboardListIcon,
+  AlertIcon,
 } from "@/components/icons";
 
 const TABS = [
@@ -32,6 +33,12 @@ const TABS = [
     href: "/dashboard/processos/andamentos",
     label: "Andamentos",
     icon: ClipboardListIcon,
+    exact: false,
+  },
+  {
+    href: "/dashboard/processos/pendencias",
+    label: "Pendências",
+    icon: AlertIcon,
     exact: false,
   },
 ] as const;

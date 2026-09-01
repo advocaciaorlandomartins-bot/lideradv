@@ -70,6 +70,20 @@ export interface PendenciaCliente {
   created_at_formatted: string;
 }
 
+export interface PendenciaAberta {
+  id: string;
+  processo_id: string;
+  descricao: string;
+  criadaEm: string;
+  diasAberta: number;
+  processoNumero: string | null;
+  tipoAcao: string | null;
+  clienteId: string | null;
+  clienteNome: string | null;
+  clienteTelefone: string | null;
+  responsavelNome: string | null;
+}
+
 export interface ColaboradorSimples {
   id: string;
   nome: string;
@@ -268,6 +282,50 @@ export async function getTarefasByProcesso(
       typeof r.co_responsaveis === "string"
         ? JSON.parse(r.co_responsaveis)
         : (r.co_responsaveis ?? []),
+  }));
+}
+
+/**
+ * Todas as pendências (documentos/ações faltando do cliente) ainda abertas
+ * no escritório inteiro, das mais antigas pras mais novas — dá pra quem
+ * cuida de cobrança/documentação varrer tudo num lugar só, em vez de abrir
+ * processo por processo pra descobrir o que está travado. Telefone já
+ * considera responsável legal (menor/incapaz), mesma regra usada nas
+ * mensagens automáticas do sistema.
+ */
+export async function getPendenciasAbertas(
+  verTodos: boolean,
+  colaboradorId: string | null
+): Promise<PendenciaAberta[]> {
+  const rows = await sql`
+    SELECT
+      pc.id::text, pc.processo_id::text, pc.descricao, pc.created_at,
+      p.numero AS processo_numero, p.tipo_acao,
+      cl.id::text AS cliente_id, cl.name AS cliente_nome,
+      CASE WHEN cl.menor_incapaz THEN cl.responsavel_telefone ELSE cl.phone END AS cliente_telefone,
+      col.nome AS responsavel_nome
+    FROM pendencias_cliente pc
+    JOIN processos p ON p.id = pc.processo_id
+    LEFT JOIN clients cl ON cl.id = p.client_id
+    LEFT JOIN colaboradores col ON col.id = p.responsavel_id
+    WHERE pc.status = 'pendente'
+      AND (${verTodos} OR p.responsavel_id = ${colaboradorId}::uuid)
+    ORDER BY pc.created_at ASC
+    LIMIT 200
+  `;
+  const now = Date.now();
+  return rows.map((r) => ({
+    id: String(r.id),
+    processo_id: String(r.processo_id),
+    descricao: String(r.descricao),
+    criadaEm: new Date(r.created_at).toLocaleDateString("pt-BR"),
+    diasAberta: Math.floor((now - new Date(r.created_at).getTime()) / 86400000),
+    processoNumero: r.processo_numero ? String(r.processo_numero) : null,
+    tipoAcao: r.tipo_acao ? String(r.tipo_acao) : null,
+    clienteId: r.cliente_id ? String(r.cliente_id) : null,
+    clienteNome: r.cliente_nome ? String(r.cliente_nome) : null,
+    clienteTelefone: r.cliente_telefone ? String(r.cliente_telefone) : null,
+    responsavelNome: r.responsavel_nome ? String(r.responsavel_nome) : null,
   }));
 }
 

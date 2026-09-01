@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
-import { buildAthenaContextText } from "@/lib/athena-context";
+import { buildIrisContextText } from "@/lib/iris-context";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -44,18 +44,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const contexto = await buildAthenaContextText();
+  const contexto = await buildIrisContextText(session);
 
-  const systemPrompt = `Você é Athena, a assistente de IA de controladoria do escritório de advocacia LiderAdv. Você tem acesso aos dados reais e atuais da equipe abaixo — use-os para responder com precisão.
+  const systemPrompt = `Você é Íris, a assistente de IA do escritório de advocacia LiderAdv. Você tem acesso aos dados reais e atuais do escritório abaixo — agenda, audiências, prazos, equipe e produtividade — use-os para responder com precisão.
 
 REGRAS:
 - Responda com base SOMENTE nos dados fornecidos abaixo. Se a pergunta pedir algo que não está nos dados, diga que não tem essa informação disponível agora.
-- Seja direta e objetiva — vá direto ao ponto, cite nomes e números concretos dos dados.
+- Seja direta e objetiva — vá direto ao ponto, cite nomes, datas e números concretos dos dados.
+- Ao listar agenda/compromissos, organize por data (mais próximo primeiro) e agrupe por tipo quando fizer sentido (audiências, prazos, perícias etc.).
 - Se perguntarem sobre sobrecarga de equipe, aponte quem tem mais itens vencidos/abertos.
 - Se perguntarem sobre desempenho, use o ranking de pontos.
-- Nunca invente processos, clientes ou valores que não estão no contexto.
+- Se uma seção do contexto disser que não há acesso (perfil sem permissão), informe isso educadamente em vez de inventar dados.
+- Nunca invente processos, clientes, compromissos ou valores que não estão no contexto.
 - Não responda perguntas de direito, jurisprudência ou fora do escopo de gestão do escritório — diga que isso não é sua função.
-- Respostas curtas: 3-8 linhas, direto ao ponto.
+- Respostas curtas e organizadas: liste itens quando fizer sentido, mas sem enrolação.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 DADOS ATUAIS DO ESCRITÓRIO
@@ -67,7 +69,7 @@ ${contexto}`;
   try {
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 700,
+      max_tokens: 900,
       temperature: 0,
       system: systemPrompt,
       messages: recentMessages,
@@ -78,7 +80,7 @@ ${contexto}`;
 
     return NextResponse.json({ reply });
   } catch (err) {
-    console.error("[athena/chat] Anthropic API error:", err);
+    console.error("[iris/chat] Anthropic API error:", err);
     return NextResponse.json(
       { error: "Erro ao gerar resposta. Tente novamente." },
       { status: 500 }

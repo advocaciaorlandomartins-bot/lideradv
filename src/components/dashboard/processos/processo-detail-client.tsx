@@ -54,6 +54,7 @@ import {
   adicionarResponsavelAction,
   removerResponsavelAction,
 } from "@/lib/tarefa-responsaveis";
+import type { CargaColaborador } from "@/lib/controladoria-db";
 import {
   XMarkIcon,
   SpinnerIcon,
@@ -77,6 +78,7 @@ interface Props {
   tarefas: TarefaProcesso[];
   pendencias: PendenciaCliente[];
   colaboradores: ColaboradorSimples[];
+  carga?: CargaColaborador[];
   modelos: ModeloDocumento[];
   sessionNome?: string;
   podeAlterarResponsavel?: boolean;
@@ -1423,16 +1425,26 @@ function EventosSection({
 function ResponsavelSection({
   processo,
   colaboradores,
+  carga = [],
   podeAlterar,
 }: {
   processo: ProcessoExtended;
   colaboradores: ColaboradorSimples[];
+  carga?: CargaColaborador[];
   podeAlterar: boolean;
 }) {
   const [value, setValue] = useState(processo.responsavel_id ?? "");
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const router = useRouter();
+
+  const cargaPorColaborador = new Map(carga.map((c) => [c.colaboradorId, c]));
+  function labelComCarga(c: ColaboradorSimples): string {
+    const cg = cargaPorColaborador.get(c.id);
+    if (!cg) return `${c.nome} (${c.cargo})`;
+    const vencidas = cg.totalVencidas > 0 ? ` ⚠${cg.totalVencidas}` : "";
+    return `${c.nome} — ${cg.totalAbertas} aberta${cg.totalAbertas === 1 ? "" : "s"}${vencidas}`;
+  }
 
   async function handleChange(v: string) {
     const anterior = value;
@@ -1450,15 +1462,29 @@ function ResponsavelSection({
   }
 
   if (!podeAlterar) {
-    const nomeAtual =
-      colaboradores.find((c) => c.id === processo.responsavel_id)?.nome ??
-      "— Sem responsável —";
+    const atual = colaboradores.find((c) => c.id === processo.responsavel_id);
+    const cargaAtual = atual ? cargaPorColaborador.get(atual.id) : null;
     return (
       <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
         <h3 className="font-heading text-sm font-semibold text-fg mb-3">
           Responsável
         </h3>
-        <p className="font-body text-sm text-fg">{nomeAtual}</p>
+        <p className="font-body text-sm text-fg">
+          {atual?.nome ?? "— Sem responsável —"}
+        </p>
+        {cargaAtual && (
+          <p className="mt-1 font-body text-xs text-muted">
+            {cargaAtual.totalAbertas} aberta
+            {cargaAtual.totalAbertas === 1 ? "" : "s"} no momento
+            {cargaAtual.totalVencidas > 0 && (
+              <span className="font-semibold text-red-600">
+                {" "}
+                · ⚠ {cargaAtual.totalVencidas} vencida
+                {cargaAtual.totalVencidas === 1 ? "" : "s"}
+              </span>
+            )}
+          </p>
+        )}
         <p className="mt-1 font-body text-xs text-muted">
           Somente o administrador pode alterar o responsável.
         </p>
@@ -1481,7 +1507,7 @@ function ResponsavelSection({
           <option value="">— Sem responsável —</option>
           {colaboradores.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.nome} ({c.cargo})
+              {labelComCarga(c)}
             </option>
           ))}
         </select>
@@ -1491,6 +1517,11 @@ function ResponsavelSection({
           </div>
         )}
       </div>
+      {carga.length > 0 && (
+        <p className="mt-1 font-body text-xs text-muted">
+          Número de tarefas/controles abertos de cada um · ⚠ = tem item vencido
+        </p>
+      )}
       {erro && (
         <p className="mt-2 font-body text-xs font-semibold text-red-600">
           {erro}
@@ -2711,6 +2742,7 @@ export default function ProcessoDetailClient({
   tarefas,
   pendencias,
   colaboradores,
+  carga = [],
   modelos,
   sessionNome,
   podeAlterarResponsavel,
@@ -2880,6 +2912,7 @@ export default function ProcessoDetailClient({
           <ResponsavelSection
             processo={processo}
             colaboradores={colaboradores}
+            carga={carga}
             podeAlterar={podeAlterarResponsavel ?? false}
           />
           <TarefasSection

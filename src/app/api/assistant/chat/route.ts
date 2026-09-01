@@ -21,7 +21,7 @@ Grupo Jurídico: Agenda · Clientes · Processos · Publicações · Controles (
 Grupo Negócios: CRM · Produção · Financeiro
 Grupo Documentos: Modelos · Assinaturas · PDFs
 Grupo Equipe: Minhas Tarefas · Meu Financeiro · Colaboradores · Teste DISC
-Grupo Sistema: Gerenciador · Controladoria · Athena IA · Auditoria · Relatórios · Integrações · Usuários · Configurações
+Grupo Sistema: Gerenciador · Controladoria · Íris IA · Auditoria · Relatórios · Integrações · Usuários · Configurações
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 MÓDULOS DO SISTEMA
@@ -70,7 +70,8 @@ Abas:
 - O sistema envia 3 mensagens WhatsApp automaticamente: convite imediato + lembrete na véspera + lembrete no dia do evento
 
 ## PROCESSOS (menu: Jurídico → Processos)
-- Lista com abas internas no topo: "Lista de Processos" · "Intimações" · "Monitoramento" · "Andamentos"
+- Lista com abas internas no topo: "Lista de Processos" · "Intimações" · "Monitoramento" · "Andamentos" · "Pendências"
+- Aba Pendências: todas as pendências (documentos/ações que faltam do cliente) em aberto, de todos os processos, num lugar só — ordenadas da mais antiga pra mais nova, com aviso visual (bolinha vermelha) a partir de 15 dias sem resposta. Botão "WhatsApp" já abre a conversa com o número do cliente (ou do responsável legal, se for menor/incapaz) e a mensagem pronta. Botão de marcar resolvida direto na lista, sem precisar abrir o processo. Existe busca por cliente/processo/descrição
 - Botão "Novo Processo" → formulário com campos: cliente, número do processo (CNJ), tipo de ação, área jurídica, fase processual, data de distribuição, dados previdenciários (DER, DIB, DCB, protocolo INSS, resultado administrativo, número do benefício), modelo de honorários (Fixo/Percentual/Misto/Sucumbência/Sem custo), tribunal/vara, observações
 
 ### Detalhe do processo:
@@ -230,9 +231,10 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
   3. Capacidade produtiva — gráfico comparando quantos itens entraram vs. quantos foram concluídos por semana, últimas 8 semanas
 - Visível para todos (cada um vê a própria posição no ranking); dados completos de gestão de equipe
 
-## ATHENA IA (menu: Sistema → Athena IA)
-- Assistente de IA com acesso aos dados reais e atuais do escritório (ranking, carga da equipe, capacidade produtiva, pendências, financeiro) — diferente do Assistente LiderAdv (este aqui só orienta sobre como usar as telas)
-- Pergunte em linguagem natural, ex: "quem está mais sobrecarregado essa semana?", "como está nosso ranking esse mês?", "quantos processos estão aguardando resultado?"
+## ÍRIS IA (menu: Sistema → Íris IA)
+- Assistente de IA com acesso aos dados reais e atuais do escritório: agenda/audiências/prazos/perícias próximos (30 dias), lista de colaboradores, ranking, carga da equipe, capacidade produtiva — diferente do Assistente LiderAdv (este aqui só orienta sobre como usar as telas)
+- Pergunte em linguagem natural, ex: "o que tenho na agenda essa semana?", "quais audiências estão chegando?", "quem está mais sobrecarregado agora?", "como está nosso ranking esse mês?"
+- Cada seção de dados respeita a permissão do usuário logado (ex.: sem "controles:ver" não vê agenda/audiências pela Íris, mesmo perguntando)
 - Chat de página inteira, separado do balão flutuante
 
 ## AUDITORIA (menu: Sistema → Auditoria)

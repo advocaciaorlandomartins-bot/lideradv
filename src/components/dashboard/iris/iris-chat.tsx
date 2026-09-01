@@ -11,14 +11,14 @@ interface Message {
 const WELCOME: Message = {
   role: "assistant",
   content:
-    "Olá! Sou a Athena, a IA de controladoria do escritório.\n\nPosso responder sobre ranking de produtividade, carga da equipe e capacidade produtiva — com os dados reais e atuais do sistema.\n\nO que você quer saber?",
+    "Olá! Sou a Íris.\n\nPosso responder sobre agenda, audiências, prazos, perícias, equipe e produtividade — com os dados reais e atuais do sistema.\n\nO que você quer saber?",
 };
 
 const SUGESTOES = [
-  "Quem está mais sobrecarregado essa semana?",
+  "O que tenho na agenda essa semana?",
+  "Quais audiências estão chegando?",
+  "Quem está mais sobrecarregado agora?",
   "Como está o ranking desse mês?",
-  "Nossa capacidade de entrega está subindo ou caindo?",
-  "Quem tem itens vencidos agora?",
 ];
 
 function DotsLoader() {
@@ -35,7 +35,7 @@ function DotsLoader() {
   );
 }
 
-export default function AthenaChat() {
+export default function IrisChat() {
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,7 +58,7 @@ export default function AthenaChat() {
       setLoading(true);
 
       try {
-        const res = await fetch("/api/athena/chat", {
+        const res = await fetch("/api/iris/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages: newMessages }),
@@ -68,7 +68,7 @@ export default function AthenaChat() {
           role: "assistant",
           content: res.ok
             ? (data.reply ?? "Não obtive resposta. Tente novamente.")
-            : (data.error ?? "Erro ao consultar a Athena."),
+            : (data.error ?? "Erro ao consultar a Íris."),
         };
         setMessages((prev) => [...prev, reply]);
       } catch {
@@ -103,10 +103,10 @@ export default function AthenaChat() {
         </div>
         <div className="min-w-0">
           <p className="font-heading text-sm font-bold text-white leading-tight">
-            Athena
+            Íris
           </p>
           <p className="font-body text-[11px] text-white/70 leading-tight">
-            IA de controladoria — dados reais e atuais do escritório
+            IA do escritório — dados reais e atuais do sistema
           </p>
         </div>
       </div>
@@ -172,7 +172,7 @@ export default function AthenaChat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Pergunte sobre a equipe..."
+            placeholder="Pergunte sobre agenda, audiências, equipe..."
             rows={1}
             className="flex-1 resize-none bg-transparent font-body text-sm text-fg placeholder:text-muted focus:outline-none leading-relaxed"
             style={{ maxHeight: "120px" }}

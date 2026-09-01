@@ -21,6 +21,7 @@ interface AgendaItem {
   clienteNome: string | null;
   prioridade: string | null;
   responsavelNome: string | null;
+  fatal: boolean;
 }
 
 /**
@@ -36,7 +37,7 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
   const [controles, compromissos] = await Promise.all([
     sql`
       SELECT c.tipo, c.descricao, c.data_evento::text AS data, c.prioridade,
-             cl.name AS cliente_nome, u.nome AS responsavel_nome
+             c.fatal, cl.name AS cliente_nome, u.nome AS responsavel_nome
       FROM controles c
       LEFT JOIN clients cl ON cl.id = c.cliente_id
       LEFT JOIN usuarios u ON u.id = c.responsavel_id
@@ -76,6 +77,7 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
     clienteNome: r.cliente_nome ? String(r.cliente_nome) : null,
     prioridade: r.prioridade ? String(r.prioridade) : null,
     responsavelNome: r.responsavel_nome ? String(r.responsavel_nome) : null,
+    fatal: !!r.fatal,
   }));
 
   const itensCompromisso: AgendaItem[] = compromissos.map((r) => ({
@@ -86,6 +88,7 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
     clienteNome: r.cliente_nome ? String(r.cliente_nome) : null,
     prioridade: null,
     responsavelNome: r.responsavel_nome ? String(r.responsavel_nome) : null,
+    fatal: false,
   }));
 
   return [...itensControle, ...itensCompromisso].sort((a, b) =>
@@ -157,7 +160,7 @@ export async function buildIrisContextText(
         : agenda
             .map(
               (a) =>
-                `${a.data}${a.hora ? ` ${a.hora}` : ""} — ${a.origem}: ${a.descricao}${a.clienteNome ? ` (cliente: ${a.clienteNome})` : ""} — responsável: ${a.responsavelNome ?? "não informado no sistema"}${a.prioridade ? ` [prioridade ${a.prioridade}]` : ""}`
+                `${a.fatal ? "[PRAZO FATAL] " : ""}${a.data}${a.hora ? ` ${a.hora}` : ""} — ${a.origem}: ${a.descricao}${a.clienteNome ? ` (cliente: ${a.clienteNome})` : ""} — responsável: ${a.responsavelNome ?? "não informado no sistema"}${a.prioridade ? ` [prioridade ${a.prioridade}]` : ""}`
             )
             .join("\n");
 

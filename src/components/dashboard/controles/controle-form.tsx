@@ -575,6 +575,25 @@ export default function ControleForm({
             </select>
           </div>
 
+          {/* Prazo Fatal */}
+          <div className="sm:col-span-2">
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-red-50/50 has-[:checked]:border-red-300 has-[:checked]:bg-red-50">
+              <input
+                type="checkbox"
+                name="fatal"
+                defaultChecked={controle?.fatal ?? false}
+                className="h-4 w-4 cursor-pointer accent-red-600"
+              />
+              <span className="font-body text-sm font-semibold text-fg">
+                Prazo fatal
+              </span>
+              <span className="font-body text-xs text-muted">
+                — perder esse prazo encerra o direito/prejudica o caso (aparece
+                em destaque vermelho na agenda e no ranking)
+              </span>
+            </label>
+          </div>
+
           {/* Tipo Demanda */}
           <div>
             <label className={labelCls}>Tipo de Demanda</label>

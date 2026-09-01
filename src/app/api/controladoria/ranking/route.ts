@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { getRanking } from "@/lib/pontuacao";
+import { getRankingDetalhado } from "@/lib/pontuacao";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,6 @@ export async function GET(req: NextRequest) {
       ? diasParam
       : 30;
 
-  const ranking = await getRanking(dias);
+  const ranking = await getRankingDetalhado(dias);
   return NextResponse.json({ ranking });
 }

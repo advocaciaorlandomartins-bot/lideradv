@@ -113,3 +113,78 @@ export async function getRanking(dias = 30): Promise<RankingItem[]> {
     entregas: Number(r.entregas),
   }));
 }
+
+export interface RankingDetalhado extends RankingItem {
+  /** % das entregas do período que foram concluídas até o prazo (null = sem entregas com prazo definido pra medir). */
+  noPrazoPct: number | null;
+  /** Controles marcados "prazo fatal", ainda abertos e já vencidos — sob responsabilidade desse colaborador agora. */
+  fataisAbertos: number;
+}
+
+/**
+ * Versão mais rica do ranking pro painel Controladoria: além de pontos/
+ * entregas, calcula % de entregas feitas dentro do prazo (compara a data de
+ * conclusão registrada em pontuacao_eventos com o prazo original do
+ * controle/tarefa) e quantos prazos fatais esse colaborador tem em aberto
+ * e já vencidos agora — sinal de atenção imediata, não histórico.
+ */
+export async function getRankingDetalhado(
+  dias = 30
+): Promise<RankingDetalhado[]> {
+  const rows = await sql`
+    WITH entregas_no_prazo AS (
+      SELECT
+        pe.colaborador_id,
+        COUNT(*) FILTER (
+          WHERE (pe.origem_tipo = 'controle' AND c.data_evento IS NOT NULL AND pe.criado_em::date <= c.data_evento)
+             OR (pe.origem_tipo = 'tarefa_processo' AND t.prazo IS NOT NULL AND pe.criado_em::date <= t.prazo)
+        )::int AS no_prazo,
+        COUNT(*) FILTER (
+          WHERE (pe.origem_tipo = 'controle' AND c.data_evento IS NOT NULL)
+             OR (pe.origem_tipo = 'tarefa_processo' AND t.prazo IS NOT NULL)
+        )::int AS com_prazo_definido
+      FROM pontuacao_eventos pe
+      LEFT JOIN controles c ON pe.origem_tipo = 'controle' AND c.id = pe.origem_id
+      LEFT JOIN tarefas_processo t ON pe.origem_tipo = 'tarefa_processo' AND t.id = pe.origem_id
+      WHERE pe.criado_em >= NOW() - (${dias} || ' days')::interval
+      GROUP BY pe.colaborador_id
+    ),
+    fatais_abertos AS (
+      SELECT u.colaborador_id, COUNT(*)::int AS total
+      FROM controles c
+      JOIN usuarios u ON u.id = c.responsavel_id
+      WHERE c.fatal = TRUE AND c.status IS NULL AND c.data_evento < CURRENT_DATE
+      GROUP BY u.colaborador_id
+    )
+    SELECT
+      col.id::text AS colaborador_id,
+      col.nome,
+      col.cargo,
+      COALESCE(SUM(pe.pontos), 0)::int AS total_pontos,
+      COUNT(pe.id)::int AS entregas,
+      enp.no_prazo,
+      enp.com_prazo_definido,
+      COALESCE(fa.total, 0) AS fatais_abertos
+    FROM colaboradores col
+    LEFT JOIN pontuacao_eventos pe
+      ON pe.colaborador_id = col.id
+      AND pe.criado_em >= NOW() - (${dias} || ' days')::interval
+    LEFT JOIN entregas_no_prazo enp ON enp.colaborador_id = col.id
+    LEFT JOIN fatais_abertos fa ON fa.colaborador_id = col.id
+    WHERE col.status = 'ativo'
+    GROUP BY col.id, col.nome, col.cargo, enp.no_prazo, enp.com_prazo_definido, fa.total
+    ORDER BY total_pontos DESC, entregas DESC
+  `;
+  return rows.map((r) => ({
+    colaboradorId: String(r.colaborador_id),
+    nome: String(r.nome),
+    cargo: String(r.cargo),
+    totalPontos: Number(r.total_pontos),
+    entregas: Number(r.entregas),
+    noPrazoPct:
+      r.com_prazo_definido != null && Number(r.com_prazo_definido) > 0
+        ? Math.round((Number(r.no_prazo) / Number(r.com_prazo_definido)) * 100)
+        : null,
+    fataisAbertos: Number(r.fatais_abertos),
+  }));
+}

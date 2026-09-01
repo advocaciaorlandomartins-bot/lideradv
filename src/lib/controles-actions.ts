@@ -243,6 +243,7 @@ export async function createControleAction(
     )
       ? (formData.get("prioridade") as string)
       : "media") || "media";
+  const fatal = formData.get("fatal") === "on";
   const checklistTexto = (formData.get("checklist_texto") as string) ?? "";
   const checklistJsonNovo = JSON.stringify(
     checklistTexto
@@ -284,28 +285,28 @@ export async function createControleAction(
   try {
     if (clienteId && processoId && responsavelId) {
       await sql`
-        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, cliente_id, processo_id, responsavel_id, tipo_demanda, observacoes, dados, checklist)
-        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${clienteId}::uuid, ${processoId}::uuid, ${responsavelId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, responsavel_id, tipo_demanda, observacoes, dados, checklist)
+        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${clienteId}::uuid, ${processoId}::uuid, ${responsavelId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
       `;
     } else if (clienteId && processoId) {
       await sql`
-        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, cliente_id, processo_id, tipo_demanda, observacoes, dados, checklist)
-        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${clienteId}::uuid, ${processoId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, tipo_demanda, observacoes, dados, checklist)
+        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${clienteId}::uuid, ${processoId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
       `;
     } else if (clienteId && responsavelId) {
       await sql`
-        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, cliente_id, responsavel_id, tipo_demanda, observacoes, dados, checklist)
-        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${clienteId}::uuid, ${responsavelId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, responsavel_id, tipo_demanda, observacoes, dados, checklist)
+        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${clienteId}::uuid, ${responsavelId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
       `;
     } else if (clienteId) {
       await sql`
-        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, cliente_id, tipo_demanda, observacoes, dados, checklist)
-        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${clienteId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, tipo_demanda, observacoes, dados, checklist)
+        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${clienteId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
       `;
     } else {
       await sql`
-        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, tipo_demanda, observacoes, dados, checklist)
-        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, tipo_demanda, observacoes, dados, checklist)
+        VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
       `;
     }
   } catch (err) {
@@ -354,6 +355,7 @@ export async function updateControleAction(
     )
       ? (formData.get("prioridade") as string)
       : "media") || "media";
+  const fatal = formData.get("fatal") === "on";
 
   if (!id) return { error: "ID inválido." };
   if (!tipo) return { error: "Tipo obrigatório." };
@@ -391,7 +393,7 @@ export async function updateControleAction(
       await sql`
         UPDATE controles SET
           tipo = ${tipo}, data_evento = ${dataEvento}::date, prazo_interno = ${prazoInterno}::date,
-          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade},
+          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal},
           cliente_id = ${clienteId}::uuid,
           processo_id = ${processoId}::uuid, responsavel_id = ${responsavelId}::uuid,
           tipo_demanda = ${tipoDemanda}, observacoes = ${observacoes},
@@ -402,7 +404,7 @@ export async function updateControleAction(
       await sql`
         UPDATE controles SET
           tipo = ${tipo}, data_evento = ${dataEvento}::date, prazo_interno = ${prazoInterno}::date,
-          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade},
+          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal},
           cliente_id = ${clienteId}::uuid,
           processo_id = ${processoId}::uuid, responsavel_id = NULL,
           tipo_demanda = ${tipoDemanda}, observacoes = ${observacoes},
@@ -413,7 +415,7 @@ export async function updateControleAction(
       await sql`
         UPDATE controles SET
           tipo = ${tipo}, data_evento = ${dataEvento}::date, prazo_interno = ${prazoInterno}::date,
-          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade},
+          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal},
           cliente_id = ${clienteId}::uuid,
           processo_id = NULL, responsavel_id = NULL,
           tipo_demanda = ${tipoDemanda}, observacoes = ${observacoes},
@@ -424,7 +426,7 @@ export async function updateControleAction(
       await sql`
         UPDATE controles SET
           tipo = ${tipo}, data_evento = ${dataEvento}::date, prazo_interno = ${prazoInterno}::date,
-          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade},
+          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal},
           cliente_id = NULL, processo_id = NULL, responsavel_id = NULL,
           tipo_demanda = ${tipoDemanda}, observacoes = ${observacoes},
           dados = ${dadosJson}::jsonb, updated_at = NOW()

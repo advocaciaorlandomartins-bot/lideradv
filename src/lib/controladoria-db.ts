@@ -83,7 +83,7 @@ export async function getCapacidadeProdutiva(
 ): Promise<CapacidadeSemana[]> {
   const [entradas, saidas] = await Promise.all([
     sql`
-      SELECT date_trunc('week', criado_em)::date AS semana, COUNT(*)::int AS n
+      SELECT date_trunc('week', criado_em)::date::text AS semana, COUNT(*)::int AS n
       FROM (
         SELECT created_at AS criado_em FROM controles
         WHERE created_at >= NOW() - (${semanas} || ' weeks')::interval
@@ -95,7 +95,7 @@ export async function getCapacidadeProdutiva(
       ORDER BY 1
     `,
     sql`
-      SELECT date_trunc('week', criado_em)::date AS semana, COUNT(*)::int AS n
+      SELECT date_trunc('week', criado_em)::date::text AS semana, COUNT(*)::int AS n
       FROM pontuacao_eventos
       WHERE criado_em >= NOW() - (${semanas} || ' weeks')::interval
       GROUP BY 1
@@ -103,6 +103,11 @@ export async function getCapacidadeProdutiva(
     `,
   ]);
 
+  // date_trunc(...)::date volta como objeto Date do driver, não string — usar
+  // String(date).slice(0,10) pega "Mon Aug 10" (toString() do JS Date), não
+  // o ISO "YYYY-MM-DD". Isso ordenava as semanas alfabeticamente por nome do
+  // dia/mês em vez de cronologicamente. ::text já converte no Postgres, que
+  // devolve o formato ISO certo independente do driver.
   const mapEntradas = new Map<string, number>(
     entradas.map((r) => [String(r.semana).slice(0, 10), Number(r.n)])
   );
@@ -119,4 +124,90 @@ export async function getCapacidadeProdutiva(
     entraram: mapEntradas.get(semana) ?? 0,
     saidas: mapSaidas.get(semana) ?? 0,
   }));
+}
+
+export interface CapacidadeSemanaComFila extends CapacidadeSemana {
+  filaAcumulada: number;
+}
+
+export interface CapacidadeResumo {
+  semanas: CapacidadeSemanaComFila[];
+  filaAtual: number;
+  entradaMediaRecente: number;
+  saidaMediaRecente: number;
+  saldoMedioRecente: number;
+  entradaVariacaoPct: number | null;
+  saidaVariacaoPct: number | null;
+  narrativa: string;
+}
+
+function variacaoPct(atual: number, anterior: number): number | null {
+  if (anterior === 0) return null;
+  return Math.round(((atual - anterior) / anterior) * 100);
+}
+
+/**
+ * Mesmo dado de getCapacidadeProdutiva, mas com fila acumulada (saldo
+ * corrido de entraram-saidas semana a semana) e uma narrativa automática
+ * comparando as últimas semanas com as anteriores — mesma ressalva de
+ * dados: semanas antes do ledger de conclusão existir mostram "saidas"
+ * zerado, o que infla a fila acumulada ali por falta de histórico, não por
+ * atraso real da equipe.
+ */
+export async function getCapacidadeResumo(
+  semanas = 8
+): Promise<CapacidadeResumo> {
+  const semanasBase = await getCapacidadeProdutiva(semanas);
+
+  let acumulado = 0;
+  const comFila: CapacidadeSemanaComFila[] = semanasBase.map((s) => {
+    acumulado += s.entraram - s.saidas;
+    return { ...s, filaAcumulada: Math.max(0, acumulado) };
+  });
+
+  const n = comFila.length;
+  const recentes = comFila.slice(Math.max(0, n - 3));
+  const anteriores = comFila.slice(Math.max(0, n - 6), Math.max(0, n - 3));
+
+  const media = (
+    arr: CapacidadeSemanaComFila[],
+    campo: "entraram" | "saidas"
+  ) =>
+    arr.length === 0 ? 0 : arr.reduce((s, c) => s + c[campo], 0) / arr.length;
+
+  const entradaMediaRecente = media(recentes, "entraram");
+  const saidaMediaRecente = media(recentes, "saidas");
+  const entradaMediaAnterior = media(anteriores, "entraram");
+  const saidaMediaAnterior = media(anteriores, "saidas");
+  const saldoMedioRecente = entradaMediaRecente - saidaMediaRecente;
+  const filaAtual =
+    comFila.length > 0 ? comFila[comFila.length - 1].filaAcumulada : 0;
+
+  const entradaVariacaoPct = variacaoPct(
+    entradaMediaRecente,
+    entradaMediaAnterior
+  );
+  const saidaVariacaoPct = variacaoPct(saidaMediaRecente, saidaMediaAnterior);
+
+  let narrativa: string;
+  if (n === 0 || (entradaMediaRecente === 0 && saidaMediaRecente === 0)) {
+    narrativa = "Ainda sem dados suficientes pra avaliar a tendência.";
+  } else if (Math.abs(saldoMedioRecente) < 1) {
+    narrativa = `A equipe está dando conta do volume. O que entra e o que sai andam no mesmo ritmo — entram ${entradaMediaRecente.toFixed(1)} e saem ${saidaMediaRecente.toFixed(1)} por semana.`;
+  } else if (saldoMedioRecente > 0) {
+    narrativa = `A fila está crescendo. Entram ${entradaMediaRecente.toFixed(1)} e saem ${saidaMediaRecente.toFixed(1)} por semana — saldo de +${saldoMedioRecente.toFixed(1)} acumulando por semana.`;
+  } else {
+    narrativa = `A equipe está reduzindo a fila. Entram ${entradaMediaRecente.toFixed(1)} e saem ${saidaMediaRecente.toFixed(1)} por semana — saldo de ${saldoMedioRecente.toFixed(1)} por semana.`;
+  }
+
+  return {
+    semanas: comFila,
+    filaAtual,
+    entradaMediaRecente,
+    saidaMediaRecente,
+    saldoMedioRecente,
+    entradaVariacaoPct,
+    saidaVariacaoPct,
+    narrativa,
+  };
 }

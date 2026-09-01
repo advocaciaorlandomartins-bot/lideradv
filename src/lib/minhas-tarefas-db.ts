@@ -14,6 +14,7 @@ export interface MinhaControle {
   estagio_producao: string | null;
   status: "pendente" | "em_andamento" | "concluido";
   checklist: ChecklistItem[];
+  fatal: boolean;
   source: "controle";
 }
 
@@ -96,7 +97,7 @@ export async function getMinhasTarefas(
     sql`
       SELECT
         c.id::text, c.tipo, c.descricao, c.data_evento::text,
-        c.status::text, c.checklist,
+        c.status::text, c.checklist, c.fatal,
         cl.id::text AS cliente_id, cl.name AS cliente_nome,
         p.id::text AS processo_id, p.numero AS processo_numero,
         p.estagio_producao
@@ -178,6 +179,7 @@ export async function getMinhasTarefas(
           ? "em_andamento"
           : "pendente",
     checklist: parseChecklist(r.checklist),
+    fatal: !!r.fatal,
     source: "controle" as const,
   }));
 

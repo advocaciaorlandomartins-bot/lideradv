@@ -20,6 +20,7 @@ import {
   ClockIcon,
   FolderOpenIcon,
   ArchiveBoxIcon,
+  AlertIcon,
 } from "@/components/icons";
 import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
 import ChecklistManager from "@/components/dashboard/controladoria/checklist-manager";
@@ -375,6 +376,12 @@ function ItemCard({
               className={`rounded px-1.5 py-0.5 font-body text-[10px] font-semibold ${tipoCls}`}
             >
               {tipoLabel}
+            </span>
+          )}
+          {ctrl?.fatal && !isConcluida && (
+            <span className="flex items-center gap-1 rounded bg-red-600 px-1.5 py-0.5 font-body text-[10px] font-bold text-white">
+              <AlertIcon className="h-3 w-3" />
+              PRAZO FATAL
             </span>
           )}
           {prioridade && (

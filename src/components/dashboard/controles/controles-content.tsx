@@ -137,6 +137,17 @@ function UrgencyBadge({
   );
 }
 
+function FatalBadge() {
+  return (
+    <span
+      className="inline-flex items-center rounded-full bg-red-600 px-2 py-0.5 font-body text-[10px] font-bold text-white"
+      title="Perder esse prazo encerra o direito/prejudica o caso"
+    >
+      PRAZO FATAL
+    </span>
+  );
+}
+
 function urgencyRowBorder(
   dataEvento: string | null,
   status: StatusControle
@@ -558,6 +569,7 @@ export default function ControlesContent({
                         dataEvento={c.data_evento}
                         status={c.status}
                       />
+                      {c.fatal && <FatalBadge />}
                     </div>
                     <span
                       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-body text-[11px] font-semibold ${STATUS_CONTROLE[c.status].color}`}
@@ -652,11 +664,14 @@ export default function ControlesContent({
                         <p className="font-body text-sm text-fg line-clamp-2 group-hover:text-primary transition-colors">
                           {c.descricao}
                         </p>
-                        {c.tipo_demanda && (
-                          <span className="mt-0.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 font-body text-[10px] font-medium text-slate-600">
-                            {c.tipo_demanda}
-                          </span>
-                        )}
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {c.fatal && <FatalBadge />}
+                          {c.tipo_demanda && (
+                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-body text-[10px] font-medium text-slate-600">
+                              {c.tipo_demanda}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Cliente / Processo */}

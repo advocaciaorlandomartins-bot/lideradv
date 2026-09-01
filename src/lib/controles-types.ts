@@ -91,6 +91,7 @@ export interface Controle {
   descricao: string;
   status: StatusControle;
   prioridade: PrioridadeControle | null;
+  fatal: boolean;
   cliente_id: string | null;
   cliente_nome: string | null;
   processo_id: string | null;

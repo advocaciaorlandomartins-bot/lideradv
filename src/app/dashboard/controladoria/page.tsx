@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { getRanking } from "@/lib/pontuacao";
+import { getRankingDetalhado } from "@/lib/pontuacao";
 import {
   getCargaColaboradores,
-  getCapacidadeProdutiva,
+  getCapacidadeResumo,
 } from "@/lib/controladoria-db";
 import ControladoriaContent from "@/components/dashboard/controladoria/controladoria-content";
 
@@ -19,9 +19,9 @@ export default async function ControladoriaPage() {
   if (!session || !hasPermission(session, "controladoria", "ver")) notFound();
 
   const [ranking, carga, capacidade] = await Promise.all([
-    getRanking(30),
+    getRankingDetalhado(30),
     getCargaColaboradores(),
-    getCapacidadeProdutiva(8),
+    getCapacidadeResumo(8),
   ]);
 
   return (

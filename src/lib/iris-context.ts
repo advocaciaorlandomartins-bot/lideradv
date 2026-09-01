@@ -20,6 +20,7 @@ interface AgendaItem {
   hora: string | null;
   clienteNome: string | null;
   prioridade: string | null;
+  responsavelNome: string | null;
 }
 
 /**
@@ -35,9 +36,10 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
   const [controles, compromissos] = await Promise.all([
     sql`
       SELECT c.tipo, c.descricao, c.data_evento::text AS data, c.prioridade,
-             cl.name AS cliente_nome
+             cl.name AS cliente_nome, u.nome AS responsavel_nome
       FROM controles c
       LEFT JOIN clients cl ON cl.id = c.cliente_id
+      LEFT JOIN usuarios u ON u.id = c.responsavel_id
       WHERE c.status IS NULL
         AND c.data_evento IS NOT NULL
         AND c.data_evento BETWEEN CURRENT_DATE AND CURRENT_DATE + (${dias} || ' days')::interval
@@ -46,9 +48,11 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
     `,
     sql`
       SELECT comp.titulo, comp.tipo, comp.data_inicio::text AS data,
-             comp.hora_inicio::text AS hora, cl.name AS cliente_nome
+             comp.hora_inicio::text AS hora, cl.name AS cliente_nome,
+             u.nome AS responsavel_nome
       FROM compromissos comp
       LEFT JOIN clients cl ON cl.id = comp.cliente_id
+      LEFT JOIN usuarios u ON u.login = comp.criado_por
       WHERE comp.status = 'pendente'
         AND comp.data_inicio BETWEEN CURRENT_DATE AND CURRENT_DATE + (${dias} || ' days')::interval
       ORDER BY comp.data_inicio ASC, comp.hora_inicio ASC NULLS LAST
@@ -71,6 +75,7 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
     hora: null,
     clienteNome: r.cliente_nome ? String(r.cliente_nome) : null,
     prioridade: r.prioridade ? String(r.prioridade) : null,
+    responsavelNome: r.responsavel_nome ? String(r.responsavel_nome) : null,
   }));
 
   const itensCompromisso: AgendaItem[] = compromissos.map((r) => ({
@@ -80,6 +85,7 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
     hora: r.hora ? String(r.hora).slice(0, 5) : null,
     clienteNome: r.cliente_nome ? String(r.cliente_nome) : null,
     prioridade: null,
+    responsavelNome: r.responsavel_nome ? String(r.responsavel_nome) : null,
   }));
 
   return [...itensControle, ...itensCompromisso].sort((a, b) =>
@@ -151,7 +157,7 @@ export async function buildIrisContextText(
         : agenda
             .map(
               (a) =>
-                `${a.data}${a.hora ? ` ${a.hora}` : ""} — ${a.origem}: ${a.descricao}${a.clienteNome ? ` (cliente: ${a.clienteNome})` : ""}${a.prioridade ? ` [prioridade ${a.prioridade}]` : ""}`
+                `${a.data}${a.hora ? ` ${a.hora}` : ""} — ${a.origem}: ${a.descricao}${a.clienteNome ? ` (cliente: ${a.clienteNome})` : ""} — responsável: ${a.responsavelNome ?? "não informado no sistema"}${a.prioridade ? ` [prioridade ${a.prioridade}]` : ""}`
             )
             .join("\n");
 

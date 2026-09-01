@@ -189,7 +189,7 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 ## COLABORADORES (menu: Equipe → Colaboradores)
 - Lista de todos os colaboradores do escritório
 - Botão "Novo Colaborador" → formulário com nome, categoria (Administrador, Sócio, Advogado, Estagiário, Colaborador), permissões
-- Cadastro/edição: seção "Comissão por fase do processo" (% administrativo, judicial, ou ambos) e seção "Metas com bônus escalonado" — até 3 faixas (Meta 1/2/3), cada uma com valor de comissão recebida no mês e bônus fixo correspondente; vale só o degrau mais alto batido, não soma os três
+- Cadastro/edição: seção "Comissão por fase do processo" (% administrativo, judicial, ou ambos) e seção "Metas com bônus escalonado" — até 3 faixas (Meta 1/2/3), cada uma com valor de comissão recebida no mês e bônus correspondente; é cumulativo (bater a Meta 2 soma o bônus da Meta 1 + o da Meta 2)
 - Na página do colaborador: card "Meta do mês" mostra a comissão recebida até agora, meta atingida e valor do bônus; botão "Gerar bônus do mês" cria uma "Bonificação" pendente em Remunerações (geração sempre manual)
 
 ## TESTE DISC (menu: Equipe → Teste DISC)

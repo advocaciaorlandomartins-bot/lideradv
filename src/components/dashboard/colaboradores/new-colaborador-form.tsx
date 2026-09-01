@@ -315,9 +315,10 @@ export default function NewColaboradorForm() {
       <div className="space-y-4">
         <SectionTitle>Metas com bônus escalonado</SectionTitle>
         <p className="font-body text-xs text-muted">
-          Ao bater cada meta de comissão recebida no mês, libera um bônus fixo.
-          Vale só o degrau mais alto atingido — não soma os três. Deixe em
-          branco para não usar metas — pode configurar depois.
+          Ao bater cada meta de comissão recebida no mês, libera o bônus daquele
+          degrau. É cumulativo: bater a Meta 2 soma o bônus da Meta 1 + o da
+          Meta 2, e assim por diante. Deixe em branco para não usar metas — pode
+          configurar depois.
         </p>
         <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-lg border border-border p-3 space-y-2">

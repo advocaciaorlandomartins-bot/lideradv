@@ -98,7 +98,7 @@ export async function gerarBonusMetaAction(
       ) VALUES (
         ${colaboradorId}::uuid, 'bonificacao', ${status.bonusValor}::numeric,
         ${`${status.competencia}-01`}::date, 'pendente',
-        ${`Bônus de meta ${status.competencia} — nível ${status.tierAtingido} (${colab?.nome ?? ""})`},
+        ${`Bônus de meta ${status.competencia} — nível ${status.tierAtingido} cumulativo (${colab?.nome ?? ""})`},
         ${`${status.competencia}-01`}::date
       )
     `;

@@ -26,8 +26,12 @@ export function competenciaAtual(): string {
 }
 
 /**
- * Degrau único: o bônus do mês é o da MAIOR meta batida, não a soma de
- * todas — bater a Meta 3 não empilha o bônus da 1 e da 2 por cima.
+ * Cumulativo: cada meta batida SOMA seu bônus ao total — bater a Meta 2 paga
+ * o bônus da Meta 1 + o incremento da Meta 2 (ex.: R$500 + R$300 = R$800);
+ * bater a Meta 3 soma os três (R$500+R$300+R$200 = R$1.000). Cada
+ * "metaN_bonus" cadastrado já é o INCREMENTO daquele degrau, não o total —
+ * mesmo modelo do documento de referência ("Metas e bônus fixos
+ * (cumulativos, independentes da comissão sobre excedente)").
  */
 export function resolveTierAtingido(
   comissaoMes: number,
@@ -48,29 +52,26 @@ export function resolveTierAtingido(
     { tier: 3, valor: config.meta3_valor, bonus: config.meta3_bonus },
   ];
 
-  let melhor: {
-    tier: 0 | 1 | 2 | 3;
-    bonusValor: number;
-    metaAtingidaValor: number | null;
-  } = {
-    tier: 0,
-    bonusValor: 0,
-    metaAtingidaValor: null,
-  };
+  let tierAtingido: 0 | 1 | 2 | 3 = 0;
+  let bonusTotal = 0;
+  let metaAtingidaValor: number | null = null;
   let proximaMetaValor: number | null = null;
 
   for (const t of tiers) {
     if (t.valor == null || t.bonus == null) continue;
     if (comissaoMes >= t.valor) {
-      melhor = {
-        tier: t.tier,
-        bonusValor: t.bonus,
-        metaAtingidaValor: t.valor,
-      };
+      tierAtingido = t.tier;
+      bonusTotal += t.bonus;
+      metaAtingidaValor = t.valor;
     } else if (proximaMetaValor == null || t.valor < proximaMetaValor) {
       proximaMetaValor = t.valor;
     }
   }
 
-  return { ...melhor, proximaMetaValor };
+  return {
+    tier: tierAtingido,
+    bonusValor: bonusTotal,
+    metaAtingidaValor,
+    proximaMetaValor,
+  };
 }

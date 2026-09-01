@@ -11,7 +11,7 @@ interface Message {
 const WELCOME: Message = {
   role: "assistant",
   content:
-    "Olá! Sou a Íris.\n\nPosso responder sobre agenda, audiências, prazos, perícias, equipe e produtividade — com os dados reais e atuais do sistema.\n\nO que você quer saber?",
+    "Olá! Sou a Íris — a única IA do sistema.\n\nPosso tirar dúvidas de uso, responder sobre agenda, audiências, prazos, equipe e produtividade com dados reais, e executar ações (sincronizar publicações, reenviar mensagens, gerenciar OABs, dados do escritório).\n\nO que você precisa?",
 };
 
 const SUGESTOES = [
@@ -19,6 +19,13 @@ const SUGESTOES = [
   "Quais audiências estão chegando?",
   "Quem está mais sobrecarregado agora?",
   "Como está o ranking desse mês?",
+];
+
+const ATALHOS_ADMIN = [
+  "Faça um diagnóstico completo do sistema",
+  "Verifique os erros e reenvie os lembretes de WhatsApp pendentes",
+  "Sincronize as publicações agora",
+  "Liste as OABs monitoradas",
 ];
 
 function DotsLoader() {
@@ -35,7 +42,7 @@ function DotsLoader() {
   );
 }
 
-export default function IrisChat() {
+export default function IrisChat({ isAdmin = false }: { isAdmin?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -161,6 +168,16 @@ export default function IrisChat() {
               {q}
             </button>
           ))}
+          {isAdmin &&
+            ATALHOS_ADMIN.map((q) => (
+              <button
+                key={q}
+                onClick={() => sendMessage(q)}
+                className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-body text-[11px] text-amber-700 hover:border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
+              >
+                {q}
+              </button>
+            ))}
         </div>
       )}
 

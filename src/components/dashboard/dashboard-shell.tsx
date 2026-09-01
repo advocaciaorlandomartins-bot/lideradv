@@ -4,7 +4,7 @@ import { useState } from "react";
 import Topbar from "@/components/dashboard/topbar";
 import Sidebar from "@/components/dashboard/sidebar";
 import BottomNav from "@/components/dashboard/bottom-nav";
-import FloatingAssistant from "@/components/dashboard/floating-assistant";
+import IrisFloating from "@/components/dashboard/iris-floating";
 import type { SessionUser } from "@/lib/session";
 
 export default function DashboardShell({
@@ -48,7 +48,7 @@ export default function DashboardShell({
         {children}
       </main>
       <BottomNav onMenuOpen={() => setSidebarOpen(true)} />
-      <FloatingAssistant />
+      <IrisFloating />
     </div>
   );
 }

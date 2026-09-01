@@ -1,20 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getSession } from "@/lib/session";
-import { hasPermission } from "@/lib/permissoes";
-import sql from "@/lib/db";
-import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
-import { getLancamentoKpis, getContasAReceber } from "@/lib/lancamentos-db";
-import { iaRateLimitExcedido } from "@/lib/rate-limit";
+import sql from "./db";
+import { enviarMensagemDireta } from "./prevbot-outbound";
+import { getLancamentoKpis, getContasAReceber } from "./lancamentos-db";
+import { hasPermission } from "./permissoes";
+import type { SessionUser } from "./session";
 
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// ── Definição das ferramentas ─────────────────────────────────────────────────
-
-const TOOLS: Anthropic.Tool[] = [
+export const IRIS_TOOLS: Anthropic.Tool[] = [
   {
     name: "verificar_saude",
     description:
@@ -30,25 +21,25 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "sincronizar_publicacoes",
     description:
-      "Busca novas publicações e intimações em todas as fontes (DJe, DJEN/TRF5, TramitaSign). Use quando o usuário pedir para buscar publicações ou não estiver recebendo intimações.",
+      "Busca novas publicações e intimações em todas as fontes (DJe, DJEN/TRF5, TramitaSign). Ação real — requer permissão de administrador.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "reenviar_mensagens_falhadas",
     description:
-      "Reenvia eventos CRM (honorário pago, processo deferido etc.) que estão na fila de pendentes. Use para reenviar notificações de status de processo.",
+      "Reenvia eventos CRM (honorário pago, processo deferido etc.) que estão na fila de pendentes. Ação real — requer permissão de administrador.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "reenviar_lembretes",
     description:
-      "Reenvia os lembretes WhatsApp pendentes de agenda, honorários e pagamentos que ainda não foram enviados. Use quando clientes não receberam mensagens de lembrete.",
+      "Reenvia os lembretes WhatsApp pendentes de agenda, honorários e pagamentos que ainda não foram enviados. Ação real — requer permissão de administrador.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "cancelar_lembretes_atrasados",
     description:
-      "Cancela (sem enviar) todos os lembretes que já passaram da data — mensagens de agenda e honorários antigos que não fazem mais sentido enviar. Use quando o usuário não quer reenviar mensagens antigas.",
+      "Cancela (sem enviar) todos os lembretes que já passaram da data. Ação real — requer permissão de administrador.",
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
@@ -59,7 +50,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "adicionar_oab",
     description:
-      "Adiciona uma nova OAB para monitoramento automático de publicações no DJe.",
+      "Adiciona uma nova OAB para monitoramento automático de publicações. Ação real — requer permissão de administrador.",
     input_schema: {
       type: "object",
       properties: {
@@ -67,10 +58,7 @@ const TOOLS: Anthropic.Tool[] = [
           type: "string",
           description: "Número da OAB (somente dígitos, ex: 14381)",
         },
-        estado: {
-          type: "string",
-          description: "Sigla do estado (ex: AL, SP, RJ)",
-        },
+        estado: { type: "string", description: "Sigla do estado (ex: AL)" },
         nome_advogado: {
           type: "string",
           description: "Nome do advogado (opcional)",
@@ -81,7 +69,8 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "remover_oab",
-    description: "Remove uma OAB do monitoramento de publicações.",
+    description:
+      "Remove uma OAB do monitoramento de publicações. Ação real — requer permissão de administrador.",
     input_schema: {
       type: "object",
       properties: {
@@ -94,16 +83,12 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "atualizar_escritorio",
     description:
-      "Atualiza dados do escritório. Campos permitidos: telefone, email, nome, cidade, estado, endereco, oab, cnpj, site, cep.",
+      "Atualiza dados do escritório. Campos permitidos: telefone, email, nome, cidade, estado, endereco, oab, cnpj, site, cep. Ação real — requer permissão de administrador.",
     input_schema: {
       type: "object",
       properties: {
-        campo: {
-          type: "string",
-          description:
-            "Nome do campo: telefone, email, nome, cidade, estado, endereco, oab, cnpj, site, cep",
-        },
-        valor: { type: "string", description: "Novo valor para o campo" },
+        campo: { type: "string" },
+        valor: { type: "string" },
       },
       required: ["campo", "valor"],
     },
@@ -111,15 +96,12 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "testar_whatsapp",
     description:
-      "Envia uma mensagem de teste pelo WhatsApp para verificar se a integração está funcionando.",
+      "Envia uma mensagem de teste pelo WhatsApp. Ação real — requer permissão de administrador.",
     input_schema: {
       type: "object",
       properties: {
-        telefone: {
-          type: "string",
-          description: "Número do telefone com DDD (somente dígitos)",
-        },
-        mensagem: { type: "string", description: "Texto da mensagem" },
+        telefone: { type: "string" },
+        mensagem: { type: "string" },
       },
       required: ["telefone", "mensagem"],
     },
@@ -133,14 +115,14 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "consultar_financeiro",
     description:
-      "Consulta dados financeiros do escritório: KPIs gerais (a receber, recebido, a pagar, pago, folha, lançamentos atrasados) e contas a receber por cliente (total pendente, total pago, histórico de lançamentos). Use quando o usuário pedir contas em aberto, histórico de pagamentos, meses em aberto por cliente, ou situação financeira geral.",
+      "Consulta dados financeiros do escritório: KPIs gerais e contas a receber por cliente. Use quando pedirem contas em aberto, histórico de pagamentos ou situação financeira geral.",
     input_schema: {
       type: "object",
       properties: {
         cliente_nome: {
           type: "string",
           description:
-            "Nome (ou parte do nome) do cliente para detalhar a conta dele. Se omitido, retorna o resumo geral do escritório e o ranking de clientes com maior valor pendente.",
+            "Nome do cliente para detalhar. Se omitido, retorna resumo geral.",
         },
       },
       required: [],
@@ -148,12 +130,33 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-// ── Executor das ferramentas ──────────────────────────────────────────────────
+/** Ferramentas que executam mudança real no sistema — exigem configuracoes:editar. */
+const FERRAMENTAS_MUTANTES = new Set([
+  "sincronizar_publicacoes",
+  "reenviar_mensagens_falhadas",
+  "reenviar_lembretes",
+  "cancelar_lembretes_atrasados",
+  "adicionar_oab",
+  "remover_oab",
+  "atualizar_escritorio",
+  "testar_whatsapp",
+]);
 
-async function executarFerramenta(
+export async function executarFerramentaIris(
+  session: SessionUser,
   name: string,
   input: Record<string, string>
 ): Promise<string> {
+  if (
+    FERRAMENTAS_MUTANTES.has(name) &&
+    !hasPermission(session, "configuracoes", "editar")
+  ) {
+    return JSON.stringify({
+      ok: false,
+      erro: "Este usuário não tem permissão de administrador para executar essa ação. Explique isso educadamente e não tente de novo.",
+    });
+  }
+
   switch (name) {
     case "verificar_saude": {
       const checks: { componente: string; ok: boolean; detalhe: string }[] = [];
@@ -239,12 +242,12 @@ async function executarFerramenta(
       let total = 0;
       const fontes: string[] = [];
 
-      const { sincronizarDJEN } = await import("@/lib/djen");
+      const { sincronizarDJEN } = await import("./djen");
       const djen = await sincronizarDJEN(7).catch(() => 0);
       total += djen;
       fontes.push(`DJEN/TRF5: +${djen}`);
 
-      const { buscarPublicacoesDjeEsaj } = await import("@/lib/dje-esaj");
+      const { buscarPublicacoesDjeEsaj } = await import("./dje-esaj");
       const oabs =
         await sql`SELECT id::text, numero, estado, nome_advogado FROM oabs_monitoradas WHERE ativa = true`;
       let dje = 0;
@@ -263,7 +266,7 @@ async function executarFerramenta(
       fontes.push(`DJe/eSAJ: +${dje}`);
 
       const { sincronizarTramitaSign, tramitaSyncAtivo } =
-        await import("@/lib/tramitasign-sync");
+        await import("./tramitasign-sync");
       if (tramitaSyncAtivo()) {
         const ts = await sincronizarTramitaSign(7).catch(() => ({
           inseridos: 0,
@@ -278,11 +281,11 @@ async function executarFerramenta(
     }
 
     case "reenviar_mensagens_falhadas": {
-      const { _enviarWebhook } = await import("@/lib/prevbot-outbound");
       const webhookKey =
         process.env.PREVBOT_WEBHOOK_KEY ?? process.env.PREVBOT_API_KEY;
       if (!webhookKey)
         return JSON.stringify({ erro: "PREVBOT_WEBHOOK_KEY não configurada" });
+      const { _enviarWebhook } = await import("./prevbot-outbound");
 
       const pendentes = await sql`
         SELECT id::text, payload, tentativas FROM prevbot_webhook_log
@@ -419,8 +422,6 @@ async function executarFerramenta(
     }
 
     case "testar_whatsapp": {
-      // Os argumentos vêm do modelo, que por sua vez é guiado por texto do
-      // usuário — valida formato e tamanho antes de disparar de verdade.
       const digitos = String(input.telefone ?? "").replace(/\D/g, "");
       if (digitos.length < 10 || digitos.length > 13)
         return JSON.stringify({
@@ -586,148 +587,4 @@ async function executarFerramenta(
     default:
       return JSON.stringify({ erro: `Ferramenta "${name}" não reconhecida` });
   }
-}
-
-const MAX_MENSAGENS = 30;
-const MAX_CHARS_TEXTO = 8000;
-
-/**
- * O cliente envia o histórico inteiro. Aceitamos apenas texto simples em turnos
- * user/assistant: blocos `tool_use`/`tool_result` forjados deixariam o chamador
- * inventar resultados de ferramentas (ex: fingir que uma checagem passou) e
- * conduzir o agente a executar ações reais com premissas falsas.
- */
-function sanitizarHistorico(raw: unknown): Anthropic.MessageParam[] | null {
-  if (!Array.isArray(raw)) return null;
-  const out: Anthropic.MessageParam[] = [];
-  for (const m of raw.slice(-MAX_MENSAGENS)) {
-    if (!m || typeof m !== "object") continue;
-    const { role, content } = m as { role?: unknown; content?: unknown };
-    if (role !== "user" && role !== "assistant") continue;
-
-    let texto = "";
-    if (typeof content === "string") texto = content;
-    else if (Array.isArray(content))
-      texto = content
-        .filter(
-          (b): b is { type: "text"; text: string } =>
-            !!b &&
-            typeof b === "object" &&
-            (b as { type?: unknown }).type === "text" &&
-            typeof (b as { text?: unknown }).text === "string"
-        )
-        .map((b) => b.text)
-        .join("\n");
-
-    texto = texto.trim().slice(0, MAX_CHARS_TEXTO);
-    if (!texto) continue;
-    out.push({ role, content: texto });
-  }
-  // A API exige que a conversa comece com um turno de usuário.
-  while (out.length && out[0].role !== "user") out.shift();
-  return out.length ? out : null;
-}
-
-// ── Handler ───────────────────────────────────────────────────────────────────
-
-const SYSTEM = `Você é o Agente do Sistema LiderAdv — um assistente com poderes para executar ações reais no sistema jurídico.
-
-Suas capacidades:
-- Verificar saúde do sistema e detectar problemas
-- Sincronizar publicações/intimações
-- Reenviar lembretes WhatsApp pendentes (agenda, honorários, pagamentos) via reenviar_lembretes
-- Reenviar eventos CRM WhatsApp falhados via reenviar_mensagens_falhadas
-- Gerenciar OABs monitoradas (listar, adicionar, remover)
-- Atualizar dados do escritório (telefone, e-mail, endereço, etc.)
-- Testar integração WhatsApp
-- Ver logs de erros (inclui erros de lembretes E eventos CRM)
-- Consultar dados financeiros via consultar_financeiro: KPIs gerais (a receber, recebido, a pagar, pago, folha, atrasados) e contas por cliente (pendente, pago, histórico de lançamentos) — use sempre que o usuário pedir situação financeira, contas em aberto, histórico de pagamentos ou meses em aberto de um cliente
-
-Quando o usuário relatar que mensagens não chegaram, use SEMPRE: 1) ver_erros para diagnosticar, 2) reenviar_lembretes para reenviar.
-Após executar, reporte claramente o resultado com emojis: ✅ sucesso, ❌ erro, ⚠️ atenção.
-Seja conciso e direto. Confirme o que foi feito.`;
-
-export async function POST(req: NextRequest) {
-  const session = await getSession();
-  // O agente EXECUTA ações destrutivas (remove OABs, altera dados do
-  // escritório, dispara WhatsApp) — exige permissão de escrita, não de leitura.
-  if (!session || !hasPermission(session, "configuracoes", "editar")) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
-  }
-
-  if (await iaRateLimitExcedido(session.login))
-    return NextResponse.json(
-      {
-        error:
-          "Limite de requisições de IA excedido. Tente novamente em 1 hora.",
-      },
-      { status: 429 }
-    );
-
-  const body = (await req.json().catch(() => null)) as {
-    messages?: unknown;
-  } | null;
-
-  const currentMessages = sanitizarHistorico(body?.messages);
-  if (!currentMessages)
-    return NextResponse.json(
-      { error: "Mensagens inválidas." },
-      { status: 400 }
-    );
-
-  try {
-    for (let i = 0; i < 6; i++) {
-      const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        system: SYSTEM,
-        tools: TOOLS,
-        messages: currentMessages,
-      });
-
-      if (response.stop_reason === "end_turn") {
-        const text = response.content
-          .filter((b) => b.type === "text")
-          .map((b) => (b as { type: "text"; text: string }).text)
-          .join("\n");
-        return NextResponse.json({ reply: text });
-      }
-
-      if (response.stop_reason === "tool_use") {
-        currentMessages.push({
-          role: "assistant",
-          content: response.content,
-        });
-
-        const toolResults: Anthropic.ToolResultBlockParam[] = [];
-        for (const block of response.content) {
-          if (block.type === "tool_use") {
-            const result = await executarFerramenta(
-              block.name,
-              block.input as Record<string, string>
-            );
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: block.id,
-              content: result,
-            });
-          }
-        }
-        currentMessages.push({ role: "user", content: toolResults });
-        continue;
-      }
-
-      break;
-    }
-  } catch (err) {
-    console.error("[sistema/agente] Erro na execução do agente:", err);
-    return NextResponse.json(
-      { error: "Erro ao processar a solicitação. Tente novamente." },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({
-    reply: "Não consegui completar a operação. Tente novamente.",
-  });
 }

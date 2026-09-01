@@ -24,6 +24,7 @@ import {
 import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
 import ChecklistManager from "@/components/dashboard/controladoria/checklist-manager";
 import type { ChecklistItem } from "@/lib/checklist-types";
+import { AvatarStack } from "@/components/dashboard/avatar";
 import {
   getTimesheetAtivo,
   iniciarTimesheetAction,
@@ -410,9 +411,14 @@ function ItemCard({
 
         {/* Co-responsáveis */}
         {tarefa && tarefa.coResponsaveis.length > 0 && (
-          <p className="mt-0.5 font-body text-[11px] text-muted truncate">
-            Com {tarefa.coResponsaveis.join(", ")}
-          </p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <AvatarStack nomes={tarefa.coResponsaveis} size="h-5 w-5" />
+            <span className="font-body text-[11px] text-muted truncate">
+              {tarefa.coResponsaveis.length === 1
+                ? tarefa.coResponsaveis[0]
+                : `+${tarefa.coResponsaveis.length} colaboradores`}
+            </span>
+          </div>
         )}
 
         {/* Número do processo (texto, não link — navegação está no botão Ver) */}
@@ -453,9 +459,25 @@ function ItemCard({
         {/* Checklist obrigatório */}
         {checklistItens.length > 0 && (
           <div className="mt-3 rounded-lg border border-border bg-slate-50 p-2.5">
-            <p className="mb-1.5 font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
-              Checklist
-            </p>
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="font-body text-[10px] font-semibold uppercase tracking-wide text-muted">
+                Checklist
+              </p>
+              <p
+                className={`font-body text-[10px] font-bold ${checklistCompleto ? "text-emerald-600" : "text-muted"}`}
+              >
+                {checklistItens.filter((i) => i.feito).length}/
+                {checklistItens.length}
+              </p>
+            </div>
+            <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${checklistCompleto ? "bg-emerald-500" : "bg-primary/60"}`}
+                style={{
+                  width: `${(checklistItens.filter((i) => i.feito).length / checklistItens.length) * 100}%`,
+                }}
+              />
+            </div>
             <ChecklistManager
               origemTipo={isControle ? "controle" : "tarefa_processo"}
               origemId={item.id}

@@ -1,22 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { SparklesIcon, XMarkIcon } from "@/components/icons";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-const STORAGE_KEY = "lideradv-assistant-history";
+const STORAGE_KEY = "lideradv-iris-history";
 const MAX_STORED = 30;
-
-function SparklesIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5zM18 1.5a.75.75 0 01.728.568l.258 1.036c.236.94.97 1.674 1.91 1.91l1.036.258a.75.75 0 010 1.456l-1.036.258c-.94.236-1.674.97-1.91 1.91l-.258 1.036a.75.75 0 01-1.456 0l-.258-1.036a2.625 2.625 0 00-1.91-1.91l-1.036-.258a.75.75 0 010-1.456l1.036-.258a2.625 2.625 0 001.91-1.91l.258-1.036A.75.75 0 0118 1.5zM16.5 15a.75.75 0 01.712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 010 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 01-1.422 0l-.395-1.183a1.5 1.5 0 00-.948-.948l-1.183-.395a.75.75 0 010-1.422l1.183-.395c.447-.15.799-.5.948-.948l.395-1.183A.75.75 0 0116.5 15z" />
-    </svg>
-  );
-}
 
 function SendIcon({ className }: { className?: string }) {
   return (
@@ -31,24 +24,6 @@ function SendIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
-      />
-    </svg>
-  );
-}
-
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      strokeWidth={2}
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M6 18L18 6M6 6l12 12"
       />
     </svg>
   );
@@ -78,7 +53,7 @@ function DotsLoader() {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="block h-2 w-2 rounded-full bg-primary/60 animate-bounce"
+          className="block h-2 w-2 rounded-full bg-violet-500/60 animate-bounce"
           style={{ animationDelay: `${i * 0.15}s`, animationDuration: "0.8s" }}
         />
       ))}
@@ -89,10 +64,10 @@ function DotsLoader() {
 const WELCOME: Message = {
   role: "assistant",
   content:
-    "Olá! Sou o Assistente LiderAdv 👋\n\nEstou aqui para ajudar você a usar o sistema. Pode me perguntar sobre qualquer funcionalidade — clientes, processos, agenda, financeiro, WhatsApp automático, e muito mais.\n\nComo posso ajudar?",
+    "Olá! Sou a Íris 👋\n\nPosso tirar dúvidas sobre o sistema, mostrar dados reais (agenda, equipe, financeiro, produtividade) e executar ações — sincronizar publicações, reenviar mensagens, gerenciar OABs, atualizar dados do escritório.\n\nComo posso ajudar?",
 };
 
-export default function FloatingAssistant() {
+export default function IrisFloating() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState("");
@@ -101,7 +76,6 @@ export default function FloatingAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load history from localStorage after hydration
   useEffect(() => {
     const run = () => {
       setHydrated(true);
@@ -109,9 +83,7 @@ export default function FloatingAssistant() {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved) as Message[];
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setMessages(parsed);
-          }
+          if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
         }
       } catch {
         // ignore
@@ -120,43 +92,37 @@ export default function FloatingAssistant() {
     queueMicrotask(run);
   }, []);
 
-  // Persist history
   useEffect(() => {
     if (!hydrated) return;
     try {
-      const toSave = messages.slice(-MAX_STORED);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(messages.slice(-MAX_STORED))
+      );
     } catch {
       // ignore
     }
   }, [messages, hydrated]);
 
-  // Scroll to bottom on new message
   useEffect(() => {
-    if (open) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    if (open) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, open, loading]);
 
-  // Focus input when opening
   useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 120);
-    }
+    if (open) setTimeout(() => inputRef.current?.focus(), 120);
   }, [open]);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
 
-    const userMsg: Message = { role: "user", content: text };
-    const newMessages = [...messages, userMsg];
+    const newMessages = [...messages, { role: "user" as const, content: text }];
     setMessages(newMessages);
     setInput("");
     setLoading(true);
 
     try {
-      const res = await fetch("/api/assistant/chat", {
+      const res = await fetch("/api/iris/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages }),
@@ -166,7 +132,7 @@ export default function FloatingAssistant() {
         role: "assistant",
         content: res.ok
           ? (data.reply ?? "Não obtive resposta. Tente novamente.")
-          : (data.error ?? "Erro ao consultar o assistente."),
+          : (data.error ?? "Erro ao consultar a Íris."),
       };
       setMessages((prev) => [...prev, reply]);
     } catch {
@@ -194,47 +160,44 @@ export default function FloatingAssistant() {
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
-      /* ignore */
+      // ignore
     }
   }
 
   return (
     <>
-      {/* Floating button */}
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label="Abrir assistente LiderAdv"
+        aria-label="Abrir Íris"
         className={`fixed bottom-[4.75rem] right-4 z-40 flex h-13 w-13 items-center justify-center rounded-full shadow-lg transition-all duration-200 cursor-pointer lg:bottom-6 lg:right-6 ${
           open
             ? "bg-slate-700 text-white scale-95"
-            : "bg-primary text-white hover:bg-primary/90 hover:scale-105"
+            : "bg-violet-600 text-white hover:bg-violet-700 hover:scale-105"
         }`}
         style={{ width: "3.25rem", height: "3.25rem" }}
       >
         {open ? (
-          <XIcon className="h-5 w-5" />
+          <XMarkIcon className="h-5 w-5" />
         ) : (
           <SparklesIcon className="h-5 w-5" />
         )}
       </button>
 
-      {/* Chat panel */}
       {open && (
         <div
           className="fixed bottom-[8.5rem] right-4 z-40 flex w-[calc(100vw-2rem)] max-w-sm flex-col rounded-2xl bg-white shadow-2xl border border-border overflow-hidden lg:bottom-20 lg:right-6"
           style={{ height: "min(520px, calc(100dvh - 10rem))" }}
         >
-          {/* Header */}
-          <div className="flex items-center gap-3 border-b border-border bg-gradient-to-r from-primary to-violet-700 px-4 py-3">
+          <div className="flex items-center gap-3 border-b border-border bg-gradient-to-r from-violet-600 to-indigo-700 px-4 py-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20">
               <SparklesIcon className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-heading text-sm font-bold text-white leading-tight">
-                Assistente LiderAdv
+                Íris
               </p>
               <p className="font-body text-[11px] text-white/70 leading-tight">
-                Tire dúvidas sobre o sistema
+                IA do escritório
               </p>
             </div>
             <button
@@ -246,7 +209,6 @@ export default function FloatingAssistant() {
             </button>
           </div>
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
             {messages.map((msg, i) => (
               <div
@@ -254,14 +216,14 @@ export default function FloatingAssistant() {
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 {msg.role === "assistant" && (
-                  <div className="mr-2 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <SparklesIcon className="h-3 w-3 text-primary" />
+                  <div className="mr-2 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100">
+                    <SparklesIcon className="h-3 w-3 text-violet-600" />
                   </div>
                 )}
                 <div
                   className={`max-w-[82%] rounded-2xl px-3 py-2 font-body text-sm leading-relaxed whitespace-pre-wrap break-words ${
                     msg.role === "user"
-                      ? "bg-primary text-white rounded-tr-sm"
+                      ? "bg-violet-600 text-white rounded-tr-sm"
                       : "bg-slate-100 text-fg rounded-tl-sm"
                   }`}
                 >
@@ -272,8 +234,8 @@ export default function FloatingAssistant() {
 
             {loading && (
               <div className="flex justify-start">
-                <div className="mr-2 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <SparklesIcon className="h-3 w-3 text-primary" />
+                <div className="mr-2 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100">
+                  <SparklesIcon className="h-3 w-3 text-violet-600" />
                 </div>
                 <div className="rounded-2xl rounded-tl-sm bg-slate-100 px-3 py-2">
                   <DotsLoader />
@@ -284,14 +246,13 @@ export default function FloatingAssistant() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick questions */}
           {messages.length <= 1 && (
             <div className="border-t border-border px-3 py-2 flex flex-wrap gap-1.5">
               {[
+                "O que tenho na agenda essa semana?",
                 "Como cadastrar um cliente?",
-                "Como agendar reunião?",
-                "Como funciona o WhatsApp automático?",
-                "Como processar PDF do INSS?",
+                "Faça um diagnóstico do sistema",
+                "Quem está sobrecarregado agora?",
               ].map((q) => (
                 <button
                   key={q}
@@ -299,7 +260,7 @@ export default function FloatingAssistant() {
                     setInput(q);
                     inputRef.current?.focus();
                   }}
-                  className="rounded-full border border-border bg-slate-50 px-2.5 py-1 font-body text-[11px] text-muted hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-colors cursor-pointer"
+                  className="rounded-full border border-border bg-slate-50 px-2.5 py-1 font-body text-[11px] text-muted hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition-colors cursor-pointer"
                 >
                   {q}
                 </button>
@@ -307,15 +268,14 @@ export default function FloatingAssistant() {
             </div>
           )}
 
-          {/* Input */}
           <div className="border-t border-border bg-white px-3 py-3">
-            <div className="flex items-end gap-2 rounded-xl border border-border bg-slate-50 px-3 py-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+            <div className="flex items-end gap-2 rounded-xl border border-border bg-slate-50 px-3 py-2 focus-within:border-violet-400 focus-within:ring-1 focus-within:ring-violet-200 transition-all">
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Pergunte sobre o sistema..."
+                placeholder="Pergunte à Íris..."
                 rows={1}
                 className="flex-1 resize-none bg-transparent font-body text-sm text-fg placeholder:text-muted focus:outline-none leading-relaxed"
                 style={{ maxHeight: "100px" }}
@@ -323,7 +283,7 @@ export default function FloatingAssistant() {
               <button
                 onClick={sendMessage}
                 disabled={!input.trim() || loading}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white transition-all hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white transition-all hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 <SendIcon className="h-4 w-4" />
               </button>

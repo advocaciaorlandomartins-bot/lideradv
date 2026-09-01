@@ -218,12 +218,6 @@ const GROUPS: {
         label: "Configurações",
         modulo: "configuracoes",
       },
-      {
-        href: "/dashboard/sistema",
-        icon: SparklesIcon,
-        label: "Agente IA",
-        modulo: "configuracoes",
-      },
     ],
   },
 ];

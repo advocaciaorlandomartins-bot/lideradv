@@ -13,6 +13,8 @@ export default async function IrisPage() {
   const session = await getSession();
   if (!session || !hasPermission(session, "controladoria", "ver")) notFound();
 
+  const isAdmin = hasPermission(session, "configuracoes", "editar");
+
   return (
     <div className="flex h-[calc(100dvh-8.5rem)] flex-col space-y-4 lg:h-[calc(100dvh-6rem)]">
       <div>
@@ -20,11 +22,14 @@ export default async function IrisPage() {
           Íris IA
         </h1>
         <p className="mt-1 font-body text-sm text-muted">
-          Pergunte sobre agenda, audiências, prazos, equipe e produtividade —
-          Íris responde com os dados reais e atuais do escritório.
+          A única IA do sistema — tira dúvidas de uso, mostra dados reais
+          (agenda, equipe, financeiro, produtividade)
+          {isAdmin &&
+            " e executa ações reais (sincronizar publicações, reenviar mensagens, gerenciar OABs, dados do escritório)"}
+          .
         </p>
       </div>
-      <IrisChat />
+      <IrisChat isAdmin={isAdmin} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import type {
   CapacidadeSemana,
 } from "@/lib/controladoria-db";
 import { TrophyIcon, GaugeIcon, AlertIcon } from "@/components/icons";
+import { Avatar } from "@/components/dashboard/avatar";
 
 interface Props {
   ranking: RankingItem[];
@@ -23,40 +24,6 @@ const PERIODOS = [
 function fmtSemana(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${d}/${m}`;
-}
-
-const AVATAR_CORES = [
-  "bg-blue-100 text-blue-700",
-  "bg-violet-100 text-violet-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
-  "bg-indigo-100 text-indigo-700",
-];
-
-function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/);
-  const primeiras = partes[0]?.[0] ?? "";
-  const ultimas =
-    partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? "") : "";
-  return (primeiras + ultimas).toUpperCase();
-}
-
-function corAvatar(nome: string): string {
-  let hash = 0;
-  for (let i = 0; i < nome.length; i++) hash = nome.charCodeAt(i) + hash * 31;
-  return AVATAR_CORES[Math.abs(hash) % AVATAR_CORES.length];
-}
-
-function Avatar({ nome, size = "h-8 w-8" }: { nome: string; size?: string }) {
-  return (
-    <span
-      className={`flex ${size} flex-shrink-0 items-center justify-center rounded-full font-body text-xs font-bold ${corAvatar(nome)}`}
-    >
-      {iniciais(nome)}
-    </span>
-  );
 }
 
 export default function ControladoriaContent({

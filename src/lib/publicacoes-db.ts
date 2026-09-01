@@ -24,6 +24,9 @@ export interface Publicacao {
   conteudo_completo: string | null;
   resumo_ia: ResumoIa | null;
   created_at: string;
+  processoId: string | null;
+  clienteId: string | null;
+  clienteNome: string | null;
 }
 
 export interface OabMonitorada {
@@ -55,11 +58,16 @@ export async function getPublicacaoById(
 ): Promise<Publicacao | null> {
   const rows = await sql`
     SELECT
-      id, processo, tipo, destinatario, advogados, orgao, tribunal,
-      TO_CHAR(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
-      status, origem, conteudo, conteudo_completo, resumo_ia, created_at::text
-    FROM publicacoes
-    WHERE id = ${id}
+      pub.id, pub.processo, pub.tipo, pub.destinatario, pub.advogados,
+      pub.orgao, pub.tribunal,
+      TO_CHAR(pub.disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
+      pub.status, pub.origem, pub.conteudo, pub.conteudo_completo,
+      pub.resumo_ia, pub.created_at::text,
+      pub.processo_id::text, p.client_id::text AS cliente_id, cl.name AS cliente_nome
+    FROM publicacoes pub
+    LEFT JOIN processos p ON p.id = pub.processo_id
+    LEFT JOIN clients cl ON cl.id = p.client_id
+    WHERE pub.id = ${id}
     LIMIT 1
   `;
   return rows[0] ? mapPublicacao(rows[0]) : null;
@@ -102,6 +110,9 @@ function mapPublicacao(r: Record<string, unknown>): Publicacao {
     conteudo_completo: r.conteudo_completo ? String(r.conteudo_completo) : null,
     resumo_ia: r.resumo_ia ? (r.resumo_ia as ResumoIa) : null,
     created_at: String(r.created_at),
+    processoId: r.processo_id ? String(r.processo_id) : null,
+    clienteId: r.cliente_id ? String(r.cliente_id) : null,
+    clienteNome: r.cliente_nome ? String(r.cliente_nome) : null,
   };
 }
 

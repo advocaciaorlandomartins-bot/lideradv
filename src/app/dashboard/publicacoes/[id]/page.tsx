@@ -174,7 +174,11 @@ export default async function PublicacaoDetalhePage({
 
         {/* Action buttons — client component */}
         <div className="border-t border-border bg-slate-50/50 px-5 py-3">
-          <PublicacaoDetalheActions pub={pub} tribunalUrl={tribunalUrl} />
+          <PublicacaoDetalheActions
+            pub={pub}
+            tribunalUrl={tribunalUrl}
+            prazoFinal={prazos?.prazo_final ?? null}
+          />
         </div>
       </div>
 

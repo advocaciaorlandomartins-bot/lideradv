@@ -20,12 +20,26 @@ export const dynamic = "force-dynamic";
 export default async function NovoControlePage({
   searchParams,
 }: {
-  searchParams: Promise<{ tipo?: string }>;
+  searchParams: Promise<{
+    tipo?: string;
+    publicacao_id?: string;
+    descricao?: string;
+    data_evento?: string;
+    processo_id?: string;
+    cliente_id?: string;
+  }>;
 }) {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "criar")) notFound();
 
-  const { tipo = "audiencias" } = await searchParams;
+  const {
+    tipo = "audiencias",
+    publicacao_id,
+    descricao,
+    data_evento,
+    processo_id,
+    cliente_id,
+  } = await searchParams;
   const tipoConfig = getTipoConfig(tipo);
 
   const [clientes, processos, usuarios, locais, locaisPericia, carga] =
@@ -78,6 +92,13 @@ export default async function NovoControlePage({
         locais={locais}
         locaisPericia={locaisPericia}
         carga={carga}
+        prefill={{
+          publicacaoId: publicacao_id ?? null,
+          descricao: descricao ?? null,
+          dataEvento: data_evento ?? null,
+          clienteId: cliente_id ?? null,
+          processoId: processo_id ?? null,
+        }}
       />
     </div>
   );

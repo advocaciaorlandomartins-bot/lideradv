@@ -15,12 +15,20 @@ import {
   ArrowTopRightOnSquareIcon,
 } from "@/components/icons";
 
+function brParaIso(br: string | null | undefined): string | null {
+  if (!br) return null;
+  const [d, m, y] = br.split("/");
+  return d && m && y ? `${y}-${m}-${d}` : null;
+}
+
 export default function PublicacaoDetalheActions({
   pub,
   tribunalUrl,
+  prazoFinal,
 }: {
   pub: Publicacao;
   tribunalUrl: string | null;
+  prazoFinal?: string | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -46,6 +54,20 @@ export default function PublicacaoDetalheActions({
       setTimeout(() => setCopied(false), 2000);
     });
   }
+
+  const descricaoSugerida = `${pub.tipo} — Proc. ${pub.processo}${
+    pub.resumo_ia?.acao_necessaria ? ` — ${pub.resumo_ia.acao_necessaria}` : ""
+  }`;
+  const prazoParams = new URLSearchParams({
+    tipo: "prazos",
+    publicacao_id: String(pub.id),
+    descricao: descricaoSugerida,
+  });
+  const dataIso = brParaIso(prazoFinal);
+  if (dataIso) prazoParams.set("data_evento", dataIso);
+  if (pub.processoId) prazoParams.set("processo_id", pub.processoId);
+  if (pub.clienteId) prazoParams.set("cliente_id", pub.clienteId);
+  const criarPrazoHref = `/dashboard/controles/novo?${prazoParams.toString()}`;
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -81,10 +103,10 @@ export default function PublicacaoDetalheActions({
       )}
 
       <Link
-        href="/dashboard/controles/novo"
+        href={criarPrazoHref}
         className="flex h-9 items-center rounded-lg border border-border bg-white px-3.5 font-body text-sm font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary"
       >
-        + Criar atividade
+        + Criar prazo desta publicação
       </Link>
 
       {pub.status === "nao_lida" ? (

@@ -244,6 +244,13 @@ export async function createControleAction(
       ? (formData.get("prioridade") as string)
       : "media") || "media";
   const fatal = formData.get("fatal") === "on";
+  const publicacaoIdRaw = (
+    (formData.get("publicacao_id") as string) ?? ""
+  ).trim();
+  const publicacaoId =
+    publicacaoIdRaw && /^\d+$/.test(publicacaoIdRaw)
+      ? Number(publicacaoIdRaw)
+      : null;
   const checklistTexto = (formData.get("checklist_texto") as string) ?? "";
   const checklistJsonNovo = JSON.stringify(
     checklistTexto
@@ -283,31 +290,45 @@ export async function createControleAction(
   }
 
   try {
+    let novoId: string | null = null;
     if (clienteId && processoId && responsavelId) {
-      await sql`
+      const rows = await sql`
         INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, responsavel_id, tipo_demanda, observacoes, dados, checklist)
         VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${clienteId}::uuid, ${processoId}::uuid, ${responsavelId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        RETURNING id::text
       `;
+      novoId = rows[0]?.id ?? null;
     } else if (clienteId && processoId) {
-      await sql`
+      const rows = await sql`
         INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, tipo_demanda, observacoes, dados, checklist)
         VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${clienteId}::uuid, ${processoId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        RETURNING id::text
       `;
+      novoId = rows[0]?.id ?? null;
     } else if (clienteId && responsavelId) {
-      await sql`
+      const rows = await sql`
         INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, responsavel_id, tipo_demanda, observacoes, dados, checklist)
         VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${clienteId}::uuid, ${responsavelId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        RETURNING id::text
       `;
+      novoId = rows[0]?.id ?? null;
     } else if (clienteId) {
-      await sql`
+      const rows = await sql`
         INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, tipo_demanda, observacoes, dados, checklist)
         VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${clienteId}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        RETURNING id::text
       `;
+      novoId = rows[0]?.id ?? null;
     } else {
-      await sql`
+      const rows = await sql`
         INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, tipo_demanda, observacoes, dados, checklist)
         VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date, ${descricao}, ${prioridade}, ${fatal}, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb, ${checklistJsonNovo}::jsonb)
+        RETURNING id::text
       `;
+      novoId = rows[0]?.id ?? null;
+    }
+    if (novoId && publicacaoId) {
+      await sql`UPDATE controles SET publicacao_id = ${publicacaoId} WHERE id = ${novoId}::uuid`;
     }
   } catch (err) {
     console.error("createControleAction:", err);

@@ -33,6 +33,7 @@ function mapRow(r: any): Controle {
     responsavel_login: r.responsavel_login ? String(r.responsavel_login) : null,
     prioridade: (r.prioridade as "baixa" | "media" | "alta") ?? "media",
     fatal: !!r.fatal,
+    publicacao_id: r.publicacao_id != null ? Number(r.publicacao_id) : null,
     tipo_demanda: r.tipo_demanda ? String(r.tipo_demanda) : null,
     observacoes: r.observacoes ? String(r.observacoes) : null,
     prazo_interno: r.prazo_interno
@@ -85,7 +86,7 @@ export async function getControles(
       c.cliente_id::text,   cl.name AS cliente_nome,
       c.processo_id::text,  p.numero AS processo_numero,
       c.responsavel_id::text, u.login AS responsavel_login,
-      c.prioridade, c.fatal, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.checklist, c.created_at::text
+      c.prioridade, c.fatal, c.publicacao_id, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.checklist, c.created_at::text
     FROM controles c
     LEFT JOIN clients cl ON cl.id = c.cliente_id
     LEFT JOIN processos p  ON p.id  = c.processo_id
@@ -131,7 +132,7 @@ export async function getControleById(id: string): Promise<Controle | null> {
       c.cliente_id::text,   cl.name AS cliente_nome,
       c.processo_id::text,  p.numero AS processo_numero,
       c.responsavel_id::text, u.login AS responsavel_login,
-      c.prioridade, c.fatal, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.checklist, c.created_at::text
+      c.prioridade, c.fatal, c.publicacao_id, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.checklist, c.created_at::text
     FROM controles c
     LEFT JOIN clients cl ON cl.id = c.cliente_id
     LEFT JOIN processos p  ON p.id  = c.processo_id

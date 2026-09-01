@@ -35,6 +35,14 @@ const labelCls = "block font-body text-sm font-semibold text-fg mb-1.5";
 const selectCls =
   "w-full h-10 cursor-pointer rounded-lg border border-border bg-white px-3 font-body text-sm text-fg outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100";
 
+interface ControlePrefill {
+  publicacaoId: string | null;
+  descricao: string | null;
+  dataEvento: string | null;
+  clienteId: string | null;
+  processoId: string | null;
+}
+
 interface Props {
   controle?: Controle;
   tipoInicial: string;
@@ -44,6 +52,7 @@ interface Props {
   locais: LocalAudiencia[];
   locaisPericia: LocalAudiencia[];
   carga?: CargaColaborador[];
+  prefill?: ControlePrefill;
 }
 
 export default function ControleForm({
@@ -55,6 +64,7 @@ export default function ControleForm({
   locais,
   locaisPericia,
   carga = [],
+  prefill,
 }: Props) {
   // Anota cada usuário com a carga atual do colaborador vinculado — dá
   // contexto na hora de escolher o responsável (evita empilhar tarefa em
@@ -78,8 +88,15 @@ export default function ControleForm({
   const [tipo] = useState(controle?.tipo ?? tipoInicial);
 
   // ── Autocomplete de cliente ──
-  const [clienteNome, setClienteNome] = useState(controle?.cliente_nome ?? "");
-  const [clienteId, setClienteId] = useState(controle?.cliente_id ?? "");
+  const prefillCliente = prefill?.clienteId
+    ? clientes.find((c) => c.id === prefill.clienteId)
+    : null;
+  const [clienteNome, setClienteNome] = useState(
+    controle?.cliente_nome ?? prefillCliente?.nome ?? ""
+  );
+  const [clienteId, setClienteId] = useState(
+    controle?.cliente_id ?? prefillCliente?.id ?? ""
+  );
   const [showDrop, setShowDrop] = useState(false);
 
   const clienteMatches =
@@ -107,7 +124,9 @@ export default function ControleForm({
   const [localMode, setLocalMode] = useState<"existente" | "novo">("existente");
 
   // ── Data do evento e prazo interno ──
-  const [dataEvento, setDataEvento] = useState(controle?.data_evento ?? "");
+  const [dataEvento, setDataEvento] = useState(
+    controle?.data_evento ?? prefill?.dataEvento ?? ""
+  );
   const [prazoInterno, setPrazoInterno] = useState(
     controle?.prazo_interno ?? ""
   );
@@ -133,6 +152,42 @@ export default function ControleForm({
     <form action={formAction} className="flex flex-col gap-6 max-w-2xl">
       {isEdit && <input type="hidden" name="id" value={controle.id} />}
       <input type="hidden" name="tipo" value={tipo} />
+      {prefill?.publicacaoId && (
+        <input
+          type="hidden"
+          name="publicacao_id"
+          value={prefill.publicacaoId}
+        />
+      )}
+
+      {prefill?.publicacaoId && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 font-body text-sm text-indigo-800">
+          Criando prazo a partir da{" "}
+          <a
+            href={`/dashboard/publicacoes/${prefill.publicacaoId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline"
+          >
+            publicação #{prefill.publicacaoId}
+          </a>{" "}
+          — dados pré-preenchidos, revise antes de salvar.
+        </div>
+      )}
+
+      {!prefill?.publicacaoId && controle?.publicacao_id && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 font-body text-sm text-indigo-800">
+          Criado a partir da{" "}
+          <a
+            href={`/dashboard/publicacoes/${controle.publicacao_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline"
+          >
+            publicação #{controle.publicacao_id}
+          </a>
+        </div>
+      )}
 
       {state?.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">
@@ -217,7 +272,7 @@ export default function ControleForm({
             <label className={labelCls}>Processo</label>
             <select
               name="processo_id"
-              defaultValue={controle?.processo_id ?? ""}
+              defaultValue={controle?.processo_id ?? prefill?.processoId ?? ""}
               className={selectCls}
             >
               <option value="">— Nenhum —</option>
@@ -413,7 +468,7 @@ export default function ControleForm({
               <textarea
                 name="descricao"
                 rows={isAudiencia ? 2 : 3}
-                defaultValue={controle?.descricao ?? ""}
+                defaultValue={controle?.descricao ?? prefill?.descricao ?? ""}
                 placeholder={
                   isAudiencia
                     ? "Ex.: Instrução e julgamento"

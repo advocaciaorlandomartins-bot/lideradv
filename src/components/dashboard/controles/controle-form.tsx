@@ -19,6 +19,7 @@ import {
   type LocalAudiencia,
 } from "@/lib/controles-types";
 import type { CargaColaborador } from "@/lib/controladoria-db";
+import ChecklistManager from "@/components/dashboard/controladoria/checklist-manager";
 
 function addDays(dateStr: string, days: number): string {
   if (!dateStr) return "";
@@ -608,6 +609,39 @@ export default function ControleForm({
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Checklist obrigatório ── */}
+      <div className="rounded-xl border border-border bg-white p-5">
+        <label className={labelCls}>Checklist obrigatório</label>
+        {isEdit ? (
+          <>
+            <ChecklistManager
+              origemTipo="controle"
+              origemId={controle.id}
+              itensIniciais={controle.checklist}
+            />
+            <p className="mt-2 font-body text-xs text-muted">
+              Todos os itens precisam estar marcados para permitir &ldquo;Dar
+              baixa&rdquo;.
+            </p>
+          </>
+        ) : (
+          <>
+            <textarea
+              name="checklist_texto"
+              rows={3}
+              placeholder={
+                "Um item por linha, ex.:\nConferir documentação\nProtocolar no INSS"
+              }
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100 resize-none"
+            />
+            <p className="mt-1 font-body text-xs text-muted">
+              Opcional. Um item por linha — todos precisarão ser marcados antes
+              de &ldquo;Dar baixa&rdquo;.
+            </p>
+          </>
+        )}
       </div>
 
       {/* ── Observações ── */}

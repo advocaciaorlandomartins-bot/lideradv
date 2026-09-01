@@ -8,6 +8,7 @@ import { hasPermission } from "./permissoes";
 import { podeEditarProcesso } from "./processo-ownership";
 import { interpretarAndamento } from "./cerebroJuridico";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
+import { checklistCompleto } from "./checklist";
 
 // ── Fase / Status ──────────────────────────────────────────────
 
@@ -368,6 +369,7 @@ export async function createTarefaProcessoAction(data: {
   prazo: string | null;
   hora: string | null;
   comentarios: string | null;
+  checklistTexto?: string | null;
 }): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "editar"))
@@ -375,10 +377,18 @@ export async function createTarefaProcessoAction(data: {
   if (!(await podeEditarProcesso(session, data.processoId)))
     return { error: "Sem permissão." };
   if (!data.titulo.trim()) return { error: "O título é obrigatório." };
+  const checklistJson = JSON.stringify(
+    (data.checklistTexto ?? "")
+      .split("\n")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .slice(0, 30)
+      .map((texto) => ({ texto: texto.slice(0, 200), feito: false }))
+  );
   try {
     await sql`
       INSERT INTO tarefas_processo
-        (processo_id, client_id, titulo, responsavel, prioridade, prazo, hora, comentarios)
+        (processo_id, client_id, titulo, responsavel, prioridade, prazo, hora, comentarios, checklist)
       VALUES
         (${data.processoId}::uuid,
          ${data.clientId}::uuid,
@@ -387,7 +397,8 @@ export async function createTarefaProcessoAction(data: {
          ${data.prioridade},
          ${data.prazo ? data.prazo : null}::date,
          ${data.hora ? data.hora : null}::time,
-         ${data.comentarios || null})
+         ${data.comentarios || null},
+         ${checklistJson}::jsonb)
     `;
     revalidatePath(`/dashboard/processos/${data.processoId}`);
     return {};
@@ -406,6 +417,11 @@ export async function updateTarefaStatusAction(
     return { error: "Sem permissão." };
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
+  if (
+    status === "Concluída" &&
+    !(await checklistCompleto("tarefa_processo", id))
+  )
+    return { error: "Marque todos os itens do checklist antes de concluir." };
   try {
     await sql`UPDATE tarefas_processo SET status = ${status}, updated_at = NOW() WHERE id = ${id}::uuid`;
     if (status === "Concluída") {
@@ -432,6 +448,8 @@ export async function darBaixaTarefaProcessoAction(
     return { error: "Sem permissão." };
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
+  if (!(await checklistCompleto("tarefa_processo", id)))
+    return { error: "Marque todos os itens do checklist antes de concluir." };
   try {
     await sql`UPDATE tarefas_processo SET status = 'Concluída', updated_at = NOW() WHERE id = ${id}::uuid`;
     await registrarPontosConclusao("tarefa_processo", id);

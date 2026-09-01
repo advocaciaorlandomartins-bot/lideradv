@@ -7,6 +7,7 @@ import {
   type UsuarioOption,
   type LocalAudiencia,
 } from "./controles-types";
+import { parseChecklist } from "./checklist-types";
 
 export type {
   Controle,
@@ -41,6 +42,7 @@ function mapRow(r: any): Controle {
         ? r.dados
         : JSON.parse(String(r.dados))
       : null,
+    checklist: parseChecklist(r.checklist),
     created_at: String(r.created_at),
   };
 }
@@ -82,7 +84,7 @@ export async function getControles(
       c.cliente_id::text,   cl.name AS cliente_nome,
       c.processo_id::text,  p.numero AS processo_numero,
       c.responsavel_id::text, u.login AS responsavel_login,
-      c.prioridade, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.created_at::text
+      c.prioridade, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.checklist, c.created_at::text
     FROM controles c
     LEFT JOIN clients cl ON cl.id = c.cliente_id
     LEFT JOIN processos p  ON p.id  = c.processo_id
@@ -128,7 +130,7 @@ export async function getControleById(id: string): Promise<Controle | null> {
       c.cliente_id::text,   cl.name AS cliente_nome,
       c.processo_id::text,  p.numero AS processo_numero,
       c.responsavel_id::text, u.login AS responsavel_login,
-      c.prioridade, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.created_at::text
+      c.prioridade, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.checklist, c.created_at::text
     FROM controles c
     LEFT JOIN clients cl ON cl.id = c.cliente_id
     LEFT JOIN processos p  ON p.id  = c.processo_id

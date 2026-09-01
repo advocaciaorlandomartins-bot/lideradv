@@ -1,5 +1,6 @@
 import sql from "./db";
 import { getProximaAcaoProcesso } from "./processo-fases";
+import { parseChecklist, type ChecklistItem } from "./checklist-types";
 
 export interface MinhaControle {
   id: string;
@@ -12,6 +13,7 @@ export interface MinhaControle {
   processo_id: string | null;
   estagio_producao: string | null;
   status: "pendente" | "em_andamento" | "concluido";
+  checklist: ChecklistItem[];
   source: "controle";
 }
 
@@ -26,6 +28,7 @@ export interface MinhaTarefa {
   cliente_nome: string | null;
   cliente_id: string | null;
   estagio_producao: string | null;
+  checklist: ChecklistItem[];
   source: "tarefa";
 }
 
@@ -92,7 +95,7 @@ export async function getMinhasTarefas(
     sql`
       SELECT
         c.id::text, c.tipo, c.descricao, c.data_evento::text,
-        c.status::text,
+        c.status::text, c.checklist,
         cl.id::text AS cliente_id, cl.name AS cliente_nome,
         p.id::text AS processo_id, p.numero AS processo_numero,
         p.estagio_producao
@@ -108,7 +111,7 @@ export async function getMinhasTarefas(
       SELECT
         t.id::text, t.titulo, t.prioridade,
         to_char(t.prazo, 'DD/MM/YYYY') AS prazo,
-        t.status,
+        t.status, t.checklist,
         p.id::text AS processo_id, p.numero AS processo_numero,
         p.estagio_producao,
         cl.id::text AS cliente_id, cl.name AS cliente_nome
@@ -162,6 +165,7 @@ export async function getMinhasTarefas(
         : r.status === "em_andamento"
           ? "em_andamento"
           : "pendente",
+    checklist: parseChecklist(r.checklist),
     source: "controle" as const,
   }));
 
@@ -176,6 +180,7 @@ export async function getMinhasTarefas(
     cliente_nome: r.cliente_nome ? String(r.cliente_nome) : null,
     cliente_id: r.cliente_id ? String(r.cliente_id) : null,
     estagio_producao: r.estagio_producao ? String(r.estagio_producao) : null,
+    checklist: parseChecklist(r.checklist),
     source: "tarefa" as const,
   }));
 

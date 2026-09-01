@@ -101,6 +101,7 @@ export interface Controle {
   observacoes: string | null;
   prazo_interno: string | null;
   dados: Record<string, string | null> | null;
+  checklist: { texto: string; feito: boolean }[];
   created_at: string;
 }
 

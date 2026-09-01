@@ -2369,6 +2369,7 @@ function NovaTarefaModal({
   const [prazo, setPrazo] = useState("");
   const [hora, setHora] = useState("");
   const [comentarios, setComentarios] = useState("");
+  const [checklistTexto, setChecklistTexto] = useState("");
   const [loading, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -2385,6 +2386,7 @@ function NovaTarefaModal({
         prazo: prazo || null,
         hora: hora || null,
         comentarios: comentarios || null,
+        checklistTexto: checklistTexto || null,
       });
       if (result.error) {
         setError(result.error);
@@ -2465,6 +2467,21 @@ function NovaTarefaModal({
             rows={3}
             className="w-full resize-none rounded-lg border border-border bg-white p-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
           />
+        </div>
+        <div>
+          <label className={labelCls}>Checklist obrigatório</label>
+          <textarea
+            value={checklistTexto}
+            onChange={(e) => setChecklistTexto(e.target.value)}
+            rows={3}
+            placeholder={
+              "Um item por linha (opcional), ex.:\nConferir documentação\nProtocolar no INSS"
+            }
+            className="w-full resize-none rounded-lg border border-border bg-white p-3 font-body text-sm text-fg placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+          />
+          <p className="mt-1 font-body text-xs text-muted">
+            Todos os itens precisarão ser marcados antes de concluir a tarefa.
+          </p>
         </div>
         {error && (
           <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 font-body text-sm text-red-700">

@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { getSession } from "./session";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
+import { checklistCompleto } from "./checklist";
 
 export async function darBaixaControleAction(
   id: string
@@ -19,6 +20,8 @@ export async function darBaixaControleAction(
       AND (u.login = ${session.login} OR c.responsavel_id IS NULL)
   `;
   if (ownerCheck.length === 0) return { error: "Sem permissão." };
+  if (!(await checklistCompleto("controle", id)))
+    return { error: "Marque todos os itens do checklist antes de concluir." };
   await sql`UPDATE controles SET status = 'concluido' WHERE id = ${id}::uuid`;
   await registrarPontosConclusao("controle", id);
   revalidatePath("/dashboard/minhas-tarefas");
@@ -40,6 +43,8 @@ export async function darBaixaTarefaAction(
       AND (t.responsavel = ${session.nome} OR t.responsavel = c.nome)
   `;
   if (ownerCheck.length === 0) return { error: "Sem permissão." };
+  if (!(await checklistCompleto("tarefa_processo", id)))
+    return { error: "Marque todos os itens do checklist antes de concluir." };
 
   // Mark tarefa as done
   await sql`UPDATE tarefas_processo SET status = 'Concluída', updated_at = NOW() WHERE id = ${id}::uuid`;

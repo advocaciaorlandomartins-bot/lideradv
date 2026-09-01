@@ -174,7 +174,11 @@ function RowActions({ controle }: { controle: Controle }) {
 
   function handleStatus(next: StatusControle) {
     startTransition(async () => {
-      await updateStatusControleAction(controle.id, next);
+      const result = await updateStatusControleAction(controle.id, next);
+      if (result?.error) {
+        alert(result.error);
+        return;
+      }
       router.refresh();
     });
   }

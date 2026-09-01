@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
@@ -24,6 +24,13 @@ import {
 import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
 import ChecklistManager from "@/components/dashboard/controladoria/checklist-manager";
 import type { ChecklistItem } from "@/lib/checklist-types";
+import {
+  getTimesheetAtivo,
+  iniciarTimesheetAction,
+  pararTimesheetAction,
+  type TimesheetAtivo,
+} from "@/lib/timesheet";
+import { PlayIcon, StopIcon } from "@/components/icons";
 
 const TIPO_LABELS: Record<string, string> = {
   audiencias: "Audiência",
@@ -88,6 +95,93 @@ function formatDeadlineDisplay(deadline: string | null): string | null {
 interface ItemCardProps {
   item: MinhaItem;
   isConcluida?: boolean;
+  timesheetAtivo?: TimesheetAtivo | null;
+  onTimesheetChange?: (ativo: TimesheetAtivo | null) => void;
+}
+
+function formatElapsed(inicioISO: string): string {
+  const inicio = new Date(inicioISO).getTime();
+  const diffMin = Math.max(0, Math.floor((Date.now() - inicio) / 60000));
+  const h = Math.floor(diffMin / 60);
+  const m = diffMin % 60;
+  return h > 0 ? `${h}h${String(m).padStart(2, "0")}` : `${m}min`;
+}
+
+function TimesheetControl({
+  origemTipo,
+  origemId,
+  titulo,
+  ativo,
+  onChange,
+}: {
+  origemTipo: "controle" | "tarefa_processo";
+  origemId: string;
+  titulo: string;
+  ativo?: TimesheetAtivo | null;
+  onChange?: (ativo: TimesheetAtivo | null) => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [, forceTick] = useState(0);
+
+  const rodandoAqui =
+    ativo?.origemTipo === origemTipo && ativo.origemId === origemId;
+
+  useEffect(() => {
+    if (!rodandoAqui) return;
+    const t = setInterval(() => forceTick((n) => n + 1), 30000);
+    return () => clearInterval(t);
+  }, [rodandoAqui]);
+
+  function handleIniciar() {
+    startTransition(async () => {
+      const r = await iniciarTimesheetAction(origemTipo, origemId, titulo);
+      if (r.id) {
+        onChange?.({
+          id: r.id,
+          origemTipo,
+          origemId,
+          titulo,
+          inicio: new Date().toISOString(),
+        });
+      }
+    });
+  }
+
+  function handleParar() {
+    if (!ativo) return;
+    startTransition(async () => {
+      await pararTimesheetAction(ativo.id);
+      onChange?.(null);
+    });
+  }
+
+  if (rodandoAqui) {
+    return (
+      <button
+        type="button"
+        onClick={handleParar}
+        disabled={pending}
+        style={{ touchAction: "manipulation" }}
+        className="flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 font-body text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+      >
+        <StopIcon className="h-3 w-3" />
+        {formatElapsed(ativo.inicio)} · Parar
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleIniciar}
+      disabled={pending}
+      style={{ touchAction: "manipulation" }}
+      className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-[11px] font-semibold text-muted transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+    >
+      <PlayIcon className="h-3 w-3" />
+      Cronômetro
+    </button>
+  );
 }
 
 function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
@@ -166,7 +260,12 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
   );
 }
 
-function ItemCard({ item, isConcluida = false }: ItemCardProps) {
+function ItemCard({
+  item,
+  isConcluida = false,
+  timesheetAtivo = null,
+  onTimesheetChange,
+}: ItemCardProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [checklistItens, setChecklistItens] = useState<ChecklistItem[]>(
@@ -283,6 +382,15 @@ function ItemCard({ item, isConcluida = false }: ItemCardProps) {
             >
               {prioridade}
             </span>
+          )}
+          {!isConcluida && (
+            <TimesheetControl
+              origemTipo={isControle ? "controle" : "tarefa_processo"}
+              origemId={item.id}
+              titulo={title}
+              ativo={timesheetAtivo}
+              onChange={onTimesheetChange}
+            />
           )}
         </div>
 
@@ -418,6 +526,8 @@ interface ColumnProps {
   headerCls: string;
   dotCls: string;
   emptyText: string;
+  timesheetAtivo: TimesheetAtivo | null;
+  onTimesheetChange: (ativo: TimesheetAtivo | null) => void;
 }
 
 function KanbanColumn({
@@ -427,6 +537,8 @@ function KanbanColumn({
   headerCls,
   dotCls,
   emptyText,
+  timesheetAtivo,
+  onTimesheetChange,
 }: ColumnProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -446,7 +558,12 @@ function KanbanColumn({
       ) : (
         <div className="flex flex-col gap-2.5">
           {items.map((item) => (
-            <ItemCard key={`${item.source}-${item.id}`} item={item} />
+            <ItemCard
+              key={`${item.source}-${item.id}`}
+              item={item}
+              timesheetAtivo={timesheetAtivo}
+              onTimesheetChange={onTimesheetChange}
+            />
           ))}
         </div>
       )}
@@ -460,7 +577,14 @@ export default function KanbanColaborador({
   concluidas,
 }: KanbanColaboradorProps) {
   const [showArquivados, setShowArquivados] = useState(false);
+  const [timesheetAtivo, setTimesheetAtivo] = useState<TimesheetAtivo | null>(
+    null
+  );
   const ativas = pendentes.length + emAndamento.length;
+
+  useEffect(() => {
+    getTimesheetAtivo().then(setTimesheetAtivo);
+  }, []);
 
   if (ativas === 0 && concluidas.length === 0) {
     return (
@@ -488,6 +612,8 @@ export default function KanbanColaborador({
             headerCls="bg-amber-50 text-amber-800"
             dotCls="bg-amber-500"
             emptyText="Nenhuma pendência"
+            timesheetAtivo={timesheetAtivo}
+            onTimesheetChange={setTimesheetAtivo}
           />
           <KanbanColumn
             title="Em Andamento"
@@ -496,6 +622,8 @@ export default function KanbanColaborador({
             headerCls="bg-blue-50 text-blue-800"
             dotCls="bg-blue-500"
             emptyText="Nenhuma em andamento"
+            timesheetAtivo={timesheetAtivo}
+            onTimesheetChange={setTimesheetAtivo}
           />
         </div>
       ) : (

@@ -20,6 +20,7 @@ import {
 } from "@/lib/controles-types";
 import type { CargaColaborador } from "@/lib/controladoria-db";
 import ChecklistManager from "@/components/dashboard/controladoria/checklist-manager";
+import TimesheetHistory from "@/components/dashboard/controladoria/timesheet-history";
 
 function addDays(dateStr: string, days: number): string {
   if (!dateStr) return "";
@@ -643,6 +644,14 @@ export default function ControleForm({
           </>
         )}
       </div>
+
+      {/* ── Tempo registrado ── */}
+      {isEdit && (
+        <div className="rounded-xl border border-border bg-white p-5">
+          <label className={labelCls}>Tempo registrado</label>
+          <TimesheetHistory origemTipo="controle" origemId={controle.id} />
+        </div>
+      )}
 
       {/* ── Observações ── */}
       <div className="rounded-xl border border-border bg-white p-5">

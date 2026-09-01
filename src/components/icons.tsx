@@ -888,6 +888,22 @@ export function GaugeIcon({ className }: IconProps) {
   );
 }
 
+export function PlayIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <polygon points="6 3 20 12 6 21 6 3" />
+    </Icon>
+  );
+}
+
+export function StopIcon({ className }: IconProps) {
+  return (
+    <Icon className={className} strokeWidth={2}>
+      <rect x="5" y="5" width="14" height="14" rx="2" />
+    </Icon>
+  );
+}
+
 export function SparklesIcon({ className }: IconProps) {
   return (
     <svg

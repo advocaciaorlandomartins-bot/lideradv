@@ -3,6 +3,7 @@ import sql from "./db";
 import { enviarMensagemDireta } from "./prevbot-outbound";
 import { getLancamentoKpis, getContasAReceber } from "./lancamentos-db";
 import { hasPermission } from "./permissoes";
+import { getColaboradorIdForUser } from "./usuarios-db";
 import type { SessionUser } from "./session";
 
 export const IRIS_TOOLS: Anthropic.Tool[] = [
@@ -174,6 +175,21 @@ const FERRAMENTAS_MUTANTES = new Set([
   "testar_whatsapp",
 ]);
 
+/**
+ * Diagnóstico/config do sistema (inclui log de WhatsApp com nome+telefone
+ * de cliente em ver_erros) — mesmo padrão do antigo "Agente do Sistema",
+ * que era 100% restrito a administrador. Ao fundir tudo na Íris, esse
+ * gate quase ficou de fora (só as mutantes continuaram checadas) — um
+ * usuário sem privilégio de admin conseguiria puxar esses dados
+ * operacionais/PII só perguntando. Corrigido: exige configuracoes:ver.
+ */
+const FERRAMENTAS_DIAGNOSTICO = new Set([
+  "verificar_saude",
+  "obter_estatisticas",
+  "ver_erros",
+  "listar_oabs",
+]);
+
 export async function executarFerramentaIris(
   session: SessionUser,
   name: string,
@@ -186,6 +202,34 @@ export async function executarFerramentaIris(
     return JSON.stringify({
       ok: false,
       erro: "Este usuário não tem permissão de administrador para executar essa ação. Explique isso educadamente e não tente de novo.",
+    });
+  }
+  if (
+    FERRAMENTAS_DIAGNOSTICO.has(name) &&
+    !hasPermission(session, "configuracoes", "ver")
+  ) {
+    return JSON.stringify({
+      ok: false,
+      erro: "Este usuário não tem permissão pra ver dados de diagnóstico/configuração do sistema. Explique isso educadamente e não tente de novo.",
+    });
+  }
+  if (
+    name === "consultar_financeiro" &&
+    !hasPermission(session, "financeiro", "ver")
+  ) {
+    return JSON.stringify({
+      ok: false,
+      erro: "Este usuário não tem permissão pra ver dados financeiros do escritório. Explique isso educadamente e não tente de novo.",
+    });
+  }
+  if (
+    (name === "listar_processos_risco" ||
+      name === "consultar_analise_cerebro") &&
+    !hasPermission(session, "processos", "ver")
+  ) {
+    return JSON.stringify({
+      ok: false,
+      erro: "Este usuário não tem permissão pra ver processos. Explique isso educadamente e não tente de novo.",
     });
   }
 
@@ -619,6 +663,10 @@ export async function executarFerramentaIris(
     case "listar_processos_risco": {
       const riscoFiltro =
         typeof input.risco === "string" ? input.risco.trim().toLowerCase() : "";
+      const podeVerTodos = hasPermission(session, "processos_ver_todos", "ver");
+      const colaboradorId = podeVerTodos
+        ? null
+        : await getColaboradorIdForUser(session.id);
       const rows = await sql`
         SELECT DISTINCT ON (ca.processo_id)
           ca.processo_id::text, ca.risco, ca.probabilidade_sucesso,
@@ -632,6 +680,7 @@ export async function executarFerramentaIris(
           AND p.status NOT IN ('arquivado', 'encerrado')
           AND p.deleted_at IS NULL
           AND (${riscoFiltro} = '' OR ca.risco = ${riscoFiltro})
+          AND (${podeVerTodos} OR p.responsavel_id = ${colaboradorId}::uuid)
         ORDER BY ca.processo_id, ca.created_at DESC
       `;
       const ordem: Record<string, number> = { alto: 0, medio: 1, baixo: 2 };
@@ -659,6 +708,14 @@ export async function executarFerramentaIris(
         return JSON.stringify({
           erro: "Informe um nome de cliente ou número de processo.",
         });
+      const podeVerTodos2 = hasPermission(
+        session,
+        "processos_ver_todos",
+        "ver"
+      );
+      const colaboradorId2 = podeVerTodos2
+        ? null
+        : await getColaboradorIdForUser(session.id);
       const rows = await sql`
         SELECT ca.titulo, ca.risco, ca.probabilidade_sucesso, ca.proxima_acao,
                ca.base_legal, ca.created_at::text AS criado_em,
@@ -669,6 +726,7 @@ export async function executarFerramentaIris(
         WHERE ca.tipo = 'inicial'
           AND p.deleted_at IS NULL
           AND (cl.name ILIKE ${"%" + busca + "%"} OR p.numero ILIKE ${"%" + busca + "%"})
+          AND (${podeVerTodos2} OR p.responsavel_id = ${colaboradorId2}::uuid)
         ORDER BY ca.created_at DESC
         LIMIT 5
       `;

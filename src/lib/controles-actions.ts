@@ -8,7 +8,11 @@ import { logAction } from "./audit";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
 
-export type ControleFormState = { error?: string; success?: boolean } | null;
+export type ControleFormState = {
+  error?: string;
+  success?: boolean;
+  id?: string;
+} | null;
 
 async function buildDadosAudiencia(formData: FormData): Promise<string | null> {
   const hora = ((formData.get("hora") as string) ?? "").trim() || null;
@@ -294,8 +298,8 @@ export async function createControleAction(
     return { error: "Erro ao processar dados." };
   }
 
+  let novoId: string | null = null;
   try {
-    let novoId: string | null = null;
     if (clienteId && processoId && responsavelId) {
       const rows = await sql`
         INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, responsavel_id, tipo_demanda, observacoes, dados, checklist)
@@ -351,7 +355,7 @@ export async function createControleAction(
     descricao: `Criou controle: ${tipo}`,
   });
   revalidatePath("/dashboard/controles");
-  return { success: true };
+  return { success: true, id: novoId ?? undefined };
 }
 
 export async function updateControleAction(

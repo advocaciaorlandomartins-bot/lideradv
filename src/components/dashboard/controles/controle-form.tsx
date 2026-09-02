@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useEffect, useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { SpinnerIcon } from "@/components/icons";
 import {
@@ -8,6 +8,7 @@ import {
   updateControleAction,
   type ControleFormState,
 } from "@/lib/controles-actions";
+import { iniciarTimesheetAction } from "@/lib/timesheet";
 import {
   TIPOS_DEMANDA,
   STATUS_CONTROLE,
@@ -86,6 +87,7 @@ export default function ControleForm({
   >(action, null);
 
   const [tipo] = useState(controle?.tipo ?? tipoInicial);
+  const [iniciarCronometro, setIniciarCronometro] = useState(false);
 
   // ── Autocomplete de cliente ──
   const prefillCliente = prefill?.clienteId
@@ -144,9 +146,16 @@ export default function ControleForm({
     ? processos.filter((p) => p.cliente_id === clienteId)
     : processos;
 
-  if (state?.success) {
-    router.push(`/dashboard/controles?tipo=${tipo}`);
-  }
+  useEffect(() => {
+    if (!state?.success) return;
+    (async () => {
+      if (!isEdit && iniciarCronometro && state.id) {
+        await iniciarTimesheetAction("controle", state.id, tipoConfig.label);
+      }
+      router.push(`/dashboard/controles?tipo=${tipo}`);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <form action={formAction} className="flex flex-col gap-6 max-w-2xl">
@@ -642,6 +651,27 @@ export default function ControleForm({
               className={inputCls}
             />
           </div>
+
+          {/* Iniciar cronômetro já na criação */}
+          {!isEdit && (
+            <div className="sm:col-span-2">
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-blue-50/50 has-[:checked]:border-primary/40 has-[:checked]:bg-blue-50">
+                <input
+                  type="checkbox"
+                  checked={iniciarCronometro}
+                  onChange={(e) => setIniciarCronometro(e.target.checked)}
+                  className="h-4 w-4 cursor-pointer accent-primary"
+                />
+                <span className="font-body text-sm font-semibold text-fg">
+                  Iniciar cronômetro agora
+                </span>
+                <span className="font-body text-xs text-muted">
+                  — começa a contar o tempo assim que salvar (encerra
+                  automaticamente qualquer outro cronômetro seu em andamento)
+                </span>
+              </label>
+            </div>
+          )}
 
           {/* Prazo Fatal */}
           <div className="sm:col-span-2">

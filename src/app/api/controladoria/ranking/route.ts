@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { getRankingDetalhado } from "@/lib/pontuacao";
+import {
+  getRankingDetalhado,
+  filtrarHistoricoPorPermissao,
+} from "@/lib/pontuacao";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +21,19 @@ export async function GET(req: NextRequest) {
       ? diasParam
       : 30;
 
-  const ranking = await getRankingDetalhado(dias);
-  return NextResponse.json({ ranking });
+  const podeVerDetalhesDeTodos = hasPermission(
+    session,
+    "processos_ver_todos",
+    "ver"
+  );
+  const [ranking, meuColaboradorId] = await Promise.all([
+    getRankingDetalhado(dias),
+    getColaboradorIdForUser(session.id),
+  ]);
+  const rankingFiltrado = filtrarHistoricoPorPermissao(
+    ranking,
+    podeVerDetalhesDeTodos,
+    meuColaboradorId
+  );
+  return NextResponse.json({ ranking: rankingFiltrado });
 }

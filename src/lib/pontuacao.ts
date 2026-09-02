@@ -141,6 +141,25 @@ export interface RankingDetalhado extends RankingItem {
   atrasados: number;
 }
 
+/**
+ * O histórico traz título do item concluído (e, indiretamente, contexto do
+ * cliente pra quem escreve a descrição) — quem não tem processos_ver_todos
+ * só pode ver esse nível de detalhe do próprio trabalho, não do de todo
+ * mundo (mesma regra de escopo usada em processos/Cérebro Jurídico). Os
+ * agregados (pontos, % no prazo, contagens) continuam visíveis pra todo
+ * mundo — só o histórico item-a-item é restrito.
+ */
+export function filtrarHistoricoPorPermissao(
+  ranking: RankingDetalhado[],
+  podeVerDetalhesDeTodos: boolean,
+  meuColaboradorId: string | null
+): RankingDetalhado[] {
+  if (podeVerDetalhesDeTodos) return ranking;
+  return ranking.map((r) =>
+    r.colaboradorId === meuColaboradorId ? r : { ...r, historico: [] }
+  );
+}
+
 function classificarEntrega(
   concluidoEm: string,
   prazoInterno: string | null,

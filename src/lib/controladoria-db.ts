@@ -52,6 +52,26 @@ const CATEGORIA_LABEL_PLURAL: Record<string, string> = {
   servicos: "Serviços",
 };
 
+/**
+ * "itens" traz título e nome do cliente de cada item aberto — quem não tem
+ * processos_ver_todos só pode ver esse detalhe do próprio trabalho, não do
+ * de todo mundo (mesma regra de escopo usada em processos/Cérebro
+ * Jurídico/Íris). Os agregados (total aberto, categorias, vencidas)
+ * continuam visíveis pra todo mundo — só a lista item-a-item é restrita.
+ */
+export function filtrarCargaPorPermissao(
+  carga: CargaColaborador[],
+  podeVerDetalhesDeTodos: boolean,
+  meuColaboradorId: string | null
+): CargaColaborador[] {
+  if (podeVerDetalhesDeTodos) return carga;
+  return carga.map((c) =>
+    c.colaboradorId === meuColaboradorId
+      ? c
+      : { ...c, itens: [], itemMaisAntigo: null, itemMaisRecente: null }
+  );
+}
+
 const HOJE_MS = () => Date.now();
 const DIA_MS = 1000 * 60 * 60 * 24;
 

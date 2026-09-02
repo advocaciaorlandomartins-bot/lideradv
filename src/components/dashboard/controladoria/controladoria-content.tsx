@@ -48,6 +48,9 @@ interface Props {
   ranking: RankingDetalhado[];
   carga: CargaColaborador[];
   capacidade: CapacidadeResumo;
+  /** false = só vê o detalhamento item a item do próprio colaborador; dos outros só os totais agregados. */
+  podeVerDetalhesDeTodos: boolean;
+  meuColaboradorId: string | null;
 }
 
 const PERIODOS = [
@@ -65,6 +68,8 @@ export default function ControladoriaContent({
   ranking: rankingInicial,
   carga,
   capacidade,
+  podeVerDetalhesDeTodos,
+  meuColaboradorId,
 }: Props) {
   const [ranking, setRanking] = useState(rankingInicial);
   const [periodo, setPeriodo] = useState(30);
@@ -175,6 +180,14 @@ export default function ControladoriaContent({
                             (desde {fmtData(c.itemMaisAntigo.criadoEm)})
                           </p>
                         )}
+                        {!c.itemMaisAntigo &&
+                          c.totalAbertas > 0 &&
+                          !podeVerDetalhesDeTodos &&
+                          c.colaboradorId !== meuColaboradorId && (
+                            <p className="mt-1 font-body text-[11px] italic text-muted">
+                              Detalhe item a item visível só pra administração
+                            </p>
+                          )}
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -476,6 +489,15 @@ export default function ControladoriaContent({
                               )}
                             </div>
                           )}
+                          {r.historico.length === 0 &&
+                            r.entregas > 0 &&
+                            !podeVerDetalhesDeTodos &&
+                            r.colaboradorId !== meuColaboradorId && (
+                              <p className="mt-1 font-body text-[11px] italic text-muted">
+                                Histórico item a item visível só pra
+                                administração
+                              </p>
+                            )}
                         </div>
                         {r.fataisAbertos > 0 && (
                           <span

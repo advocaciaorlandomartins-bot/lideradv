@@ -16,7 +16,10 @@ import {
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
-import { getCargaColaboradores } from "@/lib/controladoria-db";
+import {
+  getCargaColaboradores,
+  filtrarCargaPorPermissao,
+} from "@/lib/controladoria-db";
 import DeleteProcessoButton from "@/components/dashboard/processos/delete-processo-button";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import ProcessoDetailClient from "@/components/dashboard/processos/processo-detail-client";
@@ -58,10 +61,16 @@ export default async function ProcessoDetailPage({
 
   // Sem "processos_ver_todos": só pode abrir o processo se for o responsável.
   const verTodos = hasPermission(session, "processos_ver_todos", "ver");
+  const meuColaboradorId = await getColaboradorIdForUser(session.id);
   if (!verTodos) {
-    const colaboradorId = await getColaboradorIdForUser(session.id);
-    if (!colaboradorId || processo.responsavel_id !== colaboradorId) notFound();
+    if (!meuColaboradorId || processo.responsavel_id !== meuColaboradorId)
+      notFound();
   }
+  const cargaFiltrada = filtrarCargaPorPermissao(
+    carga,
+    verTodos,
+    meuColaboradorId
+  );
 
   // Carrega documentos do processo + documentos do cliente (enviados pela ficha do cliente)
   const [docsProcesso, docsCliente] = await Promise.all([
@@ -103,7 +112,7 @@ export default async function ProcessoDetailPage({
         tarefas={tarefas}
         pendencias={pendencias}
         colaboradores={colaboradores}
-        carga={carga}
+        carga={cargaFiltrada}
         modelos={modelos}
         sessionNome={session.nome}
         podeAlterarResponsavel={hasPermission(

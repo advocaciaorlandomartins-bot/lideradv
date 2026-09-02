@@ -10,7 +10,11 @@ import {
   getLocaisAudiencia,
   getLocaisPericia,
 } from "@/lib/controles-db";
-import { getCargaColaboradores } from "@/lib/controladoria-db";
+import {
+  getCargaColaboradores,
+  filtrarCargaPorPermissao,
+} from "@/lib/controladoria-db";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import { getTipoConfig } from "@/lib/controles-types";
 import ControleForm from "@/components/dashboard/controles/controle-form";
 
@@ -42,15 +46,28 @@ export default async function NovoControlePage({
   } = await searchParams;
   const tipoConfig = getTipoConfig(tipo);
 
-  const [clientes, processos, usuarios, locais, locaisPericia, carga] =
-    await Promise.all([
-      getClientesForControle(),
-      getProcessosForControle(),
-      getUsuariosForControle(),
-      getLocaisAudiencia(),
-      getLocaisPericia(),
-      getCargaColaboradores(),
-    ]);
+  const [
+    clientes,
+    processos,
+    usuarios,
+    locais,
+    locaisPericia,
+    carga,
+    meuColaboradorId,
+  ] = await Promise.all([
+    getClientesForControle(),
+    getProcessosForControle(),
+    getUsuariosForControle(),
+    getLocaisAudiencia(),
+    getLocaisPericia(),
+    getCargaColaboradores(),
+    getColaboradorIdForUser(session.id),
+  ]);
+  const cargaFiltrada = filtrarCargaPorPermissao(
+    carga,
+    hasPermission(session, "processos_ver_todos", "ver"),
+    meuColaboradorId
+  );
 
   return (
     <div className="space-y-6">
@@ -91,7 +108,7 @@ export default async function NovoControlePage({
         usuarios={usuarios}
         locais={locais}
         locaisPericia={locaisPericia}
-        carga={carga}
+        carga={cargaFiltrada}
         prefill={{
           publicacaoId: publicacao_id ?? null,
           descricao: descricao ?? null,

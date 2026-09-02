@@ -146,6 +146,7 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Cards do kanban são arrastáveis entre colunas para mudar de estágio
 - Leads do WhatsApp via PrevBot entram automaticamente no CRM
 - Botão "Converter em Cliente" no perfil do lead
+- Aba "Tarefas" no perfil do lead: follow-ups (ligar, enviar proposta etc.) com responsável e data — agora aparecem também no kanban de Minhas Tarefas do responsável (card roxo "CRM", com link de volta pro lead), pontuam no Ranking ao serem concluídas, e contam como categoria "Atendimento" na Carga da equipe da Controladoria
 
 ## PRODUÇÃO (menu: Negócios → Produção)
 - Kanban de processos em andamento com colunas: Análise · Produção · Administrativo · Judicial · Arquivado
@@ -206,7 +207,7 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 ## CONTROLADORIA (menu: Sistema → Controladoria)
 - Ranking de pontuação por colaborador (tarefa/controle concluído vale pontos, campo "pontos" editável na criação do controle), período 7/30/90 dias, com pódio pros 3 primeiros
 - Cada linha do ranking expande (clicar) e mostra o histórico de entregas do período, item a item, classificado em 3 níveis: "Adiantado" (concluído até o prazo interno/ideal), "No limite" (concluído depois do ideal mas dentro do prazo final) e "Atrasado" (depois do prazo final) — dá pra cobrar um atraso específico, não só ver uma % solta
-- Carga da equipe — quantas tarefas/controles abertos cada colaborador tem (com categorias: Audiências/Prazos/Perícias/Benefícios/Serviços), alerta de vencido, e "mais antigo aberto há X dias" — um item sem prazo cadastrado há 15+ dias já conta como "atenção", não fica escondido como se não houvesse risco
+- Carga da equipe — quantas tarefas/controles abertos cada colaborador tem (com categorias: Audiências/Prazos/Perícias/Benefícios/Serviços/Atendimentos, essa última são as tarefas de lead do CRM), alerta de vencido, e "mais antigo aberto há X dias" — um item sem prazo cadastrado há 15+ dias já conta como "atenção", não fica escondido como se não houvesse risco
 - Cada linha da Carga também expande e mostra os itens abertos individualmente: título, cliente, data de abertura, prazo interno/final, situação (tranquilo/atenção/vencido)
 - Ao expandir qualquer linha (Carga ou Ranking) tem um link direto pro perfil do colaborador, onde ficam as metas com bônus escalonado — fecha o ciclo entre "isso está atrasado" e "gerenciar a bonificação dessa pessoa"
 - Capacidade produtiva — o que entrou vs. o que saiu por semana, últimas 8 semanas

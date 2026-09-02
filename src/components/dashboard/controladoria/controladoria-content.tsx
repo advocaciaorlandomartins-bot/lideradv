@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import type { RankingDetalhado } from "@/lib/pontuacao";
 import type {
   CargaColaborador,
@@ -223,6 +224,12 @@ export default function ControladoriaContent({
                   </button>
                   {aberta && c.itens.length > 0 && (
                     <div className="bg-slate-50/60 px-5 py-3">
+                      <Link
+                        href={`/dashboard/colaboradores/${c.colaboradorId}`}
+                        className="mb-2 inline-block font-body text-xs font-semibold text-primary hover:underline"
+                      >
+                        Ver perfil de {c.nome} (metas, bônus e remuneração) →
+                      </Link>
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[560px] text-left">
                           <thead>
@@ -502,6 +509,12 @@ export default function ControladoriaContent({
                     </button>
                     {historicoAbertoAqui && r.historico.length > 0 && (
                       <div className="bg-slate-50/60 px-5 py-3">
+                        <Link
+                          href={`/dashboard/colaboradores/${r.colaboradorId}`}
+                          className="mb-2 inline-block font-body text-xs font-semibold text-primary hover:underline"
+                        >
+                          Ver perfil de {r.nome} (metas, bônus e remuneração) →
+                        </Link>
                         <div className="overflow-x-auto">
                           <table className="w-full min-w-[480px] text-left">
                             <thead>

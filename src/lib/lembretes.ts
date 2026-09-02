@@ -45,6 +45,23 @@ function mesmoDia(dataEvento: Date, hora: number, minuto = 0): Date {
   return d;
 }
 
+// Momento real do compromisso (data + horário marcado) menos N horas — usado
+// pro lembrete de "poucas horas antes", que funciona mesmo quando o
+// compromisso é criado no mesmo dia (os lembretes de véspera/dia fixos em
+// 8h/7h já teriam passado e nenhum aviso seria agendado).
+function horasAntesDoEvento(
+  dataEvento: Date,
+  horaStr: string | null,
+  horasAntes: number
+): Date | null {
+  if (!horaStr || !/^\d{1,2}:\d{2}$/.test(horaStr)) return null;
+  const [h, m] = horaStr.split(":").map(Number);
+  const d = new Date(dataEvento);
+  d.setHours(h, m, 0, 0);
+  d.setHours(d.getHours() - horasAntes);
+  return d;
+}
+
 // ── Formatadores ──────────────────────────────────────────────
 
 function primeiroNome(nome: string): string {
@@ -631,6 +648,22 @@ export async function agendarLembretesCompromissoPrevBot(opts: {
         `_Boa sorte! 💼_`,
     },
   ];
+
+  // Aviso poucas horas antes do horário real — cobre o caso comum de
+  // compromisso marcado e avisado no mesmo dia (ex.: reunião das 15h
+  // combinada às 9h da manhã), quando véspera/dia-fixo já passaram.
+  const avisoHoras = horasAntesDoEvento(opts.dataEvento, opts.hora, 2);
+  if (avisoHoras) {
+    lembretes.push({
+      tipo: "compromisso_2h",
+      enviarEm: avisoHoras,
+      mensagem:
+        `⏰ *Está chegando a hora!*\n\n` +
+        `*${opts.titulo}*\n` +
+        `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}\n\n` +
+        `_Faltam cerca de 2h._`,
+    });
+  }
 
   const agora = new Date();
   for (const lembrete of lembretes) {

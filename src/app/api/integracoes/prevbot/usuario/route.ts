@@ -140,9 +140,16 @@ Para não identificado:
 REGRAS:
 - Se valor em texto ("cem reais", "duzentos e cinquenta"), converta para número
 - Se data não mencionada, use hoje (${hojeISO()})
+- ATENÇÃO especial com fotos de contas (energia, água, telefone, internet): elas
+  sempre trazem um "mês de referência/competência" (ex: "Referente a 07/2026",
+  "Competência: Julho/2026") — isso é o PERÍODO CONSUMIDO, NUNCA a data do
+  pagamento. NÃO use esse mês/ano como "data". Use "data" = hoje (${hojeISO()}),
+  a menos que a mensagem ou a foto mostrem explicitamente uma data de
+  pagamento/quitação diferente (ex.: "paguei dia 15/08", comprovante com data
+  e horário da transação, código de autenticação bancária com data).
 - "tipo" da agenda: reuniao | consulta | videochamada | fechamento | outro
 - status financeiro: "pago" ou "recebido" = já aconteceu; "pendente" ou "a_receber" = ainda vai acontecer
-- Categorias comuns de despesa: Cartório, Transporte, Processo judicial, Escritório, Aluguel, Telefone, Internet, Material escritório, Alimentação, Combustível, Estacionamento
+- Categorias comuns de despesa: Cartório, Transporte, Processo judicial, Escritório, Aluguel, Energia elétrica, Água/Saneamento, Telefone, Internet, Material escritório, Alimentação, Combustível, Estacionamento
 - Categorias comuns de receita: Honorário advocatício, Consultoria, Acordo judicial, RPV, Precatório`;
 }
 

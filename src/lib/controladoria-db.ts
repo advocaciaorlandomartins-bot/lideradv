@@ -2,7 +2,7 @@ import sql from "./db";
 
 export interface ItemAberto {
   id: string;
-  origem: "controle" | "tarefa";
+  origem: "controle" | "tarefa" | "crm";
   categoria: string;
   categoriaLabel: string;
   titulo: string;
@@ -13,6 +13,8 @@ export interface ItemAberto {
   diasAberto: number;
   /** tranquilo = sem prazo próximo; proximo = já passou do prazo interno (ideal) ou falta pouco pro final; vencido = passou do prazo final. */
   statusPrazo: "tranquilo" | "proximo" | "vencido";
+  /** Preenchido só quando origem="crm" — pra montar o link de volta pro lead. */
+  leadId: string | null;
 }
 
 export interface CargaColaborador {
@@ -42,6 +44,7 @@ const CATEGORIA_LABEL: Record<string, string> = {
   "implantados-data": "Benefício",
   alvaras: "Benefício",
   servicos: "Serviço",
+  crm: "Atendimento",
 };
 
 const CATEGORIA_LABEL_PLURAL: Record<string, string> = {
@@ -50,6 +53,7 @@ const CATEGORIA_LABEL_PLURAL: Record<string, string> = {
   pericias: "Perícias",
   beneficios: "Benefícios",
   servicos: "Serviços",
+  crm: "Atendimentos",
 };
 
 /**
@@ -101,8 +105,13 @@ function classificarStatusPrazo(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapItem(r: any, origem: "controle" | "tarefa"): ItemAberto {
-  const categoria = origem === "tarefa" ? "servicos" : String(r.tipo);
+function mapItem(r: any, origem: "controle" | "tarefa" | "crm"): ItemAberto {
+  const categoria =
+    origem === "tarefa"
+      ? "servicos"
+      : origem === "crm"
+        ? "crm"
+        : String(r.tipo);
   const criadoEm = String(r.criado_em).slice(0, 10);
   const prazoInterno = r.prazo_interno
     ? String(r.prazo_interno).slice(0, 10)
@@ -124,6 +133,7 @@ function mapItem(r: any, origem: "controle" | "tarefa"): ItemAberto {
       prazoFinal,
       diasEntre(criadoEm)
     ),
+    leadId: origem === "crm" && r.lead_id ? String(r.lead_id) : null,
   };
 }
 
@@ -137,7 +147,7 @@ function mapItem(r: any, origem: "controle" | "tarefa"): ItemAberto {
  * tarefas_processo (ex: "verificar documentação", "dar entrada").
  */
 export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
-  const [controlesRows, tarefasRows] = await Promise.all([
+  const [controlesRows, tarefasRows, crmRows] = await Promise.all([
     sql`
       SELECT
         c.id::text, u.colaborador_id::text AS colaborador_id, c.tipo,
@@ -162,6 +172,17 @@ export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
       LEFT JOIN clients cl ON cl.id = t.client_id
       WHERE t.status IN ('Pendente', 'Em andamento')
     `,
+    sql`
+      SELECT
+        t.id::text, t.responsavel_id::text AS colaborador_id, t.titulo,
+        l.nome AS cliente_nome, l.id::text AS lead_id,
+        t.created_at::text AS criado_em,
+        NULL::text AS prazo_interno,
+        t.data_vencimento::text AS prazo_final
+      FROM crm_tarefas t
+      JOIN crm_leads l ON l.id = t.lead_id
+      WHERE t.concluida = FALSE AND t.responsavel_id IS NOT NULL
+    `,
   ]);
 
   const colaboradores = await sql`
@@ -177,6 +198,12 @@ export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
   }
   for (const r of tarefasRows) {
     const item = mapItem(r, "tarefa");
+    const arr = itensPorColaborador.get(String(r.colaborador_id)) ?? [];
+    arr.push(item);
+    itensPorColaborador.set(String(r.colaborador_id), arr);
+  }
+  for (const r of crmRows) {
+    const item = mapItem(r, "crm");
     const arr = itensPorColaborador.get(String(r.colaborador_id)) ?? [];
     arr.push(item);
     itensPorColaborador.set(String(r.colaborador_id), arr);

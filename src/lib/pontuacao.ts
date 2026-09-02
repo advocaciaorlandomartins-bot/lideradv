@@ -1,6 +1,6 @@
 import sql from "./db";
 
-export type OrigemPontuacao = "controle" | "tarefa_processo";
+export type OrigemPontuacao = "controle" | "tarefa_processo" | "crm_tarefa";
 
 /**
  * Registra os pontos de uma tarefa/controle no momento em que é concluído.
@@ -34,7 +34,7 @@ export async function registrarPontosConclusao(
         )
         ON CONFLICT (origem_tipo, origem_id) DO NOTHING
       `;
-    } else {
+    } else if (origemTipo === "tarefa_processo") {
       // tarefas_processo.responsavel é nome livre (sem FK) — resolve pelo
       // nome do colaborador ativo, mesmo casamento já usado em
       // minhas-tarefas-db.ts.
@@ -52,6 +52,26 @@ export async function registrarPontosConclusao(
         VALUES (
           ${row.colaborador_id}::uuid,
           'tarefa_processo',
+          ${origemId}::uuid,
+          ${String(row.titulo).slice(0, 255)},
+          ${row.pontos}
+        )
+        ON CONFLICT (origem_tipo, origem_id) DO NOTHING
+      `;
+    } else {
+      // crm_tarefas.responsavel_id já é colaborador_id direto (sem indireção
+      // por usuarios/login como as outras origens).
+      const [row] = await sql`
+        SELECT pontos, titulo, responsavel_id::text AS colaborador_id
+        FROM crm_tarefas
+        WHERE id = ${origemId}::uuid
+      `;
+      if (!row?.colaborador_id) return;
+      await sql`
+        INSERT INTO pontuacao_eventos (colaborador_id, origem_tipo, origem_id, titulo, pontos)
+        VALUES (
+          ${row.colaborador_id}::uuid,
+          'crm_tarefa',
           ${origemId}::uuid,
           ${String(row.titulo).slice(0, 255)},
           ${row.pontos}
@@ -192,11 +212,13 @@ export async function getRankingDetalhado(
         CASE WHEN pe.origem_tipo = 'controle' THEN c.prazo_interno::text ELSE NULL END AS prazo_interno,
         CASE
           WHEN pe.origem_tipo = 'controle' THEN c.data_evento::text
-          ELSE t.prazo::text
+          WHEN pe.origem_tipo = 'tarefa_processo' THEN t.prazo::text
+          ELSE ct.data_vencimento::text
         END AS prazo_final
       FROM pontuacao_eventos pe
       LEFT JOIN controles c ON pe.origem_tipo = 'controle' AND c.id = pe.origem_id
       LEFT JOIN tarefas_processo t ON pe.origem_tipo = 'tarefa_processo' AND t.id = pe.origem_id
+      LEFT JOIN crm_tarefas ct ON pe.origem_tipo = 'crm_tarefa' AND ct.id = pe.origem_id
       WHERE pe.criado_em >= NOW() - (${dias} || ' days')::interval
       ORDER BY pe.criado_em DESC
     `,

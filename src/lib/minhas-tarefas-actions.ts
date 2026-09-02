@@ -103,6 +103,48 @@ export async function reabrirControleAction(
   return {};
 }
 
+export async function darBaixaCrmTarefaAction(
+  id: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+
+  const ownerCheck = await sql`
+    SELECT t.id FROM crm_tarefas t
+    LEFT JOIN usuarios u ON u.login = ${session.login}
+    WHERE t.id = ${id}::uuid AND t.responsavel_id = u.colaborador_id
+  `;
+  if (ownerCheck.length === 0) return { error: "Sem permissão." };
+
+  await sql`UPDATE crm_tarefas SET concluida = TRUE, updated_at = NOW() WHERE id = ${id}::uuid`;
+  await registrarPontosConclusao("crm_tarefa", id);
+  revalidatePath("/dashboard/minhas-tarefas");
+  revalidatePath("/dashboard/crm");
+  revalidatePath("/dashboard");
+  return {};
+}
+
+export async function reabrirCrmTarefaAction(
+  id: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+
+  const ownerCheck = await sql`
+    SELECT t.id FROM crm_tarefas t
+    LEFT JOIN usuarios u ON u.login = ${session.login}
+    WHERE t.id = ${id}::uuid AND t.responsavel_id = u.colaborador_id
+  `;
+  if (ownerCheck.length === 0) return { error: "Sem permissão." };
+
+  await sql`UPDATE crm_tarefas SET concluida = FALSE, updated_at = NOW() WHERE id = ${id}::uuid`;
+  await reverterPontosConclusao("crm_tarefa", id);
+  revalidatePath("/dashboard/minhas-tarefas");
+  revalidatePath("/dashboard/crm");
+  revalidatePath("/dashboard");
+  return {};
+}
+
 export async function reabrirTarefaAction(
   id: string
 ): Promise<{ error?: string }> {

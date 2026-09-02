@@ -53,7 +53,22 @@ export interface MinhaAcaoProcesso {
   source: "processo";
 }
 
-export type MinhaItem = MinhaControle | MinhaTarefa | MinhaAcaoProcesso;
+export interface MinhaCrmTarefa {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  prazo: string | null;
+  concluida: boolean;
+  leadId: string;
+  leadNome: string;
+  source: "crm";
+}
+
+export type MinhaItem =
+  | MinhaControle
+  | MinhaTarefa
+  | MinhaAcaoProcesso
+  | MinhaCrmTarefa;
 
 /**
  * tarefas_processo.responsavel é texto livre (sem FK) preenchido a partir do
@@ -93,8 +108,9 @@ export async function getMinhasTarefas(
   concluidas: MinhaItem[];
 }> {
   const { nomes, colaboradorId } = await nomesResponsavel(login, nome);
-  const [controlesRows, tarefasRows, processosRows] = await Promise.all([
-    sql`
+  const [controlesRows, tarefasRows, processosRows, crmTarefasRows] =
+    await Promise.all([
+      sql`
       SELECT
         c.id::text, c.tipo, c.descricao, c.data_evento::text,
         c.status::text, c.checklist, c.fatal,
@@ -109,7 +125,7 @@ export async function getMinhasTarefas(
         AND (c.status IS NULL OR c.status IN ('pendente', 'em_andamento', 'concluido'))
       ORDER BY c.data_evento ASC NULLS LAST
     `,
-    sql`
+      sql`
       SELECT
         t.id::text, t.titulo, t.prioridade,
         to_char(t.prazo, 'DD/MM/YYYY') AS prazo,
@@ -144,8 +160,8 @@ export async function getMinhasTarefas(
         CASE t.prioridade WHEN 'Alta' THEN 1 WHEN 'Normal' THEN 2 ELSE 3 END,
         t.prazo ASC NULLS LAST
     `,
-    colaboradorId
-      ? sql`
+      colaboradorId
+        ? sql`
           SELECT
             p.id::text AS processo_id, p.numero AS processo_numero,
             p.estagio_producao, p.resultado_administrativo,
@@ -159,8 +175,20 @@ export async function getMinhasTarefas(
             AND p.deleted_at IS NULL
             AND p.status IN ('ativo', 'em_andamento')
         `
-      : Promise.resolve([]),
-  ]);
+        : Promise.resolve([]),
+      colaboradorId
+        ? sql`
+          SELECT
+            t.id::text, t.titulo, t.descricao,
+            to_char(t.data_vencimento, 'DD/MM/YYYY') AS prazo,
+            t.concluida, t.lead_id::text AS lead_id, l.nome AS lead_nome
+          FROM crm_tarefas t
+          JOIN crm_leads l ON l.id = t.lead_id
+          WHERE t.responsavel_id = ${colaboradorId}::uuid
+          ORDER BY t.data_vencimento ASC NULLS LAST
+        `
+        : Promise.resolve([]),
+    ]);
 
   const controles: MinhaControle[] = controlesRows.map((r) => ({
     id: String(r.id),
@@ -247,30 +275,48 @@ export async function getMinhasTarefas(
   const acoesPendentes = acoesProcesso.filter((a) => !a.aguardando);
   const acoesAcompanhamento = acoesProcesso.filter((a) => a.aguardando);
 
-  const all: MinhaItem[] = [...controles, ...tarefas];
+  const crmTarefas: MinhaCrmTarefa[] = crmTarefasRows.map((r) => ({
+    id: String(r.id),
+    titulo: String(r.titulo),
+    descricao: r.descricao ? String(r.descricao) : null,
+    prazo: r.prazo ? String(r.prazo) : null,
+    concluida: !!r.concluida,
+    leadId: String(r.lead_id),
+    leadNome: String(r.lead_nome),
+    source: "crm" as const,
+  }));
+
+  const all: MinhaItem[] = [...controles, ...tarefas, ...crmTarefas];
+
+  // crm_tarefas só tem 2 estados (pendente/concluída, sem "em andamento") —
+  // por isso não entra na coluna do meio, só em Pendente ou Arquivados.
+  function statusBucket(
+    i: MinhaItem
+  ): "pendente" | "em_andamento" | "concluido" {
+    if (i.source === "controle") {
+      return (i as MinhaControle).status;
+    }
+    if (i.source === "tarefa") {
+      const s = (i as MinhaTarefa).status;
+      return s === "Concluída"
+        ? "concluido"
+        : s === "Em andamento"
+          ? "em_andamento"
+          : "pendente";
+    }
+    return (i as MinhaCrmTarefa).concluida ? "concluido" : "pendente";
+  }
 
   return {
     pendentes: [
       ...acoesPendentes,
-      ...all.filter((i) =>
-        i.source === "controle"
-          ? (i as MinhaControle).status === "pendente"
-          : (i as MinhaTarefa).status === "Pendente"
-      ),
+      ...all.filter((i) => statusBucket(i) === "pendente"),
     ],
     emAndamento: [
       ...acoesAcompanhamento,
-      ...all.filter((i) =>
-        i.source === "controle"
-          ? (i as MinhaControle).status === "em_andamento"
-          : (i as MinhaTarefa).status === "Em andamento"
-      ),
+      ...all.filter((i) => statusBucket(i) === "em_andamento"),
     ],
-    concluidas: all.filter((i) =>
-      i.source === "controle"
-        ? (i as MinhaControle).status === "concluido"
-        : (i as MinhaTarefa).status === "Concluída"
-    ),
+    concluidas: all.filter((i) => statusBucket(i) === "concluido"),
   };
 }
 

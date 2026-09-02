@@ -8,12 +8,15 @@ import type {
   MinhaControle,
   MinhaTarefa,
   MinhaAcaoProcesso,
+  MinhaCrmTarefa,
 } from "@/lib/minhas-tarefas-db";
 import {
   darBaixaControleAction,
   darBaixaTarefaAction,
+  darBaixaCrmTarefaAction,
   reabrirControleAction,
   reabrirTarefaAction,
+  reabrirCrmTarefaAction,
 } from "@/lib/minhas-tarefas-actions";
 import {
   CheckCircleIcon,
@@ -262,6 +265,132 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
   );
 }
 
+function CrmTarefaCard({
+  item,
+  isConcluida = false,
+}: {
+  item: MinhaCrmTarefa;
+  isConcluida?: boolean;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const badge = deadlineBadge(item.prazo);
+  const deadlineDisplay = formatDeadlineDisplay(item.prazo);
+
+  function handleDarBaixa() {
+    setError(null);
+    startTransition(async () => {
+      const result = await darBaixaCrmTarefaAction(item.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleReabrir() {
+    setError(null);
+    startTransition(async () => {
+      const result = await reabrirCrmTarefaAction(item.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div
+      className={`rounded-xl border bg-white shadow-sm transition-opacity ${
+        pending ? "opacity-50 pointer-events-none" : ""
+      } ${isConcluida ? "border-border opacity-70" : "border-border hover:border-primary/30 hover:shadow-md"}`}
+    >
+      <div className="p-4">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <span className="rounded bg-fuchsia-100 px-1.5 py-0.5 font-body text-[10px] font-semibold text-fuchsia-700">
+            CRM
+          </span>
+        </div>
+
+        <p
+          className={`font-body text-sm font-semibold leading-snug ${isConcluida ? "text-muted line-through" : "text-fg"}`}
+        >
+          {item.titulo}
+        </p>
+
+        <p className="mt-1 font-body text-xs font-semibold text-primary truncate">
+          {item.leadNome}
+        </p>
+
+        {item.descricao && (
+          <p className="mt-1 font-body text-xs text-muted line-clamp-2">
+            {item.descricao}
+          </p>
+        )}
+
+        {deadlineDisplay && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <ClockIcon className="h-3.5 w-3.5 text-muted flex-shrink-0" />
+            <span className="font-body text-xs text-muted">
+              {deadlineDisplay}
+            </span>
+            {badge && (
+              <span
+                className={`rounded-full px-2 py-0.5 font-body text-[10px] font-bold ${badge.cls}`}
+              >
+                {badge.label}
+              </span>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <p className="mt-2 font-body text-xs font-semibold text-red-600">
+            {error}
+          </p>
+        )}
+      </div>
+
+      <div className="border-t border-border px-3 pb-3 pt-3">
+        {isConcluida ? (
+          <button
+            onClick={handleReabrir}
+            disabled={pending}
+            style={{ touchAction: "manipulation" }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-muted transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50 disabled:opacity-50"
+          >
+            Reabrir
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <Link
+              href={`/dashboard/crm/leads/${item.leadId}`}
+              style={{ touchAction: "manipulation" }}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
+            >
+              <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />
+              Ver lead
+            </Link>
+            <button
+              onClick={handleDarBaixa}
+              disabled={pending}
+              style={{ touchAction: "manipulation" }}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 font-body text-[12px] font-semibold text-white transition-colors hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50"
+            >
+              <CheckCircleIcon className="h-4 w-4 flex-shrink-0" />
+              Dar baixa
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ItemCard({
   item,
   isConcluida = false,
@@ -277,6 +406,9 @@ function ItemCard({
 
   if (item.source === "processo") {
     return <AcaoProcessoCard item={item} />;
+  }
+  if (item.source === "crm") {
+    return <CrmTarefaCard item={item} isConcluida={isConcluida} />;
   }
 
   const isControle = item.source === "controle";

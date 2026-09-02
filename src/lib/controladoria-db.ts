@@ -1,5 +1,20 @@
 import sql from "./db";
 
+export interface ItemAberto {
+  id: string;
+  origem: "controle" | "tarefa";
+  categoria: string;
+  categoriaLabel: string;
+  titulo: string;
+  clienteNome: string | null;
+  criadoEm: string;
+  prazoInterno: string | null;
+  prazoFinal: string | null;
+  diasAberto: number;
+  /** tranquilo = sem prazo próximo; proximo = já passou do prazo interno (ideal) ou falta pouco pro final; vencido = passou do prazo final. */
+  statusPrazo: "tranquilo" | "proximo" | "vencido";
+}
+
 export interface CargaColaborador {
   colaboradorId: string;
   nome: string;
@@ -9,90 +24,198 @@ export interface CargaColaborador {
   proximoPrazo: string | null;
   /** Detalhamento do total de abertas por categoria — só entram categorias com total > 0. */
   porCategoria: { categoria: string; label: string; total: number }[];
+  /** Itens abertos, do mais antigo pro mais novo — pra saber exatamente o que cobrar e desde quando. */
+  itens: ItemAberto[];
+  /** Item aberto há mais tempo (o primeiro que entrou e ainda não saiu). */
+  itemMaisAntigo: ItemAberto | null;
+  /** Item aberto mais recentemente. */
+  itemMaisRecente: ItemAberto | null;
 }
 
-const CATEGORIAS_CARGA: { categoria: string; label: string }[] = [
-  { categoria: "audiencias", label: "Audiências" },
-  { categoria: "prazos", label: "Prazos" },
-  { categoria: "pericias", label: "Perícias" },
-  { categoria: "beneficios", label: "Benefícios" },
-  { categoria: "servicos", label: "Serviços" },
-];
+const CATEGORIA_LABEL: Record<string, string> = {
+  audiencias: "Audiência",
+  prazos: "Prazo",
+  pericias: "Perícia",
+  dcb: "DCB",
+  beneficios: "Benefício",
+  implantados: "Benefício",
+  "implantados-data": "Benefício",
+  alvaras: "Benefício",
+  servicos: "Serviço",
+};
+
+const CATEGORIA_LABEL_PLURAL: Record<string, string> = {
+  audiencias: "Audiências",
+  prazos: "Prazos",
+  pericias: "Perícias",
+  beneficios: "Benefícios",
+  servicos: "Serviços",
+};
+
+const HOJE_MS = () => Date.now();
+const DIA_MS = 1000 * 60 * 60 * 24;
+
+function diasEntre(iso: string): number {
+  const d = new Date(iso + "T00:00:00");
+  return Math.max(0, Math.floor((HOJE_MS() - d.getTime()) / DIA_MS));
+}
+
+/** Item sem nenhum prazo cadastrado que já está aberto há mais tempo que isso vira "proximo" — sem prazo não é sinônimo de sem risco, é só um item que pode ficar esquecido pra sempre se ninguém olhar. */
+const DIAS_ATENCAO_SEM_PRAZO = 15;
+
+function classificarStatusPrazo(
+  prazoInterno: string | null,
+  prazoFinal: string | null,
+  diasAberto: number
+): "tranquilo" | "proximo" | "vencido" {
+  const hoje = new Date().toISOString().slice(0, 10);
+  if (prazoFinal && prazoFinal < hoje) return "vencido";
+  if (prazoFinal) {
+    const diasParaFinal = diasEntre(prazoFinal) * -1; // negativo = faltam dias
+    if (diasParaFinal >= -5) return "proximo";
+  }
+  if (prazoInterno && prazoInterno < hoje) return "proximo";
+  if (!prazoInterno && !prazoFinal && diasAberto >= DIAS_ATENCAO_SEM_PRAZO)
+    return "proximo";
+  return "tranquilo";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapItem(r: any, origem: "controle" | "tarefa"): ItemAberto {
+  const categoria = origem === "tarefa" ? "servicos" : String(r.tipo);
+  const criadoEm = String(r.criado_em).slice(0, 10);
+  const prazoInterno = r.prazo_interno
+    ? String(r.prazo_interno).slice(0, 10)
+    : null;
+  const prazoFinal = r.prazo_final ? String(r.prazo_final).slice(0, 10) : null;
+  return {
+    id: String(r.id),
+    origem,
+    categoria,
+    categoriaLabel: CATEGORIA_LABEL[categoria] ?? "Outro",
+    titulo: String(r.titulo ?? r.descricao ?? "—"),
+    clienteNome: r.cliente_nome ? String(r.cliente_nome) : null,
+    criadoEm,
+    prazoInterno,
+    prazoFinal,
+    diasAberto: diasEntre(criadoEm),
+    statusPrazo: classificarStatusPrazo(
+      prazoInterno,
+      prazoFinal,
+      diasEntre(criadoEm)
+    ),
+  };
+}
 
 /**
- * Carga de trabalho atual de cada colaborador ativo — quantas tarefas/
- * controles abertos ele tem, quantos já venceram, e o próximo prazo. Usado
- * pra mostrar contexto antes de atribuir uma nova tarefa (não sobrecarregar
- * quem já está no limite). "beneficios" agrupa dcb/beneficios/implantados/
- * implantados-data/alvaras — categorias finas demais pra listar uma a uma
- * sem poluir o painel. "servicos" são as tarefas_processo (ex: "verificar
- * documentação", "dar entrada"), que não são controles.
+ * Carga de trabalho atual de cada colaborador ativo — não só a contagem,
+ * mas a lista real do que está aberto (título, cliente, desde quando, prazo
+ * interno/final), pra dar pra cobrar um responsável específico por um item
+ * específico em vez de só ver um número solto. "beneficios" agrupa dcb/
+ * beneficios/implantados/implantados-data/alvaras — categorias finas demais
+ * pra listar uma a uma sem poluir o painel. "servicos" são as
+ * tarefas_processo (ex: "verificar documentação", "dar entrada").
  */
 export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
-  const rows = await sql`
-    WITH carga_controles AS (
+  const [controlesRows, tarefasRows] = await Promise.all([
+    sql`
       SELECT
-        u.colaborador_id,
-        COUNT(*) AS abertas,
-        COUNT(*) FILTER (
-          WHERE COALESCE(c.prazo_interno, c.data_evento) < CURRENT_DATE
-        ) AS vencidas,
-        MIN(COALESCE(c.prazo_interno, c.data_evento)) FILTER (
-          WHERE COALESCE(c.prazo_interno, c.data_evento) >= CURRENT_DATE
-        ) AS proximo_prazo,
-        COUNT(*) FILTER (WHERE c.tipo = 'audiencias') AS audiencias,
-        COUNT(*) FILTER (WHERE c.tipo = 'prazos') AS prazos,
-        COUNT(*) FILTER (WHERE c.tipo = 'pericias') AS pericias,
-        COUNT(*) FILTER (
-          WHERE c.tipo IN ('dcb', 'beneficios', 'implantados', 'implantados-data', 'alvaras')
-        ) AS beneficios
+        c.id::text, u.colaborador_id::text AS colaborador_id, c.tipo,
+        c.descricao AS titulo, cl.name AS cliente_nome,
+        c.created_at::text AS criado_em,
+        c.prazo_interno::text AS prazo_interno,
+        c.data_evento::text AS prazo_final
       FROM controles c
       JOIN usuarios u ON u.id = c.responsavel_id
+      LEFT JOIN clients cl ON cl.id = c.cliente_id
       WHERE c.status IS NULL
-      GROUP BY u.colaborador_id
-    ),
-    carga_tarefas AS (
+    `,
+    sql`
       SELECT
-        col.id AS colaborador_id,
-        COUNT(*) AS abertas,
-        COUNT(*) FILTER (WHERE t.prazo < CURRENT_DATE) AS vencidas,
-        MIN(t.prazo) FILTER (WHERE t.prazo >= CURRENT_DATE) AS proximo_prazo
+        t.id::text, col.id::text AS colaborador_id, t.titulo,
+        cl.name AS cliente_nome,
+        t.created_at::text AS criado_em,
+        NULL::text AS prazo_interno,
+        t.prazo::text AS prazo_final
       FROM tarefas_processo t
       JOIN colaboradores col ON col.nome = t.responsavel AND col.status = 'ativo'
+      LEFT JOIN clients cl ON cl.id = t.client_id
       WHERE t.status IN ('Pendente', 'Em andamento')
-      GROUP BY col.id
-    )
-    SELECT
-      col.id::text,
-      col.nome,
-      col.cargo,
-      COALESCE(cc.abertas, 0) + COALESCE(ct.abertas, 0) AS total_abertas,
-      COALESCE(cc.vencidas, 0) + COALESCE(ct.vencidas, 0) AS total_vencidas,
-      LEAST(cc.proximo_prazo, ct.proximo_prazo) AS proximo_prazo,
-      COALESCE(cc.audiencias, 0) AS audiencias,
-      COALESCE(cc.prazos, 0) AS prazos,
-      COALESCE(cc.pericias, 0) AS pericias,
-      COALESCE(cc.beneficios, 0) AS beneficios,
-      COALESCE(ct.abertas, 0) AS servicos
-    FROM colaboradores col
-    LEFT JOIN carga_controles cc ON cc.colaborador_id = col.id
-    LEFT JOIN carga_tarefas ct ON ct.colaborador_id = col.id
-    WHERE col.status = 'ativo'
-    ORDER BY total_abertas DESC
+    `,
+  ]);
+
+  const colaboradores = await sql`
+    SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo' ORDER BY nome
   `;
-  return rows.map((r) => ({
-    colaboradorId: String(r.id),
-    nome: String(r.nome),
-    cargo: String(r.cargo),
-    totalAbertas: Number(r.total_abertas),
-    totalVencidas: Number(r.total_vencidas),
-    proximoPrazo: r.proximo_prazo ? String(r.proximo_prazo).slice(0, 10) : null,
-    porCategoria: CATEGORIAS_CARGA.map(({ categoria, label }) => ({
-      categoria,
-      label,
-      total: Number(r[categoria] ?? 0),
-    })).filter((c) => c.total > 0),
-  }));
+
+  const itensPorColaborador = new Map<string, ItemAberto[]>();
+  for (const r of controlesRows) {
+    const item = mapItem(r, "controle");
+    const arr = itensPorColaborador.get(String(r.colaborador_id)) ?? [];
+    arr.push(item);
+    itensPorColaborador.set(String(r.colaborador_id), arr);
+  }
+  for (const r of tarefasRows) {
+    const item = mapItem(r, "tarefa");
+    const arr = itensPorColaborador.get(String(r.colaborador_id)) ?? [];
+    arr.push(item);
+    itensPorColaborador.set(String(r.colaborador_id), arr);
+  }
+
+  return colaboradores
+    .map((col) => {
+      const itens = (itensPorColaborador.get(String(col.id)) ?? []).sort(
+        (a, b) =>
+          a.criadoEm < b.criadoEm ? -1 : a.criadoEm > b.criadoEm ? 1 : 0
+      );
+      const porCategoriaMap = new Map<string, number>();
+      for (const item of itens) {
+        porCategoriaMap.set(
+          item.categoria === "servicos" ? "servicos" : item.categoria,
+          (porCategoriaMap.get(item.categoria) ?? 0) + 1
+        );
+      }
+      // Agrupa os tipos "benefício" (dcb/beneficios/implantados/implantados-data/alvaras) numa só pill.
+      let beneficios = 0;
+      for (const tipo of [
+        "dcb",
+        "beneficios",
+        "implantados",
+        "implantados-data",
+        "alvaras",
+      ]) {
+        beneficios += porCategoriaMap.get(tipo) ?? 0;
+        porCategoriaMap.delete(tipo);
+      }
+      if (beneficios > 0) porCategoriaMap.set("beneficios", beneficios);
+
+      const proximosPrazos = itens
+        .map((i) => i.prazoInterno ?? i.prazoFinal)
+        .filter(
+          (d): d is string => !!d && d >= new Date().toISOString().slice(0, 10)
+        )
+        .sort();
+
+      return {
+        colaboradorId: String(col.id),
+        nome: String(col.nome),
+        cargo: String(col.cargo),
+        totalAbertas: itens.length,
+        totalVencidas: itens.filter((i) => i.statusPrazo === "vencido").length,
+        proximoPrazo: proximosPrazos[0] ?? null,
+        porCategoria: Array.from(porCategoriaMap.entries()).map(
+          ([categoria, total]) => ({
+            categoria,
+            label: CATEGORIA_LABEL_PLURAL[categoria] ?? categoria,
+            total,
+          })
+        ),
+        itens,
+        itemMaisAntigo: itens[0] ?? null,
+        itemMaisRecente: itens[itens.length - 1] ?? null,
+      };
+    })
+    .sort((a, b) => b.totalAbertas - a.totalAbertas);
 }
 
 export interface CapacidadeSemana {

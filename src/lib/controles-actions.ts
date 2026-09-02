@@ -244,6 +244,11 @@ export async function createControleAction(
       ? (formData.get("prioridade") as string)
       : "media") || "media";
   const fatal = formData.get("fatal") === "on";
+  const pontosRaw = ((formData.get("pontos") as string) ?? "").trim();
+  const pontos =
+    pontosRaw && /^\d+$/.test(pontosRaw) && Number(pontosRaw) > 0
+      ? Number(pontosRaw)
+      : 1;
   const publicacaoIdRaw = (
     (formData.get("publicacao_id") as string) ?? ""
   ).trim();
@@ -327,8 +332,13 @@ export async function createControleAction(
       `;
       novoId = rows[0]?.id ?? null;
     }
-    if (novoId && publicacaoId) {
-      await sql`UPDATE controles SET publicacao_id = ${publicacaoId} WHERE id = ${novoId}::uuid`;
+    if (novoId) {
+      await sql`
+        UPDATE controles
+        SET pontos = ${pontos},
+            publicacao_id = COALESCE(${publicacaoId}, publicacao_id)
+        WHERE id = ${novoId}::uuid
+      `;
     }
   } catch (err) {
     console.error("createControleAction:", err);
@@ -377,6 +387,11 @@ export async function updateControleAction(
       ? (formData.get("prioridade") as string)
       : "media") || "media";
   const fatal = formData.get("fatal") === "on";
+  const pontosRaw = ((formData.get("pontos") as string) ?? "").trim();
+  const pontos =
+    pontosRaw && /^\d+$/.test(pontosRaw) && Number(pontosRaw) > 0
+      ? Number(pontosRaw)
+      : 1;
 
   if (!id) return { error: "ID inválido." };
   if (!tipo) return { error: "Tipo obrigatório." };
@@ -414,7 +429,7 @@ export async function updateControleAction(
       await sql`
         UPDATE controles SET
           tipo = ${tipo}, data_evento = ${dataEvento}::date, prazo_interno = ${prazoInterno}::date,
-          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal},
+          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal}, pontos = ${pontos},
           cliente_id = ${clienteId}::uuid,
           processo_id = ${processoId}::uuid, responsavel_id = ${responsavelId}::uuid,
           tipo_demanda = ${tipoDemanda}, observacoes = ${observacoes},
@@ -425,7 +440,7 @@ export async function updateControleAction(
       await sql`
         UPDATE controles SET
           tipo = ${tipo}, data_evento = ${dataEvento}::date, prazo_interno = ${prazoInterno}::date,
-          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal},
+          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal}, pontos = ${pontos},
           cliente_id = ${clienteId}::uuid,
           processo_id = ${processoId}::uuid, responsavel_id = NULL,
           tipo_demanda = ${tipoDemanda}, observacoes = ${observacoes},
@@ -436,7 +451,7 @@ export async function updateControleAction(
       await sql`
         UPDATE controles SET
           tipo = ${tipo}, data_evento = ${dataEvento}::date, prazo_interno = ${prazoInterno}::date,
-          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal},
+          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal}, pontos = ${pontos},
           cliente_id = ${clienteId}::uuid,
           processo_id = NULL, responsavel_id = NULL,
           tipo_demanda = ${tipoDemanda}, observacoes = ${observacoes},
@@ -447,7 +462,7 @@ export async function updateControleAction(
       await sql`
         UPDATE controles SET
           tipo = ${tipo}, data_evento = ${dataEvento}::date, prazo_interno = ${prazoInterno}::date,
-          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal},
+          descricao = ${descricao}, status = ${dbStatus}, prioridade = ${prioridade}, fatal = ${fatal}, pontos = ${pontos},
           cliente_id = NULL, processo_id = NULL, responsavel_id = NULL,
           tipo_demanda = ${tipoDemanda}, observacoes = ${observacoes},
           dados = ${dadosJson}::jsonb, updated_at = NOW()

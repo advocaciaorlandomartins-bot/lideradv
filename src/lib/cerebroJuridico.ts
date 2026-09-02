@@ -2007,14 +2007,15 @@ export async function salvarAnalise(
       const responsavelNome = resp?.nome ? String(resp.nome) : null;
       await sql`
         INSERT INTO tarefas_processo
-          (processo_id, client_id, titulo, prioridade, comentarios, responsavel)
+          (processo_id, client_id, titulo, prioridade, comentarios, responsavel, status)
         VALUES (
           ${processoId}::uuid,
           ${clientId}::uuid,
           ${proximaAcao.substring(0, 200)},
           ${prioridadeTarefa},
           ${"✅ Criada automaticamente pelo Cérebro Jurídico em " + new Date().toLocaleDateString("pt-BR")},
-          ${responsavelNome}
+          ${responsavelNome},
+          'Pendente'
         )
       `;
       tarefaCriada = true;

@@ -168,15 +168,23 @@ export async function createHistoricoRegistroAction(data: {
             data.processoId
           );
           if (urgente && proximaAcao) {
+            const [resp] = await sql`
+              SELECT col.nome FROM colaboradores col
+              JOIN processos p ON p.responsavel_id = col.id
+              WHERE p.id = ${data.processoId}::uuid
+            `.catch(() => [] as Record<string, unknown>[]);
+            const responsavelNome = resp?.nome ? String(resp.nome) : null;
             await sql`
               INSERT INTO tarefas_processo
-                (processo_id, client_id, titulo, prioridade, comentarios)
+                (processo_id, client_id, titulo, prioridade, comentarios, responsavel, status)
               VALUES (
                 ${data.processoId}::uuid,
                 ${data.clientId}::uuid,
                 ${proximaAcao.substring(0, 200)},
                 'Alta',
-                ${"⚡ Urgente — Cérebro Jurídico" + (prazo ? ` (prazo: ${prazo})` : "")}
+                ${"⚡ Urgente — Cérebro Jurídico" + (prazo ? ` (prazo: ${prazo})` : "")},
+                ${responsavelNome},
+                'Pendente'
               )
             `.catch(() => null);
           }
@@ -389,7 +397,7 @@ export async function createTarefaProcessoAction(data: {
   try {
     const [row] = await sql`
       INSERT INTO tarefas_processo
-        (processo_id, client_id, titulo, responsavel, prioridade, prazo, hora, comentarios, checklist)
+        (processo_id, client_id, titulo, responsavel, prioridade, prazo, hora, comentarios, checklist, status)
       VALUES
         (${data.processoId}::uuid,
          ${data.clientId}::uuid,
@@ -399,7 +407,8 @@ export async function createTarefaProcessoAction(data: {
          ${data.prazo ? data.prazo : null}::date,
          ${data.hora ? data.hora : null}::time,
          ${data.comentarios || null},
-         ${checklistJson}::jsonb)
+         ${checklistJson}::jsonb,
+         'Pendente')
       RETURNING id::text
     `;
     const tarefaId = String(row.id);

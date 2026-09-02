@@ -92,6 +92,7 @@ export interface Controle {
   status: StatusControle;
   prioridade: PrioridadeControle | null;
   fatal: boolean;
+  pontos: number;
   publicacao_id: number | null;
   cliente_id: string | null;
   cliente_nome: string | null;

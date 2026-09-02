@@ -7,13 +7,26 @@ export interface CargaColaborador {
   totalAbertas: number;
   totalVencidas: number;
   proximoPrazo: string | null;
+  /** Detalhamento do total de abertas por categoria — só entram categorias com total > 0. */
+  porCategoria: { categoria: string; label: string; total: number }[];
 }
+
+const CATEGORIAS_CARGA: { categoria: string; label: string }[] = [
+  { categoria: "audiencias", label: "Audiências" },
+  { categoria: "prazos", label: "Prazos" },
+  { categoria: "pericias", label: "Perícias" },
+  { categoria: "beneficios", label: "Benefícios" },
+  { categoria: "servicos", label: "Serviços" },
+];
 
 /**
  * Carga de trabalho atual de cada colaborador ativo — quantas tarefas/
  * controles abertos ele tem, quantos já venceram, e o próximo prazo. Usado
  * pra mostrar contexto antes de atribuir uma nova tarefa (não sobrecarregar
- * quem já está no limite).
+ * quem já está no limite). "beneficios" agrupa dcb/beneficios/implantados/
+ * implantados-data/alvaras — categorias finas demais pra listar uma a uma
+ * sem poluir o painel. "servicos" são as tarefas_processo (ex: "verificar
+ * documentação", "dar entrada"), que não são controles.
  */
 export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
   const rows = await sql`
@@ -26,7 +39,13 @@ export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
         ) AS vencidas,
         MIN(COALESCE(c.prazo_interno, c.data_evento)) FILTER (
           WHERE COALESCE(c.prazo_interno, c.data_evento) >= CURRENT_DATE
-        ) AS proximo_prazo
+        ) AS proximo_prazo,
+        COUNT(*) FILTER (WHERE c.tipo = 'audiencias') AS audiencias,
+        COUNT(*) FILTER (WHERE c.tipo = 'prazos') AS prazos,
+        COUNT(*) FILTER (WHERE c.tipo = 'pericias') AS pericias,
+        COUNT(*) FILTER (
+          WHERE c.tipo IN ('dcb', 'beneficios', 'implantados', 'implantados-data', 'alvaras')
+        ) AS beneficios
       FROM controles c
       JOIN usuarios u ON u.id = c.responsavel_id
       WHERE c.status IS NULL
@@ -49,7 +68,12 @@ export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
       col.cargo,
       COALESCE(cc.abertas, 0) + COALESCE(ct.abertas, 0) AS total_abertas,
       COALESCE(cc.vencidas, 0) + COALESCE(ct.vencidas, 0) AS total_vencidas,
-      LEAST(cc.proximo_prazo, ct.proximo_prazo) AS proximo_prazo
+      LEAST(cc.proximo_prazo, ct.proximo_prazo) AS proximo_prazo,
+      COALESCE(cc.audiencias, 0) AS audiencias,
+      COALESCE(cc.prazos, 0) AS prazos,
+      COALESCE(cc.pericias, 0) AS pericias,
+      COALESCE(cc.beneficios, 0) AS beneficios,
+      COALESCE(ct.abertas, 0) AS servicos
     FROM colaboradores col
     LEFT JOIN carga_controles cc ON cc.colaborador_id = col.id
     LEFT JOIN carga_tarefas ct ON ct.colaborador_id = col.id
@@ -63,6 +87,11 @@ export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
     totalAbertas: Number(r.total_abertas),
     totalVencidas: Number(r.total_vencidas),
     proximoPrazo: r.proximo_prazo ? String(r.proximo_prazo).slice(0, 10) : null,
+    porCategoria: CATEGORIAS_CARGA.map(({ categoria, label }) => ({
+      categoria,
+      label,
+      total: Number(r[categoria] ?? 0),
+    })).filter((c) => c.total > 0),
   }));
 }
 

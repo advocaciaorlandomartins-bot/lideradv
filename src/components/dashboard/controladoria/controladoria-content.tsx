@@ -102,6 +102,18 @@ export default function ControladoriaContent({
                       <p className="font-body text-xs text-muted capitalize">
                         {c.cargo}
                       </p>
+                      {c.porCategoria.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {c.porCategoria.map((cat) => (
+                            <span
+                              key={cat.categoria}
+                              className="rounded-full bg-slate-100 px-2 py-0.5 font-body text-[11px] font-medium text-muted"
+                            >
+                              {cat.label}: {cat.total}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-4">

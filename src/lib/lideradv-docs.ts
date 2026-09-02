@@ -95,11 +95,14 @@ A seção abre com sub-navegação no topo: "Controles" e "Perícias"
 ### Aba Controles:
 - Filtros por tipo: Audiências · Prazos Processuais · Perícias e Av. Sociais · Prorrogação (DCB) · Benefícios – Ag. Implantação · Benefícios Implantados (1° Pag.) · Benefícios Implantados · Alvarás/RPVs
 - Status disponíveis: Aguardando · Concluído · Cancelado
-- Botão "Novo {tipo}" (ex: "Nova audiência", "Novo prazo", "Novo alvará") → formulário com data, descrição, cliente, processo, responsável, local, prioridade, observações
+- Botão "Novo {tipo}" (ex: "Nova audiência", "Novo prazo", "Novo alvará") → formulário com data, prazo interno, descrição, cliente, processo, responsável, local, prioridade, pontos (ranking), observações
+- Checkbox "Prazo fatal" (destaque vermelho) — marca que perder aquele prazo encerra o direito/prejudica o caso; aparece em destaque na agenda, na Íris e no ranking/carga da Controladoria
+- Checkbox "Iniciar cronômetro agora" — já começa a contar o tempo assim que salva, sem precisar abrir de novo em Minhas Tarefas (encerra automaticamente qualquer outro cronômetro do usuário que estivesse rodando)
 - Ao escolher o responsável, o formulário mostra quantas tarefas/controles abertos cada pessoa já tem (e um aviso ⚠ se tiver algo vencido)
 - Checklist obrigatório (opcional): campo de texto (um item por linha) na criação; na edição do controle, lista com caixinhas de marcar + botão para adicionar/remover itens. Enquanto houver item não marcado, o botão "Dar baixa" fica bloqueado
 - Tempo registrado: na edição do controle, mostra o histórico de cronômetro (ver Minhas Tarefas) somado
 - Criação automática via botão "Processar INSS" na aba Documentos do cliente
+- No detalhe de uma publicação (Jurídico → Publicações), o botão "+ Criar prazo desta publicação" já leva descrição/prazo/cliente/processo pré-preenchidos pro formulário de novo controle, e grava o vínculo — o controle criado mostra um link de volta pra publicação de origem
 
 ### Aba Perícias (clique em "Perícias" na sub-navegação):
 - Lista todas as perícias médicas e avaliações sociais com status
@@ -201,10 +204,13 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Painel analítico completo do escritório (somente Administradores) — KPIs de clientes, processos, colaboradores, receitas, leads CRM
 
 ## CONTROLADORIA (menu: Sistema → Controladoria)
-- Ranking de pontuação por colaborador (tarefa/controle concluído vale pontos), período 7/30/90 dias
-- Carga da equipe — quantas tarefas/controles abertos cada colaborador tem, com alerta de vencido
+- Ranking de pontuação por colaborador (tarefa/controle concluído vale pontos, campo "pontos" editável na criação do controle), período 7/30/90 dias, com pódio pros 3 primeiros
+- Cada linha do ranking expande (clicar) e mostra o histórico de entregas do período, item a item, classificado em 3 níveis: "Adiantado" (concluído até o prazo interno/ideal), "No limite" (concluído depois do ideal mas dentro do prazo final) e "Atrasado" (depois do prazo final) — dá pra cobrar um atraso específico, não só ver uma % solta
+- Carga da equipe — quantas tarefas/controles abertos cada colaborador tem (com categorias: Audiências/Prazos/Perícias/Benefícios/Serviços), alerta de vencido, e "mais antigo aberto há X dias" — um item sem prazo cadastrado há 15+ dias já conta como "atenção", não fica escondido como se não houvesse risco
+- Cada linha da Carga também expande e mostra os itens abertos individualmente: título, cliente, data de abertura, prazo interno/final, situação (tranquilo/atenção/vencido)
+- Ao expandir qualquer linha (Carga ou Ranking) tem um link direto pro perfil do colaborador, onde ficam as metas com bônus escalonado — fecha o ciclo entre "isso está atrasado" e "gerenciar a bonificação dessa pessoa"
 - Capacidade produtiva — o que entrou vs. o que saiu por semana, últimas 8 semanas
-- Visível pra todos (cada um vê a própria posição no ranking)
+- Agregados (totais, %) visíveis pra todos com acesso à Controladoria; o detalhamento item a item (nome de cliente, título) só aparece pra quem tem "processos_ver_todos" (Administrador/Sócio) ou pro próprio colaborador vendo a própria linha
 
 ## AUDITORIA (menu: Sistema → Auditoria)
 - Log de todas as ações do sistema, com filtros por usuário/ação/módulo/período/busca

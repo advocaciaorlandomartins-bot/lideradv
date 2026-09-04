@@ -1,6 +1,6 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import type { ClientFull } from "./clients-db";
-import type { EscritorioConfig } from "./escritorio-db";
+import { configParaDocumento, type EscritorioConfig } from "./escritorio-db";
 import { TimbradoHeader, TimbradoFooter } from "./pdf-timbrado";
 import { getPdfConfig, buildStyles, type PdfPageConfig } from "./pdf-config";
 
@@ -17,7 +17,12 @@ function PageHeader({
   s,
 }: SharedProps & { s: ReturnType<typeof buildStyles> }) {
   if (config && config.modelo_timbrado_ativo) {
-    return <TimbradoHeader config={config} logoData={logoData ?? null} />;
+    return (
+      <TimbradoHeader
+        config={configParaDocumento(config)}
+        logoData={logoData ?? null}
+      />
+    );
   }
   // Nome/OAB fixos em "ADVOCACIA ORLANDO MARTINS" mesmo com o timbrado
   // personalizado desativado — qualquer escritório comprando o sistema e
@@ -42,7 +47,7 @@ function PageFooter({
   s,
 }: SharedProps & { date: string; s: ReturnType<typeof buildStyles> }) {
   if (config && config.modelo_timbrado_ativo) {
-    return <TimbradoFooter config={config} date={date} />;
+    return <TimbradoFooter config={configParaDocumento(config)} date={date} />;
   }
   return (
     <Text style={s.simpleFooter} fixed>
@@ -91,6 +96,12 @@ function formatAddress(c: ClientFull) {
   return `${parts.join(", ")}, ${c.neighborhood}, ${c.city}/${c.state}, CEP ${c.cep}`;
 }
 
+/** Nome pra metadata "Autor" do PDF — respeita identificacao_ativo (não é só o cabeçalho/rodapé visível que precisa disso). */
+function authorName(config?: EscritorioConfig | null) {
+  if (config && !config.identificacao_ativo) return "Advocacia Orlando Martins";
+  return config?.nome ?? "Advocacia Orlando Martins";
+}
+
 function lawyerName(config?: EscritorioConfig | null) {
   if (config && !config.identificacao_ativo) return "ORLANDO MARTINS";
   return config?.nome?.toUpperCase() ?? "ORLANDO MARTINS";
@@ -122,7 +133,7 @@ export function ProcuracaoDoc({
   return (
     <Document
       title={`Procuração Ad Judicia — ${client.name}`}
-      author={config?.nome ?? "Advocacia Orlando Martins"}
+      author={authorName(config)}
     >
       <Page size="A4" style={s.page}>
         <PageHeader config={config} logoData={logoData} s={s} />
@@ -144,8 +155,7 @@ export function ProcuracaoDoc({
             <Text style={{ fontFamily: pdfCfg.fontBold }}>
               {lawyerName(config)}, Advogado(a)
             </Text>
-            , inscrito(a) na Ordem dos Advogados do Brasil
-            {config?.oab ? `, ${config.oab}` : ", Seção de São Paulo (OAB/SP)"},
+            , inscrito(a) na Ordem dos Advogados do Brasil, {lawyerOab(config)},
             ao qual outorga os poderes da cláusula AD JUDICIA ET EXTRA, em
             geral, e em especial para:
           </Text>
@@ -221,7 +231,7 @@ export function ContratoHonorariosDoc({
   return (
     <Document
       title={`Contrato de Honorários — ${client.name}`}
-      author={config?.nome ?? "Advocacia Orlando Martins"}
+      author={authorName(config)}
     >
       <Page size="A4" style={s.page}>
         <PageHeader config={config} logoData={logoData} s={s} />
@@ -332,7 +342,7 @@ export function DeclaracaoHipossuficienciaDoc({
   return (
     <Document
       title={`Declaração de Hipossuficiência — ${client.name}`}
-      author={config?.nome ?? "Advocacia Orlando Martins"}
+      author={authorName(config)}
     >
       <Page size="A4" style={s.page}>
         <PageHeader config={config} logoData={logoData} s={s} />
@@ -453,7 +463,7 @@ export function ComunicadoHonorariosDoc({
   return (
     <Document
       title={`Comunicado de Honorários — ${client.name}`}
-      author={config?.nome ?? "Advocacia Orlando Martins"}
+      author={authorName(config)}
     >
       <Page size="A4" style={s.page}>
         <PageHeader config={config} logoData={logoData} s={s} />
@@ -687,7 +697,7 @@ export function NotificacaoExtrajudicialDoc({
   return (
     <Document
       title={`Notificação Extrajudicial — ${client.name}`}
-      author={config?.nome ?? "Advocacia Orlando Martins"}
+      author={authorName(config)}
     >
       <Page size="A4" style={s.page}>
         <PageHeader config={config} logoData={logoData} s={s} />

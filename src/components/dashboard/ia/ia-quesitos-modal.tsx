@@ -113,10 +113,15 @@ export default function IaQuesitosModal({
   }
 
   function copiar(texto: string, chave: string) {
-    navigator.clipboard.writeText(texto).then(() => {
-      setCopiado(chave);
-      setTimeout(() => setCopiado(null), 2000);
-    });
+    navigator.clipboard
+      .writeText(texto)
+      .then(() => {
+        setCopiado(chave);
+        setTimeout(() => setCopiado(null), 2000);
+      })
+      .catch(() => {
+        setErro("Não foi possível copiar — copie manualmente o texto.");
+      });
   }
 
   return (

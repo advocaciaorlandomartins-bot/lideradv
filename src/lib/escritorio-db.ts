@@ -119,3 +119,31 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
     salario_minimo: r.salario_minimo ?? DEFAULTS.salario_minimo,
   };
 }
+
+/**
+ * Aplica o toggle "identificacao_ativo" removendo nome/OAB/CNPJ/contato/
+ * endereço reais do config antes de montar QUALQUER documento — inclusive
+ * com papel timbrado ativo. TimbradoHeader/TimbradoFooter (pdf-timbrado.tsx)
+ * leem esses campos direto do config que recebem, sem saber desse toggle;
+ * por isso todo lugar que monta um PDF (com ou sem timbrado) deve passar o
+ * config por aqui antes de repassar pro Timbrado, não só no fallback sem
+ * timbrado.
+ */
+export function configParaDocumento(
+  config: EscritorioConfig
+): EscritorioConfig {
+  if (config.identificacao_ativo) return config;
+  return {
+    ...config,
+    nome: "Advocacia Orlando Martins",
+    oab: null,
+    cnpj: null,
+    telefone: null,
+    email: null,
+    site: null,
+    endereco: null,
+    cidade: null,
+    estado: null,
+    cep: null,
+  };
+}

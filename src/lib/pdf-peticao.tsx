@@ -3,7 +3,7 @@
  * Usa o mesmo sistema de timbrado dos demais documentos do escritório.
  */
 import { Document, Page, Text, View } from "@react-pdf/renderer";
-import type { EscritorioConfig } from "./escritorio-db";
+import { configParaDocumento, type EscritorioConfig } from "./escritorio-db";
 import { TimbradoHeader, TimbradoFooter } from "./pdf-timbrado";
 import { getPdfConfig, buildStyles } from "./pdf-config";
 
@@ -53,12 +53,19 @@ export function PeticaoIaDoc({
   return (
     <Document
       title={titulo}
-      author={config?.nome ?? "Escritório de Advocacia"}
+      author={
+        config && !config.identificacao_ativo
+          ? "Escritório de Advocacia"
+          : (config?.nome ?? "Escritório de Advocacia")
+      }
       creator="LiderAdv — Dr. Lex IA"
     >
       <Page size="A4" style={s.page}>
         {comTimbrado && config && (
-          <TimbradoHeader config={config} logoData={logoData ?? null} />
+          <TimbradoHeader
+            config={configParaDocumento(config)}
+            logoData={logoData ?? null}
+          />
         )}
 
         {/* Título da peça */}
@@ -96,7 +103,7 @@ export function PeticaoIaDoc({
         })}
 
         {comTimbrado && config && (
-          <TimbradoFooter config={config} date={date} />
+          <TimbradoFooter config={configParaDocumento(config)} date={date} />
         )}
       </Page>
     </Document>

@@ -95,6 +95,25 @@ Retorne APENAS um JSON com a estrutura EXATA abaixo (nenhum texto fora do JSON, 
 
   const fullText = res.content[0]?.type === "text" ? res.content[0].text : "{}";
 
+  // Normaliza um item de "quesitos" pra string legível mesmo se a IA
+  // devolver um objeto em vez de string (ex: {texto: "..."}) — sem isso
+  // vira literalmente o texto "[object Object]" mostrado ao usuário.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function textoDoItem(item: any): string {
+    if (typeof item === "string") return item;
+    if (item && typeof item === "object") {
+      const candidato =
+        item.texto ?? item.text ?? item.quesito ?? item.pergunta ?? null;
+      if (typeof candidato === "string") return candidato;
+      try {
+        return JSON.stringify(item);
+      } catch {
+        return String(item);
+      }
+    }
+    return String(item);
+  }
+
   try {
     const match = fullText.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(match?.[0] ?? fullText) as {
@@ -104,7 +123,7 @@ Retorne APENAS um JSON com a estrutura EXATA abaixo (nenhum texto fora do JSON, 
     };
     return {
       quesitos: Array.isArray(parsed.quesitos)
-        ? parsed.quesitos.map(String)
+        ? parsed.quesitos.map(textoDoItem)
         : [],
       briefingAdvogado: String(parsed.briefing_advogado ?? ""),
       resumoCliente: String(parsed.resumo_cliente ?? ""),

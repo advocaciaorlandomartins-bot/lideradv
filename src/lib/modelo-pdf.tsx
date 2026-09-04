@@ -1,5 +1,5 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
-import type { EscritorioConfig } from "./escritorio-db";
+import { configParaDocumento, type EscritorioConfig } from "./escritorio-db";
 import { TimbradoHeader, TimbradoFooter } from "./pdf-timbrado";
 import { getPdfConfig, buildStyles } from "./pdf-config";
 import { renderBlocks } from "./modelo-pdf-blocks";
@@ -44,11 +44,14 @@ export function ModeloPdfDoc({
   return (
     <Document
       title={`${titulo} — ${clientName}`}
-      author={config?.nome ?? "Advocacia"}
+      author={identificacaoAtiva ? (config?.nome ?? "Advocacia") : "Advocacia"}
     >
       <Page size="A4" style={s.page}>
         {withLetterhead ? (
-          <TimbradoHeader config={config!} logoData={logoData ?? null} />
+          <TimbradoHeader
+            config={configParaDocumento(config!)}
+            logoData={logoData ?? null}
+          />
         ) : (
           <View fixed>
             <Text style={s.simpleHeader.firmName}>
@@ -72,7 +75,7 @@ export function ModeloPdfDoc({
             ))}
 
         {withLetterhead ? (
-          <TimbradoFooter config={config!} date={date} />
+          <TimbradoFooter config={configParaDocumento(config!)} date={date} />
         ) : (
           <Text style={s.simpleFooter} fixed>
             {nomeExibido}

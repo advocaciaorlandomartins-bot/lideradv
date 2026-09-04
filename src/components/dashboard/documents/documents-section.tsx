@@ -66,7 +66,6 @@ export default function DocumentsSection({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [openingId, setOpeningId] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloadingZip, setDownloadingZip] = useState(false);
@@ -89,24 +88,26 @@ export default function DocumentsSection({
     );
   }
 
-  async function handleAbrir(doc: Documento) {
+  function handleAbrir(doc: Documento) {
     setOpenError(null);
-    setOpeningId(doc.id);
-    try {
-      const res = await fetch(`/api/documentos/download?id=${doc.id}`);
-      if (!res.ok) {
-        const data: { error?: string } = await res.json().catch(() => ({}));
-        setOpenError(data.error ?? `Erro ao abrir "${doc.nome}".`);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      setOpenError(`Erro ao abrir "${doc.nome}": sem conexão com o servidor.`);
-    } finally {
-      setOpeningId(null);
+    // Precisa ser window.open síncrono, chamado direto no clique — sem
+    // await antes. No Safari iOS, window.open só é tratado como abertura
+    // legítima (fora do bloqueador de pop-up) se rodar no mesmo gesto do
+    // usuário; com fetch().then(blob).then(window.open) — como era antes —
+    // a espera de rede quebra essa janela e o Safari bloqueia a aba em
+    // silêncio (sem exceção, sem erro na tela: só não abre nada). Abrir a
+    // URL da API diretamente deixa o navegador seguir o redirect nativo
+    // pra URL assinada do Vercel Blob, com Content-Type/Content-Disposition
+    // corretos — sem passar arquivo nenhum por JS.
+    const aberta = window.open(
+      `/api/documentos/download?id=${doc.id}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+    if (!aberta) {
+      setOpenError(
+        `Não consegui abrir "${doc.nome}" — o navegador bloqueou a aba. Tente permitir pop-ups para este site.`
+      );
     }
   }
 
@@ -398,10 +399,9 @@ export default function DocumentsSection({
                 <div className="flex flex-shrink-0 items-center gap-3">
                   <button
                     onClick={() => handleAbrir(doc)}
-                    disabled={openingId === doc.id}
-                    className="font-body text-xs font-semibold text-primary transition-colors duration-150 hover:text-primary-dark disabled:opacity-50 cursor-pointer"
+                    className="font-body text-xs font-semibold text-primary transition-colors duration-150 hover:text-primary-dark cursor-pointer"
                   >
-                    {openingId === doc.id ? "Abrindo…" : "Abrir"}
+                    Abrir
                   </button>
                   <span className="text-slate-300">·</span>
                   <button

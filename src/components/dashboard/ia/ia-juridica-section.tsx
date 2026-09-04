@@ -14,6 +14,9 @@ const IaPeticaoModal = dynamic(() => import("./ia-peticao-modal"), {
 const IaAnalisarModal = dynamic(() => import("./ia-analisar-modal"), {
   ssr: false,
 });
+const IaQuesitosModal = dynamic(() => import("./ia-quesitos-modal"), {
+  ssr: false,
+});
 
 interface Props {
   clienteId?: string;
@@ -41,7 +44,7 @@ const LABEL_RISCO: Record<string, string> = {
   alto: "Risco Alto",
 };
 
-type Secao = "peticao" | "analisar" | "estrategia" | null;
+type Secao = "peticao" | "analisar" | "estrategia" | "quesitos" | null;
 
 // Passo 1: docs analisados / Passo 2: cadastro complementado / Passo 3: Cérebro rodou
 type WorkflowStep = 0 | 1 | 2 | 3;
@@ -132,14 +135,21 @@ export default function IaJuridicaSection({
           }
         />
       )}
+      {secao === "quesitos" && processoId && (
+        <IaQuesitosModal
+          clienteId={clienteId}
+          processoId={processoId}
+          onClose={() => setSecao(null)}
+        />
+      )}
 
       {/* ── Painel principal ── */}
       <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
         {/* Guia de fluxo recomendado */}
         <WorkflowGuide step={workflowStep} temCliente={!!clienteId} />
 
-        {/* Header com 3 botões em linha — ordem do fluxo */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 border-b border-border">
+        {/* Header com botões em linha — ordem do fluxo */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-b border-border">
           <ActionButton
             icon="🔍"
             label="Analisar Documento"
@@ -168,6 +178,17 @@ export default function IaJuridicaSection({
             color="primary"
             border
           />
+          {processoId && (
+            <ActionButton
+              icon="🩺"
+              label="Quesitos Médicos"
+              sublabel="Perícia do INSS"
+              active={secao === "quesitos"}
+              onClick={() => setSecao(secao === "quesitos" ? null : "quesitos")}
+              color="teal"
+              border
+            />
+          )}
         </div>
 
         {/* ── Diagnóstico Estratégico inline ── */}
@@ -459,18 +480,20 @@ function ActionButton({
   sublabel: string;
   active: boolean;
   onClick: () => void;
-  color: "primary" | "blue" | "violet";
+  color: "primary" | "blue" | "violet" | "teal";
   border?: boolean;
 }) {
   const activeClasses = {
     primary: "bg-primary text-white",
     blue: "bg-blue-600 text-white",
     violet: "bg-violet-600 text-white",
+    teal: "bg-teal-600 text-white",
   };
   const hoverClasses = {
     primary: "hover:bg-primary/5 hover:text-primary",
     blue: "hover:bg-blue-50 hover:text-blue-700",
     violet: "hover:bg-violet-50 hover:text-violet-700",
+    teal: "hover:bg-teal-50 hover:text-teal-700",
   };
 
   return (

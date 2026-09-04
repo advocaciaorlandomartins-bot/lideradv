@@ -26,6 +26,28 @@ export type TipoLembrete =
   | "conta_vence_hoje";
 
 // ── Helpers de data ───────────────────────────────────────────
+//
+// Estas funções rodam em serverless da Vercel, cujo runtime é sempre UTC —
+// setHours()/getHours() operam no fuso do processo, não em Brasília. Antes,
+// "8h" aqui virava 8h UTC = 5h da manhã no Brasil (o servidor "achava" que já
+// era 8h quando na verdade eram 5h). Convertemos explicitamente para/de UTC
+// usando o offset fixo -03:00 (Brasil não tem mais horário de verão desde
+// 2019, então isso é seguro o ano todo).
+const OFFSET_BRASILIA_HORAS = 3;
+
+// Combina ano/mês/dia (em UTC, como dataEvento é sempre construída) com um
+// horário de relógio de Brasília e devolve o instante absoluto (UTC) correto.
+function horaBrasiliaParaUTC(
+  ano: number,
+  mesIndex: number,
+  dia: number,
+  hora: number,
+  minuto = 0
+): Date {
+  return new Date(
+    Date.UTC(ano, mesIndex, dia, hora + OFFSET_BRASILIA_HORAS, minuto, 0)
+  );
+}
 
 function diasAntes(
   dataEvento: Date,
@@ -34,15 +56,24 @@ function diasAntes(
   minuto = 0
 ): Date {
   const d = new Date(dataEvento);
-  d.setDate(d.getDate() - dias);
-  d.setHours(hora, minuto, 0, 0);
-  return d;
+  d.setUTCDate(d.getUTCDate() - dias);
+  return horaBrasiliaParaUTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
+    hora,
+    minuto
+  );
 }
 
 function mesmoDia(dataEvento: Date, hora: number, minuto = 0): Date {
-  const d = new Date(dataEvento);
-  d.setHours(hora, minuto, 0, 0);
-  return d;
+  return horaBrasiliaParaUTC(
+    dataEvento.getUTCFullYear(),
+    dataEvento.getUTCMonth(),
+    dataEvento.getUTCDate(),
+    hora,
+    minuto
+  );
 }
 
 // Momento real do compromisso (data + horário marcado) menos N horas — usado
@@ -56,10 +87,14 @@ function horasAntesDoEvento(
 ): Date | null {
   if (!horaStr || !/^\d{1,2}:\d{2}$/.test(horaStr)) return null;
   const [h, m] = horaStr.split(":").map(Number);
-  const d = new Date(dataEvento);
-  d.setHours(h, m, 0, 0);
-  d.setHours(d.getHours() - horasAntes);
-  return d;
+  const momento = horaBrasiliaParaUTC(
+    dataEvento.getUTCFullYear(),
+    dataEvento.getUTCMonth(),
+    dataEvento.getUTCDate(),
+    h,
+    m
+  );
+  return new Date(momento.getTime() - horasAntes * 3_600_000);
 }
 
 // ── Formatadores ──────────────────────────────────────────────

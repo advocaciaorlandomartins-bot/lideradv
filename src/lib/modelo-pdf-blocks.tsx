@@ -30,12 +30,10 @@ function spanFontFamily(cfg: PdfPageConfig, span: TextSpan): string {
   return variants.regular;
 }
 
-function renderSpans(
-  spans: TextSpan[],
-  cfg: PdfPageConfig,
-  fontSize: number,
-  baseColor?: string
-) {
+// Documentos gerados são sempre preto e branco — cor/destaque de span ou
+// bloco vindos da IA (ou salvos em modelos antigos) são ignorados de
+// propósito, não é só falta de instrução no prompt.
+function renderSpans(spans: TextSpan[], cfg: PdfPageConfig, fontSize: number) {
   return spans.map((span, i) => (
     <Text
       key={i}
@@ -43,30 +41,12 @@ function renderSpans(
         fontFamily: spanFontFamily(cfg, span),
         fontSize,
         textDecoration: span.underline ? ("underline" as const) : undefined,
-        color: span.color ?? baseColor ?? "#1a1a1a",
-        ...(span.highlight ? { backgroundColor: span.highlight } : {}),
+        color: "#1a1a1a",
       }}
     >
       {span.text}
     </Text>
   ));
-}
-
-function expandHex(hex: string): string {
-  if (hex.length === 4) {
-    const [, r, g, b] = hex;
-    return `#${r}${r}${g}${g}${b}${b}`;
-  }
-  return hex;
-}
-
-/** Cor de fundo suave derivada da cor de destaque (usada nos callouts). */
-function tintFromHex(hex: string, alpha: number): string {
-  const h = expandHex(hex).slice(1);
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export function renderBlocks(
@@ -102,10 +82,9 @@ export function renderBlocks(
             style={{
               ...base,
               ...(block.align ? { textAlign: block.align } : {}),
-              ...(block.color ? { color: block.color } : {}),
             }}
           >
-            {renderSpans(block.spans, pdfCfg, base.fontSize, block.color)}
+            {renderSpans(block.spans, pdfCfg, base.fontSize)}
           </Text>
         );
       }
@@ -203,15 +182,14 @@ export function renderBlocks(
         );
 
       case "callout": {
-        const accent = block.color ?? "#1E3A8A";
         return (
           <View
             key={idx}
             style={{
               marginBottom: 14,
-              backgroundColor: tintFromHex(accent, 0.08),
+              backgroundColor: "#f8f8f8",
               borderLeftWidth: 3,
-              borderLeftColor: accent,
+              borderLeftColor: "#1a1a1a",
               padding: 10,
             }}
           >
@@ -221,7 +199,7 @@ export function renderBlocks(
                 style={{
                   fontFamily: pdfCfg.fontBold,
                   fontSize: pdfCfg.fontSize,
-                  color: accent,
+                  color: "#1a1a1a",
                   marginBottom: 4,
                 }}
               >

@@ -22,6 +22,10 @@ export interface EscritorioConfig {
   margem_direita: number;
   margem_inferior: number;
   margem_esquerda: number;
+  // Se falso, nome/OAB/CNPJ etc. cadastrados aqui não são aplicados nos
+  // documentos gerados — cai no fallback genérico ("Advocacia Orlando
+  // Martins"), mesmo com os campos preenchidos. Independente do timbrado.
+  identificacao_ativo: boolean;
   // Letterhead layout
   modelo_timbrado: string;
   modelo_timbrado_ativo: boolean;
@@ -36,6 +40,7 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
   const rows = await sql`
     SELECT id::text, nome, oab, cnpj, telefone, email, site,
            endereco, cidade, estado, cep, logo_url, logo_ativo,
+           identificacao_ativo,
            font_padrao, tamanho_padrao::float AS tamanho_padrao,
            line_height::float AS line_height,
            margem_topo::float AS margem_topo,
@@ -50,6 +55,7 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
   `;
   const DEFAULTS = {
     logo_ativo: true,
+    identificacao_ativo: true,
     font_padrao: "Times",
     tamanho_padrao: 12,
     line_height: 1.8,
@@ -96,6 +102,7 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
     cep: r.cep ?? null,
     logo_url: r.logo_url ?? null,
     logo_ativo: r.logo_ativo ?? DEFAULTS.logo_ativo,
+    identificacao_ativo: r.identificacao_ativo ?? DEFAULTS.identificacao_ativo,
     font_padrao: r.font_padrao ?? DEFAULTS.font_padrao,
     tamanho_padrao: r.tamanho_padrao ?? DEFAULTS.tamanho_padrao,
     line_height: r.line_height ?? DEFAULTS.line_height,

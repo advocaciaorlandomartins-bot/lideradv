@@ -46,8 +46,7 @@ function PageFooter({
   }
   return (
     <Text style={s.simpleFooter} fixed>
-      Documento gerado em {date} — {config?.nome ?? "Advocacia Orlando Martins"}{" "}
-      · Todos os direitos reservados
+      {lawyerName(config)} — {lawyerOab(config)} · {date}
     </Text>
   );
 }
@@ -93,9 +92,11 @@ function formatAddress(c: ClientFull) {
 }
 
 function lawyerName(config?: EscritorioConfig | null) {
+  if (config && !config.identificacao_ativo) return "ORLANDO MARTINS";
   return config?.nome?.toUpperCase() ?? "ORLANDO MARTINS";
 }
 function lawyerOab(config?: EscritorioConfig | null) {
+  if (config && !config.identificacao_ativo) return "OAB/SP";
   return config?.oab ?? "OAB/SP";
 }
 

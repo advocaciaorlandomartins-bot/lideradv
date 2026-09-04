@@ -27,6 +27,7 @@ export async function saveEscritorioConfigAction(
   const cep = ((formData.get("cep") as string) ?? "").trim() || null;
   const logoUrl = ((formData.get("logo_url") as string) ?? "").trim() || null;
   const logoAtivo = formData.get("logo_ativo") !== "false";
+  const identificacaoAtivo = formData.get("identificacao_ativo") !== "false";
 
   // Typography & layout
   const fontPadrao = (
@@ -69,6 +70,7 @@ export async function saveEscritorioConfigAction(
           telefone = ${telefone}, email = ${email}, site = ${site},
           endereco = ${endereco}, cidade = ${cidade}, estado = ${estado},
           cep = ${cep}, logo_url = ${logoUrl}, logo_ativo = ${logoAtivo},
+          identificacao_ativo = ${identificacaoAtivo},
           font_padrao = ${fontPadrao}, tamanho_padrao = ${tamanhoPadrao},
           line_height = ${lineHeight}, margem_topo = ${margemTopo},
           margem_direita = ${margemDireita}, margem_inferior = ${margemInferior},
@@ -84,13 +86,14 @@ export async function saveEscritorioConfigAction(
       await sql`
         INSERT INTO escritorio_config
           (nome, oab, cnpj, telefone, email, site, endereco, cidade, estado, cep,
-           logo_url, logo_ativo, font_padrao, tamanho_padrao, line_height,
+           logo_url, logo_ativo, identificacao_ativo, font_padrao, tamanho_padrao, line_height,
            margem_topo, margem_direita, margem_inferior, margem_esquerda,
            modelo_timbrado, modelo_timbrado_ativo,
            fundo_timbrado, fundo_timbrado_ativo, salario_minimo)
         VALUES
           (${nome}, ${oab}, ${cnpj}, ${telefone}, ${email}, ${site},
            ${endereco}, ${cidade}, ${estado}, ${cep}, ${logoUrl}, ${logoAtivo},
+           ${identificacaoAtivo},
            ${fontPadrao}, ${tamanhoPadrao}, ${lineHeight},
            ${margemTopo}, ${margemDireita}, ${margemInferior}, ${margemEsquerda},
            ${modeloTimbrado}, ${modeloTimbradoAtivo},

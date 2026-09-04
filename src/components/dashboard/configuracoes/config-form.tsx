@@ -344,6 +344,9 @@ export default function ConfigForm({ config }: Props) {
   );
 
   // Identification
+  const [identificacaoAtivo, setIdentificacaoAtivo] = useState(
+    config.identificacao_ativo ?? true
+  );
   const [nome, setNome] = useState(config.nome);
   const [oab, setOab] = useState(config.oab ?? "");
   const [cnpj, setCnpj] = useState(config.cnpj ?? "");
@@ -964,9 +967,28 @@ export default function ConfigForm({ config }: Props) {
 
       {/* ── Identificação ── */}
       <div className="rounded-xl border border-border bg-white p-5">
-        <h2 className="font-heading text-sm font-semibold text-fg mb-4">
-          Identificação do escritório
-        </h2>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-heading text-sm font-semibold text-fg mb-1">
+              Identificação do escritório
+            </h2>
+            <p className="font-body text-xs text-muted">
+              {identificacaoAtivo
+                ? "Nome, OAB, CNPJ etc. abaixo são aplicados nos documentos gerados (cabeçalho/rodapé sem papel timbrado)."
+                : "Desativado — os dados ficam salvos, mas os documentos gerados usam a identificação genérica padrão."}
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={identificacaoAtivo}
+            onChange={setIdentificacaoAtivo}
+            label="Ativar identificação do escritório"
+          />
+          <input
+            type="hidden"
+            name="identificacao_ativo"
+            value={identificacaoAtivo ? "true" : "false"}
+          />
+        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className={labelCls}>

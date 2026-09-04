@@ -47,6 +47,88 @@ function uid() {
   return Math.random().toString(36).slice(2);
 }
 
+/** Select com busca por nome — os <select> nativos de cliente/colaborador
+ * listavam todo mundo sem filtro, inutilizável com muitos cadastros. */
+function SearchSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  options: { id: string; nome: string }[];
+  placeholder: string;
+}) {
+  const [busca, setBusca] = useState("");
+  const [aberto, setAberto] = useState(false);
+  const selecionado = options.find((o) => o.id === value);
+  const filtrados = options
+    .filter((o) => o.nome.toLowerCase().includes(busca.trim().toLowerCase()))
+    .slice(0, 50);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={aberto ? busca : (selecionado?.nome ?? "")}
+        onChange={(e) => {
+          setBusca(e.target.value);
+          setAberto(true);
+        }}
+        onFocus={() => {
+          setBusca("");
+          setAberto(true);
+        }}
+        onBlur={() => setTimeout(() => setAberto(false), 150)}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
+      {aberto && (
+        <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+          {value && (
+            <button
+              type="button"
+              onMouseDown={() => {
+                onChange("");
+                setBusca("");
+                setAberto(false);
+              }}
+              className="block w-full px-3 py-2 text-left font-body text-xs text-muted hover:bg-slate-50"
+            >
+              Limpar seleção
+            </button>
+          )}
+          {filtrados.length === 0 ? (
+            <p className="px-3 py-2 font-body text-sm text-muted">
+              Nenhum resultado.
+            </p>
+          ) : (
+            filtrados.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onMouseDown={() => {
+                  onChange(o.id);
+                  setBusca("");
+                  setAberto(false);
+                }}
+                className={`block w-full px-3 py-2 text-left font-body text-sm hover:bg-slate-50 ${
+                  o.id === value
+                    ? "bg-primary/5 font-semibold text-primary"
+                    : "text-fg"
+                }`}
+              >
+                {o.nome}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const STEP_LABELS = [
   "Envelope",
   "Documentos",
@@ -268,18 +350,12 @@ export default function NovoEnvelope({
               <label className="block font-body text-sm font-medium text-fg mb-1">
                 Cliente <span className="text-red-500">*</span>
               </label>
-              <select
+              <SearchSelect
                 value={clienteId}
-                onChange={(e) => setClienteId(e.target.value)}
-                className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="">Selecione o cliente…</option>
-                {clientes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
+                onChange={setClienteId}
+                options={clientes}
+                placeholder="Digite pra buscar o cliente…"
+              />
               <p className="mt-1 font-body text-xs text-muted">
                 Usado para preencher as variáveis dos modelos ({"{{nome}}"},{" "}
                 {"{{cpf_cnpj}}"} etc.)
@@ -546,27 +622,27 @@ export default function NovoEnvelope({
 
             {/* Select for colaborador/cliente */}
             {(newTipo === "colaborador" || newTipo === "cliente") && (
-              <select
+              <SearchSelect
                 value={newRefId}
-                onChange={(e) => {
-                  setNewRefId(e.target.value);
-                  fillFromRef(newTipo, e.target.value);
+                onChange={(id) => {
+                  setNewRefId(id);
+                  fillFromRef(newTipo, id);
                 }}
-                className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="">
-                  {newTipo === "colaborador"
-                    ? "Selecione um colaborador…"
-                    : "Selecione um cliente…"}
-                </option>
-                {(newTipo === "colaborador" ? colaboradores : clientes).map(
-                  (x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.nome}
-                    </option>
-                  )
-                )}
-              </select>
+                options={newTipo === "colaborador" ? colaboradores : clientes}
+                placeholder={
+                  newTipo === "colaborador"
+                    ? "Digite pra buscar o colaborador…"
+                    : "Digite pra buscar o cliente…"
+                }
+              />
+            )}
+
+            {newTipo === "cliente" && newRefId && !newEmail.trim() && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 font-body text-xs text-amber-800">
+                Este cliente não tem e-mail cadastrado — digite um e-mail
+                manualmente no campo abaixo pra poder adicionar como assinante
+                (é por aí que o link de assinatura é enviado).
+              </p>
             )}
 
             {/* Nome e Email */}

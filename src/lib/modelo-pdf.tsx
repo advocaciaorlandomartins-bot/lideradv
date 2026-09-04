@@ -30,6 +30,11 @@ export function ModeloPdfDoc({
     (usarTimbrado ?? false) && !!config && config.modelo_timbrado_ativo;
   const pdfCfg = getPdfConfig(config, withLetterhead);
   const s = buildStyles(pdfCfg);
+  const identificacaoAtiva = !config || config.identificacao_ativo;
+  const nomeExibido = identificacaoAtiva
+    ? (config?.nome ?? "Advocacia Orlando Martins")
+    : "Advocacia Orlando Martins";
+  const oabExibida = identificacaoAtiva ? (config?.oab ?? null) : null;
 
   const paragraphs = conteudo
     .split(/\n{2,}/)
@@ -47,10 +52,10 @@ export function ModeloPdfDoc({
         ) : (
           <View fixed>
             <Text style={s.simpleHeader.firmName}>
-              {config?.nome?.toUpperCase() ?? "ADVOCACIA ORLANDO MARTINS"}
+              {nomeExibido.toUpperCase()}
             </Text>
-            {config?.oab && (
-              <Text style={s.simpleHeader.firmSub}>{config.oab}</Text>
+            {oabExibida && (
+              <Text style={s.simpleHeader.firmSub}>{oabExibida}</Text>
             )}
             <View style={s.simpleHeader.divider} />
           </View>
@@ -70,9 +75,8 @@ export function ModeloPdfDoc({
           <TimbradoFooter config={config!} date={date} />
         ) : (
           <Text style={s.simpleFooter} fixed>
-            Documento gerado em {date} —{" "}
-            {config?.nome ?? "Advocacia Orlando Martins"} · Todos os direitos
-            reservados
+            {nomeExibido}
+            {oabExibida ? ` — ${oabExibida}` : ""} · {date}
           </Text>
         )}
       </Page>

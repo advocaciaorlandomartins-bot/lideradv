@@ -23,11 +23,13 @@ const PROMPT = `Você é um assistente jurídico que transforma um documento de 
 Tarefas:
 1. Leia o documento de exemplo (texto, PDF ou imagem) fornecido.
 2. Identifique trechos que representam dados específicos de uma pessoa (nome, CPF/CNPJ, RG, endereço, e-mail, telefone, data de nascimento, profissão, estado civil, nacionalidade, dados do responsável legal etc.) e substitua CADA ocorrência pela variável exata correspondente da lista abaixo — NUNCA invente uma tag que não esteja na lista, e NUNCA deixe o dado real da pessoa do exemplo no texto.
-3. Reconstrua o restante do documento (cláusulas, títulos, avisos legais) como blocos estruturados, preservando o máximo possível da redação original.
-4. Cláusulas numeradas/tituladas ou destacadas visualmente no original (como caixas de pergunta-e-resposta, avisos, seções com borda) devem virar blocos do tipo "callout", com o título da cláusula em "title" e uma cor de destaque em "color" (hex, ex: "#1E3A8A").
+3. Reconstrua o restante do documento (cláusulas, títulos, avisos legais) como blocos estruturados, preservando **ao máximo a redação original, inclusive a estrutura** — não resuma, não parafraseie e não corte texto do exemplo.
+4. Cláusulas numeradas/tituladas ou destacadas visualmente no original (avisos, seções com borda) viram blocos "callout", com o título da cláusula em "title".
+   - **Caixas em formato PERGUNTA/RESPOSTA são o caso mais importante de preservar literalmente**: se o exemplo tem uma pergunta seguida da resposta (ex: "PERGUNTA: ...? RESPOSTA: ..."), o bloco "callout" tem que manter as DUAS partes dentro de "spans" — a pergunta em negrito seguida da resposta, exatamente como no original (pode usar "title" para o título da cláusula, tipo "A) BENEFÍCIO PARCIAL...", mas a pergunta em si NUNCA vira só o "title" no lugar do texto — ela tem que continuar aparecendo por extenso dentro do corpo, com a resposta logo depois). NUNCA rebaixe uma caixa pergunta/resposta pra um "paragraph" comum nem apague a pergunta.
 5. Títulos de seção viram blocos "heading" (level 1 para o título principal do documento, 2 para seções, 3 para subseções).
 6. Uma linha para assinatura (traço + "Nome/Outorgante" etc.) vira um bloco "signatureLine" com "label" apropriado.
 7. Sugira um "titulo" curto para o modelo e uma "categoria" dentre exatamente estas opções: ${CATEGORIAS.join(", ")}.
+8. **NUNCA use a propriedade "color" em bloco ou span nenhum** — o documento final é sempre preto e branco, sem cor de destaque em texto, título ou callout. Não inclua esse campo na resposta, mesmo que o exemplo original tenha cor.
 
 Variáveis disponíveis (use exatamente estas tags): ${TAGS_DISPONIVEIS}
 
@@ -39,12 +41,12 @@ Responda SOMENTE com um JSON no formato:
 }
 
 Onde cada item de "blocks" segue um destes formatos:
-{ "type": "paragraph", "align": "left|center|right|justify" (opcional), "spans": [ { "text": "...", "bold": true|false, "italic": true|false, "underline": true|false, "color": "#RRGGBB" (opcional) } ] }
-{ "type": "heading", "level": 1|2|3, "color": "#RRGGBB" (opcional), "spans": [ ...spans ] }
+{ "type": "paragraph", "align": "left|center|right|justify" (opcional), "spans": [ { "text": "...", "bold": true|false, "italic": true|false, "underline": true|false } ] }
+{ "type": "heading", "level": 1|2|3, "spans": [ ...spans ] }
 { "type": "list", "ordered": true|false, "items": [ [ ...spans ], [ ...spans ] ] }
 { "type": "divider" }
 { "type": "table", "rows": [ [ [ ...spans ], [ ...spans ] ] ] }
-{ "type": "callout", "title": "string" (opcional), "color": "#RRGGBB" (opcional), "spans": [ ...spans ] }
+{ "type": "callout", "title": "string" (opcional), "spans": [ ...spans ] }
 { "type": "signatureLine", "label": "string" }
 
 Não inclua nenhum texto fora do JSON.`;

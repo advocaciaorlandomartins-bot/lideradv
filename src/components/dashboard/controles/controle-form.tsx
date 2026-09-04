@@ -23,6 +23,131 @@ import type { CargaColaborador } from "@/lib/controladoria-db";
 import ChecklistManager from "@/components/dashboard/controladoria/checklist-manager";
 import TimesheetHistory from "@/components/dashboard/controladoria/timesheet-history";
 
+/**
+ * Seletor de responsável rico — um <select> nativo só cabe uma linha de
+ * texto por opção, então só dava pra mostrar "N abertas". Aqui cada opção
+ * mostra também o detalhamento por categoria (Audiências, Serviços etc.) e
+ * destaque de vencidas, igual ao que já existe na Controladoria — antes
+ * dava pra escolher um responsável sem fazer ideia se ele já está afogado
+ * em prazo vencido de uma categoria específica.
+ */
+function ResponsavelSelect({
+  usuarios,
+  carga,
+  defaultValue,
+}: {
+  usuarios: UsuarioOption[];
+  carga: CargaColaborador[];
+  defaultValue: string;
+}) {
+  const [valor, setValor] = useState(defaultValue);
+  const [busca, setBusca] = useState("");
+  const [aberto, setAberto] = useState(false);
+  const cargaPorColaborador = new Map(carga.map((c) => [c.colaboradorId, c]));
+  const selecionado = usuarios.find((u) => u.id === valor);
+
+  const filtrados = usuarios.filter((u) =>
+    u.nome.toLowerCase().includes(busca.trim().toLowerCase())
+  );
+
+  return (
+    <div className="relative">
+      <input type="hidden" name="responsavel_id" value={valor} />
+      <input
+        type="text"
+        value={
+          aberto
+            ? busca
+            : selecionado
+              ? `${selecionado.nome} (${selecionado.login})`
+              : ""
+        }
+        onChange={(e) => {
+          setBusca(e.target.value);
+          setAberto(true);
+        }}
+        onFocus={() => {
+          setBusca("");
+          setAberto(true);
+        }}
+        onBlur={() => setTimeout(() => setAberto(false), 150)}
+        placeholder="— Nenhum — (clique pra escolher)"
+        className={selectCls}
+      />
+      {aberto && (
+        <div className="absolute z-10 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+          <button
+            type="button"
+            onMouseDown={() => {
+              setValor("");
+              setBusca("");
+              setAberto(false);
+            }}
+            className="block w-full px-3 py-2 text-left font-body text-xs text-muted hover:bg-slate-50"
+          >
+            — Nenhum —
+          </button>
+          {filtrados.length === 0 ? (
+            <p className="px-3 py-2 font-body text-sm text-muted">
+              Nenhum resultado.
+            </p>
+          ) : (
+            filtrados.map((u) => {
+              const c = u.colaboradorId
+                ? cargaPorColaborador.get(u.colaboradorId)
+                : null;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  onMouseDown={() => {
+                    setValor(u.id);
+                    setBusca("");
+                    setAberto(false);
+                  }}
+                  className={`block w-full px-3 py-2 text-left transition-colors hover:bg-slate-50 ${
+                    u.id === valor ? "bg-primary/5" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`font-body text-sm ${u.id === valor ? "font-semibold text-primary" : "text-fg"}`}
+                    >
+                      {u.nome}
+                    </span>
+                    {c && (
+                      <span className="flex flex-shrink-0 items-center gap-1 font-body text-xs text-muted">
+                        {c.totalAbertas} aberta{c.totalAbertas === 1 ? "" : "s"}
+                        {c.totalVencidas > 0 && (
+                          <span className="font-bold text-red-600">
+                            ⚠{c.totalVencidas}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {c && c.porCategoria.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {c.porCategoria.map((cat) => (
+                        <span
+                          key={cat.categoria}
+                          className="rounded-full bg-slate-100 px-1.5 py-0.5 font-body text-[10px] font-medium text-muted"
+                        >
+                          {cat.label}: {cat.total}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function addDays(dateStr: string, days: number): string {
   if (!dateStr) return "";
   const d = new Date(dateStr + "T12:00:00");
@@ -67,16 +192,6 @@ export default function ControleForm({
   carga = [],
   prefill,
 }: Props) {
-  // Anota cada usuário com a carga atual do colaborador vinculado — dá
-  // contexto na hora de escolher o responsável (evita empilhar tarefa em
-  // quem já está com prazo vencido).
-  const cargaPorColaborador = new Map(carga.map((c) => [c.colaboradorId, c]));
-  function labelComCarga(u: UsuarioOption): string {
-    const c = u.colaboradorId ? cargaPorColaborador.get(u.colaboradorId) : null;
-    if (!c) return `${u.nome} (${u.login})`;
-    const vencidas = c.totalVencidas > 0 ? ` ⚠${c.totalVencidas}` : "";
-    return `${u.nome} — ${c.totalAbertas} aberta${c.totalAbertas === 1 ? "" : "s"}${vencidas}`;
-  }
   const isEdit = !!controle;
   const router = useRouter();
 
@@ -301,22 +416,15 @@ export default function ControleForm({
           {/* Responsável */}
           <div>
             <label className={labelCls}>Responsável</label>
-            <select
-              name="responsavel_id"
+            <ResponsavelSelect
+              usuarios={usuarios}
+              carga={carga}
               defaultValue={controle?.responsavel_id ?? ""}
-              className={selectCls}
-            >
-              <option value="">— Nenhum —</option>
-              {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {labelComCarga(u)}
-                </option>
-              ))}
-            </select>
+            />
             {carga.length > 0 && (
               <p className="mt-1 font-body text-xs text-muted">
-                Número de tarefas/controles abertos de cada um · ⚠ = tem item
-                vencido
+                Abertas por categoria e vencidas de cada um — clique pra
+                escolher ou buscar por nome.
               </p>
             )}
           </div>

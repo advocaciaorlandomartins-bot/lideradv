@@ -1446,12 +1446,11 @@ function ResponsavelSection({
   const router = useRouter();
 
   const cargaPorColaborador = new Map(carga.map((c) => [c.colaboradorId, c]));
-  function labelComCarga(c: ColaboradorSimples): string {
-    const cg = cargaPorColaborador.get(c.id);
-    if (!cg) return `${c.nome} (${c.cargo})`;
-    const vencidas = cg.totalVencidas > 0 ? ` ⚠${cg.totalVencidas}` : "";
-    return `${c.nome} — ${cg.totalAbertas} aberta${cg.totalAbertas === 1 ? "" : "s"}${vencidas}`;
-  }
+  const [seletorAberto, setSeletorAberto] = useState(false);
+  const [buscaResp, setBuscaResp] = useState("");
+  const colaboradoresFiltrados = colaboradores.filter((c) =>
+    c.nome.toLowerCase().includes(buscaResp.trim().toLowerCase())
+  );
 
   async function handleChange(v: string) {
     const anterior = value;
@@ -1480,17 +1479,31 @@ function ResponsavelSection({
           {atual?.nome ?? "— Sem responsável —"}
         </p>
         {cargaAtual && (
-          <p className="mt-1 font-body text-xs text-muted">
-            {cargaAtual.totalAbertas} aberta
-            {cargaAtual.totalAbertas === 1 ? "" : "s"} no momento
-            {cargaAtual.totalVencidas > 0 && (
-              <span className="font-semibold text-red-600">
-                {" "}
-                · ⚠ {cargaAtual.totalVencidas} vencida
-                {cargaAtual.totalVencidas === 1 ? "" : "s"}
-              </span>
+          <>
+            <p className="mt-1 font-body text-xs text-muted">
+              {cargaAtual.totalAbertas} aberta
+              {cargaAtual.totalAbertas === 1 ? "" : "s"} no momento
+              {cargaAtual.totalVencidas > 0 && (
+                <span className="font-semibold text-red-600">
+                  {" "}
+                  · ⚠ {cargaAtual.totalVencidas} vencida
+                  {cargaAtual.totalVencidas === 1 ? "" : "s"}
+                </span>
+              )}
+            </p>
+            {cargaAtual.porCategoria.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {cargaAtual.porCategoria.map((cat) => (
+                  <span
+                    key={cat.categoria}
+                    className="rounded-full bg-slate-100 px-1.5 py-0.5 font-body text-[10px] font-medium text-muted"
+                  >
+                    {cat.label}: {cat.total}
+                  </span>
+                ))}
+              </div>
             )}
-          </p>
+          </>
         )}
         <p className="mt-1 font-body text-xs text-muted">
           Somente o administrador pode alterar o responsável.
@@ -1505,28 +1518,108 @@ function ResponsavelSection({
         Responsável
       </h3>
       <div className="relative">
-        <select
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
+        <input
+          type="text"
+          value={
+            seletorAberto
+              ? buscaResp
+              : (colaboradores.find((c) => c.id === value)?.nome ?? "")
+          }
+          onChange={(e) => {
+            setBuscaResp(e.target.value);
+            setSeletorAberto(true);
+          }}
+          onFocus={() => {
+            setBuscaResp("");
+            setSeletorAberto(true);
+          }}
+          onBlur={() => setTimeout(() => setSeletorAberto(false), 150)}
           disabled={saving}
+          placeholder="— Sem responsável — (clique pra escolher)"
           className={selectCls}
-        >
-          <option value="">— Sem responsável —</option>
-          {colaboradores.map((c) => (
-            <option key={c.id} value={c.id}>
-              {labelComCarga(c)}
-            </option>
-          ))}
-        </select>
+        />
         {saving && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
             <SpinnerIcon className="h-4 w-4 text-muted" />
           </div>
         )}
+        {seletorAberto && (
+          <div className="absolute z-10 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+            <button
+              type="button"
+              onMouseDown={() => {
+                handleChange("");
+                setBuscaResp("");
+                setSeletorAberto(false);
+              }}
+              className="block w-full px-3 py-2 text-left font-body text-xs text-muted hover:bg-slate-50"
+            >
+              — Sem responsável —
+            </button>
+            {colaboradoresFiltrados.length === 0 ? (
+              <p className="px-3 py-2 font-body text-sm text-muted">
+                Nenhum resultado.
+              </p>
+            ) : (
+              colaboradoresFiltrados.map((c) => {
+                const cg = cargaPorColaborador.get(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onMouseDown={() => {
+                      handleChange(c.id);
+                      setBuscaResp("");
+                      setSeletorAberto(false);
+                    }}
+                    className={`block w-full px-3 py-2 text-left transition-colors hover:bg-slate-50 ${
+                      c.id === value ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`font-body text-sm ${c.id === value ? "font-semibold text-primary" : "text-fg"}`}
+                      >
+                        {c.nome}{" "}
+                        <span className="font-normal text-muted">
+                          ({c.cargo})
+                        </span>
+                      </span>
+                      {cg && (
+                        <span className="flex flex-shrink-0 items-center gap-1 font-body text-xs text-muted">
+                          {cg.totalAbertas} aberta
+                          {cg.totalAbertas === 1 ? "" : "s"}
+                          {cg.totalVencidas > 0 && (
+                            <span className="font-bold text-red-600">
+                              ⚠{cg.totalVencidas}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    {cg && cg.porCategoria.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {cg.porCategoria.map((cat) => (
+                          <span
+                            key={cat.categoria}
+                            className="rounded-full bg-slate-100 px-1.5 py-0.5 font-body text-[10px] font-medium text-muted"
+                          >
+                            {cat.label}: {cat.total}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
       {carga.length > 0 && (
         <p className="mt-1 font-body text-xs text-muted">
-          Número de tarefas/controles abertos de cada um · ⚠ = tem item vencido
+          Abertas por categoria e vencidas de cada um — clique pra escolher ou
+          buscar por nome.
         </p>
       )}
       {erro && (

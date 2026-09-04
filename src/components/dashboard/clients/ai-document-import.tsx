@@ -12,7 +12,7 @@ import {
   UserPlusIcon,
   UploadIcon,
 } from "@/components/icons";
-import { createClientAction } from "@/lib/client-actions";
+import { createClientActionComId } from "@/lib/client-actions";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +35,16 @@ const DOCUMENT_TYPES = [
   "Certidão de Nascimento",
   "Certidão de Casamento",
 ];
+
+const STATUS_BENEFICIO_OPTS = ["ativo", "suspenso", "cessado", "nao_recebe"];
+const CATEGORIA_CONTRIBUINTE_OPTS = [
+  "empregado",
+  "individual",
+  "especial",
+  "avulso",
+  "facultativo",
+];
+const TIPO_INCAPACIDADE_OPTS = ["permanente", "temporaria", "nao_se_aplica"];
 
 const ESTADOS_UF = [
   "AC",
@@ -69,6 +79,11 @@ const ESTADOS_UF = [
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type Step = "upload" | "extracting" | "review" | "creating" | "success";
+
+interface ArquivoAnexo {
+  file: File;
+  label: string;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -226,6 +241,7 @@ export default function AiDocumentImport({
   const [cep, setCep] = useState("");
   const [street, setStreet] = useState("");
   const [addrNumber, setAddrNumber] = useState("");
+  const [complement, setComplement] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [city, setCity] = useState("");
   const [stateUf, setStateUf] = useState("");
@@ -235,6 +251,32 @@ export default function AiDocumentImport({
   const [naturalidadeEstado, setNaturalidadeEstado] = useState("");
   const [notes, setNotes] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
+
+  // Dados previdenciários/médicos (opcional — vêm de comprovante de
+  // residência e/ou documento médico/INSS importados à parte)
+  const [nis, setNis] = useState("");
+  const [numBeneficio, setNumBeneficio] = useState("");
+  const [statusBeneficio, setStatusBeneficio] = useState("");
+  const [tipoBeneficio, setTipoBeneficio] = useState("");
+  const [dataInicioBeneficio, setDataInicioBeneficio] = useState("");
+  const [valorBeneficio, setValorBeneficio] = useState("");
+  const [categoriaContribuinte, setCategoriaContribuinte] = useState("");
+  const [cidPrincipal, setCidPrincipal] = useState("");
+  const [tipoIncapacidade, setTipoIncapacidade] = useState("");
+  const [dataDiagnostico, setDataDiagnostico] = useState("");
+  const [dataAfastamento, setDataAfastamento] = useState("");
+  const [atividadeAnterior, setAtividadeAnterior] = useState("");
+  const [numContribuicoes, setNumContribuicoes] = useState("");
+
+  // Arquivos usados na extração — anexados automaticamente ao cliente
+  // assim que ele é criado, pra não precisar subir tudo de novo manualmente
+  const [arquivosParaAnexar, setArquivosParaAnexar] = useState<ArquivoAnexo[]>(
+    []
+  );
+  const [comprovanteImporting, setComprovanteImporting] = useState(false);
+  const comprovanteFileRef = useRef<HTMLInputElement>(null);
+  const [medicoImporting, setMedicoImporting] = useState(false);
+  const medicoFileRef = useRef<HTMLInputElement>(null);
 
   // Responsável legal (menor/incapaz)
   const [respNome, setRespNome] = useState("");
@@ -302,10 +344,128 @@ export default function AiDocumentImport({
       const d = result.data;
       if (d.name) setRespNome(d.name);
       if (d.cpf) setRespCpf(maskCPF(d.cpf));
+      setArquivosParaAnexar((prev) => [
+        ...prev,
+        { file, label: "Documento do responsável legal" },
+      ]);
     } catch {
       setErrors(["Erro ao processar documento do responsável."]);
     } finally {
       setRespImporting(false);
+    }
+  }
+
+  async function handleComprovanteFileSelect(file: File) {
+    const errs = validateFile(file);
+    if (errs.length > 0) {
+      setErrors(errs);
+      return;
+    }
+    setComprovanteImporting(true);
+    setErrors([]);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/clientes/importacao-ia", {
+        method: "POST",
+        body: fd,
+      });
+      const result: { data?: AiExtractedData; error?: string } = await res
+        .json()
+        .catch(() => ({}));
+      if (!res.ok || result.error || !result.data) {
+        setErrors([
+          result.error ?? "Erro ao processar comprovante de residência.",
+        ]);
+        return;
+      }
+      // Só preenche o que ainda está vazio — não sobrescreve o que já veio
+      // do documento de identidade ou foi editado manualmente na revisão.
+      const d = result.data;
+      if (d.zipcode) {
+        const digits = d.zipcode.replace(/\D/g, "");
+        if (digits) setCep((prev) => prev || maskCEP(digits));
+      }
+      if (d.street) setStreet((prev) => prev || d.street!);
+      if (d.addr_number) setAddrNumber((prev) => prev || d.addr_number!);
+      if (d.complement) setComplement((prev) => prev || d.complement!);
+      if (d.neighborhood) setNeighborhood((prev) => prev || d.neighborhood!);
+      if (d.city) setCity((prev) => prev || d.city!);
+      if (d.state) setStateUf((prev) => prev || d.state!);
+      setArquivosParaAnexar((prev) => [
+        ...prev,
+        { file, label: "Comprovante de residência" },
+      ]);
+    } catch {
+      setErrors(["Erro ao processar comprovante de residência."]);
+    } finally {
+      setComprovanteImporting(false);
+    }
+  }
+
+  async function handleMedicoFileSelect(file: File) {
+    const errs = validateFile(file);
+    if (errs.length > 0) {
+      setErrors(errs);
+      return;
+    }
+    setMedicoImporting(true);
+    setErrors([]);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/clientes/importacao-ia", {
+        method: "POST",
+        body: fd,
+      });
+      const result: { data?: AiExtractedData; error?: string } = await res
+        .json()
+        .catch(() => ({}));
+      if (!res.ok || result.error || !result.data) {
+        setErrors([result.error ?? "Erro ao processar documento médico/INSS."]);
+        return;
+      }
+      const d = result.data;
+      if (d.nis) setNis((prev) => prev || d.nis!);
+      if (d.num_beneficio) setNumBeneficio((prev) => prev || d.num_beneficio!);
+      if (
+        d.status_beneficio &&
+        STATUS_BENEFICIO_OPTS.includes(d.status_beneficio)
+      )
+        setStatusBeneficio((prev) => prev || d.status_beneficio!);
+      if (d.tipo_beneficio)
+        setTipoBeneficio((prev) => prev || d.tipo_beneficio!);
+      if (d.data_inicio_beneficio)
+        setDataInicioBeneficio((prev) => prev || d.data_inicio_beneficio!);
+      if (d.valor_beneficio)
+        setValorBeneficio((prev) => prev || d.valor_beneficio!);
+      if (
+        d.categoria_contribuinte &&
+        CATEGORIA_CONTRIBUINTE_OPTS.includes(d.categoria_contribuinte)
+      )
+        setCategoriaContribuinte((prev) => prev || d.categoria_contribuinte!);
+      if (d.cid_principal) setCidPrincipal((prev) => prev || d.cid_principal!);
+      if (
+        d.tipo_incapacidade &&
+        TIPO_INCAPACIDADE_OPTS.includes(d.tipo_incapacidade)
+      )
+        setTipoIncapacidade((prev) => prev || d.tipo_incapacidade!);
+      if (d.data_diagnostico)
+        setDataDiagnostico((prev) => prev || d.data_diagnostico!);
+      if (d.data_afastamento)
+        setDataAfastamento((prev) => prev || d.data_afastamento!);
+      if (d.atividade_anterior)
+        setAtividadeAnterior((prev) => prev || d.atividade_anterior!);
+      if (d.num_contribuicoes)
+        setNumContribuicoes((prev) => prev || d.num_contribuicoes!);
+      setArquivosParaAnexar((prev) => [
+        ...prev,
+        { file, label: d.document_type || "Documento médico/INSS" },
+      ]);
+    } catch {
+      setErrors(["Erro ao processar documento médico/INSS."]);
+    } finally {
+      setMedicoImporting(false);
     }
   }
 
@@ -361,6 +521,7 @@ export default function AiDocumentImport({
     setCep(cepDigits ? maskCEP(cepDigits) : "");
     setStreet(data.street ?? "");
     setAddrNumber(data.addr_number ?? "");
+    setComplement(data.complement ?? "");
     setNeighborhood(data.neighborhood ?? "");
     setCity(data.city ?? "");
     setStateUf(data.state ?? "");
@@ -368,6 +529,34 @@ export default function AiDocumentImport({
     setFiliacaoPai(data.father_name ?? "");
     setNaturalidadeCidade(data.naturalidade_city ?? "");
     setNaturalidadeEstado(data.naturalidade_state ?? "");
+    setNis(data.nis ?? "");
+    setNumBeneficio(data.num_beneficio ?? "");
+    setStatusBeneficio(
+      data.status_beneficio &&
+        STATUS_BENEFICIO_OPTS.includes(data.status_beneficio)
+        ? data.status_beneficio
+        : ""
+    );
+    setTipoBeneficio(data.tipo_beneficio ?? "");
+    setDataInicioBeneficio(data.data_inicio_beneficio ?? "");
+    setValorBeneficio(data.valor_beneficio ?? "");
+    setCategoriaContribuinte(
+      data.categoria_contribuinte &&
+        CATEGORIA_CONTRIBUINTE_OPTS.includes(data.categoria_contribuinte)
+        ? data.categoria_contribuinte
+        : ""
+    );
+    setCidPrincipal(data.cid_principal ?? "");
+    setTipoIncapacidade(
+      data.tipo_incapacidade &&
+        TIPO_INCAPACIDADE_OPTS.includes(data.tipo_incapacidade)
+        ? data.tipo_incapacidade
+        : ""
+    );
+    setDataDiagnostico(data.data_diagnostico ?? "");
+    setDataAfastamento(data.data_afastamento ?? "");
+    setAtividadeAnterior(data.atividade_anterior ?? "");
+    setNumContribuicoes(data.num_contribuicoes ?? "");
     const extras = [
       data.document_type && `Doc: ${data.document_type}`,
       data.cnh_numero &&
@@ -433,8 +622,16 @@ export default function AiDocumentImport({
         return;
       }
 
-      setExtracted(result.data);
-      populateForm(result.data);
+      const data = result.data;
+      setExtracted(data);
+      populateForm(data);
+      setArquivosParaAnexar((prev) => [
+        ...prev,
+        {
+          file: selectedFile,
+          label: data.document_type || "Documento de identificação",
+        },
+      ]);
       setStep("review");
     } catch (err) {
       clearInterval(timer);
@@ -472,6 +669,7 @@ export default function AiDocumentImport({
     fd.set("cep", cep || "00000-000");
     fd.set("street", street || "A preencher");
     fd.set("number", addrNumber || "S/N");
+    fd.set("complement", complement.trim());
     fd.set("neighborhood", neighborhood || "A preencher");
     fd.set("city", city || "A preencher");
     fd.set("state", stateUf || "AL");
@@ -490,23 +688,54 @@ export default function AiDocumentImport({
     fd.set("indicador_tipo_trabalho", "");
     fd.set("comissao_tipo", "");
     fd.set("comissao_valor", "");
+    fd.set("nis", nis.trim());
+    fd.set("num_beneficio", numBeneficio.trim());
+    fd.set("status_beneficio", statusBeneficio);
+    fd.set("tipo_beneficio", tipoBeneficio.trim());
+    fd.set("data_inicio_beneficio", dataInicioBeneficio);
+    fd.set("valor_beneficio", valorBeneficio.trim());
+    fd.set("categoria_contribuinte", categoriaContribuinte);
+    fd.set("cid_principal", cidPrincipal.trim());
+    fd.set("tipo_incapacidade", tipoIncapacidade);
+    fd.set("data_diagnostico", dataDiagnostico);
+    fd.set("data_afastamento", dataAfastamento);
+    fd.set("atividade_anterior", atividadeAnterior.trim());
+    fd.set("num_contribuicoes", numContribuicoes.trim());
 
     startTransition(async () => {
-      const result = await createClientAction(null, fd);
-      if (result?.error) {
+      const result = await createClientActionComId(fd);
+      if ("error" in result) {
         setErrors([result.error]);
         setStep("review");
-      } else {
-        setStep("success");
-        setTimeout(() => {
-          if (onSuccess) {
-            onSuccess();
-          } else {
-            router.push("/dashboard/clientes");
-          }
-          router.refresh();
-        }, 1500);
+        return;
       }
+
+      // Anexa os documentos usados na extração ao cadastro recém-criado —
+      // um upload falho aqui não deve impedir o cliente de ter sido criado.
+      for (const { file, label } of arquivosParaAnexar) {
+        try {
+          const docFd = new FormData();
+          docFd.set("file", file);
+          docFd.set("entityType", "cliente");
+          docFd.set("entityId", result.id);
+          await fetch("/api/documentos/upload", {
+            method: "POST",
+            body: docFd,
+          });
+        } catch (e) {
+          console.error(`Falha ao anexar "${label}":`, e);
+        }
+      }
+
+      setStep("success");
+      setTimeout(() => {
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          router.push(`/dashboard/clientes/${result.id}`);
+        }
+        router.refresh();
+      }, 1500);
     });
   }
 
@@ -527,6 +756,7 @@ export default function AiDocumentImport({
     setCep("");
     setStreet("");
     setAddrNumber("");
+    setComplement("");
     setNeighborhood("");
     setCity("");
     setStateUf("");
@@ -538,6 +768,20 @@ export default function AiDocumentImport({
     setRespNome("");
     setRespCpf("");
     setRespTelefone("");
+    setNis("");
+    setNumBeneficio("");
+    setStatusBeneficio("");
+    setTipoBeneficio("");
+    setDataInicioBeneficio("");
+    setValorBeneficio("");
+    setCategoriaContribuinte("");
+    setCidPrincipal("");
+    setTipoIncapacidade("");
+    setDataDiagnostico("");
+    setDataAfastamento("");
+    setAtividadeAnterior("");
+    setNumContribuicoes("");
+    setArquivosParaAnexar([]);
     lastFetchedCep.current = "";
   }
 
@@ -671,6 +915,12 @@ export default function AiDocumentImport({
                 </span>
               ))}
             </div>
+            <p className="mt-3 font-body text-xs text-muted">
+              Depois de extrair os dados de identificação, você também pode
+              importar um comprovante de residência e uma carta do INSS, extrato
+              do CNIS ou laudo médico na tela de revisão — cada documento
+              importado é anexado automaticamente ao cadastro do cliente.
+            </p>
           </div>
 
           <div className="flex justify-end">
@@ -924,6 +1174,16 @@ export default function AiDocumentImport({
                 </Field>
               </div>
               <div className="sm:col-span-4">
+                <Field label="Complemento">
+                  <input
+                    value={complement}
+                    onChange={(e) => setComplement(e.target.value)}
+                    className={inputCls}
+                    placeholder="Apto, bloco, casa dos fundos…"
+                  />
+                </Field>
+              </div>
+              <div className="sm:col-span-4">
                 <Field label="Bairro">
                   <input
                     value={neighborhood}
@@ -957,6 +1217,196 @@ export default function AiDocumentImport({
                       </option>
                     ))}
                   </select>
+                </Field>
+              </div>
+            </div>
+            <input
+              ref={comprovanteFileRef}
+              type="file"
+              accept={ACCEPTED_TYPES.join(",")}
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleComprovanteFileSelect(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => comprovanteFileRef.current?.click()}
+              disabled={comprovanteImporting}
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-2.5 font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+            >
+              {comprovanteImporting ? (
+                <SpinnerIcon className="h-4 w-4 animate-spin" />
+              ) : (
+                <DocumentArrowUpIcon className="h-4 w-4" />
+              )}
+              {comprovanteImporting
+                ? "Importando comprovante…"
+                : "Importar comprovante de residência (preenche o endereço)"}
+            </button>
+          </div>
+
+          {/* Dados Previdenciários / Médicos */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="h-px flex-1 bg-border" />
+              <span className="font-body text-xs font-bold uppercase tracking-wide text-muted">
+                Dados Previdenciários / Médicos (opcional)
+              </span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <input
+              ref={medicoFileRef}
+              type="file"
+              accept={ACCEPTED_TYPES.join(",")}
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleMedicoFileSelect(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => medicoFileRef.current?.click()}
+              disabled={medicoImporting}
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-4 py-2.5 font-body text-sm text-muted transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+            >
+              {medicoImporting ? (
+                <SpinnerIcon className="h-4 w-4 animate-spin" />
+              ) : (
+                <DocumentArrowUpIcon className="h-4 w-4" />
+              )}
+              {medicoImporting
+                ? "Importando documento…"
+                : "Importar carta do INSS, extrato CNIS ou laudo médico"}
+            </button>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="NIS / PIS / PASEP">
+                <input
+                  value={nis}
+                  onChange={(e) => setNis(e.target.value)}
+                  className={inputCls}
+                  placeholder="000.00000.00-0"
+                  inputMode="numeric"
+                />
+              </Field>
+              <Field label="Número do Benefício INSS">
+                <input
+                  value={numBeneficio}
+                  onChange={(e) => setNumBeneficio(e.target.value)}
+                  className={inputCls}
+                  placeholder="Ex: 123456789-0"
+                  inputMode="numeric"
+                />
+              </Field>
+              <Field label="Status do Benefício">
+                <select
+                  value={statusBeneficio}
+                  onChange={(e) => setStatusBeneficio(e.target.value)}
+                  className={selectCls}
+                >
+                  <option value="">— Selecione —</option>
+                  <option value="ativo">Ativo</option>
+                  <option value="suspenso">Suspenso</option>
+                  <option value="cessado">Cessado</option>
+                  <option value="nao_recebe">Não recebe benefício</option>
+                </select>
+              </Field>
+              <Field label="Tipo de Benefício">
+                <input
+                  value={tipoBeneficio}
+                  onChange={(e) => setTipoBeneficio(e.target.value)}
+                  className={inputCls}
+                  placeholder="Ex: Auxílio-doença, BPC/LOAS…"
+                />
+              </Field>
+              <Field label="Data de início do benefício">
+                <input
+                  type="date"
+                  value={dataInicioBeneficio}
+                  onChange={(e) => setDataInicioBeneficio(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Valor do benefício (R$)">
+                <input
+                  value={valorBeneficio}
+                  onChange={(e) => setValorBeneficio(e.target.value)}
+                  className={inputCls}
+                  placeholder="0,00"
+                  inputMode="decimal"
+                />
+              </Field>
+              <Field label="Categoria contribuinte">
+                <select
+                  value={categoriaContribuinte}
+                  onChange={(e) => setCategoriaContribuinte(e.target.value)}
+                  className={selectCls}
+                >
+                  <option value="">— Selecione —</option>
+                  <option value="empregado">Empregado</option>
+                  <option value="individual">Contribuinte individual</option>
+                  <option value="especial">Segurado especial</option>
+                  <option value="avulso">Trabalhador avulso</option>
+                  <option value="facultativo">Contribuinte facultativo</option>
+                </select>
+              </Field>
+              <Field label="Qtd. de contribuições (meses)">
+                <input
+                  value={numContribuicoes}
+                  onChange={(e) => setNumContribuicoes(e.target.value)}
+                  className={inputCls}
+                  placeholder="Ex.: 180"
+                  inputMode="numeric"
+                />
+              </Field>
+              <Field label="CID principal">
+                <input
+                  value={cidPrincipal}
+                  onChange={(e) => setCidPrincipal(e.target.value)}
+                  className={inputCls}
+                  placeholder="Ex.: M54.5"
+                />
+              </Field>
+              <Field label="Tipo de incapacidade">
+                <select
+                  value={tipoIncapacidade}
+                  onChange={(e) => setTipoIncapacidade(e.target.value)}
+                  className={selectCls}
+                >
+                  <option value="">— Selecione —</option>
+                  <option value="permanente">Permanente</option>
+                  <option value="temporaria">Temporária</option>
+                  <option value="nao_se_aplica">Não se aplica</option>
+                </select>
+              </Field>
+              <Field label="Data do diagnóstico">
+                <input
+                  type="date"
+                  value={dataDiagnostico}
+                  onChange={(e) => setDataDiagnostico(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Data de afastamento do trabalho">
+                <input
+                  type="date"
+                  value={dataAfastamento}
+                  onChange={(e) => setDataAfastamento(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Atividade laboral anterior">
+                  <input
+                    value={atividadeAnterior}
+                    onChange={(e) => setAtividadeAnterior(e.target.value)}
+                    className={inputCls}
+                    placeholder="Ex.: Agricultora, Pedreiro, Costureira…"
+                  />
                 </Field>
               </div>
             </div>
@@ -1045,6 +1495,24 @@ export default function AiDocumentImport({
               />
             </Field>
           </div>
+
+          {arquivosParaAnexar.length > 0 && (
+            <div className="rounded-lg border border-border bg-slate-50 p-3">
+              <p className="mb-1.5 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                Documentos que serão anexados ao cliente
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {arquivosParaAnexar.map((a, i) => (
+                  <span
+                    key={i}
+                    className="rounded-full border border-border bg-white px-2.5 py-1 font-body text-xs text-fg"
+                  >
+                    {a.label} · {a.file.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center justify-between gap-3 border-t border-border pt-4">

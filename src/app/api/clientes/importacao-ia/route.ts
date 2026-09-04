@@ -11,7 +11,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const EXTRACTION_PROMPT = `Extraia todos os dados deste documento de identificação brasileiro e retorne SOMENTE o JSON abaixo. Campos ausentes ou ilegíveis devem ter valor null.
+const EXTRACTION_PROMPT = `Extraia todos os dados deste documento brasileiro e retorne SOMENTE o JSON abaixo. Pode ser um documento de identificação, um comprovante de residência (conta de água/luz/telefone, contrato de aluguel) ou um documento médico/previdenciário (carta de concessão/indeferimento do INSS, extrato do CNIS, laudo médico, atestado). Preencha só os campos que existirem nesse tipo de documento — campos ausentes, ilegíveis ou que não se aplicam ao documento devem ter valor null.
 
 {
   "name": "Nome completo",
@@ -31,10 +31,24 @@ const EXTRACTION_PROMPT = `Extraia todos os dados deste documento de identifica�
   "zipcode": "00000-000",
   "street": "Logradouro",
   "addr_number": "000",
+  "complement": "Complemento (apto, bloco, casa dos fundos etc)",
   "neighborhood": "Bairro",
   "city": "Cidade",
   "state": "UF",
-  "document_type": "RG|CNH|CPF|Passaporte|Titulo de Eleitor|Certidao de Nascimento|Certidao de Casamento"
+  "nis": "NIS/PIS/PASEP, só dígitos",
+  "num_beneficio": "Número do benefício (NB) do INSS",
+  "status_beneficio": "ativo|suspenso|cessado|nao_recebe|null — status atual do benefício, se identificável",
+  "tipo_beneficio": "descrição do benefício, ex: Auxílio-doença, Aposentadoria por invalidez, BPC/LOAS, Pensão por morte",
+  "data_inicio_beneficio": "YYYY-MM-DD (DIB — data de início do benefício)",
+  "valor_beneficio": "valor numérico sem formatação, ex: 1518.00",
+  "categoria_contribuinte": "empregado|individual|especial|avulso|facultativo|null",
+  "cid_principal": "Código CID-10 do diagnóstico principal, ex: M54.5",
+  "tipo_incapacidade": "permanente|temporaria|nao_se_aplica|null",
+  "data_diagnostico": "YYYY-MM-DD",
+  "data_afastamento": "YYYY-MM-DD — data de afastamento do trabalho, se constar",
+  "atividade_anterior": "última atividade/profissão exercida antes do afastamento, se constar",
+  "num_contribuicoes": "número inteiro de contribuições/carência, se constar",
+  "document_type": "RG|CNH|CPF|Passaporte|Titulo de Eleitor|Certidao de Nascimento|Certidao de Casamento|Comprovante de Residencia|Carta de Concessao INSS|Carta de Indeferimento INSS|Extrato CNIS|Laudo Medico|Outro"
 }`;
 
 export interface AiExtractedData {
@@ -55,9 +69,23 @@ export interface AiExtractedData {
   zipcode: string | null;
   street: string | null;
   addr_number: string | null;
+  complement: string | null;
   neighborhood: string | null;
   city: string | null;
   state: string | null;
+  nis: string | null;
+  num_beneficio: string | null;
+  status_beneficio: string | null;
+  tipo_beneficio: string | null;
+  data_inicio_beneficio: string | null;
+  valor_beneficio: string | null;
+  categoria_contribuinte: string | null;
+  cid_principal: string | null;
+  tipo_incapacidade: string | null;
+  data_diagnostico: string | null;
+  data_afastamento: string | null;
+  atividade_anterior: string | null;
+  num_contribuicoes: string | null;
   document_type: string | null;
 }
 

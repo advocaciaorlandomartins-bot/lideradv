@@ -3,18 +3,21 @@
 import { redirect } from "next/navigation";
 import sql from "./db";
 import { logAction } from "./audit";
-import { getSession } from "./session";
+import { getSession, type SessionUser } from "./session";
 import { hasPermission } from "./permissoes";
 import { notificarPrevBot } from "./prevbot-outbound";
 
 export type ClientFormState = { error: string } | null;
 
-export async function createClientAction(
-  _prev: ClientFormState,
+// Núcleo compartilhado entre a criação "clássica" (form action, redireciona
+// pro próprio Next) e a criação usada por fluxos que precisam do id do
+// cliente recém-criado na hora (importação por IA, cadastro rápido) —
+// evita duplicar ~250 linhas de parsing/validação/insert em dois lugares.
+async function criarClienteCore(
+  session: SessionUser,
   formData: FormData
-): Promise<ClientFormState> {
-  const session = await getSession();
-  if (!session || !hasPermission(session, "clientes", "criar"))
+): Promise<{ id: string } | { error: string }> {
+  if (!hasPermission(session, "clientes", "criar"))
     return { error: "Sem permissão." };
   const podeDefinirIndicador =
     session.categoria === "Administrador(a)" ||
@@ -178,8 +181,9 @@ export async function createClientAction(
     }
   }
 
+  let novoId: string;
   try {
-    await sql`
+    const rows = await sql`
       INSERT INTO clients
         (type, name, doc, trade_name, birth_date, email, phone,
          rg, rg_orgao, estado_civil, genero, profissao, nacionalidade,
@@ -216,13 +220,15 @@ export async function createClientAction(
          ${naturalidadeCidade}, ${naturalidadeEstado},
          ${filiacaoMae}, ${filiacaoPai},
          ${dataAfastamento}::date, ${atividadeAnterior}, ${numContribuicoes})
+      RETURNING id::text
     `;
+    novoId = rows[0].id as string;
   } catch (err: unknown) {
     // If new origin columns don't exist yet, fall back to insert without them
     const code = (err as { code?: string }).code;
     if (code === "42703") {
       try {
-        await sql`
+        const rows = await sql`
           INSERT INTO clients
             (type, name, doc, trade_name, birth_date, email, phone,
              rg, rg_orgao, estado_civil, genero, profissao, nacionalidade,
@@ -243,7 +249,9 @@ export async function createClientAction(
              ${responsavelParentesco},
              ${cep}, ${street}, ${addrNumber},
              ${complement}, ${neighborhood}, ${city}, ${state}, ${notes})
+          RETURNING id::text
         `;
+        novoId = rows[0].id as string;
       } catch (fallbackErr) {
         console.error("createClientAction fallback DB error:", fallbackErr);
         return { error: "Erro ao salvar cliente. Tente novamente." };
@@ -261,7 +269,34 @@ export async function createClientAction(
     detalhes: { type, doc },
   });
 
+  return { id: novoId };
+}
+
+export async function createClientAction(
+  _prev: ClientFormState,
+  formData: FormData
+): Promise<ClientFormState> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+  const result = await criarClienteCore(session, formData);
+  if ("error" in result) return result;
   redirect("/dashboard/clientes");
+}
+
+/**
+ * Mesma criação, mas devolve o id do cliente em vez de redirecionar —
+ * usada por fluxos que continuam trabalhando com o cliente logo em
+ * seguida (ex: anexar os documentos importados por IA), já que
+ * redirect() dentro de uma Server Action chamada diretamente (fora de um
+ * <form action>) interrompe a execução e nunca deixa o código de sucesso
+ * do chamador rodar.
+ */
+export async function createClientActionComId(
+  formData: FormData
+): Promise<{ id: string } | { error: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+  return criarClienteCore(session, formData);
 }
 
 export async function updateClientAction(

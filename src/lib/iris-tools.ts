@@ -6,6 +6,28 @@ import { hasPermission } from "./permissoes";
 import { getColaboradorIdForUser } from "./usuarios-db";
 import type { SessionUser } from "./session";
 
+// Rótulo amigável exibido na tela como "trace" de consultas (ex: "Consultou o
+// financeiro") enquanto a Íris usa ferramentas antes de responder.
+export const IRIS_TOOL_LABELS: Record<string, string> = {
+  verificar_saude: "Verificou a saúde do sistema",
+  obter_estatisticas: "Consultou as estatísticas gerais",
+  sincronizar_publicacoes: "Sincronizou as publicações",
+  reenviar_mensagens_falhadas: "Reenviou as mensagens pendentes",
+  reenviar_lembretes: "Reenviou os lembretes",
+  cancelar_lembretes_atrasados: "Cancelou os lembretes atrasados",
+  listar_oabs: "Consultou as OABs monitoradas",
+  adicionar_oab: "Adicionou uma OAB",
+  remover_oab: "Removeu uma OAB",
+  atualizar_escritorio: "Atualizou dados do escritório",
+  testar_whatsapp: "Testou o envio de WhatsApp",
+  ver_erros: "Verificou os erros do sistema",
+  consultar_financeiro: "Consultou o financeiro",
+  listar_processos_risco: "Consultou processos por risco",
+  consultar_analise_cerebro: "Consultou o Cérebro Jurídico",
+  listar_etiquetas: "Consultou as etiquetas cadastradas",
+  adicionar_etiqueta: "Aplicou uma etiqueta",
+};
+
 export const IRIS_TOOLS: Anthropic.Tool[] = [
   {
     name: "verificar_saude",

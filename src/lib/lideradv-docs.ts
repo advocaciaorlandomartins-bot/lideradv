@@ -26,6 +26,7 @@ MÓDULOS DO SISTEMA
 ## CLIENTES (menu: Jurídico → Clientes)
 - Lista de todos os clientes com filtros e busca
 - Botão "Novo Cliente" → abre formulário com 5 etapas (para PF) / 3 etapas (para PJ)
+- Botão "Importar por documento (IA)" — tanto no topo da página de Novo Cliente quanto no menu da listagem: envia foto/PDF de RG, CNH ou CPF, a IA extrai nome, CPF, RG, órgão expedidor, data de nascimento, gênero, naturalidade, filiação (mãe/pai) e endereço (se tiver no documento) — usuário revisa/edita cada campo antes de confirmar e criar o cliente. Não substitui o cadastro completo (não preenche dados previdenciários/INSS nem parceria/comissão), é um atalho pros dados básicos de identificação
 
 ### Cadastrar cliente — etapas:
 1. Dados principais: tipo PF/PJ, nome, CPF/CNPJ, telefone, e-mail (CNPJ preenche dados automaticamente)
@@ -71,7 +72,7 @@ Abas:
 - Logo abaixo do stepper, uma faixa "Próxima ação" resume em uma frase o que falta fazer no caso (ex: "Dar entrada no requerimento administrativo (INSS)", "INSS indeferiu — ingressar com ação judicial", "Aguardando resultado do INSS") — calculada automaticamente a partir do estágio e dos resultados administrativo/judicial, sem precisar de tarefa manual; fica vermelha quando é urgente
 - Abas: "Dados" · "Relato" · "Linha do tempo"
 - Linha do tempo: adicionar histórico, criar evento de controle, criar tarefa, criar pendência — com botões de baixa, reabertura, exclusão
-- Seletor de Responsável mostra quantas tarefas/controles cada colaborador já tem em aberto (e ⚠ se tiver algo vencido) — ajuda a não sobrecarregar ninguém
+- Seletor de Responsável (aqui e no formulário de Controles) tem busca por nome e mostra, por colaborador, quantas tarefas/controles tem em aberto, quantas vencidas (⚠) e o detalhamento por categoria (Audiências: N, Serviços: N etc.) — ajuda a não sobrecarregar ninguém nem empilhar trabalho em quem já está afogado numa categoria específica
 - Ao criar uma tarefa do processo: além do responsável principal, dá pra marcar "Colaboradores adicionais" (múltiplos responsáveis) — eles também passam a ver a tarefa em Minhas Tarefas. Depois de criada, dá pra adicionar/remover colaboradores adicionais direto na lista de Tarefas do processo (botão "+ colaborador"). Também dá pra definir um checklist obrigatório (um item por linha) que precisa estar todo marcado antes de dar baixa na tarefa
 - Botões de avanço: "Mover para Produção", "Registrar resultado Administrativo", "Registrar resultado Judicial", "Arquivar", "Reabrir", "Voltar etapa"
 - "Arquivar" abre um formulário pedindo o resultado final (Deferido, Indeferido, Sentença favorável, Desistência, etc.) e observação — existe só essa via de arquivamento no processo, para o estágio da Linha de Produção e o status do processo nunca ficarem dessincronizados
@@ -92,7 +93,7 @@ Abas:
 - Também tem um scheduler diário que revisita casos parados
 - O que ele produz: risco do caso, probabilidade de êxito, tese principal, se o andamento é urgente (nesse caso já cria uma tarefa "Alta" prioridade sozinho)
 - Aprende com o resultado: quando um processo é arquivado/encerrado com resultado (administrativo ou judicial), o Cérebro registra esse desfecho pra refinar as próximas análises daquela área
-- Painel "IA Jurídica" no processo tem 3 passos manuais complementares (esses sim acionados pelo usuário): "Analisar Documento" (Passo 1, lê PDF/imagem), "Diagnóstico Estratégico" (Passo 2, probabilidade de êxito + pontos fortes/frágeis + jurisprudência), "Gerar Petição" (Passo 3, IA "Dr. Lex" redige a peça com prompt em linguagem natural + todos os dados reais do processo/cliente — depois dá pra "Revisar com IA", aplicar correções, ou pedir modificação livre tipo "inclua esse novo laudo"; salva num banco de petições reutilizável, exporta PDF)
+- Painel "IA Jurídica" no processo tem 4 passos manuais complementares (esses sim acionados pelo usuário): "Analisar Documento" (Passo 1, lê PDF/imagem), "Diagnóstico Estratégico" (Passo 2, probabilidade de êxito + pontos fortes/frágeis + jurisprudência), "Gerar Petição" (Passo 3, IA "Dr. Lex" redige a peça com prompt em linguagem natural + todos os dados reais do processo/cliente — depois dá pra "Revisar com IA", aplicar correções, ou pedir modificação livre tipo "inclua esse novo laudo"; salva num banco de petições reutilizável, exporta PDF), e "Quesitos Médicos" (botão 🩺, exige que o processo já esteja cadastrado — o usuário seleciona a petição inicial + laudo do INSS + exames já anexados ao processo ou ao cliente, e a IA lê tudo e gera: lista de quesitos médicos complementares específicos ao caso pra perícia judicial, um briefing técnico pro advogado, e um resumo em linguagem simples pra explicar o exame ao cliente — fica salvo no histórico do Cérebro Jurídico do processo)
 
 ## AGENDA (menu: Jurídico → Agenda)
 - Calendário que exibe prazos/controles (audiências, prazos, perícias, DCB, benefícios, alvarás), compromissos (reuniões/consultas/videochamadas/fechamentos criados em "Agendar Reunião" ou por perícias/INSS), vencimentos financeiros e aniversários de clientes — e eventos do Google Calendar se conectado
@@ -182,12 +183,13 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Botão "Novo Modelo" → formulário com título, categoria, editor de texto rico, toggle "Papel timbrado"
 - Categorias: Contratos · Procurações · Declarações · Notificações · Petições · Previdenciário · Família · Trabalhista · Outro
 - Variáveis automáticas: Cliente ({{nome}}, {{cpf_cnpj}}, {{email}}, {{telefone}}, {{data_nascimento}}, {{rg}}, {{estado_civil}}, {{profissao}}, {{nacionalidade}}), Responsável ({{responsavel_nome}}, {{responsavel_cpf}}, {{responsavel_rg}}, {{responsavel_telefone}}, {{responsavel_parentesco}}), Endereço ({{endereco}}, {{endereco_completo}}, {{bairro}}, {{cidade}}, {{estado}}, {{cep}}), Geral ({{data_hoje}}, {{advogado}})
-- Gerar modelo com IA: botão "Gerar com IA" → envia arquivo de exemplo (PDF/imagem) ou cola texto → a IA reconstrói o documento em blocos formatados e insere as variáveis certas
+- Gerar modelo com IA: botão "Gerar com IA" → envia arquivo de exemplo (PDF/imagem) ou cola texto → a IA reconstrói o documento em blocos formatados e insere as variáveis certas, preservando ao máximo a redação original (inclusive caixas em formato pergunta/resposta, se o exemplo tiver) — documentos gerados são sempre em preto e branco, sem cor de destaque
 - Para usar com um cliente: aba Documentos do cliente → "Gerar Documento" → escolhe o modelo → variáveis preenchidas automaticamente
 
 ## ASSINATURAS (menu: Documentos → Assinaturas)
 - Envelopes de assinatura digital via TramitaSign
-- Botão "Novo envelope" → formulário com nome, prazo, lista de assinantes (nome + e-mail)
+- Botão "Novo envelope" → fluxo em 5 passos: Envelope (nome, cliente vinculado) → Documentos (modelos) → Assinantes → Notificações → Revisão
+- Passo "Assinantes": tipo Eu mesmo/Colaborador/Cliente/Outro; ao escolher Colaborador ou Cliente, um campo de busca por nome filtra a lista (não precisa rolar todo mundo). Nome/e-mail vêm preenchidos automaticamente do cadastro — se o cliente não tem e-mail cadastrado, aparece um aviso e é preciso digitar um e-mail manualmente antes de conseguir adicionar (é por ali que o link de assinatura é enviado)
 - Status dos envelopes: Rascunho · Aguardando · Concluído · Expirado · Cancelado
 
 ## PDFs (menu: Documentos → PDFs)
@@ -238,6 +240,7 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 
 ## CONFIGURAÇÕES (menu: Sistema → Configurações — somente Administradores)
 - Abas "Escritório" (nome, OAB, CNPJ, logomarca, endereço) e "Mensagens Automáticas" (textos e intervalos de WhatsApp)
+- Aba Escritório tem vários toggles ativo/desativado independentes (logo, modelo do papel timbrado, fundo do papel timbrado, identificação do escritório) — o de "Identificação do escritório" é o mais recente: se desativado, nome/OAB/CNPJ cadastrados não são aplicados nos documentos gerados, cai no nome genérico padrão mesmo com os campos preenchidos (útil pra cadastrar sem aplicar ainda)
 - Comissão de colaborador não fica aqui — é no cadastro do próprio colaborador
 
 ## MENSAGENS WHATSAPP AUTOMÁTICAS

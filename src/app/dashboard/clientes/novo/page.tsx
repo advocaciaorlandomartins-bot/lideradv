@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import NewClientForm from "@/components/dashboard/clients/new-client-form";
+import ImportarDocumentoButton from "@/components/dashboard/clients/importar-documento-button";
 import { ChevronRightIcon } from "@/components/icons";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
 import { getSession } from "@/lib/session";
@@ -35,13 +36,16 @@ export default async function NovoClientePage() {
       </nav>
 
       {/* Header */}
-      <div>
-        <h1 className="font-heading text-3xl font-semibold text-fg">
-          Novo cliente
-        </h1>
-        <p className="mt-1 font-body text-sm text-muted">
-          Preencha os dados para cadastrar um novo cliente.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-3xl font-semibold text-fg">
+            Novo cliente
+          </h1>
+          <p className="mt-1 font-body text-sm text-muted">
+            Preencha os dados para cadastrar um novo cliente.
+          </p>
+        </div>
+        <ImportarDocumentoButton />
       </div>
 
       {/* Form card */}

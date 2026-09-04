@@ -229,6 +229,10 @@ export default function AiDocumentImport({
   const [neighborhood, setNeighborhood] = useState("");
   const [city, setCity] = useState("");
   const [stateUf, setStateUf] = useState("");
+  const [filiacaoMae, setFiliacaoMae] = useState("");
+  const [filiacaoPai, setFiliacaoPai] = useState("");
+  const [naturalidadeCidade, setNaturalidadeCidade] = useState("");
+  const [naturalidadeEstado, setNaturalidadeEstado] = useState("");
   const [notes, setNotes] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
 
@@ -360,10 +364,12 @@ export default function AiDocumentImport({
     setNeighborhood(data.neighborhood ?? "");
     setCity(data.city ?? "");
     setStateUf(data.state ?? "");
+    setFiliacaoMae(data.mother_name ?? "");
+    setFiliacaoPai(data.father_name ?? "");
+    setNaturalidadeCidade(data.naturalidade_city ?? "");
+    setNaturalidadeEstado(data.naturalidade_state ?? "");
     const extras = [
       data.document_type && `Doc: ${data.document_type}`,
-      data.father_name && `Pai: ${data.father_name}`,
-      data.mother_name && `Mãe: ${data.mother_name}`,
       data.cnh_numero &&
         `CNH: ${data.cnh_numero}${data.cnh_validade ? ` (val. ${data.cnh_validade})` : ""}`,
     ]
@@ -469,6 +475,10 @@ export default function AiDocumentImport({
     fd.set("neighborhood", neighborhood || "A preencher");
     fd.set("city", city || "A preencher");
     fd.set("state", stateUf || "AL");
+    fd.set("filiacao_mae", filiacaoMae.trim());
+    fd.set("filiacao_pai", filiacaoPai.trim());
+    fd.set("naturalidade_cidade", naturalidadeCidade.trim());
+    fd.set("naturalidade_estado", naturalidadeEstado.trim());
     fd.set("notes", notes);
     fd.set("menor_incapaz", temResponsavel ? "true" : "false");
     fd.set("responsavel_nome", respNome.trim());
@@ -520,6 +530,10 @@ export default function AiDocumentImport({
     setNeighborhood("");
     setCity("");
     setStateUf("");
+    setFiliacaoMae("");
+    setFiliacaoPai("");
+    setNaturalidadeCidade("");
+    setNaturalidadeEstado("");
     setNotes("");
     setRespNome("");
     setRespCpf("");
@@ -777,6 +791,44 @@ export default function AiDocumentImport({
                   <option value="Mulher trans">Mulher trans</option>
                   <option value="Não binário">Não binário</option>
                 </select>
+              </Field>
+              <Field label="Naturalidade (cidade)">
+                <input
+                  value={naturalidadeCidade}
+                  onChange={(e) => setNaturalidadeCidade(e.target.value)}
+                  className={inputCls}
+                  placeholder="Maceió"
+                />
+              </Field>
+              <Field label="Naturalidade (UF)">
+                <select
+                  value={naturalidadeEstado}
+                  onChange={(e) => setNaturalidadeEstado(e.target.value)}
+                  className={selectCls}
+                >
+                  <option value="">— Selecione —</option>
+                  {ESTADOS_UF.map((uf) => (
+                    <option key={uf} value={uf}>
+                      {uf}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Filiação — Mãe">
+                <input
+                  value={filiacaoMae}
+                  onChange={(e) => setFiliacaoMae(e.target.value)}
+                  className={inputCls}
+                  placeholder="Nome da mãe"
+                />
+              </Field>
+              <Field label="Filiação — Pai">
+                <input
+                  value={filiacaoPai}
+                  onChange={(e) => setFiliacaoPai(e.target.value)}
+                  className={inputCls}
+                  placeholder="Nome do pai"
+                />
               </Field>
             </div>
           </div>

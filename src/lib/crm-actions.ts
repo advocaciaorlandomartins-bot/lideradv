@@ -6,6 +6,7 @@ import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { logAction } from "./audit";
 import { podeGerenciarLead } from "./crm-ownership";
+import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 
 export type CrmFormState = { error?: string; success?: boolean } | null;
 
@@ -380,8 +381,18 @@ export async function toggleTarefaAction(
     UPDATE crm_tarefas SET concluida = ${concluida}, updated_at = NOW()
     WHERE id = ${id}::uuid
   `;
+  // Mesma tarefa também pode ser concluída/reaberta pelo kanban de Minhas
+  // Tarefas (darBaixaCrmTarefaAction/reabrirCrmTarefaAction) — os dois
+  // caminhos precisam pontuar igual, senão só quem usa um dos dois ganha
+  // ponto pelo mesmo trabalho.
+  if (concluida) {
+    await registrarPontosConclusao("crm_tarefa", id);
+  } else {
+    await reverterPontosConclusao("crm_tarefa", id);
+  }
   revalidatePath(`/dashboard/crm/leads/${leadId}`);
   revalidatePath("/dashboard/crm");
+  revalidatePath("/dashboard/minhas-tarefas");
 }
 
 export async function deleteTarefaAction(

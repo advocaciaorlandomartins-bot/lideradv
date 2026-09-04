@@ -37,6 +37,7 @@ MÓDULOS DO SISTEMA
 
 ### Perfil do cliente (clique no cliente):
 Botões no topo: "Agendar Reunião" (videochamada ou ligação WhatsApp) · "Editar cadastro" · "Excluir cliente"
+Logo abaixo do nome: etiquetas do cliente (ver seção ETIQUETAS)
 Abas:
 1. Visão Geral — dados de contato, endereço, dados previdenciários, processos vinculados, toggle de mensagens WhatsApp (ativar/bloquear)
 2. Processos — lista de processos desse cliente
@@ -76,6 +77,15 @@ Abas:
 - "Arquivar" abre um formulário pedindo o resultado final (Deferido, Indeferido, Sentença favorável, Desistência, etc.) e observação — existe só essa via de arquivamento no processo, para o estágio da Linha de Produção e o status do processo nunca ficarem dessincronizados
 - Seção Cérebro Jurídico + IA Jurídica (ver seção própria abaixo)
 - Seção Documentos: upload de documentos do processo
+- Etiquetas no cabeçalho, ao lado do nome do cliente (ver seção ETIQUETAS)
+
+## ETIQUETAS (na ficha do cliente e no cabeçalho do processo)
+- Formato obrigatório CATEGORIA:VALOR (ex: FASE:JUDICIAL, PRIORIDADE:URGENTE, AREA:PREVIDENCIARIO) — nunca uma etiqueta solta
+- Catálogo padrão já vem pronto: FASE (MARKETING, EM_NEGOCIACAO, CONSULTORIA, ADMINISTRATIVA, JUDICIAL, RECURSAL, EXECUCAO, ARQUIVADO), AREA (CIVIL, CONSUMIDOR, CRIMINAL, FAMILIA, PREVIDENCIARIO, TRABALHISTA, TRIBUTARIO), BENEFICIO (APIU, APTC, BPC_LOAS, INCAPACIDADE, PCD, PENSAO_POR_MORTE, SALARIO_MATERNIDADE, APOSENTADORIA_IDADE, APOSENTADORIA_INVALIDEZ), ORIGEM (FACEBOOK, GOOGLE_ADS, INDICACAO, INSTAGRAM, PARCEIRO, SITE, WHATSAPP), PRIORIDADE (URGENTE, ALTA, NORMAL, BAIXA)
+- Botão "+ Etiqueta" na ficha do cliente e no cabeçalho do processo — autocomplete pelas etiquetas já existentes; se digitar CATEGORIA:VALOR que não existe, oferece criar uma nova (só administradores podem criar categoria/valor novos — qualquer um com permissão de editar cliente/processo pode aplicar uma já existente)
+- Reflexo automático: etiqueta aplicada no cliente aparece (marcada como "(cliente)") em todos os processos vinculados a ele, sem precisar aplicar de novo em cada processo
+- Filtro por etiqueta nas listagens de Clientes e Processos, com combinação "E" (todas) ou "OU" (qualquer uma)
+- Ferramentas da Íris: listar_etiquetas (ver o catálogo) e adicionar_etiqueta (aplicar uma etiqueta a um cliente ou processo pelo nome/número, ex: "coloque PRIORIDADE:URGENTE no processo do João")
 
 ## CÉREBRO JURÍDICO (dentro do detalhe de cada processo)
 - Roda AUTOMATICAMENTE em segundo plano — não precisa apertar botão: sempre que um novo andamento é lançado na Linha do Tempo, ou um documento é enviado ao processo, o Cérebro analisa sozinho logo depois (em background, sem travar a tela)

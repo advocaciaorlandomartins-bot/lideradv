@@ -303,6 +303,12 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
     [clients]
   );
 
+  const etiquetasDisponiveis = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of clients) for (const t of c.etiquetas) set.add(t);
+    return Array.from(set).sort();
+  }, [clients]);
+
   // Filtered + sorted
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -330,6 +336,13 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
         if (af.comProcessos === "nao" && c.processes > 0) return false;
         if (af.cpfCnpj && !c.doc.includes(af.cpfCnpj.replace(/\D/g, "")))
           return false;
+        if (af.etiquetas.length > 0) {
+          const bate =
+            af.etiquetasModo === "E"
+              ? af.etiquetas.every((t) => c.etiquetas.includes(t))
+              : af.etiquetas.some((t) => c.etiquetas.includes(t));
+          if (!bate) return false;
+        }
       }
 
       return true;
@@ -1142,6 +1155,7 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
         onDeleteSaved={(nome) =>
           persistQuickFilters(quickFilters.filter((q) => q.nome !== nome))
         }
+        etiquetasDisponiveis={etiquetasDisponiveis}
       />
     </div>
   );

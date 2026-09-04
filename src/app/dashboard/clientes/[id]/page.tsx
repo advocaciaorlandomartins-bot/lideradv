@@ -13,7 +13,12 @@ import {
   getEmailsByClientId,
   setupInboundEmailTables,
 } from "@/lib/inbound-emails-db";
+import {
+  getEtiquetasDeCliente,
+  getCatalogoEtiquetas,
+} from "@/lib/etiquetas-db";
 import DeleteClientButton from "@/components/dashboard/clients/delete-client-button";
+import EtiquetaPicker from "@/components/dashboard/etiquetas/etiqueta-picker";
 import ClienteDetailTabs from "@/components/dashboard/clients/cliente-detail-tabs";
 import LgpdActions from "@/components/dashboard/clients/lgpd-actions";
 import AgendarVideochamadaButton from "@/components/dashboard/clients/agendar-videochamada-button";
@@ -66,15 +71,31 @@ export default async function ClienteDetailPage({
   // Garantir que as tabelas de inbound email existam (idempotente)
   await setupInboundEmailTables().catch(() => null);
 
-  const [client, processes, documentos, debito, inboundAddress] =
-    await Promise.all([
-      getClientFull(id),
-      getProcessosByClientId(id),
-      getDocumentosAllByClientId(id),
-      getClientDebito(id),
-      getAddressByClientId(id).catch(() => null),
-    ]);
+  const [
+    client,
+    processes,
+    documentos,
+    debito,
+    inboundAddress,
+    etiquetas,
+    catalogoEtiquetas,
+  ] = await Promise.all([
+    getClientFull(id),
+    getProcessosByClientId(id),
+    getDocumentosAllByClientId(id),
+    getClientDebito(id),
+    getAddressByClientId(id).catch(() => null),
+    getEtiquetasDeCliente(id),
+    getCatalogoEtiquetas(),
+  ]);
   if (!client) notFound();
+
+  const podeEditarEtiquetas = hasPermission(session, "clientes", "editar");
+  const podeCriarCategoriaNova = hasPermission(
+    session,
+    "configuracoes",
+    "editar"
+  );
 
   const inboundEmails = inboundAddress
     ? await getEmailsByClientId(id).catch(() => [])
@@ -139,6 +160,16 @@ export default async function ClienteDetailPage({
               <p className="mt-0.5 font-body text-sm text-muted">
                 {client.doc} · Cliente desde {client.since}
               </p>
+              <div className="mt-2">
+                <EtiquetaPicker
+                  entidade="cliente"
+                  entidadeId={client.id}
+                  etiquetas={etiquetas}
+                  catalogo={catalogoEtiquetas}
+                  podeEditar={podeEditarEtiquetas}
+                  podeCriarCategoriaNova={podeCriarCategoriaNova}
+                />
+              </div>
             </div>
           </div>
 

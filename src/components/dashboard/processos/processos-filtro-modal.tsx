@@ -108,17 +108,6 @@ const RESULTADOS = [
   "Procedente em parte",
 ];
 
-const MARCADORES_OPCOES = [
-  "Urgente",
-  "Monitorado",
-  "Audiência marcada",
-  "Aguardando sentença",
-  "Recurso pendente",
-  "Cliente VIP",
-  "Em execução",
-  "Acordo em negociação",
-];
-
 export interface FiltroAvancado {
   exibir: "habilitados" | "desabilitados";
   souResponsavel: boolean;
@@ -198,6 +187,7 @@ interface Props {
   onSaveFilter: (nome: string, f: FiltroAvancado) => void;
   onLoadFilter: (f: FiltroAvancado) => void;
   onDeleteSavedFilter: (nome: string) => void;
+  etiquetasDisponiveis: string[];
 }
 
 const labelCls =
@@ -264,6 +254,7 @@ export default function ProcessosFiltroModal({
   onSaveFilter,
   onLoadFilter,
   onDeleteSavedFilter,
+  etiquetasDisponiveis,
 }: Props) {
   const [local, setLocal] = useState<FiltroAvancado>(filtros);
   const [saveNome, setSaveNome] = useState("");
@@ -731,27 +722,29 @@ export default function ProcessosFiltroModal({
             </div>
           </Section>
 
-          {/* Marcadores */}
-          <Section title="Marcadores" icon={TagsIcon}>
-            <div className="flex flex-wrap gap-2">
-              {MARCADORES_OPCOES.map((m) => {
-                const sel = local.marcadores.includes(m);
-                return (
-                  <button
-                    key={m}
-                    onClick={() => toggleMarcador(m)}
-                    className={`cursor-pointer rounded-full border px-3 py-1 font-body text-xs font-semibold transition-colors ${
-                      sel
-                        ? "border-primary bg-primary text-white"
-                        : "border-border bg-white text-muted hover:border-primary/40 hover:text-fg"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                );
-              })}
-            </div>
-          </Section>
+          {/* Etiquetas (CATEGORIA:VALOR) */}
+          {etiquetasDisponiveis.length > 0 && (
+            <Section title="Etiquetas" icon={TagsIcon}>
+              <div className="flex flex-wrap gap-2">
+                {etiquetasDisponiveis.map((m) => {
+                  const sel = local.marcadores.includes(m);
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => toggleMarcador(m)}
+                      className={`cursor-pointer rounded-full border px-3 py-1 font-body text-xs font-semibold transition-colors ${
+                        sel
+                          ? "border-primary bg-primary text-white"
+                          : "border-border bg-white text-muted hover:border-primary/40 hover:text-fg"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+            </Section>
+          )}
 
           {/* Upload planilha */}
           <Section title="Filtrar via planilha" icon={UploadIcon}>

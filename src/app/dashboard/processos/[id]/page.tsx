@@ -20,6 +20,11 @@ import {
   getCargaColaboradores,
   filtrarCargaPorPermissao,
 } from "@/lib/controladoria-db";
+import {
+  getEtiquetasDeProcesso,
+  getEtiquetasHerdadasDoCliente,
+  getCatalogoEtiquetas,
+} from "@/lib/etiquetas-db";
 import DeleteProcessoButton from "@/components/dashboard/processos/delete-processo-button";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import ProcessoDetailClient from "@/components/dashboard/processos/processo-detail-client";
@@ -72,6 +77,12 @@ export default async function ProcessoDetailPage({
     meuColaboradorId
   );
 
+  const [etiquetas, etiquetasHerdadas, catalogoEtiquetas] = await Promise.all([
+    getEtiquetasDeProcesso(id),
+    getEtiquetasHerdadasDoCliente(id),
+    getCatalogoEtiquetas(),
+  ]);
+
   // Carrega documentos do processo + documentos do cliente (enviados pela ficha do cliente)
   const [docsProcesso, docsCliente] = await Promise.all([
     getDocumentosByEntityId("processo", id),
@@ -121,6 +132,15 @@ export default async function ProcessoDetailPage({
           "editar"
         )}
         podeVerFinanceiro={hasPermission(session, "financeiro", "ver")}
+        etiquetas={etiquetas}
+        etiquetasHerdadas={etiquetasHerdadas}
+        catalogoEtiquetas={catalogoEtiquetas}
+        podeEditarEtiquetas={hasPermission(session, "processos", "editar")}
+        podeCriarCategoriaNova={hasPermission(
+          session,
+          "configuracoes",
+          "editar"
+        )}
       />
 
       {/* Arquivos (server, static) */}

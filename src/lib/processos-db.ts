@@ -36,6 +36,8 @@ export interface Processo {
   der: string | null;
   dib: string | null;
   dcb: string | null;
+  /** Etiquetas no formato "CATEGORIA:VALOR" — próprias do processo + herdadas do cliente vinculado. */
+  etiquetas: string[];
 }
 
 export interface ProcessoFull extends Processo {
@@ -90,6 +92,7 @@ function mapRow(r: any): Processo {
     der: r.der ? String(r.der).slice(0, 10) : null,
     dib: r.dib ? String(r.dib).slice(0, 10) : null,
     dcb: r.dcb ? String(r.dcb).slice(0, 10) : null,
+    etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
   };
 }
 
@@ -150,7 +153,16 @@ export async function getAllProcessos(
           p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
           to_char(p.der, 'YYYY-MM-DD') AS der,
           to_char(p.dib, 'YYYY-MM-DD') AS dib,
-          to_char(p.dcb, 'YYYY-MM-DD') AS dcb
+          to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+          (
+            SELECT COALESCE(array_agg(DISTINCT e.categoria || ':' || e.valor), ARRAY[]::text[])
+            FROM etiquetas e
+            WHERE e.id IN (
+              SELECT etiqueta_id FROM etiquetas_processos WHERE processo_id = p.id
+              UNION
+              SELECT etiqueta_id FROM etiquetas_clientes WHERE cliente_id = p.client_id
+            )
+          ) AS etiquetas
         FROM processos p
         JOIN clients c ON c.id = p.client_id
         WHERE p.deleted_at IS NULL AND p.responsavel_id = ${responsavelId}::uuid
@@ -185,7 +197,16 @@ export async function getAllProcessos(
           p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
           to_char(p.der, 'YYYY-MM-DD') AS der,
           to_char(p.dib, 'YYYY-MM-DD') AS dib,
-          to_char(p.dcb, 'YYYY-MM-DD') AS dcb
+          to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+          (
+            SELECT COALESCE(array_agg(DISTINCT e.categoria || ':' || e.valor), ARRAY[]::text[])
+            FROM etiquetas e
+            WHERE e.id IN (
+              SELECT etiqueta_id FROM etiquetas_processos WHERE processo_id = p.id
+              UNION
+              SELECT etiqueta_id FROM etiquetas_clientes WHERE cliente_id = p.client_id
+            )
+          ) AS etiquetas
         FROM processos p
         JOIN clients c ON c.id = p.client_id
         WHERE p.deleted_at IS NULL

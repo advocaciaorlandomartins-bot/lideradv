@@ -9,6 +9,7 @@ import {
   MapPinIcon,
   FolderOpenIcon,
   CalendarIcon,
+  TagsIcon,
 } from "@/components/icons";
 
 const ESTADOS_BR = [
@@ -60,6 +61,8 @@ export interface FiltroCliente {
   dataInicio: string;
   dataFim: string;
   cpfCnpj: string;
+  etiquetas: string[];
+  etiquetasModo: "E" | "OU";
 }
 
 export const FILTRO_CLIENTE_INICIAL: FiltroCliente = {
@@ -71,10 +74,16 @@ export const FILTRO_CLIENTE_INICIAL: FiltroCliente = {
   dataInicio: "",
   dataFim: "",
   cpfCnpj: "",
+  etiquetas: [],
+  etiquetasModo: "OU",
 };
 
 export function countFiltrosCliente(f: FiltroCliente): number {
-  return Object.values(f).filter((v) => v !== "").length;
+  return Object.entries(f).filter(([k, v]) => {
+    if (k === "etiquetasModo") return false; // é config do filtro de etiquetas, não um filtro em si
+    if (k === "etiquetas") return (v as string[]).length > 0;
+    return v !== "";
+  }).length;
 }
 
 interface Props {
@@ -86,6 +95,7 @@ interface Props {
   savedFilters: Array<{ nome: string; filtros: FiltroCliente }>;
   onSaveFilter: (nome: string, f: FiltroCliente) => void;
   onDeleteSaved: (nome: string) => void;
+  etiquetasDisponiveis: string[];
 }
 
 const labelCls =
@@ -160,6 +170,7 @@ export default function ClientesFiltroModal({
   savedFilters,
   onSaveFilter,
   onDeleteSaved,
+  etiquetasDisponiveis,
 }: Props) {
   const [local, setLocal] = useState<FiltroCliente>(filtros);
   const [saveNome, setSaveNome] = useState("");
@@ -169,6 +180,15 @@ export default function ClientesFiltroModal({
 
   function set<K extends keyof FiltroCliente>(key: K, val: FiltroCliente[K]) {
     setLocal((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function toggleEtiqueta(tag: string) {
+    setLocal((prev) => ({
+      ...prev,
+      etiquetas: prev.etiquetas.includes(tag)
+        ? prev.etiquetas.filter((t) => t !== tag)
+        : [...prev.etiquetas, tag],
+    }));
   }
 
   function handleBuscar() {
@@ -367,6 +387,46 @@ export default function ClientesFiltroModal({
               </div>
             </div>
           </Section>
+          {/* Etiquetas */}
+          {etiquetasDisponiveis.length > 0 && (
+            <Section title="Etiquetas" icon={TagsIcon}>
+              {local.etiquetas.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <span className="font-body text-xs text-muted">
+                    Combinar com
+                  </span>
+                  <button
+                    onClick={() =>
+                      set(
+                        "etiquetasModo",
+                        local.etiquetasModo === "E" ? "OU" : "E"
+                      )
+                    }
+                    className="cursor-pointer rounded-full border border-primary/30 bg-primary/5 px-2.5 py-0.5 font-body text-xs font-bold text-primary hover:bg-primary/10"
+                  >
+                    {local.etiquetasModo === "E"
+                      ? "E (todas)"
+                      : "OU (qualquer)"}
+                  </button>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {etiquetasDisponiveis.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleEtiqueta(tag)}
+                    className={`cursor-pointer rounded-full border px-2.5 py-1 font-body text-xs font-semibold transition-colors ${
+                      local.etiquetas.includes(tag)
+                        ? "border-primary bg-primary text-white"
+                        : "border-border bg-white text-muted hover:border-primary/40 hover:text-fg"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </Section>
+          )}
         </div>
 
         {/* Footer */}

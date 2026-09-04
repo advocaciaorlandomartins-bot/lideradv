@@ -356,6 +356,12 @@ export default function ProcessosContent({
     [processos]
   );
 
+  const etiquetasDisponiveis = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of processos) for (const t of p.etiquetas) set.add(t);
+    return Array.from(set).sort();
+  }, [processos]);
+
   // Filtered & sorted
   const filtered = useMemo(() => {
     const diasMov = settings.diasMovimentado;
@@ -420,6 +426,11 @@ export default function ProcessosContent({
         if (af.dataFim && p.data_distribuicao_iso) {
           if (p.data_distribuicao_iso > af.dataFim) return false;
         }
+        if (
+          af.marcadores.length > 0 &&
+          !af.marcadores.some((m) => p.etiquetas.includes(m))
+        )
+          return false;
       }
 
       return true;
@@ -1226,6 +1237,7 @@ export default function ProcessosContent({
           setFiltrosAtivos(f);
         }}
         onDeleteSavedFilter={handleDeleteQuickFilter}
+        etiquetasDisponiveis={etiquetasDisponiveis}
       />
 
       <ProcessosSettingsModal

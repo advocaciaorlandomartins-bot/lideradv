@@ -55,6 +55,8 @@ import {
   removerResponsavelAction,
 } from "@/lib/tarefa-responsaveis";
 import type { CargaColaborador } from "@/lib/controladoria-db";
+import type { Etiqueta } from "@/lib/etiquetas-types";
+import EtiquetaPicker from "@/components/dashboard/etiquetas/etiqueta-picker";
 import {
   XMarkIcon,
   SpinnerIcon,
@@ -83,6 +85,11 @@ interface Props {
   sessionNome?: string;
   podeAlterarResponsavel?: boolean;
   podeVerFinanceiro?: boolean;
+  etiquetas?: Etiqueta[];
+  etiquetasHerdadas?: Etiqueta[];
+  catalogoEtiquetas?: Etiqueta[];
+  podeEditarEtiquetas?: boolean;
+  podeCriarCategoriaNova?: boolean;
 }
 
 type Tab = "dados" | "relato" | "linha_do_tempo";
@@ -2747,6 +2754,11 @@ export default function ProcessoDetailClient({
   sessionNome,
   podeAlterarResponsavel,
   podeVerFinanceiro,
+  etiquetas = [],
+  etiquetasHerdadas = [],
+  catalogoEtiquetas = [],
+  podeEditarEtiquetas = false,
+  podeCriarCategoriaNova = false,
 }: Props) {
   const [tab, setTab] = useState<Tab>("dados");
   const [arquivarOpen, setArquivarOpen] = useState(false);
@@ -2817,6 +2829,17 @@ export default function ProcessoDetailClient({
               >
                 Ficha do cliente →
               </Link>
+            </div>
+            <div className="mt-2">
+              <EtiquetaPicker
+                entidade="processo"
+                entidadeId={processo.id}
+                etiquetas={etiquetas}
+                etiquetasHerdadas={etiquetasHerdadas}
+                catalogo={catalogoEtiquetas}
+                podeEditar={podeEditarEtiquetas}
+                podeCriarCategoriaNova={podeCriarCategoriaNova}
+              />
             </div>
           </div>
           <div className="flex flex-wrap gap-2 items-start">

@@ -161,6 +161,50 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
       required: ["busca"],
     },
   },
+  {
+    name: "listar_etiquetas",
+    description:
+      "Lista as etiquetas cadastradas no catálogo (formato CATEGORIA:VALOR, ex: FASE:JUDICIAL, PRIORIDADE:URGENTE). Use quando o usuário perguntar 'quais etiquetas temos' ou quiser saber o que já existe antes de aplicar uma.",
+    input_schema: {
+      type: "object",
+      properties: {
+        categoria: {
+          type: "string",
+          description:
+            "Filtra só por essa categoria (ex: 'FASE'). Se omitido, traz o catálogo inteiro agrupado por categoria.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "adicionar_etiqueta",
+    description:
+      "Aplica uma etiqueta (CATEGORIA:VALOR) a um cliente ou processo, buscando-o pelo nome ou número. Se a etiqueta já existe no catálogo, aplica direto; se for uma etiqueta nova (categoria:valor nunca visto), só administradores podem criá-la.",
+    input_schema: {
+      type: "object",
+      properties: {
+        entidade_tipo: {
+          type: "string",
+          description: "'cliente' ou 'processo'.",
+        },
+        entidade_busca: {
+          type: "string",
+          description:
+            "Nome do cliente, ou nome do cliente/número do processo (CNJ) pra identificar o processo.",
+        },
+        categoria: {
+          type: "string",
+          description: "Categoria da etiqueta, ex: FASE, AREA, PRIORIDADE.",
+        },
+        valor: {
+          type: "string",
+          description: "Valor da etiqueta, ex: JUDICIAL, URGENTE.",
+        },
+      },
+      required: ["entidade_tipo", "entidade_busca", "categoria", "valor"],
+    },
+  },
 ];
 
 /** Ferramentas que executam mudança real no sistema — exigem configuracoes:editar. */
@@ -744,6 +788,149 @@ export async function executarFerramentaIris(
           base_legal: r.base_legal,
           analisado_em: r.criado_em,
         })),
+      });
+    }
+
+    case "listar_etiquetas": {
+      const { getCatalogoEtiquetas } = await import("./etiquetas-db");
+      const { formatarEtiqueta } = await import("./etiquetas-types");
+      const categoriaFiltro =
+        typeof input.categoria === "string"
+          ? input.categoria.trim().toUpperCase()
+          : "";
+      const catalogo = await getCatalogoEtiquetas();
+      const filtradas = categoriaFiltro
+        ? catalogo.filter((e) => e.categoria === categoriaFiltro)
+        : catalogo;
+      const porCategoria = new Map<string, string[]>();
+      for (const e of filtradas) {
+        const arr = porCategoria.get(e.categoria) ?? [];
+        arr.push(formatarEtiqueta(e));
+        porCategoria.set(e.categoria, arr);
+      }
+      return JSON.stringify({
+        total: filtradas.length,
+        por_categoria: Object.fromEntries(porCategoria),
+      });
+    }
+
+    case "adicionar_etiqueta": {
+      const entidadeTipo = String(input.entidade_tipo ?? "")
+        .trim()
+        .toLowerCase();
+      const entidadeBusca = String(input.entidade_busca ?? "").trim();
+      const categoriaRaw = String(input.categoria ?? "").trim();
+      const valorRaw = String(input.valor ?? "").trim();
+      if (!entidadeBusca || !categoriaRaw || !valorRaw) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Informe entidade_busca, categoria e valor.",
+        });
+      }
+      if (entidadeTipo !== "cliente" && entidadeTipo !== "processo") {
+        return JSON.stringify({
+          ok: false,
+          erro: "entidade_tipo precisa ser 'cliente' ou 'processo'.",
+        });
+      }
+
+      const categoria = categoriaRaw.toUpperCase().replace(/\s+/g, "_");
+      const valor = valorRaw.toUpperCase().replace(/\s+/g, "_");
+
+      const {
+        getEtiquetaPorCategoriaValor,
+        criarOuObterEtiqueta,
+        aplicarEtiquetaCliente,
+        aplicarEtiquetaProcesso,
+      } = await import("./etiquetas-db");
+
+      let etiquetaId: string;
+      const existente = await getEtiquetaPorCategoriaValor(categoria, valor);
+      if (existente) {
+        etiquetaId = existente.id;
+      } else if (!hasPermission(session, "configuracoes", "editar")) {
+        return JSON.stringify({
+          ok: false,
+          erro: `A etiqueta "${categoria}:${valor}" ainda não existe no catálogo — só administradores podem criar uma etiqueta nova. Sugira usar "listar_etiquetas" pra ver as que já existem.`,
+        });
+      } else {
+        const nova = await criarOuObterEtiqueta(
+          categoria,
+          valor,
+          "slate",
+          "ambos"
+        );
+        etiquetaId = nova.id;
+      }
+
+      if (entidadeTipo === "cliente") {
+        if (!hasPermission(session, "clientes", "editar"))
+          return JSON.stringify({
+            ok: false,
+            erro: "Este usuário não tem permissão pra editar clientes.",
+          });
+        const clientes = await sql`
+          SELECT id::text, name FROM clients
+          WHERE deleted_at IS NULL AND name ILIKE ${"%" + entidadeBusca + "%"}
+          LIMIT 5
+        `;
+        if (clientes.length === 0)
+          return JSON.stringify({
+            ok: false,
+            erro: `Nenhum cliente encontrado com "${entidadeBusca}".`,
+          });
+        if (clientes.length > 1)
+          return JSON.stringify({
+            ok: false,
+            erro: `Mais de um cliente encontrado com "${entidadeBusca}" — seja mais específico.`,
+            opcoes: clientes.map((c) => c.name),
+          });
+        await aplicarEtiquetaCliente(etiquetaId, String(clientes[0].id));
+        return JSON.stringify({
+          ok: true,
+          mensagem: `Etiqueta ${categoria}:${valor} aplicada em ${clientes[0].name}.`,
+        });
+      }
+
+      if (!hasPermission(session, "processos", "editar"))
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem permissão pra editar processos.",
+        });
+      const podeVerTodos3 = hasPermission(
+        session,
+        "processos_ver_todos",
+        "ver"
+      );
+      const colaboradorId3 = podeVerTodos3
+        ? null
+        : await getColaboradorIdForUser(session.id);
+      const processos = await sql`
+        SELECT p.id::text, p.numero, cl.name AS cliente_nome
+        FROM processos p
+        LEFT JOIN clients cl ON cl.id = p.client_id
+        WHERE p.deleted_at IS NULL
+          AND (cl.name ILIKE ${"%" + entidadeBusca + "%"} OR p.numero ILIKE ${"%" + entidadeBusca + "%"})
+          AND (${podeVerTodos3} OR p.responsavel_id = ${colaboradorId3}::uuid)
+        LIMIT 5
+      `;
+      if (processos.length === 0)
+        return JSON.stringify({
+          ok: false,
+          erro: `Nenhum processo encontrado com "${entidadeBusca}".`,
+        });
+      if (processos.length > 1)
+        return JSON.stringify({
+          ok: false,
+          erro: `Mais de um processo encontrado com "${entidadeBusca}" — seja mais específico (use o número CNJ).`,
+          opcoes: processos.map(
+            (p) => `${p.cliente_nome} — ${p.numero ?? "sem número"}`
+          ),
+        });
+      await aplicarEtiquetaProcesso(etiquetaId, String(processos[0].id));
+      return JSON.stringify({
+        ok: true,
+        mensagem: `Etiqueta ${categoria}:${valor} aplicada no processo de ${processos[0].cliente_nome}.`,
       });
     }
 

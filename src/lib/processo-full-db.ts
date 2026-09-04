@@ -189,6 +189,9 @@ export async function getProcessoExtended(
     der: r.der ? String(r.der).slice(0, 10) : null,
     dib: r.dib ? String(r.dib).slice(0, 10) : null,
     dcb: r.dcb ? String(r.dcb).slice(0, 10) : null,
+    // Etiquetas são buscadas à parte (getEtiquetasDeProcesso/getEtiquetasHerdadasDoCliente)
+    // e passadas como props próprias pro ProcessoDetailClient — não usado daqui.
+    etiquetas: [],
   };
 }
 

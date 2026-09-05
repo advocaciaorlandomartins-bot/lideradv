@@ -26,6 +26,7 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   consultar_analise_cerebro: "Consultou o Cérebro Jurídico",
   listar_etiquetas: "Consultou as etiquetas cadastradas",
   adicionar_etiqueta: "Aplicou uma etiqueta",
+  consultar_atualizacoes_legais: "Consultou mudanças legais recentes",
 };
 
 export const IRIS_TOOLS: Anthropic.Tool[] = [
@@ -181,6 +182,22 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["busca"],
+    },
+  },
+  {
+    name: "consultar_atualizacoes_legais",
+    description:
+      "Consulta mudanças legais/normativas recentes (últimos 6 meses, impacto alto ou médio) que afetam benefícios previdenciários — instruções normativas do INSS, portarias, decretos, mudanças de cálculo/carência/prazo. Já vem classificado por impacto, com 'o que muda na prática' e 'ação recomendada' (análise automática do cron diário de atualizações legais). Use ANTES de responder sobre regras/critérios/carência de um benefício específico, pra garantir que a informação não ficou desatualizada por uma mudança recente que o modelo não conhece.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tipo_beneficio: {
+          type: "string",
+          description:
+            "Filtra por tipo: aposentadoria_invalidez, auxilio_doenca, bpc_loas, rural, revisao_beneficio, salario_minimo, pensao_morte, acidente_trabalho, aposentadoria_tempo, aposentadoria_especial, calculo_beneficio, prazo_processo. Omitir pra trazer as mudanças recentes mais relevantes de qualquer tipo.",
+        },
+      },
+      required: [],
     },
   },
   {
@@ -810,6 +827,20 @@ export async function executarFerramentaIris(
           base_legal: r.base_legal,
           analisado_em: r.criado_em,
         })),
+      });
+    }
+
+    case "consultar_atualizacoes_legais": {
+      const { getAtualizacoesLegaisRecentes, formatarAtualizacoesLegaisTexto } =
+        await import("./atualizacoes-legais-db");
+      const tipoBeneficio =
+        typeof input.tipo_beneficio === "string" && input.tipo_beneficio.trim()
+          ? [input.tipo_beneficio.trim()]
+          : undefined;
+      const atualizacoes = await getAtualizacoesLegaisRecentes(tipoBeneficio);
+      return JSON.stringify({
+        atualizacoes: formatarAtualizacoesLegaisTexto(atualizacoes),
+        total: atualizacoes.length,
       });
     }
 

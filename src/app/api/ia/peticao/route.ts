@@ -12,6 +12,10 @@ import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { gerarContextoPeticao } from "@/lib/cerebroJuridico";
+import {
+  getAtualizacoesLegaisRecentes,
+  formatarAtualizacoesLegaisTexto,
+} from "@/lib/atualizacoes-legais-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -65,16 +69,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Skill inválida." }, { status: 400 });
   }
 
-  const [escritorio, cliente, processo, cerebroCtx] = await Promise.all([
-    getEscritorioConfig(),
-    clienteId ? getClientFull(clienteId).catch(() => null) : null,
-    processoId ? getProcessoById(processoId).catch(() => null) : null,
-    processoId
-      ? gerarContextoPeticao(processoId, tipoPeticao).catch(() => "")
-      : Promise.resolve(""),
-  ]);
+  const [escritorio, cliente, processo, cerebroCtx, atualizacoesLegais] =
+    await Promise.all([
+      getEscritorioConfig(),
+      clienteId ? getClientFull(clienteId).catch(() => null) : null,
+      processoId ? getProcessoById(processoId).catch(() => null) : null,
+      processoId
+        ? gerarContextoPeticao(processoId, tipoPeticao).catch(() => "")
+        : Promise.resolve(""),
+      getAtualizacoesLegaisRecentes().catch(() => []),
+    ]);
 
-  const instrucaoFinal = [cerebroCtx, instrucaoExtra]
+  // Mudanças normativas recentes (INSS/Previdência) que a IA de treino não
+  // teria como conhecer — mesmo cron diário já usado na tela "Leis & DOU",
+  // agora também informando o Dr. Lex antes de redigir.
+  const atualizacoesTexto =
+    atualizacoesLegais.length > 0
+      ? `=== MUDANÇAS LEGAIS/NORMATIVAS RECENTES (últimos 6 meses) ===\n${formatarAtualizacoesLegaisTexto(atualizacoesLegais)}\n\nUse essas informações apenas se forem relevantes pro caso — não force a citação se não se aplicar.`
+      : "";
+
+  const instrucaoFinal = [cerebroCtx, atualizacoesTexto, instrucaoExtra]
     .filter(Boolean)
     .join("\n\n");
 

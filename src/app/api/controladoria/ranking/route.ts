@@ -26,10 +26,11 @@ export async function GET(req: NextRequest) {
     "processos_ver_todos",
     "ver"
   );
-  const [ranking, meuColaboradorId] = await Promise.all([
-    getRankingDetalhado(dias),
-    getColaboradorIdForUser(session.id),
-  ]);
+  const meuColaboradorId = await getColaboradorIdForUser(session.id);
+  const ranking = await getRankingDetalhado(
+    dias,
+    podeVerDetalhesDeTodos ? null : meuColaboradorId
+  );
   const rankingFiltrado = filtrarHistoricoPorPermissao(
     ranking,
     podeVerDetalhesDeTodos,

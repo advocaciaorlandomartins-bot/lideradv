@@ -11,6 +11,31 @@ function revalidate(id?: string) {
   if (id) revalidatePath(`/dashboard/processos/${id}`);
 }
 
+/**
+ * Tarefas que o Cérebro Jurídico gera como "próxima ação" (ex: "Verificar
+ * documentação com cliente") são pensadas pro estágio do processo em que
+ * foram criadas — quando o processo avança sozinho (ex: resultado do INSS
+ * empurrando de "administrativo" pra "judicial"), nada tocava em
+ * tarefas_processo, e a tarefa antiga ficava "Pendente" pra sempre, sem
+ * relação nenhuma com o estágio atual. Em Minhas Tarefas isso aparecia ao
+ * lado da ação real do estágio novo (ex: "Ingressar com a ação judicial"),
+ * dando a impressão contraditória de "já vai entrar na justiça mas ainda
+ * falta documento". Concluída automaticamente aqui sempre que o estágio
+ * avança — a próxima ação certa pro estágio novo já é calculada à parte
+ * por getProximaAcaoProcesso, então nenhuma orientação real se perde.
+ */
+async function concluirTarefasCerebroObsoletas(processoId: string) {
+  await sql`
+    UPDATE tarefas_processo
+    SET status = 'Concluída',
+        comentarios = COALESCE(comentarios || ' ', '') || '[auto-concluída: estágio do processo avançou]',
+        updated_at = NOW()
+    WHERE processo_id = ${processoId}::uuid
+      AND status IN ('Pendente', 'Em andamento')
+      AND comentarios ILIKE '%Cérebro Jurídico%'
+  `;
+}
+
 export async function moverParaProducaoAction(
   id: string
 ): Promise<{ error?: string }> {
@@ -23,6 +48,7 @@ export async function moverParaProducaoAction(
       SET estagio_producao = 'producao', data_estagio_at = NOW()
       WHERE id = ${id}::uuid
     `;
+    await concluirTarefasCerebroObsoletas(id);
     revalidate(id);
     return {};
   } catch {
@@ -42,6 +68,7 @@ export async function moverParaAdministrativoAction(
       SET estagio_producao = 'administrativo', data_estagio_at = NOW()
       WHERE id = ${id}::uuid
     `;
+    await concluirTarefasCerebroObsoletas(id);
     revalidate(id);
     return {};
   } catch {
@@ -71,6 +98,7 @@ export async function registrarResultadoAdminAction(
         data_estagio_at          = NOW()
     WHERE id = ${id}::uuid
   `;
+  await concluirTarefasCerebroObsoletas(id);
   revalidate(id);
   return {};
 }
@@ -92,6 +120,7 @@ export async function registrarResultadoJudicialAction(
         data_estagio_at    = NOW()
     WHERE id = ${id}::uuid
   `;
+  await concluirTarefasCerebroObsoletas(id);
   revalidate(id);
   return {};
 }
@@ -178,6 +207,7 @@ export async function arquivarProcessoAction(
           data_estagio_at  = NOW()
       WHERE id = ${id}::uuid
     `;
+    await concluirTarefasCerebroObsoletas(id);
     revalidate(id);
     return {};
   } catch {

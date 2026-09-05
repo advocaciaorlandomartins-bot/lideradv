@@ -23,22 +23,33 @@ export default async function ControladoriaPage() {
   const session = await getSession();
   if (!session || !hasPermission(session, "controladoria", "ver")) notFound();
 
-  const [ranking, carga, capacidade, meuColaboradorId] = await Promise.all([
-    getRankingDetalhado(30),
-    getCargaColaboradores(),
-    getCapacidadeResumo(8),
-    getColaboradorIdForUser(session.id),
-  ]);
-
-  // "Carga da equipe" e o histórico do Ranking mostram título de item e
-  // nome de cliente — quem não tem processos_ver_todos só devia ver esse
-  // nível de detalhe do próprio trabalho, não do de todo mundo (mesma
-  // regra de escopo já usada em processos/Cérebro Jurídico).
+  // "Carga da equipe" e o Ranking mostram nome, cargo e agregados (total
+  // aberto, pontos, % no prazo) de cada colaborador — quem não tem
+  // processos_ver_todos só deve ver a própria linha, não a de todo mundo
+  // (mesma regra de escopo já usada em processos/Cérebro Jurídico). O
+  // filtro entra já na query (getRankingDetalhado/getCargaColaboradores
+  // recebem o colaboradorId), não só escondendo linhas depois de
+  // recebidas — senão o JSON com nome+carga de toda a equipe chegaria ao
+  // navegador de qualquer jeito, inspecionável via DevTools.
   const podeVerDetalhesDeTodos = hasPermission(
     session,
     "processos_ver_todos",
     "ver"
   );
+  const meuColaboradorId = await getColaboradorIdForUser(session.id);
+  const colaboradorIdParaFiltro = podeVerDetalhesDeTodos
+    ? null
+    : meuColaboradorId;
+
+  const [ranking, carga, capacidade] = await Promise.all([
+    getRankingDetalhado(30, colaboradorIdParaFiltro),
+    getCargaColaboradores(colaboradorIdParaFiltro),
+    getCapacidadeResumo(8),
+  ]);
+
+  // Camada extra (defense-in-depth): pro caso raro de admin/sócio olhando a
+  // própria linha, ou de algum caminho futuro voltar a chamar as funções
+  // acima sem o filtro — nunca depender só de uma das duas camadas.
   const cargaFiltrada = filtrarCargaPorPermissao(
     carga,
     podeVerDetalhesDeTodos,

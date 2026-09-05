@@ -5,6 +5,7 @@ import {
   getCapacidadeProdutiva,
 } from "./controladoria-db";
 import { getAllColaboradores } from "./colaboradores-db";
+import { getColaboradorIdForUser } from "./usuarios-db";
 import { hasPermission } from "./permissoes";
 import { TIPOS_CONTROLE } from "./controles-types";
 import type { SessionUser } from "./session";
@@ -112,15 +113,30 @@ export async function buildIrisContextText(
 ): Promise<string> {
   const podeVerControles = hasPermission(session, "controles", "ver");
   const podeVerColaboradores = hasPermission(session, "colaboradores", "ver");
+  // Mesma regra de escopo da tela Controladoria: sem "processos_ver_todos",
+  // a Íris só pode falar da carga/ranking do próprio colaborador quando
+  // perguntarem "quem está sobrecarregado" — sem isso, ela vazaria pelo chat
+  // o mesmo dado da equipe inteira que a tela já restringe.
+  const podeVerDetalhesDeTodos = hasPermission(
+    session,
+    "processos_ver_todos",
+    "ver"
+  );
+  const meuColaboradorId = podeVerDetalhesDeTodos
+    ? null
+    : await getColaboradorIdForUser(session.id);
 
-  const [ranking30, carga, capacidade, agenda, colaboradores] =
+  const [ranking30Bruto, carga, capacidade, agenda, colaboradores] =
     await Promise.all([
       getRanking(30),
-      getCargaColaboradores(),
+      getCargaColaboradores(podeVerDetalhesDeTodos ? null : meuColaboradorId),
       getCapacidadeProdutiva(4),
       podeVerControles ? getAgendaProxima(30) : Promise.resolve(null),
       podeVerColaboradores ? getAllColaboradores() : Promise.resolve(null),
     ]);
+  const ranking30 = podeVerDetalhesDeTodos
+    ? ranking30Bruto
+    : ranking30Bruto.filter((r) => r.colaboradorId === meuColaboradorId);
 
   const rankingTxt =
     ranking30.length === 0

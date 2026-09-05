@@ -200,36 +200,72 @@ function classificarEntrega(
  * e "atrasado" (concluído depois do prazo final) — e quantos prazos fatais
  * esse colaborador tem em aberto e já vencidos agora (sinal de atenção
  * imediata, não histórico).
+ *
+ * colaboradorId: quando informado, restringe o ranking (e as duas consultas
+ * de base) a esse colaborador só — mesma regra de escopo de
+ * getCargaColaboradores, pra quem não tem "processos_ver_todos" não receber
+ * pontos/entregas/% no prazo de todo mundo, só os próprios.
  */
 export async function getRankingDetalhado(
-  dias = 30
+  dias = 30,
+  colaboradorId?: string | null
 ): Promise<RankingDetalhado[]> {
   const [entregasRows, fataisRows, colaboradores] = await Promise.all([
-    sql`
-      SELECT
-        pe.id::text, pe.colaborador_id::text AS colaborador_id, pe.titulo, pe.pontos,
-        pe.criado_em::date::text AS concluido_em,
-        CASE WHEN pe.origem_tipo = 'controle' THEN c.prazo_interno::text ELSE NULL END AS prazo_interno,
-        CASE
-          WHEN pe.origem_tipo = 'controle' THEN c.data_evento::text
-          WHEN pe.origem_tipo = 'tarefa_processo' THEN t.prazo::text
-          ELSE ct.data_vencimento::text
-        END AS prazo_final
-      FROM pontuacao_eventos pe
-      LEFT JOIN controles c ON pe.origem_tipo = 'controle' AND c.id = pe.origem_id
-      LEFT JOIN tarefas_processo t ON pe.origem_tipo = 'tarefa_processo' AND t.id = pe.origem_id
-      LEFT JOIN crm_tarefas ct ON pe.origem_tipo = 'crm_tarefa' AND ct.id = pe.origem_id
-      WHERE pe.criado_em >= NOW() - (${dias} || ' days')::interval
-      ORDER BY pe.criado_em DESC
-    `,
-    sql`
-      SELECT u.colaborador_id::text AS colaborador_id, COUNT(*)::int AS total
-      FROM controles c
-      JOIN usuarios u ON u.id = c.responsavel_id
-      WHERE c.fatal = TRUE AND c.status IS NULL AND c.data_evento < CURRENT_DATE
-      GROUP BY u.colaborador_id
-    `,
-    sql`SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo'`,
+    colaboradorId
+      ? sql`
+          SELECT
+            pe.id::text, pe.colaborador_id::text AS colaborador_id, pe.titulo, pe.pontos,
+            pe.criado_em::date::text AS concluido_em,
+            CASE WHEN pe.origem_tipo = 'controle' THEN c.prazo_interno::text ELSE NULL END AS prazo_interno,
+            CASE
+              WHEN pe.origem_tipo = 'controle' THEN c.data_evento::text
+              WHEN pe.origem_tipo = 'tarefa_processo' THEN t.prazo::text
+              ELSE ct.data_vencimento::text
+            END AS prazo_final
+          FROM pontuacao_eventos pe
+          LEFT JOIN controles c ON pe.origem_tipo = 'controle' AND c.id = pe.origem_id
+          LEFT JOIN tarefas_processo t ON pe.origem_tipo = 'tarefa_processo' AND t.id = pe.origem_id
+          LEFT JOIN crm_tarefas ct ON pe.origem_tipo = 'crm_tarefa' AND ct.id = pe.origem_id
+          WHERE pe.criado_em >= NOW() - (${dias} || ' days')::interval
+            AND pe.colaborador_id = ${colaboradorId}::uuid
+          ORDER BY pe.criado_em DESC
+        `
+      : sql`
+          SELECT
+            pe.id::text, pe.colaborador_id::text AS colaborador_id, pe.titulo, pe.pontos,
+            pe.criado_em::date::text AS concluido_em,
+            CASE WHEN pe.origem_tipo = 'controle' THEN c.prazo_interno::text ELSE NULL END AS prazo_interno,
+            CASE
+              WHEN pe.origem_tipo = 'controle' THEN c.data_evento::text
+              WHEN pe.origem_tipo = 'tarefa_processo' THEN t.prazo::text
+              ELSE ct.data_vencimento::text
+            END AS prazo_final
+          FROM pontuacao_eventos pe
+          LEFT JOIN controles c ON pe.origem_tipo = 'controle' AND c.id = pe.origem_id
+          LEFT JOIN tarefas_processo t ON pe.origem_tipo = 'tarefa_processo' AND t.id = pe.origem_id
+          LEFT JOIN crm_tarefas ct ON pe.origem_tipo = 'crm_tarefa' AND ct.id = pe.origem_id
+          WHERE pe.criado_em >= NOW() - (${dias} || ' days')::interval
+          ORDER BY pe.criado_em DESC
+        `,
+    colaboradorId
+      ? sql`
+          SELECT u.colaborador_id::text AS colaborador_id, COUNT(*)::int AS total
+          FROM controles c
+          JOIN usuarios u ON u.id = c.responsavel_id
+          WHERE c.fatal = TRUE AND c.status IS NULL AND c.data_evento < CURRENT_DATE
+            AND u.colaborador_id = ${colaboradorId}::uuid
+          GROUP BY u.colaborador_id
+        `
+      : sql`
+          SELECT u.colaborador_id::text AS colaborador_id, COUNT(*)::int AS total
+          FROM controles c
+          JOIN usuarios u ON u.id = c.responsavel_id
+          WHERE c.fatal = TRUE AND c.status IS NULL AND c.data_evento < CURRENT_DATE
+          GROUP BY u.colaborador_id
+        `,
+    colaboradorId
+      ? sql`SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo' AND id = ${colaboradorId}::uuid`
+      : sql`SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo'`,
   ]);
 
   const fataisPorColaborador = new Map(

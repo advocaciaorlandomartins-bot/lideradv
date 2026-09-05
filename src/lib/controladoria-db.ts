@@ -145,49 +145,103 @@ function mapItem(r: any, origem: "controle" | "tarefa" | "crm"): ItemAberto {
  * beneficios/implantados/implantados-data/alvaras — categorias finas demais
  * pra listar uma a uma sem poluir o painel. "servicos" são as
  * tarefas_processo (ex: "verificar documentação", "dar entrada").
+ *
+ * colaboradorId: quando informado, restringe a lista (e as três consultas de
+ * itens abertos) a esse colaborador só — usado para quem não tem
+ * "processos_ver_todos" (mesma regra de escopo do resto do sistema). Sem
+ * isso, nome, cargo e os agregados (totalAbertas, totalVencidas,
+ * porCategoria) de todo mundo chegavam ao navegador de qualquer usuário com
+ * acesso à Controladoria, mesmo que só o detalhe item a item já fosse
+ * restrito por filtrarCargaPorPermissao.
  */
-export async function getCargaColaboradores(): Promise<CargaColaborador[]> {
+export async function getCargaColaboradores(
+  colaboradorId?: string | null
+): Promise<CargaColaborador[]> {
   const [controlesRows, tarefasRows, crmRows] = await Promise.all([
-    sql`
-      SELECT
-        c.id::text, u.colaborador_id::text AS colaborador_id, c.tipo,
-        c.descricao AS titulo, cl.name AS cliente_nome,
-        c.created_at::text AS criado_em,
-        c.prazo_interno::text AS prazo_interno,
-        c.data_evento::text AS prazo_final
-      FROM controles c
-      JOIN usuarios u ON u.id = c.responsavel_id
-      LEFT JOIN clients cl ON cl.id = c.cliente_id
-      WHERE c.status IS NULL
-    `,
-    sql`
-      SELECT
-        t.id::text, col.id::text AS colaborador_id, t.titulo,
-        cl.name AS cliente_nome,
-        t.created_at::text AS criado_em,
-        NULL::text AS prazo_interno,
-        t.prazo::text AS prazo_final
-      FROM tarefas_processo t
-      JOIN colaboradores col ON col.nome = t.responsavel AND col.status = 'ativo'
-      LEFT JOIN clients cl ON cl.id = t.client_id
-      WHERE t.status IN ('Pendente', 'Em andamento')
-    `,
-    sql`
-      SELECT
-        t.id::text, t.responsavel_id::text AS colaborador_id, t.titulo,
-        l.nome AS cliente_nome, l.id::text AS lead_id,
-        t.created_at::text AS criado_em,
-        NULL::text AS prazo_interno,
-        t.data_vencimento::text AS prazo_final
-      FROM crm_tarefas t
-      JOIN crm_leads l ON l.id = t.lead_id
-      WHERE t.concluida = FALSE AND t.responsavel_id IS NOT NULL
-    `,
+    colaboradorId
+      ? sql`
+          SELECT
+            c.id::text, u.colaborador_id::text AS colaborador_id, c.tipo,
+            c.descricao AS titulo, cl.name AS cliente_nome,
+            c.created_at::text AS criado_em,
+            c.prazo_interno::text AS prazo_interno,
+            c.data_evento::text AS prazo_final
+          FROM controles c
+          JOIN usuarios u ON u.id = c.responsavel_id
+          LEFT JOIN clients cl ON cl.id = c.cliente_id
+          WHERE c.status IS NULL AND u.colaborador_id = ${colaboradorId}::uuid
+        `
+      : sql`
+          SELECT
+            c.id::text, u.colaborador_id::text AS colaborador_id, c.tipo,
+            c.descricao AS titulo, cl.name AS cliente_nome,
+            c.created_at::text AS criado_em,
+            c.prazo_interno::text AS prazo_interno,
+            c.data_evento::text AS prazo_final
+          FROM controles c
+          JOIN usuarios u ON u.id = c.responsavel_id
+          LEFT JOIN clients cl ON cl.id = c.cliente_id
+          WHERE c.status IS NULL
+        `,
+    colaboradorId
+      ? sql`
+          SELECT
+            t.id::text, col.id::text AS colaborador_id, t.titulo,
+            cl.name AS cliente_nome,
+            t.created_at::text AS criado_em,
+            NULL::text AS prazo_interno,
+            t.prazo::text AS prazo_final
+          FROM tarefas_processo t
+          JOIN colaboradores col ON col.nome = t.responsavel AND col.status = 'ativo'
+          LEFT JOIN clients cl ON cl.id = t.client_id
+          WHERE t.status IN ('Pendente', 'Em andamento') AND col.id = ${colaboradorId}::uuid
+        `
+      : sql`
+          SELECT
+            t.id::text, col.id::text AS colaborador_id, t.titulo,
+            cl.name AS cliente_nome,
+            t.created_at::text AS criado_em,
+            NULL::text AS prazo_interno,
+            t.prazo::text AS prazo_final
+          FROM tarefas_processo t
+          JOIN colaboradores col ON col.nome = t.responsavel AND col.status = 'ativo'
+          LEFT JOIN clients cl ON cl.id = t.client_id
+          WHERE t.status IN ('Pendente', 'Em andamento')
+        `,
+    colaboradorId
+      ? sql`
+          SELECT
+            t.id::text, t.responsavel_id::text AS colaborador_id, t.titulo,
+            l.nome AS cliente_nome, l.id::text AS lead_id,
+            t.created_at::text AS criado_em,
+            NULL::text AS prazo_interno,
+            t.data_vencimento::text AS prazo_final
+          FROM crm_tarefas t
+          JOIN crm_leads l ON l.id = t.lead_id
+          WHERE t.concluida = FALSE AND t.responsavel_id = ${colaboradorId}::uuid
+        `
+      : sql`
+          SELECT
+            t.id::text, t.responsavel_id::text AS colaborador_id, t.titulo,
+            l.nome AS cliente_nome, l.id::text AS lead_id,
+            t.created_at::text AS criado_em,
+            NULL::text AS prazo_interno,
+            t.data_vencimento::text AS prazo_final
+          FROM crm_tarefas t
+          JOIN crm_leads l ON l.id = t.lead_id
+          WHERE t.concluida = FALSE AND t.responsavel_id IS NOT NULL
+        `,
   ]);
 
-  const colaboradores = await sql`
-    SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo' ORDER BY nome
-  `;
+  const colaboradores = colaboradorId
+    ? await sql`
+        SELECT id::text, nome, cargo FROM colaboradores
+        WHERE status = 'ativo' AND id = ${colaboradorId}::uuid
+        ORDER BY nome
+      `
+    : await sql`
+        SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo' ORDER BY nome
+      `;
 
   const itensPorColaborador = new Map<string, ItemAberto[]>();
   for (const r of controlesRows) {

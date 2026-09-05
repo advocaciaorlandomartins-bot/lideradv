@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef } from "react";
-import { UploadIcon, XMarkIcon, DocumentTextIcon } from "@/components/icons";
-import { IRIS_ACCEPT_ATTR } from "./use-iris-chat";
-
-interface PendingFile {
-  file: File;
-  id: string;
-}
+import {
+  UploadIcon,
+  XMarkIcon,
+  DocumentTextIcon,
+  SpinnerIcon,
+  ExclamationCircleIcon,
+} from "@/components/icons";
+import { IRIS_ACCEPT_ATTR, type PendingFile } from "./use-iris-chat";
 
 export function IrisAttachButton({
   onAdd,
@@ -59,14 +60,28 @@ export function IrisPendingChips({
       {pendingFiles.map((p) => (
         <span
           key={p.id}
-          className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 py-0.5 pl-2 pr-1 font-body text-[11px] text-violet-700"
+          className={`inline-flex items-center gap-1 rounded-full border py-0.5 pl-2 pr-1 font-body text-[11px] ${
+            p.status === "erro"
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-violet-200 bg-violet-50 text-violet-700"
+          }`}
         >
-          <DocumentTextIcon className="h-3 w-3" />
-          <span className="max-w-[8rem] truncate">{p.file.name}</span>
+          {p.status === "enviando" ? (
+            <SpinnerIcon className="h-3 w-3 animate-spin" />
+          ) : p.status === "erro" ? (
+            <ExclamationCircleIcon className="h-3 w-3" />
+          ) : (
+            <DocumentTextIcon className="h-3 w-3" />
+          )}
+          <span className="max-w-[8rem] truncate">
+            {p.nome}
+            {p.status === "enviando" && " — enviando…"}
+            {p.status === "erro" && " — falhou"}
+          </span>
           <button
             type="button"
             onClick={() => onRemove(p.id)}
-            className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-violet-200 cursor-pointer"
+            className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-black/10 cursor-pointer"
           >
             <XMarkIcon className="h-2.5 w-2.5" />
           </button>

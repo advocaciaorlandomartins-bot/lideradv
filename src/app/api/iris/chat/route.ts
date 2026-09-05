@@ -27,7 +27,6 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MAX_CHARS_TEXTO = 8000;
 const MAX_LOOP = 6;
 const MAX_ARQUIVOS = 3;
-const MAX_ARQUIVO_BYTES = 6 * 1024 * 1024;
 const MIME_SUPORTADOS = new Set([
   "application/pdf",
   "image/jpeg",
@@ -35,6 +34,43 @@ const MIME_SUPORTADOS = new Set([
   "image/png",
   "image/webp",
 ]);
+
+interface AnexoRequest {
+  url: string;
+  nome: string;
+  mimeType: string;
+}
+
+// Nunca confiar numa URL arbitrária vinda do cliente pra não virar um proxy
+// de download de qualquer coisa — mesmo helper já usado em
+// /api/ia/analisar. addRandomSuffix no upload já torna a URL imprevisível,
+// isso aqui só garante que é mesmo um blob nosso.
+function isUrlPermitida(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname;
+    return (
+      host === "blob.vercel-storage.com" ||
+      host.endsWith(".blob.vercel-storage.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Blobs privados exigem o token de leitura/escrita no header — sem isso o
+// fetch volta 403. Mesmo helper já usado em cerebroJuridico.ts e
+// /api/ia/quesitos e /api/ia/analisar pra ler documento já anexado.
+async function fetchBlobContent(url: string): Promise<Response | null> {
+  if (url.includes(".private.blob.vercel-storage.com")) {
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    return fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).catch(() => null);
+  }
+  return fetch(url).catch(() => null);
+}
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -50,39 +86,44 @@ export async function POST(req: NextRequest) {
       { status: 429 }
     );
 
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
+  const body = await req.json().catch(() => null);
+  if (!body)
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
-  }
 
-  const text = String(form.get("text") ?? "")
+  const text = String(body.text ?? "")
     .trim()
     .slice(0, MAX_CHARS_TEXTO);
   if (!text)
     return NextResponse.json({ error: "Mensagem vazia." }, { status: 400 });
 
-  const conversaIdRaw = form.get("conversaId");
   const conversaIdInformado =
-    typeof conversaIdRaw === "string" && conversaIdRaw.trim()
-      ? conversaIdRaw.trim()
+    typeof body.conversaId === "string" && body.conversaId.trim()
+      ? body.conversaId.trim()
       : null;
 
-  const arquivos = form
-    .getAll("files")
-    .filter((f): f is File => f instanceof File)
+  const attachmentsRaw = Array.isArray(body.attachments)
+    ? (body.attachments as unknown[])
+    : [];
+  const anexosRequest: AnexoRequest[] = attachmentsRaw
+    .filter(
+      (a): a is AnexoRequest =>
+        !!a &&
+        typeof a === "object" &&
+        typeof (a as AnexoRequest).url === "string" &&
+        typeof (a as AnexoRequest).nome === "string" &&
+        typeof (a as AnexoRequest).mimeType === "string"
+    )
     .slice(0, MAX_ARQUIVOS);
-  for (const f of arquivos) {
-    if (!MIME_SUPORTADOS.has(f.type))
+  for (const a of anexosRequest) {
+    if (!MIME_SUPORTADOS.has(a.mimeType))
       return NextResponse.json(
-        { error: `Tipo de arquivo não suportado: ${f.name}` },
+        { error: `Tipo de arquivo não suportado: ${a.nome}` },
         { status: 400 }
       );
-    if (f.size > MAX_ARQUIVO_BYTES)
+    if (!isUrlPermitida(a.url))
       return NextResponse.json(
-        { error: `Arquivo muito grande: ${f.name} (limite 6 MB)` },
-        { status: 413 }
+        { error: `Anexo inválido: ${a.nome}` },
+        { status: 400 }
       );
   }
 
@@ -107,17 +148,26 @@ export async function POST(req: NextRequest) {
   // Anexos só valem pro turno em que foram enviados: não são reenviados
   // nos turnos seguintes (o texto já persistido carrega o que a Íris
   // concluiu sobre eles) — evita reprocessar o mesmo PDF a cada mensagem.
-  const temPdf = arquivos.some((f) => f.type === "application/pdf");
+  // O arquivo já foi enviado direto do navegador pro Blob (upload() do
+  // @vercel/blob/client) — aqui só baixamos o conteúdo pra montar os
+  // blocos que vão pra Anthropic.
+  const temPdf = anexosRequest.some((a) => a.mimeType === "application/pdf");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let userContent: string | any[] = text;
   const anexosMeta: AnexoMeta[] = [];
-  if (arquivos.length > 0) {
+  if (anexosRequest.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blocks: any[] = [];
-    for (const f of arquivos) {
-      const buffer = Buffer.from(await f.arrayBuffer());
+    for (const a of anexosRequest) {
+      const res = await fetchBlobContent(a.url);
+      if (!res || !res.ok)
+        return NextResponse.json(
+          { error: `Não consegui baixar o anexo: ${a.nome}` },
+          { status: 502 }
+        );
+      const buffer = Buffer.from(await res.arrayBuffer());
       const base64 = buffer.toString("base64");
-      if (f.type === "application/pdf") {
+      if (a.mimeType === "application/pdf") {
         blocks.push({
           type: "document",
           source: {
@@ -129,10 +179,10 @@ export async function POST(req: NextRequest) {
       } else {
         blocks.push({
           type: "image",
-          source: { type: "base64", media_type: f.type, data: base64 },
+          source: { type: "base64", media_type: a.mimeType, data: base64 },
         });
       }
-      anexosMeta.push({ nome: f.name, mimeType: f.type });
+      anexosMeta.push({ nome: a.nome, mimeType: a.mimeType });
     }
     blocks.push({ type: "text", text });
     userContent = blocks;

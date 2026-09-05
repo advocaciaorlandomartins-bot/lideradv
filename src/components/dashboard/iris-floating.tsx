@@ -265,7 +265,11 @@ export default function IrisFloating() {
                   />
                   <button
                     onClick={handleSend}
-                    disabled={!input.trim() || loading}
+                    disabled={
+                      !input.trim() ||
+                      loading ||
+                      pendingFiles.some((p) => p.status === "enviando")
+                    }
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white transition-all hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
                     <SendIcon className="h-4 w-4" />

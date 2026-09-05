@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { upload } from "@vercel/blob/client";
 
 export interface IrisAnexo {
   nome: string;
@@ -25,13 +26,17 @@ export interface IrisConversaResumo {
   updatedAt: string;
 }
 
-interface PendingFile {
-  file: File;
+export interface PendingFile {
   id: string;
+  nome: string;
+  mimeType: string;
+  status: "enviando" | "pronto" | "erro";
+  url?: string;
+  erro?: string;
 }
 
 export const IRIS_MAX_ANEXOS = 3;
-export const IRIS_MAX_ANEXO_BYTES = 6 * 1024 * 1024;
+export const IRIS_MAX_ANEXO_BYTES = 25 * 1024 * 1024;
 export const IRIS_MIME_SUPORTADOS = new Set([
   "application/pdf",
   "image/jpeg",
@@ -102,33 +107,70 @@ export function useIrisChat(welcome: IrisMessage, storageKey: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addFiles = useCallback((incoming: FileList | File[]) => {
-    const arr = Array.from(incoming);
-    let erro = "";
-    setPendingFiles((prev) => {
-      const next = [...prev];
-      for (const file of arr) {
-        if (next.length >= IRIS_MAX_ANEXOS) {
-          erro = `Máximo de ${IRIS_MAX_ANEXOS} arquivos por mensagem.`;
-          break;
-        }
-        if (!IRIS_MIME_SUPORTADOS.has(file.type)) {
-          erro = `Tipo não suportado: ${file.name}`;
-          continue;
-        }
-        if (file.size > IRIS_MAX_ANEXO_BYTES) {
-          erro = `Arquivo muito grande: ${file.name} (limite 6 MB)`;
-          continue;
-        }
-        next.push({
-          file,
-          id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
-        });
-      }
-      return next;
-    });
-    setErroAnexo(erro);
+  // Sobe direto do navegador pro Vercel Blob (upload() do @vercel/blob/client)
+  // em vez de mandar os bytes dentro do corpo de /api/iris/chat — Serverless
+  // Functions da Vercel têm um limite fixo de 4,5 MB de corpo de requisição,
+  // bem abaixo do tamanho normal de um PDF escaneado de verdade (uma
+  // procuração + RG + laudo já passa disso). Só a URL do Blob (texto
+  // pequeno) chega na rota do chat.
+  const uploadArquivo = useCallback(async (id: string, file: File) => {
+    try {
+      const blob = await upload(file.name, file, {
+        access: "private",
+        handleUploadUrl: "/api/iris/upload-anexo",
+      });
+      setPendingFiles((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, status: "pronto", url: blob.url } : p
+        )
+      );
+    } catch {
+      setPendingFiles((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? { ...p, status: "erro", erro: "Falha ao enviar o arquivo." }
+            : p
+        )
+      );
+    }
   }, []);
+
+  const addFiles = useCallback(
+    (incoming: FileList | File[]) => {
+      const arr = Array.from(incoming);
+      let erro = "";
+      setPendingFiles((prev) => {
+        const novos: PendingFile[] = [];
+        let total = prev.length;
+        for (const file of arr) {
+          if (total >= IRIS_MAX_ANEXOS) {
+            erro = `Máximo de ${IRIS_MAX_ANEXOS} arquivos por mensagem.`;
+            break;
+          }
+          if (!IRIS_MIME_SUPORTADOS.has(file.type)) {
+            erro = `Tipo não suportado: ${file.name}`;
+            continue;
+          }
+          if (file.size > IRIS_MAX_ANEXO_BYTES) {
+            erro = `Arquivo muito grande: ${file.name} (limite ${Math.round(IRIS_MAX_ANEXO_BYTES / 1024 / 1024)} MB)`;
+            continue;
+          }
+          const id = `${file.name}-${file.size}-${Date.now()}-${Math.random()}`;
+          novos.push({
+            id,
+            nome: file.name,
+            mimeType: file.type,
+            status: "enviando",
+          });
+          total += 1;
+          uploadArquivo(id, file);
+        }
+        return [...prev, ...novos];
+      });
+      setErroAnexo(erro);
+    },
+    [uploadArquivo]
+  );
 
   const removeFile = useCallback((id: string) => {
     setPendingFiles((prev) => prev.filter((p) => p.id !== id));
@@ -174,10 +216,15 @@ export function useIrisChat(welcome: IrisMessage, storageKey: string) {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || loading) return;
+      if (pendingFiles.some((p) => p.status === "enviando")) return;
 
-      const anexosMeta: IrisAnexo[] = pendingFiles.map((p) => ({
-        nome: p.file.name,
-        mimeType: p.file.type,
+      const prontos = pendingFiles.filter(
+        (p): p is PendingFile & { url: string } =>
+          p.status === "pronto" && !!p.url
+      );
+      const anexosMeta: IrisAnexo[] = prontos.map((p) => ({
+        nome: p.nome,
+        mimeType: p.mimeType,
       }));
       setMessages((prev) => [
         ...prev,
@@ -189,15 +236,22 @@ export function useIrisChat(welcome: IrisMessage, storageKey: string) {
       ]);
       setLoading(true);
       setErroAnexo("");
-
-      const fd = new FormData();
-      fd.set("text", trimmed);
-      if (conversaId) fd.set("conversaId", conversaId);
-      for (const p of pendingFiles) fd.append("files", p.file);
       setPendingFiles([]);
 
       try {
-        const res = await fetch("/api/iris/chat", { method: "POST", body: fd });
+        const res = await fetch("/api/iris/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: trimmed,
+            conversaId,
+            attachments: prontos.map((p) => ({
+              url: p.url,
+              nome: p.nome,
+              mimeType: p.mimeType,
+            })),
+          }),
+        });
         const data = await res.json();
         if (!res.ok) {
           // Conversa não existe mais (ex: excluída em outra aba) — limpa o

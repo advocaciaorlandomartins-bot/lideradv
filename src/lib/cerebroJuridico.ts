@@ -280,7 +280,32 @@ export interface DadoFaltante {
   campo: string;
   prioridade: "alta" | "media" | "baixa";
   impacto: string;
+  /** Onde o campo mora — pra dar pra linkar direto pra tela certa em vez de
+   * só avisar "falta X" sem dizer onde preencher (achado real: usuário
+   * procurou no processo um campo que só existe no cadastro do cliente). */
+  destino: "cliente" | "processo";
 }
+
+/**
+ * Cada `campo` usado nos checklists (CAMPOS_CRITICOS/CAMPOS_BPC/...) mora ou
+ * na tabela clients ou na processos — usado só pra saber pra qual tela
+ * linkar o "dado faltante" (edit-client-form.tsx vs edição do processo).
+ */
+const CAMPO_DESTINO: Record<string, "cliente" | "processo"> = {
+  cid_principal: "cliente",
+  tipo_incapacidade: "cliente",
+  data_afastamento: "cliente",
+  num_contribuicoes: "cliente",
+  categoria_contribuinte: "cliente",
+  atividade_anterior: "cliente",
+  nis: "cliente",
+  tipo_acao: "processo",
+  der: "processo",
+  relato: "processo",
+  resultado_admin: "processo",
+  protocolo_inss: "processo",
+  data_distribuicao: "processo",
+};
 
 export interface AlertaJuridico {
   tipo:
@@ -765,6 +790,7 @@ function calcularCompletude(processo: Record<string, unknown>): {
         campo: def.label,
         prioridade: def.prioridade,
         impacto: def.impacto,
+        destino: CAMPO_DESTINO[def.campo] ?? "processo",
       });
     }
   }

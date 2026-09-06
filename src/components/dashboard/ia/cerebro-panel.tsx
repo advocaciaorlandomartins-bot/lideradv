@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { MetadadosCerebro } from "@/lib/cerebroJuridico";
+import Link from "next/link";
+import type { MetadadosCerebro, DadoFaltante } from "@/lib/cerebroJuridico";
 
 interface Analise {
   id: string;
@@ -19,6 +20,7 @@ interface Analise {
 interface Props {
   processoId: string;
   processoStatus: string;
+  clientId: string;
 }
 
 const COR_RISCO: Record<string, string> = {
@@ -42,11 +44,15 @@ const TIPO_ICON: Record<string, string> = {
   andamento: "📋",
 };
 
-export default function CerebroPanel({ processoId, processoStatus }: Props) {
+export default function CerebroPanel({
+  processoId,
+  processoStatus,
+  clientId,
+}: Props) {
   const [analises, setAnalises] = useState<Analise[]>([]);
   const [completudeAtual, setCompletude] = useState<{
     pct: number;
-    faltantes: import("@/lib/cerebroJuridico").DadoFaltante[];
+    faltantes: DadoFaltante[];
   } | null>(null);
   const [analisando, setAnalisando] = useState(false);
   const [expandido, setExpandido] = useState(false);
@@ -418,14 +424,19 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
           {mostrarChecklist && (
             <div className="px-5 pb-4 space-y-1.5">
               {faltantesCriticos.map((f, i) => (
-                <div
+                <Link
                   key={i}
-                  className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-100 px-3 py-2"
+                  href={
+                    f.destino === "cliente"
+                      ? `/dashboard/clientes/${clientId}/editar`
+                      : `/dashboard/processos/${processoId}/editar`
+                  }
+                  className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-100 px-3 py-2 hover:border-red-300 transition-colors"
                 >
                   <span className="text-red-500 flex-shrink-0 text-xs font-bold mt-0.5">
                     !
                   </span>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-body text-xs font-semibold text-red-800">
                       {f.campo}
                     </p>
@@ -433,17 +444,25 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
                       {f.impacto}
                     </p>
                   </div>
-                </div>
+                  <span className="flex-shrink-0 font-body text-[10px] font-semibold text-red-700 underline">
+                    Preencher
+                  </span>
+                </Link>
               ))}
               {faltantesMedia.map((f, i) => (
-                <div
+                <Link
                   key={i}
-                  className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2"
+                  href={
+                    f.destino === "cliente"
+                      ? `/dashboard/clientes/${clientId}/editar`
+                      : `/dashboard/processos/${processoId}/editar`
+                  }
+                  className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 hover:border-amber-300 transition-colors"
                 >
                   <span className="text-amber-500 flex-shrink-0 text-xs mt-0.5">
                     ○
                   </span>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-body text-xs font-semibold text-amber-800">
                       {f.campo}
                     </p>
@@ -451,7 +470,10 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
                       {f.impacto}
                     </p>
                   </div>
-                </div>
+                  <span className="flex-shrink-0 font-body text-[10px] font-semibold text-amber-700 underline">
+                    Preencher
+                  </span>
+                </Link>
               ))}
             </div>
           )}

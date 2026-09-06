@@ -2968,7 +2968,11 @@ export default function ProcessoDetailClient({
       />
 
       {/* Cérebro Jurídico — roda depois dos documentos analisados */}
-      <CerebroPanel processoId={processo.id} processoStatus={processo.status} />
+      <CerebroPanel
+        processoId={processo.id}
+        processoStatus={processo.status}
+        clientId={processo.client_id}
+      />
 
       {/* Petições salvas do processo */}
       <IaPeticoesProcesso

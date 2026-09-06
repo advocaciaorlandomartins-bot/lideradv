@@ -95,18 +95,41 @@ export async function GET(req: Request) {
     // Resumo diário pro escritório — roda no mesmo horário (08h) já
     // agendado; não pede um 3º slot de cron (o plano da Vercel só libera 2).
     // Falha aqui não deve derrubar o envio de lembretes que já rodou acima.
+    //
+    // IMPORTANTE: essa rota está sendo invocada a cada ~15 min em produção
+    // (confirmado em cron_execucoes — bem mais frequente que o "0 8 * * *"
+    // do vercel.json; causa ainda não identificada, possivelmente algo
+    // configurado direto no painel da Vercel por fora do repositório).
+    // Antes disso era inofensivo porque só processava lembretes pendentes
+    // (0 na maioria das vezes). O resumo diário, sem essa trava, mandaria a
+    // mesma mensagem a cada 15 min — por isso só dispara uma vez por dia,
+    // controlado por um marcador dedicado em cron_execucoes.
+    const ROTA_RESUMO = "/api/cron/lembretes:resumo-diario";
     let resumoEnviado = false;
     try {
-      const [cfg] = await sql`SELECT telefone FROM escritorio_config LIMIT 1`;
-      const telefone = String(cfg?.telefone ?? "").trim();
-      if (telefone) {
-        const resumo = await montarResumoDiario();
-        if (resumo) {
-          const envio = await enviarMensagemDireta({
-            telefone,
-            mensagem: resumo,
-          });
-          resumoEnviado = envio.ok;
+      const [jaEnviadoHoje] = await sql`
+        SELECT id FROM cron_execucoes
+        WHERE rota = ${ROTA_RESUMO} AND executado_em::date = CURRENT_DATE
+        LIMIT 1
+      `;
+      if (!jaEnviadoHoje) {
+        const [cfg] = await sql`SELECT telefone FROM escritorio_config LIMIT 1`;
+        const telefone = String(cfg?.telefone ?? "").trim();
+        if (telefone) {
+          const resumo = await montarResumoDiario();
+          if (resumo) {
+            const envio = await enviarMensagemDireta({
+              telefone,
+              mensagem: resumo,
+            });
+            resumoEnviado = envio.ok;
+            if (envio.ok) {
+              await sql`
+                INSERT INTO cron_execucoes (rota, enviados)
+                VALUES (${ROTA_RESUMO}, 1)
+              `.catch(() => null);
+            }
+          }
         }
       }
     } catch (err) {

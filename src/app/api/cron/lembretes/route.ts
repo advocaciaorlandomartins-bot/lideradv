@@ -96,10 +96,12 @@ export async function GET(req: Request) {
     // agendado; não pede um 3º slot de cron (o plano da Vercel só libera 2).
     // Falha aqui não deve derrubar o envio de lembretes que já rodou acima.
     //
-    // IMPORTANTE: essa rota está sendo invocada a cada ~15 min em produção
-    // (confirmado em cron_execucoes — bem mais frequente que o "0 8 * * *"
-    // do vercel.json; causa ainda não identificada, possivelmente algo
-    // configurado direto no painel da Vercel por fora do repositório).
+    // IMPORTANTE: essa rota é invocada a cada ~15 min em produção — bem mais
+    // frequente que o "0 8 * * *" do vercel.json — de propósito: o PrevBot
+    // (sistema externo, outro repositório) roda um pinger próprio
+    // (iniciarLideradvCronPinger, em src/services/lideradvCron.ts do PrevBot)
+    // porque o plano Hobby da Vercel só executa cron 1x/dia, insuficiente pra
+    // entregar lembretes de compromisso/cobrança perto do horário certo.
     // Antes disso era inofensivo porque só processava lembretes pendentes
     // (0 na maioria das vezes). O resumo diário, sem essa trava, mandaria a
     // mesma mensagem a cada 15 min — por isso só dispara uma vez por dia,

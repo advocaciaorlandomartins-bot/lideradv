@@ -110,8 +110,13 @@ export default function CerebroPanel({ processoId, processoStatus }: Props) {
               t?: string;
               done?: boolean;
               error?: string;
+              retry?: boolean;
             };
-            if (data.t) {
+            if (data.retry) {
+              // Resposta anterior veio cortada — o servidor já está
+              // tentando de novo do zero, descarta o texto parcial.
+              setStreamText("");
+            } else if (data.t) {
               setStreamText((prev) => prev + data.t);
             } else if (data.done) {
               await carregar();

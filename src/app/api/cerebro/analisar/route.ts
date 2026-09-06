@@ -77,40 +77,73 @@ export async function POST(req: NextRequest) {
           apiKey: process.env.ANTHROPIC_API_KEY!,
         });
 
-        const claudeStream = client.messages.stream(
-          {
-            model: "claude-sonnet-5",
-            // O prompt pede 12 seções (risco, probabilidade de êxito, tese
-            // principal, base legal, próxima ação etc.) — 1500 tokens
-            // (~4800 caracteres em pt-BR) cortava a resposta no meio antes
-            // de chegar nas seções finais em 94% das análises reais já
-            // salvas em produção, fazendo a UI mostrar os valores de
-            // fallback genéricos ("Risco: Médio", "Verificar documentação
-            // com cliente") como se fossem o veredito real da IA.
-            max_tokens: 4096,
-            system: [
-              {
-                type: "text",
-                text: prepared.systemPrompt,
-                cache_control: { type: "ephemeral" },
-              },
-            ],
-            messages: [{ role: "user", content: prepared.userContent }],
-          },
-          { headers: { "anthropic-beta": "prompt-caching-2024-07-31" } }
-        );
-
+        // O prompt pede 12 seções (risco, probabilidade de êxito, tese
+        // principal, base legal, próxima ação etc.) — max_tokens já foi
+        // subido de 1500 pra 4096 (era o suspeito óbvio), mas análises
+        // reais continuaram chegando cortadas bem abaixo desse limite
+        // (uma de 04/09/2026 parou em 918 caracteres, no meio de uma
+        // frase) — ou seja, o corte não é (só) tamanho de resposta, é o
+        // stream da Anthropic terminando cedo por algum motivo que o
+        // código nunca registrava. Em vez de confiar cegamente que o
+        // loop `for await` terminar = sucesso, agora: (1) confere
+        // stop_reason via finalMessage(), (2) confere se a seção "RISCO
+        // GERAL" realmente veio (mesmo regex que salvarAnalise usa pra
+        // extrair o risco — se não casar, é sinal de corte), (3) tenta
+        // de novo uma única vez antes de desistir, (4) registra o
+        // diagnóstico em metadata pra dar pra investigar depois sem
+        // depender do log da Vercel (que no plano Hobby só guarda 12h).
+        const MAX_TENTATIVAS = 2;
+        const RISCO_RE = /RISCO GERAL[:\s*]+(\w+)/i;
         let fullText = "";
+        let stopReason: string | null = null;
+        let tentativa = 0;
 
-        for await (const event of claudeStream) {
-          if (
-            event.type === "content_block_delta" &&
-            event.delta.type === "text_delta"
-          ) {
-            fullText += event.delta.text;
-            send({ t: event.delta.text });
+        for (tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+          if (tentativa > 1) {
+            fullText = "";
+            send({ retry: true });
           }
+
+          try {
+            const claudeStream = client.messages.stream(
+              {
+                model: "claude-sonnet-5",
+                max_tokens: 4096,
+                system: [
+                  {
+                    type: "text",
+                    text: prepared.systemPrompt,
+                    cache_control: { type: "ephemeral" },
+                  },
+                ],
+                messages: [{ role: "user", content: prepared.userContent }],
+              },
+              { headers: { "anthropic-beta": "prompt-caching-2024-07-31" } }
+            );
+
+            for await (const event of claudeStream) {
+              if (
+                event.type === "content_block_delta" &&
+                event.delta.type === "text_delta"
+              ) {
+                fullText += event.delta.text;
+                send({ t: event.delta.text });
+              }
+            }
+
+            const finalMsg = await claudeStream.finalMessage();
+            stopReason = finalMsg.stop_reason;
+          } catch (streamErr) {
+            if (tentativa === MAX_TENTATIVAS) throw streamErr;
+            stopReason = null;
+            continue;
+          }
+
+          const completa = stopReason === "end_turn" && RISCO_RE.test(fullText);
+          if (completa || tentativa === MAX_TENTATIVAS) break;
         }
+
+        const truncada = !RISCO_RE.test(fullText);
 
         // Salva resultado no banco e cria tarefa
         const result = await salvarAnalise(
@@ -120,7 +153,12 @@ export async function POST(req: NextRequest) {
           prepared.modo,
           prepared.completudePct,
           prepared.faltantes,
-          prepared.alertas
+          prepared.alertas,
+          {
+            stopReason: stopReason ?? undefined,
+            tentativas: tentativa,
+            truncada,
+          }
         );
 
         send({ done: true, ...result });

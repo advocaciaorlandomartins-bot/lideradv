@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { logAction } from "./audit";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
+import { alertarPrazoFatalNovo } from "./resumo-diario";
 
 export type ControleFormState = {
   error?: string;
@@ -354,6 +356,20 @@ export async function createControleAction(
     entidade: "controle",
     descricao: `Criou controle: ${tipo}`,
   });
+
+  if (fatal && novoId) {
+    const descricaoFinal = descricao || tipo;
+    const clienteIdFinal = clienteId;
+    after(async () => {
+      const clienteNome = clienteIdFinal
+        ? await sql`SELECT name FROM clients WHERE id = ${clienteIdFinal}::uuid`
+            .then((r) => (r[0]?.name as string | undefined) ?? null)
+            .catch(() => null)
+        : null;
+      await alertarPrazoFatalNovo(descricaoFinal, dataEvento, clienteNome);
+    });
+  }
+
   revalidatePath("/dashboard/controles");
   return { success: true, id: novoId ?? undefined };
 }
@@ -409,6 +425,11 @@ export async function updateControleAction(
     return { error: "Descrição é obrigatória." };
 
   const dbStatus = status === "pendente" || !status ? null : status;
+
+  const [antes] = await sql`
+    SELECT fatal FROM controles WHERE id = ${id}::uuid
+  `.catch(() => [] as { fatal: boolean }[]);
+  const eraFatal = !!antes?.fatal;
 
   let dadosJson: string | null = null;
   try {
@@ -484,6 +505,22 @@ export async function updateControleAction(
     entidadeId: id,
     descricao: `Editou controle: ${tipo}`,
   });
+
+  // Só dispara na transição false→true — reeditar um controle já fatal
+  // (mudar outro campo qualquer) não deve reenviar o alerta.
+  if (fatal && !eraFatal) {
+    const descricaoFinal = descricao || tipo;
+    const clienteIdFinal = clienteId;
+    after(async () => {
+      const clienteNome = clienteIdFinal
+        ? await sql`SELECT name FROM clients WHERE id = ${clienteIdFinal}::uuid`
+            .then((r) => (r[0]?.name as string | undefined) ?? null)
+            .catch(() => null)
+        : null;
+      await alertarPrazoFatalNovo(descricaoFinal, dataEvento, clienteNome);
+    });
+  }
+
   revalidatePath("/dashboard/controles");
   return { success: true };
 }

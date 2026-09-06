@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
+import { montarResumoDiario } from "@/lib/resumo-diario";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -91,11 +92,36 @@ export async function GET(req: Request) {
       VALUES ('/api/cron/lembretes', ${pendentes.length}, ${enviados}, ${erros})
     `.catch(() => null);
 
+    // Resumo diário pro escritório — roda no mesmo horário (08h) já
+    // agendado; não pede um 3º slot de cron (o plano da Vercel só libera 2).
+    // Falha aqui não deve derrubar o envio de lembretes que já rodou acima.
+    let resumoEnviado = false;
+    try {
+      const [cfg] = await sql`SELECT telefone FROM escritorio_config LIMIT 1`;
+      const telefone = String(cfg?.telefone ?? "").trim();
+      if (telefone) {
+        const resumo = await montarResumoDiario();
+        if (resumo) {
+          const envio = await enviarMensagemDireta({
+            telefone,
+            mensagem: resumo,
+          });
+          resumoEnviado = envio.ok;
+        }
+      }
+    } catch (err) {
+      console.error(
+        "[cron/lembretes] Falha ao montar/enviar resumo diário:",
+        err
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       processados: pendentes.length,
       enviados,
       erros,
+      resumoEnviado,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

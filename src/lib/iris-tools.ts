@@ -376,6 +376,19 @@ export async function executarFerramentaIris(
             : `${fila[0].total} mensagens na fila`,
       });
 
+      const { getCronsAtrasados } = await import("./saude-sistema");
+      const cronsAtrasados = (await getCronsAtrasados()).filter(
+        (c) => c.atrasado
+      );
+      checks.push({
+        componente: "Rotinas automáticas (crons)",
+        ok: cronsAtrasados.length === 0,
+        detalhe:
+          cronsAtrasados.length === 0
+            ? "Todas rodando em dia"
+            : `Atrasadas: ${cronsAtrasados.map((c) => `${c.rota} (última: ${c.ultimaExecucao ?? "nunca"})`).join(", ")}`,
+      });
+
       return JSON.stringify(checks);
     }
 
@@ -622,33 +635,47 @@ export async function executarFerramentaIris(
     }
 
     case "ver_erros": {
-      const [resumoCRM, errosCRM, resumoLembretes, errosLembretes] =
-        await Promise.all([
-          sql`SELECT status, COUNT(*) as total FROM prevbot_webhook_log GROUP BY status ORDER BY total DESC`,
-          sql`
+      const { getLoginFalhosRecentes } = await import("./saude-sistema");
+      const [
+        resumoCRM,
+        errosCRM,
+        resumoLembretes,
+        errosLembretes,
+        loginsFalhos,
+      ] = await Promise.all([
+        sql`SELECT status, COUNT(*) as total FROM prevbot_webhook_log GROUP BY status ORDER BY total DESC`,
+        sql`
             SELECT payload->>'evento' as evento, status, ultimo_erro, tentativas, created_at::text
             FROM prevbot_webhook_log WHERE status IN ('pendente', 'falhou')
             ORDER BY created_at DESC LIMIT 5
           `,
-          sql`
+        sql`
             SELECT enviado, COUNT(*) as total,
                    SUM(CASE WHEN tentativas >= 3 AND NOT enviado THEN 1 ELSE 0 END)::int as bloqueados
             FROM lembretes_agendados
             GROUP BY enviado
           `,
-          sql`
+        sql`
             SELECT tipo, destinatario_nome, destinatario_telefone, erro,
                    tentativas, enviar_em::text, enviado
             FROM lembretes_agendados
             WHERE (NOT enviado AND enviar_em <= NOW()) OR erro IS NOT NULL
             ORDER BY enviar_em DESC LIMIT 10
           `,
-        ]);
+        getLoginFalhosRecentes(24),
+      ]);
       return JSON.stringify({
         crm_webhook: { resumo: resumoCRM, erros_recentes: errosCRM },
         lembretes_whatsapp: {
           resumo: resumoLembretes,
           pendentes_com_erro: errosLembretes,
+        },
+        seguranca: {
+          tentativas_login_falhas_24h: loginsFalhos,
+          observacao:
+            loginsFalhos > 20
+              ? "Volume alto — pode indicar tentativa de força bruta."
+              : "Dentro do esperado.",
         },
       });
     }

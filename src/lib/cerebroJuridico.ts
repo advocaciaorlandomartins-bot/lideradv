@@ -302,6 +302,14 @@ export interface MetadadosCerebro {
   tarefa_criada: boolean;
   beneficio_provavel?: string;
   estrategia_recomendada?: string;
+  /** Diagnóstico de geração — stop_reason da Anthropic, quantas tentativas
+   * foram necessárias e se mesmo assim a resposta ficou incompleta (seção
+   * "RISCO GERAL" não encontrada). Sem isso não dava pra saber, depois do
+   * fato, se uma análise ruim veio de um corte de stream ou de um problema
+   * real de conteúdo — os logs da Vercel no plano Hobby só guardam 12h. */
+  stop_reason?: string;
+  tentativas_geracao?: number;
+  truncada?: boolean;
 }
 
 // ─── Helpers de análise (server-side, sem IA) ────────────────────────────────
@@ -1916,7 +1924,12 @@ export async function salvarAnalise(
   modo: string,
   completudePct: number,
   faltantes: DadoFaltante[],
-  alertas: AlertaJuridico[]
+  alertas: AlertaJuridico[],
+  diagnosticoGeracao?: {
+    stopReason?: string;
+    tentativas?: number;
+    truncada?: boolean;
+  }
 ): Promise<{
   risco: string;
   prob: number | null;
@@ -2032,6 +2045,9 @@ export async function salvarAnalise(
     tarefa_criada: tarefaCriada,
     beneficio_provavel: beneficioProvavel,
     estrategia_recomendada: estrategiaRecomendada,
+    stop_reason: diagnosticoGeracao?.stopReason,
+    tentativas_geracao: diagnosticoGeracao?.tentativas,
+    truncada: diagnosticoGeracao?.truncada,
   };
 
   try {

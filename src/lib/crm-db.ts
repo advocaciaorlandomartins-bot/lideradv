@@ -37,7 +37,17 @@ function mapLead(r: any): Lead {
   };
 }
 
-export async function getAllLeads(): Promise<Lead[]> {
+/**
+ * colaboradorId: quando informado, restringe aos leads onde esse colaborador
+ * é responsável — mesma regra de "processos_ver_todos" já usada em
+ * processos-db.ts/getAllProcessos. Sem isso, /dashboard/crm mostrava nome,
+ * telefone, e-mail e notas de leads de TODOS os colaboradores pra qualquer
+ * usuário com "crm:ver", mesmo sem essa permissão de ver tudo.
+ */
+export async function getAllLeads(
+  colaboradorId?: string | null
+): Promise<Lead[]> {
+  const cid = colaboradorId ?? null;
   const rows = await sql`
     SELECT
       l.id::text,
@@ -53,6 +63,7 @@ export async function getAllLeads(): Promise<Lead[]> {
       (SELECT COUNT(*)::int FROM crm_tarefas    WHERE lead_id = l.id AND concluida = FALSE) AS tarefas_pendentes
     FROM crm_leads l
     LEFT JOIN colaboradores col ON col.id = l.responsavel_id
+    WHERE ${cid}::uuid IS NULL OR l.responsavel_id = ${cid}::uuid
     ORDER BY l.created_at DESC
   `;
   return rows.map(mapLead);

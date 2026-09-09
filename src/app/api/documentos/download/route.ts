@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
 import { head } from "@vercel/blob";
 import { getSession } from "@/lib/session";
-import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarEntidade } from "@/lib/acesso";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const MODULO_POR_ENTITY_TYPE: Record<string, string> = {
-  processo: "processos",
-  cliente: "clientes",
-  pericia: "controles",
-};
 
 export async function GET(request: Request) {
   const session = await getSession();
@@ -30,7 +24,7 @@ export async function GET(request: Request) {
 
   // Verifica que o documento existe e pertence a uma entidade ativa do sistema
   const rows = await sql`
-    SELECT d.url, d.nome, d.entity_type
+    SELECT d.url, d.nome, d.entity_type, d.entity_id::text
     FROM documentos d
     WHERE d.id = ${id}::uuid
       AND (
@@ -62,14 +56,14 @@ export async function GET(request: Request) {
     );
   }
 
-  const { url, entity_type } = rows[0] as {
+  const { url, entity_type, entity_id } = rows[0] as {
     url: string;
     nome: string;
-    entity_type: string;
+    entity_type: "processo" | "cliente" | "pericia";
+    entity_id: string;
   };
 
-  const modulo = MODULO_POR_ENTITY_TYPE[entity_type];
-  if (!modulo || !hasPermission(session, modulo, "ver")) {
+  if (!(await podeAcessarEntidade(session, entity_type, entity_id))) {
     return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 

@@ -95,7 +95,20 @@ function mapRow(r: any): ProcessoProducao {
   };
 }
 
-export async function getAllProcessosProducao(): Promise<ProcessoProducao[]> {
+/**
+ * colaboradorId: quando informado, restringe aos processos onde esse
+ * colaborador é responsável — mesma regra de "processos_ver_todos" já usada
+ * em processos-db.ts/getAllProcessos. Sem isso, o Kanban de Produção
+ * (/dashboard/producao) e a ferramenta da Íris "listar_processos_parados"
+ * mostravam o escritório inteiro pra qualquer Advogado(a)/Estagiário(a),
+ * mesmo sem essa permissão. Chamadores que precisam do escritório inteiro
+ * de propósito (resumo diário do cron, outras ferramentas admin da Íris)
+ * continuam passando null/omitindo o argumento.
+ */
+export async function getAllProcessosProducao(
+  colaboradorId?: string | null
+): Promise<ProcessoProducao[]> {
+  const cid = colaboradorId ?? null;
   const rows = await sql`
     SELECT
       p.id::text,
@@ -120,6 +133,7 @@ export async function getAllProcessosProducao(): Promise<ProcessoProducao[]> {
     LEFT JOIN colaboradores resp ON resp.id = p.responsavel_id
     LEFT JOIN tarefas_processo t ON t.processo_id = p.id AND t.status != 'Cancelada'
     WHERE p.deleted_at IS NULL
+      AND (${cid}::uuid IS NULL OR p.responsavel_id = ${cid}::uuid)
     GROUP BY p.id, c.name, resp.nome
     ORDER BY p.data_estagio_at ASC
   `;

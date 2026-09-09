@@ -11,6 +11,7 @@ import {
   getTarefasByLead,
 } from "@/lib/crm-db";
 import { getAllColaboradores } from "@/lib/colaboradores-db";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import LeadDetail from "@/components/dashboard/crm/lead-detail";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,17 @@ export default async function LeadDetailPage({ params }: Props) {
   ]);
 
   if (!lead) notFound();
+
+  // Sem "processos_ver_todos": só pode abrir o lead se for o responsável —
+  // mesma regra já aplicada em /dashboard/processos/[id]. Sem isso, dava
+  // pra abrir o lead de qualquer colega direto pela URL mesmo escondido da
+  // listagem.
+  const verTodos = hasPermission(session, "processos_ver_todos", "ver");
+  if (!verTodos) {
+    const meuColaboradorId = await getColaboradorIdForUser(session.id);
+    if (!meuColaboradorId || lead.responsavel_id !== meuColaboradorId)
+      notFound();
+  }
 
   return (
     <div className="space-y-6">

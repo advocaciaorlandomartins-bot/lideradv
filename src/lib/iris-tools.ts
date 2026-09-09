@@ -918,7 +918,15 @@ export async function executarFerramentaIris(
         typeof input.dias_minimo === "string" && /^\d+$/.test(input.dias_minimo)
           ? Number(input.dias_minimo)
           : 30;
-      const processos = await getAllProcessosProducao();
+      const podeVerTodosParados = hasPermission(
+        session,
+        "processos_ver_todos",
+        "ver"
+      );
+      const colaboradorIdParados = podeVerTodosParados
+        ? null
+        : await getColaboradorIdForUser(session.id);
+      const processos = await getAllProcessosProducao(colaboradorIdParados);
       const parados = processos
         .filter(
           (p) =>

@@ -2,7 +2,7 @@ import sql from "./db";
 
 export interface ItemAberto {
   id: string;
-  origem: "controle" | "tarefa" | "crm";
+  origem: "controle" | "tarefa" | "crm" | "processo";
   categoria: string;
   categoriaLabel: string;
   titulo: string;
@@ -15,6 +15,8 @@ export interface ItemAberto {
   statusPrazo: "tranquilo" | "proximo" | "vencido";
   /** Preenchido só quando origem="crm" — pra montar o link de volta pro lead. */
   leadId: string | null;
+  /** Link pra abrir o item direto (controle/processo/lead) sem precisar procurar em outra tela — null quando não há destino claro. */
+  href: string | null;
 }
 
 export interface CargaColaborador {
@@ -45,6 +47,11 @@ const CATEGORIA_LABEL: Record<string, string> = {
   alvaras: "Benefício",
   servicos: "Serviço",
   crm: "Atendimento",
+  // Estágios de processo (origem="processo") — mesmas chaves de EstagioProducao.
+  analise: "Análise",
+  producao: "Produção",
+  administrativo: "Administrativo",
+  judicial: "Judicial",
 };
 
 const CATEGORIA_LABEL_PLURAL: Record<string, string> = {
@@ -54,6 +61,10 @@ const CATEGORIA_LABEL_PLURAL: Record<string, string> = {
   beneficios: "Benefícios",
   servicos: "Serviços",
   crm: "Atendimentos",
+  analise: "Em análise",
+  producao: "Em produção",
+  administrativo: "Administrativo",
+  judicial: "Judicial",
 };
 
 /**
@@ -104,19 +115,37 @@ function classificarStatusPrazo(
   return "tranquilo";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapItem(r: any, origem: "controle" | "tarefa" | "crm"): ItemAberto {
+function mapItem(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  r: any,
+  origem: "controle" | "tarefa" | "crm" | "processo"
+): ItemAberto {
   const categoria =
     origem === "tarefa"
       ? "servicos"
       : origem === "crm"
         ? "crm"
-        : String(r.tipo);
+        : origem === "processo"
+          ? String(r.estagio_producao)
+          : String(r.tipo);
   const criadoEm = String(r.criado_em).slice(0, 10);
   const prazoInterno = r.prazo_interno
     ? String(r.prazo_interno).slice(0, 10)
     : null;
   const prazoFinal = r.prazo_final ? String(r.prazo_final).slice(0, 10) : null;
+  const leadId = origem === "crm" && r.lead_id ? String(r.lead_id) : null;
+  // Link direto pro item — o ponto de "acesso a tudo sem abrir várias telas"
+  // que motivou esse detalhamento existir: cada linha já leva pro destino certo.
+  const href =
+    origem === "controle"
+      ? `/dashboard/controles/${r.id}`
+      : origem === "tarefa" && r.processo_id
+        ? `/dashboard/processos/${r.processo_id}`
+        : origem === "crm" && leadId
+          ? `/dashboard/crm/leads/${leadId}`
+          : origem === "processo"
+            ? `/dashboard/processos/${r.id}`
+            : null;
   return {
     id: String(r.id),
     origem,
@@ -133,7 +162,8 @@ function mapItem(r: any, origem: "controle" | "tarefa" | "crm"): ItemAberto {
       prazoFinal,
       diasEntre(criadoEm)
     ),
-    leadId: origem === "crm" && r.lead_id ? String(r.lead_id) : null,
+    leadId,
+    href,
   };
 }
 
@@ -157,9 +187,10 @@ function mapItem(r: any, origem: "controle" | "tarefa" | "crm"): ItemAberto {
 export async function getCargaColaboradores(
   colaboradorId?: string | null
 ): Promise<CargaColaborador[]> {
-  const [controlesRows, tarefasRows, crmRows] = await Promise.all([
-    colaboradorId
-      ? sql`
+  const [controlesRows, tarefasRows, crmRows, processosRows] =
+    await Promise.all([
+      colaboradorId
+        ? sql`
           SELECT
             c.id::text, u.colaborador_id::text AS colaborador_id, c.tipo,
             c.descricao AS titulo, cl.name AS cliente_nome,
@@ -171,7 +202,7 @@ export async function getCargaColaboradores(
           LEFT JOIN clients cl ON cl.id = c.cliente_id
           WHERE c.status IS NULL AND u.colaborador_id = ${colaboradorId}::uuid
         `
-      : sql`
+        : sql`
           SELECT
             c.id::text, u.colaborador_id::text AS colaborador_id, c.tipo,
             c.descricao AS titulo, cl.name AS cliente_nome,
@@ -183,10 +214,11 @@ export async function getCargaColaboradores(
           LEFT JOIN clients cl ON cl.id = c.cliente_id
           WHERE c.status IS NULL
         `,
-    colaboradorId
-      ? sql`
+      colaboradorId
+        ? sql`
           SELECT
             t.id::text, col.id::text AS colaborador_id, t.titulo,
+            t.processo_id::text,
             cl.name AS cliente_nome,
             t.created_at::text AS criado_em,
             NULL::text AS prazo_interno,
@@ -196,9 +228,10 @@ export async function getCargaColaboradores(
           LEFT JOIN clients cl ON cl.id = t.client_id
           WHERE t.status IN ('Pendente', 'Em andamento') AND col.id = ${colaboradorId}::uuid
         `
-      : sql`
+        : sql`
           SELECT
             t.id::text, col.id::text AS colaborador_id, t.titulo,
+            t.processo_id::text,
             cl.name AS cliente_nome,
             t.created_at::text AS criado_em,
             NULL::text AS prazo_interno,
@@ -208,8 +241,8 @@ export async function getCargaColaboradores(
           LEFT JOIN clients cl ON cl.id = t.client_id
           WHERE t.status IN ('Pendente', 'Em andamento')
         `,
-    colaboradorId
-      ? sql`
+      colaboradorId
+        ? sql`
           SELECT
             t.id::text, t.responsavel_id::text AS colaborador_id, t.titulo,
             l.nome AS cliente_nome, l.id::text AS lead_id,
@@ -220,7 +253,7 @@ export async function getCargaColaboradores(
           JOIN crm_leads l ON l.id = t.lead_id
           WHERE t.concluida = FALSE AND t.responsavel_id = ${colaboradorId}::uuid
         `
-      : sql`
+        : sql`
           SELECT
             t.id::text, t.responsavel_id::text AS colaborador_id, t.titulo,
             l.nome AS cliente_nome, l.id::text AS lead_id,
@@ -231,7 +264,39 @@ export async function getCargaColaboradores(
           JOIN crm_leads l ON l.id = t.lead_id
           WHERE t.concluida = FALSE AND t.responsavel_id IS NOT NULL
         `,
-  ]);
+      // Processo em si (fase/estágio) — complementa os itens acima, que são
+      // tarefas/prazos DENTRO de um processo, não a fase do processo. É o que
+      // dá "Karina tem 1 em Administrativo, 1 em Judicial" de relance.
+      colaboradorId
+        ? sql`
+          SELECT
+            p.id::text, p.responsavel_id::text AS colaborador_id,
+            p.estagio_producao, p.tipo_acao AS titulo,
+            c.name AS cliente_nome,
+            p.data_estagio_at::text AS criado_em,
+            NULL::text AS prazo_interno,
+            NULL::text AS prazo_final
+          FROM processos p
+          JOIN clients c ON c.id = p.client_id
+          WHERE p.deleted_at IS NULL
+            AND p.estagio_producao != 'arquivado'
+            AND p.responsavel_id = ${colaboradorId}::uuid
+        `
+        : sql`
+          SELECT
+            p.id::text, p.responsavel_id::text AS colaborador_id,
+            p.estagio_producao, p.tipo_acao AS titulo,
+            c.name AS cliente_nome,
+            p.data_estagio_at::text AS criado_em,
+            NULL::text AS prazo_interno,
+            NULL::text AS prazo_final
+          FROM processos p
+          JOIN clients c ON c.id = p.client_id
+          WHERE p.deleted_at IS NULL
+            AND p.estagio_producao != 'arquivado'
+            AND p.responsavel_id IS NOT NULL
+        `,
+    ]);
 
   const colaboradores = colaboradorId
     ? await sql`
@@ -258,6 +323,12 @@ export async function getCargaColaboradores(
   }
   for (const r of crmRows) {
     const item = mapItem(r, "crm");
+    const arr = itensPorColaborador.get(String(r.colaborador_id)) ?? [];
+    arr.push(item);
+    itensPorColaborador.set(String(r.colaborador_id), arr);
+  }
+  for (const r of processosRows) {
+    const item = mapItem(r, "processo");
     const arr = itensPorColaborador.get(String(r.colaborador_id)) ?? [];
     arr.push(item);
     itensPorColaborador.set(String(r.colaborador_id), arr);

@@ -10,8 +10,13 @@ import { getColaboradorContaPagar } from "@/lib/remuneracoes-db";
 import { cargoColor, cargoLabel } from "@/lib/colaboradores-types";
 import DeleteColaboradorButton from "@/components/dashboard/colaboradores/delete-colaborador-button";
 import ColaboradorRemuneracoes from "@/components/dashboard/colaboradores/colaborador-remuneracoes";
+import { CargaColaboradorCard } from "@/components/dashboard/colaboradores/carga-colaborador-card";
 import { getEstagioSnapshotByResponsavel } from "@/lib/producao-db";
-import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
+import {
+  getCargaColaboradores,
+  filtrarCargaPorPermissao,
+} from "@/lib/controladoria-db";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import { getBonusMetaStatus } from "@/lib/metas-bonus";
 import GerarBonusButton from "@/components/dashboard/colaboradores/gerar-bonus-button";
 import {
@@ -46,12 +51,14 @@ export default async function ColaboradorDetailPage({
   if (!session || !hasPermission(session, "colaboradores", "ver")) notFound();
 
   const { id } = await params;
-  const [colaborador, conta, estagioSnapshot, bonusStatus] = await Promise.all([
-    getColaboradorFull(id),
-    getColaboradorContaPagar(id),
-    getEstagioSnapshotByResponsavel(id),
-    getBonusMetaStatus(id),
-  ]);
+  const [colaborador, conta, estagioSnapshot, bonusStatus, cargaRaw] =
+    await Promise.all([
+      getColaboradorFull(id),
+      getColaboradorContaPagar(id),
+      getEstagioSnapshotByResponsavel(id),
+      getBonusMetaStatus(id),
+      getCargaColaboradores(id),
+    ]);
   if (!colaborador) notFound();
 
   const temMetas =
@@ -59,6 +66,20 @@ export default async function ColaboradorDetailPage({
     colaborador.meta2_valor != null ||
     colaborador.meta3_valor != null;
   const podeEditar = hasPermission(session, "colaboradores", "editar");
+
+  // Mesma regra de escopo do resto do sistema: quem não tem
+  // "processos_ver_todos" só vê o detalhe item a item da própria carga.
+  const podeVerDetalhesDeTodos = hasPermission(
+    session,
+    "processos_ver_todos",
+    "ver"
+  );
+  const meuColaboradorId = await getColaboradorIdForUser(session.id);
+  const carga = filtrarCargaPorPermissao(
+    cargaRaw,
+    podeVerDetalhesDeTodos,
+    meuColaboradorId
+  )[0];
 
   return (
     <div className="space-y-6">
@@ -196,37 +217,30 @@ export default async function ColaboradorDetailPage({
         </div>
       )}
 
-      {/* Processos ativos por estágio */}
-      <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
-        <h2 className="font-heading text-base font-semibold text-fg mb-1">
-          Processos ativos por estágio
-        </h2>
-        <p className="mb-4 font-body text-xs text-muted">
-          Onde {colaborador.nome.split(" ")[0]} é responsável — útil na hora de
-          conferir o que já foi feito (administrativo/judicial) e o que está
-          pendente antes de calcular pagamento.
-        </p>
-        {estagioSnapshot.porEstagio.length === 0 ? (
-          <p className="py-4 text-center font-body text-sm text-muted">
-            Nenhum processo ativo no momento.
+      {/* Carga atual — processos por fase + controles/tarefas/CRM em aberto,
+          tudo num lugar só, sem precisar abrir Produção/Controles/CRM
+          separadamente pra montar esse quadro. */}
+      {carga && (
+        <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+          <h2 className="font-heading text-base font-semibold text-fg mb-1">
+            Carga atual
+          </h2>
+          <p className="mb-4 font-body text-xs text-muted">
+            Tudo que está sob responsabilidade de{" "}
+            {colaborador.nome.split(" ")[0]} agora — fase de cada processo,
+            audiências, prazos, perícias e atendimentos em aberto.
           </p>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-2">
-              {estagioSnapshot.porEstagio.map((e) => {
-                const meta = ESTAGIO_PRODUCAO_META[e.estagio];
-                return (
-                  <span
-                    key={e.estagio}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-xs font-semibold ${meta.bg} ${meta.border} ${meta.color}`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-                    {meta.label}: {e.count}
-                  </span>
-                );
-              })}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-4 font-body text-xs text-muted">
+          <div className="max-w-sm">
+            <CargaColaboradorCard
+              carga={carga}
+              podeVerDetalhesDeTodos={podeVerDetalhesDeTodos}
+              meuColaboradorId={meuColaboradorId}
+              ocultarLinkPerfil
+            />
+          </div>
+          {(estagioSnapshot.comAdministrativo > 0 ||
+            estagioSnapshot.comJudicial > 0) && (
+            <div className="mt-4 flex flex-wrap gap-4 border-t border-border pt-4 font-body text-xs text-muted">
               <span>
                 Com resultado administrativo:{" "}
                 <strong className="text-fg">
@@ -244,9 +258,9 @@ export default async function ColaboradorDetailPage({
                 <strong className="text-fg">{estagioSnapshot.comAmbos}</strong>
               </span>
             </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Metas com bônus escalonado */}
       {temMetas && bonusStatus && (

@@ -9,7 +9,6 @@ import {
 import {
   listarCompromissosProximos,
   TIPO_LABELS_COMP,
-  TIPO_ICONS_COMP,
 } from "@/lib/compromissos-db";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +49,64 @@ function formatarDataPT(iso: string): string {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+interface LancamentoResumo {
+  tipo: string;
+  categoria: string;
+  descricao: string;
+  valor: number;
+  data: string;
+  status: string;
+}
+
+// Monta o retrato atual da agenda e do financeiro do usuário para dar à IA
+// dados reais pra responder perguntas ("de quem é a avaliação do dia 21?",
+// "quanto eu gastei esse mês?") em vez de só reconhecer frases decoradas.
+function formatarContextoAtual(
+  compromissos: Awaited<ReturnType<typeof listarCompromissosProximos>>,
+  lancamentos: LancamentoResumo[]
+): string {
+  const linhasAgenda = compromissos.length
+    ? compromissos
+        .map((c) => {
+          const label = TIPO_LABELS_COMP[c.tipo] ?? c.tipo;
+          const clienteStr = c.cliente_nome
+            ? `, cliente: ${c.cliente_nome}`
+            : "";
+          const horaStr = c.hora_inicio ? ` ${c.hora_inicio}` : "";
+          return `- [${c.data_inicio}${horaStr}] ${c.titulo} (tipo: ${label}${clienteStr})`;
+        })
+        .join("\n")
+    : "(nenhum compromisso agendado nos próximos 30 dias)";
+
+  const anoMesAtual = hojeISO().slice(0, 7);
+  const totalDespesasMes = lancamentos
+    .filter((l) => l.tipo === "despesa" && l.data.slice(0, 7) === anoMesAtual)
+    .reduce((s, l) => s + l.valor, 0);
+  const totalReceitasMes = lancamentos
+    .filter((l) => l.tipo === "receita" && l.data.slice(0, 7) === anoMesAtual)
+    .reduce((s, l) => s + l.valor, 0);
+
+  const linhasFinanceiro = lancamentos.length
+    ? lancamentos
+        .map((l) => {
+          const tipoLabel = l.tipo === "receita" ? "Receita" : "Despesa";
+          return `- [${l.data}] ${tipoLabel}: ${l.descricao} — ${formatarMoeda(l.valor)} (${l.categoria}, status: ${l.status})`;
+        })
+        .join("\n")
+    : "(nenhum lançamento nos últimos 60 dias)";
+
+  return `DADOS ATUAIS DO USUÁRIO (use para responder com precisão — não invente o que não estiver aqui; se não encontrar, diga que não encontrou):
+
+Compromissos agendados (próximos 30 dias):
+${linhasAgenda}
+
+Lançamentos financeiros (últimos 60 dias):
+${linhasFinanceiro}
+
+Total de despesas neste mês (${anoMesAtual}): ${formatarMoeda(totalDespesasMes)}
+Total de receitas neste mês (${anoMesAtual}): ${formatarMoeda(totalReceitasMes)}`;
 }
 
 function normalizarTelefone(tel: string): string {
@@ -103,7 +160,7 @@ async function resolverUsuario(telefone?: string): Promise<{
 
 // ── Prompt Claude ─────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(contextoAtual: string): string {
   const hoje = new Date().toLocaleDateString("pt-BR", {
     timeZone: "America/Sao_Paulo",
     weekday: "long",
@@ -116,7 +173,7 @@ function buildSystemPrompt(): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-  return `Você é um assistente que extrai informações de mensagens de WhatsApp de um advogado para registrar no sistema LiderAdv.
+  return `Você é a secretária pessoal (por WhatsApp) de um advogado que usa o sistema LiderAdv. Sua função não é só registrar dados — é entender o que foi pedido ou perguntado e responder como uma secretária de verdade responderia, usando os dados reais abaixo sempre que a pergunta for sobre algo que já existe (agenda ou financeiro).
 
 Hoje é ${hoje}, agora são ${agoraHora}. Ano atual: ${new Date().getFullYear()}.
 
@@ -131,12 +188,15 @@ INTENÇÕES POSSÍVEIS:
    (reunião, consulta, audiência) OU pessoal (tomar remédio, ir dormir, acordar,
    ligar pra alguém, levar o carro na oficina, etc.) → "agenda". Se tem uma ação
    e um horário/dia, é "agenda" — não precisa ser compromisso de escritório.
-5. Pedido pra VER/CONSULTAR a agenda — "me manda meus compromissos", "o que eu
-   tenho marcado", "qual minha agenda essa semana", "tem algo marcado pra
-   amanhã?" → "consultar_agenda". Isso é uma CONSULTA (não cria nada novo) —
-   diferente de "agenda", que CRIA um compromisso novo.
+5. QUALQUER pergunta sobre algo que JÁ EXISTE — agenda ("de quem é a avaliação
+   do dia 21", "que horas é minha reunião de amanhã", "tenho algo marcado
+   sexta?", "me manda meus compromissos", "onde é a consulta de quinta") OU
+   financeiro ("quanto eu gastei esse mês", "quanto já recebi de honorário",
+   "quanto gastei com combustível") → "pergunta". Responda usando os DADOS
+   ATUAIS DO USUÁRIO fornecidos abaixo. Isso é uma CONSULTA (não cria nada
+   novo) — diferente de "agenda"/"despesa"/"receita", que CRIAM algo novo.
 6. Só use "desconhecido" quando a mensagem realmente não tiver NENHUMA ação,
-   valor, horário ou pedido de consulta identificável (ex.: "oi", "bom dia").
+   valor, horário ou pergunta identificável (ex.: "oi", "bom dia").
 
 FORMATOS DE RESPOSTA:
 
@@ -150,15 +210,24 @@ Para despesa pendente:
 {"intent":"despesa","valor":500.00,"categoria":"Aluguel","descricao":"Aluguel sala advocacia","data":"YYYY-MM-DD","status":"pendente"}
 
 Para agenda:
-{"intent":"agenda","titulo":"Reunião com cliente","tipo":"reuniao","data":"YYYY-MM-DD","hora":"14:00","local":"Escritório","descricao":"Assunto da reunião"}
+{"intent":"agenda","titulo":"Avaliação médica - Maria Silva","tipo":"consulta","data":"YYYY-MM-DD","hora":"14:00","local":"Escritório","descricao":"Assunto da reunião","pessoa":"Maria Silva"}
 
-Para consultar agenda:
-{"intent":"consultar_agenda"}
+Para pergunta sobre agenda ou financeiro (usando os DADOS ATUAIS DO USUÁRIO):
+{"intent":"pergunta","resposta":"📅 A avaliação do dia 21/09 às 14h é da cliente Maria Silva."}
 
 Para não identificado:
 {"intent":"desconhecido"}
 
 REGRAS:
+- "titulo" da agenda deve SEMPRE incluir o nome da pessoa quando um nome for
+  mencionado (ex.: "Avaliação - Maria Silva", nunca só "Avaliação" sozinho).
+- "pessoa": nome da pessoa/cliente envolvida no compromisso, se houver (usado
+  para localizar depois quem é o compromisso — repita o nome já usado no título).
+- Para "pergunta": responda com um texto pronto pra WhatsApp (pode usar
+  emojis), respondendo diretamente com base nos DADOS ATUAIS DO USUÁRIO
+  fornecidos no fim deste prompt. Se a informação pedida não estiver nos
+  dados fornecidos, diga claramente que não encontrou e peça mais detalhes
+  (data exata, nome) — NUNCA invente valor, data, hora ou nome de cliente.
 - Se valor em texto ("cem reais", "duzentos e cinquenta"), converta para número
 - Se data não mencionada, use hoje (${hojeISO()})
 - ATENÇÃO especial com fotos de contas (energia, água, telefone, internet): elas
@@ -175,7 +244,9 @@ REGRAS:
   que o horário já tenha passado hoje, aí use amanhã.
 - status financeiro: "pago" ou "recebido" = já aconteceu; "pendente" ou "a_receber" = ainda vai acontecer
 - Categorias comuns de despesa: Cartório, Transporte, Processo judicial, Escritório, Aluguel, Energia elétrica, Água/Saneamento, Telefone, Internet, Material escritório, Alimentação, Combustível, Estacionamento
-- Categorias comuns de receita: Honorário advocatício, Consultoria, Acordo judicial, RPV, Precatório`;
+- Categorias comuns de receita: Honorário advocatício, Consultoria, Acordo judicial, RPV, Precatório
+
+${contextoAtual}`;
 }
 
 type AIResult =
@@ -195,8 +266,9 @@ type AIResult =
       hora?: string;
       local?: string;
       descricao?: string;
+      pessoa?: string;
     }
-  | { intent: "consultar_agenda" }
+  | { intent: "pergunta"; resposta: string }
   | { intent: "desconhecido" };
 
 // ── POST /api/integracoes/prevbot/usuario ─────────────────────────────────────
@@ -248,6 +320,32 @@ export async function POST(req: NextRequest) {
       body.telefone
     );
 
+    // Retrato atual da agenda e do financeiro — dá à IA dados reais pra
+    // responder perguntas, em vez de só reconhecer frases específicas.
+    const [proximosCompromissos, lancamentosRows] = await Promise.all([
+      listarCompromissosProximos(usuarioLogin, 30),
+      sql`
+        SELECT tipo, categoria, descricao, valor, data::text AS data, status
+        FROM meu_financeiro_lancamentos
+        WHERE usuario_id = ${usuarioId}::uuid
+          AND data >= CURRENT_DATE - INTERVAL '60 days'
+        ORDER BY data DESC
+        LIMIT 60
+      `,
+    ]);
+    const lancamentosResumo: LancamentoResumo[] = lancamentosRows.map((r) => ({
+      tipo: String(r.tipo),
+      categoria: String(r.categoria),
+      descricao: String(r.descricao),
+      valor: Number(r.valor),
+      data: String(r.data),
+      status: String(r.status),
+    }));
+    const contextoAtual = formatarContextoAtual(
+      proximosCompromissos,
+      lancamentosResumo
+    );
+
     // Monta conteúdo para o Claude
     const userContent: Anthropic.MessageParam["content"] = [];
 
@@ -275,7 +373,7 @@ export async function POST(req: NextRequest) {
     const aiResp = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 512,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt(contextoAtual),
       messages: [{ role: "user", content: userContent }],
     });
 
@@ -371,13 +469,26 @@ export async function POST(req: NextRequest) {
       const hora = result.hora ? String(result.hora) : null;
       const local = result.local ? String(result.local) : null;
       const descricao = result.descricao ? String(result.descricao) : null;
+      const pessoa = result.pessoa ? String(result.pessoa).trim() : "";
+
+      // Tenta vincular a um cliente já cadastrado pelo nome mencionado, pra
+      // "de quem é esse compromisso" ter resposta certa depois (via "pergunta").
+      let clienteId: string | null = null;
+      if (pessoa) {
+        const matches = await sql`
+          SELECT id::text FROM clients
+          WHERE name ILIKE ${"%" + pessoa + "%"} AND deleted_at IS NULL
+          LIMIT 2
+        `;
+        if (matches.length === 1) clienteId = String(matches[0].id);
+      }
 
       const [comp] = await sql`
         INSERT INTO compromissos
-          (titulo, tipo, data_inicio, hora_inicio, local_link, descricao, cor, criado_por)
+          (titulo, tipo, data_inicio, hora_inicio, local_link, descricao, cor, criado_por, cliente_id)
         VALUES
           (${titulo}, ${tipo}, ${data}::date, ${hora}, ${local},
-           ${descricao}, '#0ea5e9', ${usuarioLogin})
+           ${descricao}, '#0ea5e9', ${usuarioLogin}, ${clienteId}::uuid)
         RETURNING id::text
       `;
 
@@ -411,32 +522,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── CONSULTAR AGENDA ─────────────────────────────────────────────────────
+    // ── PERGUNTA (agenda ou financeiro) ────────────────────────────────────────
 
-    if (result.intent === "consultar_agenda") {
-      const proximos = await listarCompromissosProximos(usuarioLogin, 14);
-
-      if (proximos.length === 0) {
-        return NextResponse.json({
-          ok: true,
-          acao: "agenda_consultada",
-          resposta:
-            "📅 Você não tem nenhum compromisso marcado nos próximos 14 dias.",
-        });
-      }
-
-      const linhas = proximos.map((c) => {
-        const icone = TIPO_ICONS_COMP[c.tipo] ?? "📌";
-        const label = TIPO_LABELS_COMP[c.tipo] ?? c.tipo;
-        const dataFmt = formatarDataPT(c.data_inicio);
-        const horaStr = c.hora_inicio ? ` às ${c.hora_inicio}` : "";
-        return `${icone} *${c.titulo}* (${label})\n🗓️ ${dataFmt}${horaStr}`;
-      });
-
+    if (result.intent === "pergunta") {
+      const resposta = String(result.resposta ?? "").trim();
       return NextResponse.json({
         ok: true,
-        acao: "agenda_consultada",
-        resposta: `📅 *Seus próximos compromissos:*\n\n${linhas.join("\n\n")}`,
+        acao: "pergunta_respondida",
+        resposta:
+          resposta ||
+          "🤔 Não encontrei essa informação nos seus dados. Pode me dar mais detalhes (data exata ou nome)?",
       });
     }
 

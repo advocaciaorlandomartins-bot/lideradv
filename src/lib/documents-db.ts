@@ -63,36 +63,74 @@ export interface DocumentoGlobal extends Documento {
  * nome do cliente dono, via processos.client_id) pra dar pra buscar/filtrar
  * de um lugar só. Documentos de perícia ficam de fora — continuam só na
  * própria perícia, onde já fazem sentido junto com o evento.
+ *
+ * colaboradorId: quando informado, restringe documentos de PROCESSO ao
+ * responsável — mesma regra de "processos_ver_todos" já aplicada em
+ * /dashboard/processos e /dashboard/processos/andamentos. Sem isso, quem
+ * não pode ver o processo de outro colaborador na listagem normal ainda
+ * conseguiria achar os documentos dele por aqui. Documentos de CLIENTE não
+ * são restritos — a própria listagem de Clientes também não restringe.
  */
-export async function getAllDocumentos(): Promise<DocumentoGlobal[]> {
-  const rows = await sql`
-    SELECT
-      d.id::text,
-      d.entity_type,
-      d.entity_id::text,
-      d.nome,
-      d.tipo,
-      d.tamanho,
-      d.caminho,
-      d.url,
-      d.created_at,
-      CASE WHEN d.entity_type = 'cliente' THEN cd.id::text ELSE cp.id::text END AS cliente_id,
-      CASE WHEN d.entity_type = 'cliente' THEN cd.name ELSE cp.name END AS cliente_nome,
-      p.id::text AS processo_id,
-      p.numero AS processo_numero,
-      p.tipo_acao AS processo_tipo_acao
-    FROM documentos d
-    LEFT JOIN processos p
-      ON d.entity_type = 'processo' AND p.id = d.entity_id AND p.deleted_at IS NULL
-    LEFT JOIN clients cd
-      ON d.entity_type = 'cliente' AND cd.id = d.entity_id AND cd.deleted_at IS NULL
-    LEFT JOIN clients cp
-      ON d.entity_type = 'processo' AND cp.id = p.client_id
-    WHERE (d.entity_type = 'cliente' AND cd.id IS NOT NULL)
-       OR (d.entity_type = 'processo' AND p.id IS NOT NULL)
-    ORDER BY d.created_at DESC
-    LIMIT 500
-  `;
+export async function getAllDocumentos(
+  colaboradorId?: string | null
+): Promise<DocumentoGlobal[]> {
+  const rows = colaboradorId
+    ? await sql`
+        SELECT
+          d.id::text,
+          d.entity_type,
+          d.entity_id::text,
+          d.nome,
+          d.tipo,
+          d.tamanho,
+          d.caminho,
+          d.url,
+          d.created_at,
+          CASE WHEN d.entity_type = 'cliente' THEN cd.id::text ELSE cp.id::text END AS cliente_id,
+          CASE WHEN d.entity_type = 'cliente' THEN cd.name ELSE cp.name END AS cliente_nome,
+          p.id::text AS processo_id,
+          p.numero AS processo_numero,
+          p.tipo_acao AS processo_tipo_acao
+        FROM documentos d
+        LEFT JOIN processos p
+          ON d.entity_type = 'processo' AND p.id = d.entity_id AND p.deleted_at IS NULL
+        LEFT JOIN clients cd
+          ON d.entity_type = 'cliente' AND cd.id = d.entity_id AND cd.deleted_at IS NULL
+        LEFT JOIN clients cp
+          ON d.entity_type = 'processo' AND cp.id = p.client_id
+        WHERE (d.entity_type = 'cliente' AND cd.id IS NOT NULL)
+           OR (d.entity_type = 'processo' AND p.id IS NOT NULL AND p.responsavel_id = ${colaboradorId}::uuid)
+        ORDER BY d.created_at DESC
+        LIMIT 500
+      `
+    : await sql`
+        SELECT
+          d.id::text,
+          d.entity_type,
+          d.entity_id::text,
+          d.nome,
+          d.tipo,
+          d.tamanho,
+          d.caminho,
+          d.url,
+          d.created_at,
+          CASE WHEN d.entity_type = 'cliente' THEN cd.id::text ELSE cp.id::text END AS cliente_id,
+          CASE WHEN d.entity_type = 'cliente' THEN cd.name ELSE cp.name END AS cliente_nome,
+          p.id::text AS processo_id,
+          p.numero AS processo_numero,
+          p.tipo_acao AS processo_tipo_acao
+        FROM documentos d
+        LEFT JOIN processos p
+          ON d.entity_type = 'processo' AND p.id = d.entity_id AND p.deleted_at IS NULL
+        LEFT JOIN clients cd
+          ON d.entity_type = 'cliente' AND cd.id = d.entity_id AND cd.deleted_at IS NULL
+        LEFT JOIN clients cp
+          ON d.entity_type = 'processo' AND cp.id = p.client_id
+        WHERE (d.entity_type = 'cliente' AND cd.id IS NOT NULL)
+           OR (d.entity_type = 'processo' AND p.id IS NOT NULL)
+        ORDER BY d.created_at DESC
+        LIMIT 500
+      `;
 
   return rows.map((r) => ({
     id: r.id,

@@ -770,7 +770,12 @@ function ClienteRows({
   onOpenParcial,
   onOpenCancelar,
 }: {
-  conta: ContaCliente & { totalPendente: number; totalPago: number };
+  conta: ContaCliente & {
+    totalPendente: number;
+    totalPago: number;
+    totalAtrasado: number;
+    qtdAtrasados: number;
+  };
   isExpanded: boolean;
   onToggle: () => void;
   onBaixa: (id: string) => void;
@@ -796,17 +801,37 @@ function ClienteRows({
       <tr className="border-b border-border hover:bg-slate-50 transition-colors">
         <td className="px-4 py-3 w-8" />
         <td className="px-4 py-3">
-          <p className="font-body font-semibold text-fg">{conta.client_name}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-body font-semibold text-fg">
+              {conta.client_name}
+            </p>
+            {conta.qtdAtrasados > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 font-body text-[11px] font-bold text-red-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                {conta.qtdAtrasados}{" "}
+                {conta.qtdAtrasados === 1 ? "atrasada" : "atrasadas"}
+              </span>
+            )}
+          </div>
           <p className="font-body text-xs text-muted">{conta.client_doc}</p>
         </td>
         <td className="px-4 py-3 text-right">
           <span
             className={`font-heading text-base font-semibold ${
-              conta.totalPendente > 0 ? "text-red-600" : "text-muted"
+              conta.qtdAtrasados > 0
+                ? "text-red-600"
+                : conta.totalPendente > 0
+                  ? "text-amber-600"
+                  : "text-muted"
             }`}
           >
             {fmt(conta.totalPendente)}
           </span>
+          {conta.qtdAtrasados > 0 && (
+            <p className="font-body text-[11px] font-semibold text-red-600">
+              {fmt(conta.totalAtrasado)} vencido
+            </p>
+          )}
         </td>
         <td className="px-4 py-3 text-right">
           <span className="font-body font-semibold text-emerald-700">
@@ -893,11 +918,16 @@ function ClienteRows({
 interface Props {
   contasReceber: ContaCliente[];
   defaultCliente?: string;
+  /** true quando chegou aqui pelo alerta/KPI de cobrança atrasada — já
+   * abre filtrado, pra não precisar expandir cliente por cliente pra achar
+   * quem está devendo. */
+  defaultSomenteAtrasados?: boolean;
 }
 
 export default function ReceberContent({
   contasReceber,
   defaultCliente,
+  defaultSomenteAtrasados,
 }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -925,6 +955,9 @@ export default function ReceberContent({
   const [periodo, setPeriodo] = useState<Periodo>("todos");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+  const [somenteAtrasados, setSomenteAtrasados] = useState(
+    defaultSomenteAtrasados ?? false
+  );
 
   function toggleExpand(id: string) {
     setExpanded((prev) => {
@@ -1018,6 +1051,8 @@ export default function ReceberContent({
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
     return contasReceber
       .filter(
         (c) =>
@@ -1037,6 +1072,11 @@ export default function ReceberContent({
                   dataFim
                 )
               );
+        const atrasadosItems = items.filter((i) => {
+          if (i.status !== "pendente") return false;
+          const venc = parseVencimento(i.data_vencimento);
+          return venc !== null && venc < hoje;
+        });
         return {
           ...c,
           items,
@@ -1046,14 +1086,26 @@ export default function ReceberContent({
           totalPago: items
             .filter((i) => i.status === "pago")
             .reduce((s, i) => s + i.valor, 0),
+          totalAtrasado: atrasadosItems.reduce((s, i) => s + i.valor, 0),
+          qtdAtrasados: atrasadosItems.length,
         };
       })
-      .filter((c) => periodo === "todos" || c.items.length > 0);
-  }, [contasReceber, search, periodo, dataInicio, dataFim]);
+      .filter((c) => periodo === "todos" || c.items.length > 0)
+      .filter((c) => !somenteAtrasados || c.qtdAtrasados > 0);
+  }, [contasReceber, search, periodo, dataInicio, dataFim, somenteAtrasados]);
 
   const totalPendente = filtered.reduce((s, c) => s + c.totalPendente, 0);
   const totalRecebido = filtered.reduce((s, c) => s + c.totalPago, 0);
   const clientesPendentes = filtered.filter((c) => c.totalPendente > 0).length;
+  const totalClientesAtrasados = contasReceber.filter((c) =>
+    c.items.some((i) => {
+      if (i.status !== "pendente") return false;
+      const venc = parseVencimento(i.data_vencimento);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      return venc !== null && venc < hoje;
+    })
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -1112,6 +1164,22 @@ export default function ReceberContent({
             className="h-10 w-full rounded-lg border border-border bg-white pl-9 pr-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-blue-100"
           />
         </div>
+        {totalClientesAtrasados > 0 && (
+          <button
+            type="button"
+            onClick={() => setSomenteAtrasados((v) => !v)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 font-body text-sm font-semibold transition-colors cursor-pointer ${
+              somenteAtrasados
+                ? "border-red-600 bg-red-600 text-white"
+                : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${somenteAtrasados ? "bg-white" : "bg-red-500"}`}
+            />
+            Somente atrasados ({totalClientesAtrasados})
+          </button>
+        )}
         <div className="flex gap-1 rounded-lg border border-border bg-white p-1 w-fit shadow-sm">
           {(
             [
@@ -1172,7 +1240,9 @@ export default function ReceberContent({
             <p className="font-body text-sm text-muted">
               {search
                 ? `Nenhum cliente encontrado para "${search}"`
-                : "Nenhum lançamento a receber"}
+                : somenteAtrasados
+                  ? "Nenhum cliente atrasado — tudo em dia."
+                  : "Nenhum lançamento a receber"}
             </p>
           </div>
         ) : (

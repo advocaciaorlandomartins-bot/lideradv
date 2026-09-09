@@ -120,7 +120,7 @@ export default function ResumoContent({
             vencidas e ainda pendentes
           </p>
           <Link
-            href="/dashboard/financeiro?tab=receber"
+            href="/dashboard/financeiro?tab=receber&atrasados=1"
             className="ml-auto font-body text-xs font-semibold text-amber-700 underline underline-offset-2 hover:no-underline whitespace-nowrap"
           >
             Ver em A Receber →
@@ -135,7 +135,11 @@ export default function ResumoContent({
           value={aReceber}
           sub="de clientes"
           valueColor="text-red-600"
-          href="/dashboard/financeiro?tab=receber"
+          href={
+            atrasados > 0
+              ? "/dashboard/financeiro?tab=receber&atrasados=1"
+              : "/dashboard/financeiro?tab=receber"
+          }
           badge={
             atrasados > 0
               ? `${atrasados} atrasad${atrasados === 1 ? "a" : "as"}`

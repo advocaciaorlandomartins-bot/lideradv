@@ -46,10 +46,15 @@ function resolveTab(raw: string | undefined): Tab {
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; cliente?: string }>;
+  searchParams: Promise<{ tab?: string; cliente?: string; atrasados?: string }>;
 }) {
-  const { tab: rawTab, cliente: defaultCliente } = await searchParams;
+  const {
+    tab: rawTab,
+    cliente: defaultCliente,
+    atrasados: rawAtrasados,
+  } = await searchParams;
   const tab = resolveTab(rawTab);
+  const defaultSomenteAtrasados = rawAtrasados === "1";
 
   const session = await getSession();
   if (!session) redirect("/login");
@@ -191,6 +196,7 @@ export default async function FinanceiroPage({
         <ReceberContent
           contasReceber={contasReceber!}
           defaultCliente={defaultCliente}
+          defaultSomenteAtrasados={defaultSomenteAtrasados}
         />
       )}
       {tab === "pagar" && (

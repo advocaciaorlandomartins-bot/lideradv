@@ -27,6 +27,9 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   listar_etiquetas: "Consultou as etiquetas cadastradas",
   adicionar_etiqueta: "Aplicou uma etiqueta",
   consultar_atualizacoes_legais: "Consultou mudanças legais recentes",
+  listar_processos_parados: "Consultou processos parados",
+  consultar_saude_financeira: "Consultou a saúde financeira",
+  listar_clientes_sem_resposta: "Consultou clientes sem resposta no WhatsApp",
 };
 
 export const IRIS_TOOLS: Anthropic.Tool[] = [
@@ -183,6 +186,44 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
       },
       required: ["busca"],
     },
+  },
+  {
+    name: "listar_processos_parados",
+    description:
+      "Lista processos ativos (não arquivados) que estão há muito tempo sem mudança de estágio (analise/produção/administrativo/judicial) — sinal de que ninguém está tocando o caso. Não existe SLA oficial no sistema; usa 30 dias como limiar de bom senso. Use quando o usuário perguntar 'quais processos estão parados', 'o que ninguém está tocando' ou pedir uma visão de gargalos.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dias_minimo: {
+          type: "string",
+          description:
+            "Quantidade mínima de dias parado pra entrar na lista. Se omitido, usa 30.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "listar_clientes_sem_resposta",
+    description:
+      "Lista clientes com processo ativo que mandamos mensagem no WhatsApp (via PrevBot) e ainda não responderam, com há quantos dias. Consulta o PrevBot (sistema externo) em tempo real — pode demorar alguns segundos. Use quando o usuário perguntar sobre cliente que sumiu, não responde, ou pedir uma visão de acompanhamento de atendimento.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dias_minimo: {
+          type: "string",
+          description:
+            "Quantidade mínima de dias sem resposta pra entrar na lista. Se omitido, usa 3.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "consultar_saude_financeira",
+    description:
+      "Traz KPIs financeiros do escritório inteiro: total a receber, recebido, a pagar, pago, folha pendente/paga, e quantidade + valor de lançamentos em atraso. Use pra perguntas sobre saúde financeira geral, inadimplência ou fluxo de caixa do escritório (não é o financeiro pessoal de um colaborador).",
+    input_schema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "consultar_atualizacoes_legais",
@@ -868,6 +909,64 @@ export async function executarFerramentaIris(
       return JSON.stringify({
         atualizacoes: formatarAtualizacoesLegaisTexto(atualizacoes),
         total: atualizacoes.length,
+      });
+    }
+
+    case "listar_processos_parados": {
+      const { getAllProcessosProducao } = await import("./producao-db");
+      const diasMinimo =
+        typeof input.dias_minimo === "string" && /^\d+$/.test(input.dias_minimo)
+          ? Number(input.dias_minimo)
+          : 30;
+      const processos = await getAllProcessosProducao();
+      const parados = processos
+        .filter(
+          (p) =>
+            p.estagio_producao !== "arquivado" &&
+            p.dias_no_estagio >= diasMinimo
+        )
+        .sort((a, b) => b.dias_no_estagio - a.dias_no_estagio);
+      return JSON.stringify({
+        total: parados.length,
+        dias_minimo: diasMinimo,
+        processos: parados.map((p) => ({
+          cliente: p.client_name,
+          numero: p.numero,
+          estagio: p.estagio_producao,
+          dias_parado: p.dias_no_estagio,
+          responsavel: p.responsavel_nome,
+        })),
+      });
+    }
+
+    case "consultar_saude_financeira": {
+      const { getLancamentoKpis } = await import("./lancamentos-db");
+      const kpis = await getLancamentoKpis();
+      const [{ total: valorAtrasado }] = await sql`
+        SELECT COALESCE(SUM(valor), 0) AS total
+        FROM lancamentos
+        WHERE tipo = 'entrada' AND status = 'pendente'
+          AND data_vencimento < CURRENT_DATE
+          AND data_vencimento < '9998-01-01'
+      `;
+      return JSON.stringify({ ...kpis, valor_atrasado: Number(valorAtrasado) });
+    }
+
+    case "listar_clientes_sem_resposta": {
+      const { getClientesAguardandoResposta } =
+        await import("./prevbot-status");
+      const diasMinimo =
+        typeof input.dias_minimo === "string" && /^\d+$/.test(input.dias_minimo)
+          ? Number(input.dias_minimo)
+          : 3;
+      const clientes = await getClientesAguardandoResposta(diasMinimo);
+      return JSON.stringify({
+        total: clientes.length,
+        dias_minimo: diasMinimo,
+        clientes: clientes.map((c) => ({
+          cliente: c.clienteNome,
+          dias_sem_resposta: c.diasSemResposta,
+        })),
       });
     }
 

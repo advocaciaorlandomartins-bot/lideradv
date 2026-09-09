@@ -195,8 +195,12 @@ INTENÇÕES POSSÍVEIS:
    "quanto gastei com combustível") → "pergunta". Responda usando os DADOS
    ATUAIS DO USUÁRIO fornecidos abaixo. Isso é uma CONSULTA (não cria nada
    novo) — diferente de "agenda"/"despesa"/"receita", que CRIAM algo novo.
-6. Só use "desconhecido" quando a mensagem realmente não tiver NENHUMA ação,
-   valor, horário ou pergunta identificável (ex.: "oi", "bom dia").
+6. Cumprimento, agradecimento, confirmação ou conversa social — "oi", "bom
+   dia", "obrigado", "valeu", "de nada", "ok", "beleza", "👍" → "social".
+   Responda com uma frase curta e simpática de secretária de verdade (não
+   use a lista de exemplos genérica aqui).
+7. Só use "desconhecido" quando a mensagem realmente não tiver NENHUMA ação,
+   valor, horário, pergunta ou intenção social identificável.
 
 FORMATOS DE RESPOSTA:
 
@@ -214,6 +218,9 @@ Para agenda:
 
 Para pergunta sobre agenda ou financeiro (usando os DADOS ATUAIS DO USUÁRIO):
 {"intent":"pergunta","resposta":"📅 A avaliação do dia 21/09 às 14h é da cliente Maria Silva."}
+
+Para cumprimento/agradecimento/conversa social:
+{"intent":"social","resposta":"De nada! 😊 Qualquer coisa é só chamar."}
 
 Para não identificado:
 {"intent":"desconhecido"}
@@ -269,6 +276,7 @@ type AIResult =
       pessoa?: string;
     }
   | { intent: "pergunta"; resposta: string }
+  | { intent: "social"; resposta: string }
   | { intent: "desconhecido" };
 
 // ── POST /api/integracoes/prevbot/usuario ─────────────────────────────────────
@@ -532,6 +540,17 @@ export async function POST(req: NextRequest) {
         resposta:
           resposta ||
           "🤔 Não encontrei essa informação nos seus dados. Pode me dar mais detalhes (data exata ou nome)?",
+      });
+    }
+
+    // ── SOCIAL (cumprimento, agradecimento, conversa) ──────────────────────────
+
+    if (result.intent === "social") {
+      const resposta = String(result.resposta ?? "").trim();
+      return NextResponse.json({
+        ok: true,
+        acao: "social",
+        resposta: resposta || "😊",
       });
     }
 

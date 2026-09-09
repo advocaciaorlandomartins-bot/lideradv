@@ -43,47 +43,33 @@ async function main() {
   await sql`CREATE INDEX IF NOT EXISTS idx_etiquetas_categoria ON etiquetas (categoria)`;
   console.log("✓ Índices");
 
-  // Seed com os grupos padrão pra não começar em branco. Sem STATUS
-  // (ATIVO/INATIVO) — já existe status/deleted_at reais em clients/processos,
-  // uma etiqueta duplicando isso só confundiria.
+  // Seed com os grupos padrão pra não começar em branco. Catálogo do
+  // concorrente (TramitaIA) tinha STATUS/AREA/ORIGEM/PRIORIDADE além de FASE
+  // completo e BENEFICIO — cortado pro que não duplica dado que o LiderAdv já
+  // tem em coluna real (viraria uma segunda fonte de verdade, divergente da
+  // primeira, exatamente o tipo de coisa que devia ter sido pego antes):
+  // - STATUS: já existe status/deleted_at reais em clients/processos.
+  // - AREA: já existe processos.area — e o escritório é 100% previdenciário
+  //   (área nunca varia), então a etiqueta nunca discriminaria nada.
+  // - ORIGEM: já existe crm_leads.origem — e hoje 100% dos leads chegam via
+  //   PrevBot, então idem, nunca discriminaria nada.
+  // - PRIORIDADE: já existe processos.prioridade (editável, exibido na ficha
+  //   do processo).
+  // - FASE: a maior parte dos valores do concorrente (MARKETING/
+  //   EM_NEGOCIACAO/CONSULTORIA/ADMINISTRATIVA/JUDICIAL/ARQUIVADO) já é
+  //   coberta pelos dois kanbans reais e orientados a estágio que o LiderAdv
+  //   tem (funil do CRM + Linha de Produção) — uma etiqueta manual por cima
+  //   disso pode divergir do estágio real sem ninguém perceber. Sobra só
+  //   RECURSAL/EXECUCAO, que não têm estágio dedicado em lugar nenhum hoje.
   const seed: {
     categoria: string;
     valor: string;
     cor: string;
     escopo: string;
   }[] = [
-    // FASE — esteira de atendimento (mais usada em cliente, mas cabe em ambos)
-    { categoria: "FASE", valor: "MARKETING", cor: "amber", escopo: "ambos" },
-    {
-      categoria: "FASE",
-      valor: "EM_NEGOCIACAO",
-      cor: "amber",
-      escopo: "ambos",
-    },
-    { categoria: "FASE", valor: "CONSULTORIA", cor: "amber", escopo: "ambos" },
-    {
-      categoria: "FASE",
-      valor: "ADMINISTRATIVA",
-      cor: "amber",
-      escopo: "ambos",
-    },
-    { categoria: "FASE", valor: "JUDICIAL", cor: "amber", escopo: "ambos" },
+    // FASE — só as sub-fases judiciais que não têm estágio real no sistema.
     { categoria: "FASE", valor: "RECURSAL", cor: "amber", escopo: "ambos" },
     { categoria: "FASE", valor: "EXECUCAO", cor: "amber", escopo: "ambos" },
-    { categoria: "FASE", valor: "ARQUIVADO", cor: "amber", escopo: "ambos" },
-    // AREA
-    { categoria: "AREA", valor: "CIVIL", cor: "blue", escopo: "ambos" },
-    { categoria: "AREA", valor: "CONSUMIDOR", cor: "blue", escopo: "ambos" },
-    { categoria: "AREA", valor: "CRIMINAL", cor: "blue", escopo: "ambos" },
-    { categoria: "AREA", valor: "FAMILIA", cor: "blue", escopo: "ambos" },
-    {
-      categoria: "AREA",
-      valor: "PREVIDENCIARIO",
-      cor: "blue",
-      escopo: "ambos",
-    },
-    { categoria: "AREA", valor: "TRABALHISTA", cor: "blue", escopo: "ambos" },
-    { categoria: "AREA", valor: "TRIBUTARIO", cor: "blue", escopo: "ambos" },
     // BENEFICIO — específico do caso previdenciário
     {
       categoria: "BENEFICIO",
@@ -134,34 +120,6 @@ async function main() {
       cor: "violet",
       escopo: "processo",
     },
-    // ORIGEM — de onde veio o cliente/lead
-    { categoria: "ORIGEM", valor: "FACEBOOK", cor: "slate", escopo: "cliente" },
-    {
-      categoria: "ORIGEM",
-      valor: "GOOGLE_ADS",
-      cor: "slate",
-      escopo: "cliente",
-    },
-    {
-      categoria: "ORIGEM",
-      valor: "INDICACAO",
-      cor: "slate",
-      escopo: "cliente",
-    },
-    {
-      categoria: "ORIGEM",
-      valor: "INSTAGRAM",
-      cor: "slate",
-      escopo: "cliente",
-    },
-    { categoria: "ORIGEM", valor: "PARCEIRO", cor: "slate", escopo: "cliente" },
-    { categoria: "ORIGEM", valor: "SITE", cor: "slate", escopo: "cliente" },
-    { categoria: "ORIGEM", valor: "WHATSAPP", cor: "slate", escopo: "cliente" },
-    // PRIORIDADE — cor por valor (semântica), não por categoria
-    { categoria: "PRIORIDADE", valor: "URGENTE", cor: "red", escopo: "ambos" },
-    { categoria: "PRIORIDADE", valor: "ALTA", cor: "orange", escopo: "ambos" },
-    { categoria: "PRIORIDADE", valor: "NORMAL", cor: "cyan", escopo: "ambos" },
-    { categoria: "PRIORIDADE", valor: "BAIXA", cor: "slate", escopo: "ambos" },
   ];
 
   let inseridas = 0;

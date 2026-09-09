@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import {
@@ -10,8 +11,26 @@ import {
   getCapacidadeResumo,
   filtrarCargaPorPermissao,
 } from "@/lib/controladoria-db";
+import {
+  getCarteiraResumo,
+  getRankingTipoAcao,
+  getDesfechosAdministrativos,
+  getClientesResumo,
+  getClientesPorMes,
+  getClientesPorUF,
+  getClientesPorOrigem,
+} from "@/lib/controladoria-carteira-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import ControladoriaContent from "@/components/dashboard/controladoria/controladoria-content";
+import CarteiraProcessosContent from "@/components/dashboard/controladoria/carteira-processos-content";
+import CarteiraEconomicaContent from "@/components/dashboard/controladoria/carteira-economica-content";
+import CarteiraClientesContent from "@/components/dashboard/controladoria/carteira-clientes-content";
+import {
+  UsersIcon,
+  FolderOpenIcon,
+  BanknotesIcon,
+  TrophyIcon,
+} from "@/components/icons";
 
 export const metadata = {
   title: "Controladoria — LiderAdv",
@@ -19,18 +38,29 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function ControladoriaPage() {
+type Tab = "equipe" | "processos" | "economica" | "clientes";
+
+function resolveTab(raw: string | undefined): Tab {
+  if (raw === "processos" || raw === "economica" || raw === "clientes")
+    return raw;
+  return "equipe";
+}
+
+export default async function ControladoriaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const session = await getSession();
   if (!session || !hasPermission(session, "controladoria", "ver")) notFound();
 
-  // "Carga da equipe" e o Ranking mostram nome, cargo e agregados (total
-  // aberto, pontos, % no prazo) de cada colaborador — quem não tem
-  // processos_ver_todos só deve ver a própria linha, não a de todo mundo
-  // (mesma regra de escopo já usada em processos/Cérebro Jurídico). O
-  // filtro entra já na query (getRankingDetalhado/getCargaColaboradores
-  // recebem o colaboradorId), não só escondendo linhas depois de
-  // recebidas — senão o JSON com nome+carga de toda a equipe chegaria ao
-  // navegador de qualquer jeito, inspecionável via DevTools.
+  const { tab: rawTab } = await searchParams;
+  const tab = resolveTab(rawTab);
+
+  // "Carga da equipe"/Ranking (aba Equipe) e a carteira de processos/clientes
+  // (abas novas) mostram nome, cargo e agregados de todo o escritório — quem
+  // não tem processos_ver_todos só deve ver o próprio recorte, mesma regra
+  // já usada em toda a Controladoria/Produção/CRM.
   const podeVerDetalhesDeTodos = hasPermission(
     session,
     "processos_ver_todos",
@@ -41,15 +71,39 @@ export default async function ControladoriaPage() {
     ? null
     : meuColaboradorId;
 
-  const [ranking, carga, capacidade] = await Promise.all([
-    getRankingDetalhado(30, colaboradorIdParaFiltro),
-    getCargaColaboradores(colaboradorIdParaFiltro),
-    getCapacidadeResumo(8),
-  ]);
+  const [ranking, carga, capacidade] =
+    tab === "equipe"
+      ? await Promise.all([
+          getRankingDetalhado(30, colaboradorIdParaFiltro),
+          getCargaColaboradores(colaboradorIdParaFiltro),
+          getCapacidadeResumo(8),
+        ])
+      : [[], [], null];
 
-  // Camada extra (defense-in-depth): pro caso raro de admin/sócio olhando a
-  // própria linha, ou de algum caminho futuro voltar a chamar as funções
-  // acima sem o filtro — nunca depender só de uma das duas camadas.
+  const [carteiraResumo, rankingTipoAcao, desfechosAdm] =
+    tab === "processos"
+      ? await Promise.all([
+          getCarteiraResumo(colaboradorIdParaFiltro),
+          getRankingTipoAcao(colaboradorIdParaFiltro),
+          getDesfechosAdministrativos(colaboradorIdParaFiltro),
+        ])
+      : [null, [], null];
+
+  const carteiraResumoEconomica =
+    tab === "economica"
+      ? await getCarteiraResumo(colaboradorIdParaFiltro)
+      : null;
+
+  const [clientesResumo, clientesPorMes, clientesPorUF, clientesPorOrigem] =
+    tab === "clientes"
+      ? await Promise.all([
+          getClientesResumo(colaboradorIdParaFiltro),
+          getClientesPorMes(24),
+          getClientesPorUF(),
+          getClientesPorOrigem(),
+        ])
+      : [null, [], null, null];
+
   const cargaFiltrada = filtrarCargaPorPermissao(
     carga,
     podeVerDetalhesDeTodos,
@@ -61,6 +115,29 @@ export default async function ControladoriaPage() {
     meuColaboradorId
   );
 
+  const tabDef: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    {
+      key: "equipe",
+      label: "Equipe",
+      icon: <TrophyIcon className="h-4 w-4 flex-shrink-0" />,
+    },
+    {
+      key: "processos",
+      label: "Processos",
+      icon: <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />,
+    },
+    {
+      key: "economica",
+      label: "Econômica",
+      icon: <BanknotesIcon className="h-4 w-4 flex-shrink-0" />,
+    },
+    {
+      key: "clientes",
+      label: "Clientes",
+      icon: <UsersIcon className="h-4 w-4 flex-shrink-0" />,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -68,17 +145,61 @@ export default async function ControladoriaPage() {
           Controladoria
         </h1>
         <p className="mt-1 font-body text-sm text-muted">
-          Ranking de produtividade, carga da equipe e vazão de trabalho — a
-          visão que atravessa todas as outras.
+          Ranking de produtividade, carga da equipe, carteira de processos e
+          clientes — a visão que atravessa todas as outras.
         </p>
       </div>
-      <ControladoriaContent
-        ranking={rankingFiltrado}
-        carga={cargaFiltrada}
-        capacidade={capacidade}
-        podeVerDetalhesDeTodos={podeVerDetalhesDeTodos}
-        meuColaboradorId={meuColaboradorId}
-      />
+
+      <div className="overflow-x-auto scrollbar-none">
+        <div className="flex gap-1 rounded-xl border border-border bg-white p-1 w-fit shadow-sm">
+          {tabDef.map(({ key, label, icon }) => (
+            <Link
+              key={key}
+              href={
+                key === "equipe"
+                  ? "/dashboard/controladoria"
+                  : `/dashboard/controladoria?tab=${key}`
+              }
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-semibold transition-colors duration-150 sm:gap-2 sm:px-4 sm:py-2 whitespace-nowrap ${
+                tab === key
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              {icon}
+              {label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {tab === "equipe" && (
+        <ControladoriaContent
+          ranking={rankingFiltrado}
+          carga={cargaFiltrada}
+          capacidade={capacidade!}
+          podeVerDetalhesDeTodos={podeVerDetalhesDeTodos}
+          meuColaboradorId={meuColaboradorId}
+        />
+      )}
+      {tab === "processos" && (
+        <CarteiraProcessosContent
+          resumo={carteiraResumo!}
+          rankingTipoAcao={rankingTipoAcao}
+          desfechosAdm={desfechosAdm!}
+        />
+      )}
+      {tab === "economica" && (
+        <CarteiraEconomicaContent resumo={carteiraResumoEconomica!} />
+      )}
+      {tab === "clientes" && (
+        <CarteiraClientesContent
+          resumo={clientesResumo!}
+          porMes={clientesPorMes}
+          porUF={clientesPorUF!}
+          porOrigem={clientesPorOrigem!}
+        />
+      )}
     </div>
   );
 }

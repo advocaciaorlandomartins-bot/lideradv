@@ -819,6 +819,10 @@ function StatsBar({
   );
 }
 
+// Sentinela pro filtro/chip de "sem responsável" — não pode ser um UUID real
+// pra nunca colidir com um responsavel_id de verdade.
+const SEM_RESPONSAVEL = "__sem-responsavel__";
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function ProducaoContent({
@@ -870,23 +874,44 @@ export default function ProducaoContent({
         !(p.numero ?? "").toLowerCase().includes(q)
       )
         return false;
-      if (filterResponsavel && p.responsavel_id !== filterResponsavel)
+      if (filterResponsavel === SEM_RESPONSAVEL) {
+        if (p.responsavel_id) return false;
+      } else if (filterResponsavel && p.responsavel_id !== filterResponsavel) {
         return false;
+      }
       return true;
     });
   }, [processos, search, filterResponsavel]);
 
   // Contagem por responsável (processos ativos, sem contar arquivados) — usada
   // na faixa de resumo para o admin ver a carga de cada colaborador de relance.
+  // Inclui um bucket "Sem responsável" pra a soma dos chips sempre bater com
+  // o total de casos ativos (senão um caso não atribuído some da contagem
+  // sem explicação, dando a impressão de números que "não conferem").
   const contagemPorResponsavel = useMemo(() => {
     const map = new Map<string, number>();
+    let semResponsavel = 0;
     for (const p of processos) {
-      if (!p.responsavel_id || p.estagio_producao === "arquivado") continue;
+      if (p.estagio_producao === "arquivado") continue;
+      if (!p.responsavel_id) {
+        semResponsavel++;
+        continue;
+      }
       map.set(p.responsavel_id, (map.get(p.responsavel_id) ?? 0) + 1);
     }
-    return responsaveis
+    const nomeados = responsaveis
       .map((r) => ({ ...r, count: map.get(r.id) ?? 0 }))
       .filter((r) => r.count > 0);
+    return semResponsavel > 0
+      ? [
+          ...nomeados,
+          {
+            id: SEM_RESPONSAVEL,
+            nome: "Sem responsável",
+            count: semResponsavel,
+          },
+        ]
+      : nomeados;
   }, [processos, responsaveis]);
 
   const byEstagio = Object.fromEntries(
@@ -933,6 +958,9 @@ export default function ProducaoContent({
                 {r.nome}
               </option>
             ))}
+            {contagemPorResponsavel.some((r) => r.id === SEM_RESPONSAVEL) && (
+              <option value={SEM_RESPONSAVEL}>Sem responsável</option>
+            )}
           </select>
         )}
         <div className="ml-auto flex items-center gap-2">
@@ -964,20 +992,44 @@ export default function ProducaoContent({
       {!filterResponsavel && contagemPorResponsavel.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
-            Por responsável:
+            Por responsável
           </span>
-          {contagemPorResponsavel.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => setFilterResponsavel(r.id)}
-              className="flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1 font-body text-xs font-semibold text-fg transition-colors hover:border-primary hover:text-primary cursor-pointer"
-            >
-              {r.nome}
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-muted">
-                {r.count}
-              </span>
-            </button>
-          ))}
+          <span className="font-body text-[11px] text-muted">
+            ({contagemPorResponsavel.reduce((s, r) => s + r.count, 0)} caso
+            {contagemPorResponsavel.reduce((s, r) => s + r.count, 0) !== 1
+              ? "s"
+              : ""}{" "}
+            ativo
+            {contagemPorResponsavel.reduce((s, r) => s + r.count, 0) !== 1
+              ? "s"
+              : ""}
+            )
+          </span>
+          {contagemPorResponsavel.map((r) => {
+            const semResp = r.id === SEM_RESPONSAVEL;
+            return (
+              <button
+                key={r.id}
+                onClick={() => setFilterResponsavel(r.id)}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-xs font-semibold transition-colors cursor-pointer ${
+                  semResp
+                    ? "border-dashed border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-400"
+                    : "border-border bg-white text-fg hover:border-primary hover:text-primary"
+                }`}
+              >
+                {r.nome}
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                    semResp
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-slate-100 text-muted"
+                  }`}
+                >
+                  {r.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 

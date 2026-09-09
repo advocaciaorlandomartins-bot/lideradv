@@ -6,6 +6,11 @@ import {
   agendarLembretesCompromissoPrevBot,
   agendarLembretesContaPendente,
 } from "@/lib/lembretes";
+import {
+  listarCompromissosProximos,
+  TIPO_LABELS_COMP,
+  TIPO_ICONS_COMP,
+} from "@/lib/compromissos-db";
 
 export const dynamic = "force-dynamic";
 
@@ -126,8 +131,12 @@ INTENÇÕES POSSÍVEIS:
    (reunião, consulta, audiência) OU pessoal (tomar remédio, ir dormir, acordar,
    ligar pra alguém, levar o carro na oficina, etc.) → "agenda". Se tem uma ação
    e um horário/dia, é "agenda" — não precisa ser compromisso de escritório.
-5. Só use "desconhecido" quando a mensagem realmente não tiver NENHUMA ação,
-   valor ou horário identificável (ex.: "oi", "bom dia", pergunta solta).
+5. Pedido pra VER/CONSULTAR a agenda — "me manda meus compromissos", "o que eu
+   tenho marcado", "qual minha agenda essa semana", "tem algo marcado pra
+   amanhã?" → "consultar_agenda". Isso é uma CONSULTA (não cria nada novo) —
+   diferente de "agenda", que CRIA um compromisso novo.
+6. Só use "desconhecido" quando a mensagem realmente não tiver NENHUMA ação,
+   valor, horário ou pedido de consulta identificável (ex.: "oi", "bom dia").
 
 FORMATOS DE RESPOSTA:
 
@@ -142,6 +151,9 @@ Para despesa pendente:
 
 Para agenda:
 {"intent":"agenda","titulo":"Reunião com cliente","tipo":"reuniao","data":"YYYY-MM-DD","hora":"14:00","local":"Escritório","descricao":"Assunto da reunião"}
+
+Para consultar agenda:
+{"intent":"consultar_agenda"}
 
 Para não identificado:
 {"intent":"desconhecido"}
@@ -184,6 +196,7 @@ type AIResult =
       local?: string;
       descricao?: string;
     }
+  | { intent: "consultar_agenda" }
   | { intent: "desconhecido" };
 
 // ── POST /api/integracoes/prevbot/usuario ─────────────────────────────────────
@@ -398,6 +411,35 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // ── CONSULTAR AGENDA ─────────────────────────────────────────────────────
+
+    if (result.intent === "consultar_agenda") {
+      const proximos = await listarCompromissosProximos(usuarioLogin, 14);
+
+      if (proximos.length === 0) {
+        return NextResponse.json({
+          ok: true,
+          acao: "agenda_consultada",
+          resposta:
+            "📅 Você não tem nenhum compromisso marcado nos próximos 14 dias.",
+        });
+      }
+
+      const linhas = proximos.map((c) => {
+        const icone = TIPO_ICONS_COMP[c.tipo] ?? "📌";
+        const label = TIPO_LABELS_COMP[c.tipo] ?? c.tipo;
+        const dataFmt = formatarDataPT(c.data_inicio);
+        const horaStr = c.hora_inicio ? ` às ${c.hora_inicio}` : "";
+        return `${icone} *${c.titulo}* (${label})\n🗓️ ${dataFmt}${horaStr}`;
+      });
+
+      return NextResponse.json({
+        ok: true,
+        acao: "agenda_consultada",
+        resposta: `📅 *Seus próximos compromissos:*\n\n${linhas.join("\n\n")}`,
+      });
+    }
+
     // ── NÃO IDENTIFICADO ─────────────────────────────────────────────────────
 
     return NextResponse.json({
@@ -407,7 +449,8 @@ export async function POST(req: NextRequest) {
         "Não entendi a mensagem. 🤔\n\nExemplos que funcionam:\n\n" +
         "💸 *Despesa:* _gastei R$150 com cartório hoje_\n" +
         "💰 *Receita:* _recebi R$2000 de honorário do processo Silva_\n" +
-        "📅 *Agenda:* _agende consulta com João sexta às 14h no escritório_\n\n" +
+        "📅 *Agenda:* _agende consulta com João sexta às 14h no escritório_\n" +
+        "🗓️ *Ver agenda:* _me manda meus compromissos_\n\n" +
         "Pode enviar texto, áudio ou foto de comprovante/nota fiscal.",
     });
   } catch (err) {

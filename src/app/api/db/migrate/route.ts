@@ -263,6 +263,15 @@ export async function GET() {
       sql`ALTER TABLE compromissos ADD COLUMN IF NOT EXISTS cliente_id UUID REFERENCES clients(id) ON DELETE SET NULL`
   );
 
+  // Marca quando o cliente confirmou presença respondendo "SIM" ao convite de
+  // WhatsApp — antes disso o convite pedia confirmação mas nada processava a
+  // resposta, então o escritório nunca sabia quem realmente tinha confirmado.
+  await run(
+    "compromissos.confirmado_em",
+    () =>
+      sql`ALTER TABLE compromissos ADD COLUMN IF NOT EXISTS confirmado_em TIMESTAMPTZ`
+  );
+
   await run(
     "mensagens_config",
     () => sql`

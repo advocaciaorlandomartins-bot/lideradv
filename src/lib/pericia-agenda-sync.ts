@@ -24,6 +24,11 @@ import { enviarMensagemDireta } from "./prevbot-outbound";
  * que na verdade era o celular do próprio advogado (usado pra agendar a
  * perícia em nome do cliente no Meu INSS), não da família.
  */
+const TIPO_PERICIA_LABEL: Record<string, string> = {
+  pericia_administrativa: "Perícia Médica",
+  avaliacao_social_administrativa: "Avaliação Social",
+};
+
 export async function sincronizarCompromissoDaPericia(
   periciaId: string
 ): Promise<{ sincronizado: boolean; avisoEnviado: boolean }> {
@@ -76,18 +81,26 @@ export async function sincronizarCompromissoDaPericia(
           telefone: String(cliente.responsavel_telefone),
         }
       : null;
-  const clienteContato =
-    !clienteResponsavel && cliente.phone
-      ? {
-          id: String(cliente.id),
-          nome: String(cliente.name),
-          telefone: String(cliente.phone),
-        }
-      : null;
+  // Sempre passa o cliente (não só "quando não há responsável") — é o nome
+  // dele que agendarNotificacoesCompromisso usa no prefixo "Compromisso de:
+  // X" quando a mensagem vai pro responsável. Sem isso, a mensagem pra mãe/
+  // responsável saía sem dizer de qual filho(a) era a consulta — bug real:
+  // mandou "Olá, THAMIRES! Gostaríamos de confirmar o Consulta..." sem
+  // mencionar o Anthony em lugar nenhum, parecendo compromisso da própria
+  // Thamires.
+  const clienteContato = cliente.phone
+    ? {
+        id: String(cliente.id),
+        nome: String(cliente.name),
+        telefone: String(cliente.phone),
+      }
+    : null;
+  const tituloLabel =
+    TIPO_PERICIA_LABEL[pericia.tipo] ?? String(pericia.tipo).replace(/_/g, " ");
 
   await agendarNotificacoesCompromisso({
     compromissoId: pericia.compromisso_id,
-    titulo: String(pericia.tipo),
+    titulo: tituloLabel,
     tipo: "consulta",
     dataEvento,
     hora: horaFmt,
@@ -109,9 +122,12 @@ export async function sincronizarCompromissoDaPericia(
     const localStr = pericia.local_pericia
       ? `\n📍 ${pericia.local_pericia}`
       : "";
+    // Sempre nomeia o cliente explicitamente — quando enviado ao responsável
+    // legal, "sua avaliação" sozinho não diz de qual filho(a) se trata.
+    const deQuem = clienteResponsavel ? ` de ${String(cliente.name)}` : "";
     const mensagem =
       `🔄 *Avaliação remarcada*\n\n` +
-      `Sua avaliação (${String(pericia.tipo).replace(/_/g, " ")}) foi remarcada para *${dataFmt}${horaStr}*.` +
+      `A ${tituloLabel.toLowerCase()}${deQuem} foi remarcada para *${dataFmt}${horaStr}*.` +
       `${localStr}\n\nQualquer dúvida, fale com o escritório.`;
     const res = await enviarMensagemDireta({
       telefone: destino.telefone,

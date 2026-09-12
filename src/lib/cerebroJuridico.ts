@@ -2442,9 +2442,13 @@ Se houver prazo, quando vence e qual a base legal do prazo.
 ## BASE LEGAL
 Dispositivo que fundamenta a providência.`;
 
+  // Sonnet, não Haiku: isto interpreta o impacto do andamento no caso e
+  // manda a "próxima ação obrigatória" (com base legal) direto pro
+  // advogado — é raciocínio jurídico, não extração de dado, mesma
+  // categoria do Diagnóstico Estratégico (que já usa Sonnet).
   const resp = await getClaudeClient().messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 600,
+    model: "claude-sonnet-5",
+    max_tokens: 900,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -2587,9 +2591,11 @@ Responda SOMENTE o JSON abaixo (sem markdown, sem texto fora do JSON):
   "perfil_caso": "descrição do perfil de caso ideal para este tipo de ação"
 }`;
 
+  // Sonnet: isto vira tese/argumento reaproveitado em casos futuros
+  // (cerebro_teses) — erro de leitura aqui se propaga pra outras análises.
   const resp = await getClaudeClient().messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 800,
+    model: "claude-sonnet-5",
+    max_tokens: 1100,
     messages: [{ role: "user", content: prompt }],
   });
 

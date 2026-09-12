@@ -31,6 +31,7 @@ import ProcessosFiltroModal, {
 import ProcessosSettingsModal, {
   useProcessosSettings,
 } from "./processos-settings-modal";
+import CadastroSimplesModal from "./cadastro-simples-modal";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -254,7 +255,7 @@ const QUICK_FILTERS_KEY = "advmartins:processos:quick-filters";
 
 export default function ProcessosContent({
   processos,
-  clients: _clients,
+  clients,
   initialBusca,
 }: ProcessosContentProps) {
   const router = useRouter();
@@ -309,6 +310,7 @@ export default function ProcessosContent({
     useState<FiltroAvancado>(FILTRO_INICIAL);
   const [showSettings, setShowSettings] = useState(false);
   const [showNovo, setShowNovo] = useState(false);
+  const [showCadastroSimples, setShowCadastroSimples] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showQuick, setShowQuick] = useState(false);
 
@@ -672,10 +674,10 @@ export default function ProcessosContent({
                 <DropdownItem
                   icon={FolderOpenIcon}
                   label="Cadastro automático CNJ"
-                  description="Busca e preenche via tribunal"
+                  description="Busca órgão/vara e dados via tribunal"
                   onClick={() => {
                     setShowNovo(false);
-                    alert("Integração com CNJ disponível em breve.");
+                    setShowCadastroSimples(true);
                   }}
                 />
               </DropdownMenu>
@@ -1245,6 +1247,13 @@ export default function ProcessosContent({
         onClose={() => setShowSettings(false)}
         settings={settings}
         onSave={saveSettings}
+      />
+
+      <CadastroSimplesModal
+        open={showCadastroSimples}
+        onClose={() => setShowCadastroSimples(false)}
+        clients={clients}
+        onSuccess={() => router.refresh()}
       />
     </div>
   );

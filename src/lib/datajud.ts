@@ -65,6 +65,10 @@ interface DatajudProcesso {
   dataHoraUltimaAtualizacao?: string;
   movimentos?: DatajudMovimento[];
   partes?: DatajudParte[];
+  classe?: { codigo?: number; nome?: string };
+  assuntos?: { codigo?: number; nome?: string }[];
+  dataAjuizamento?: string;
+  grau?: string;
 }
 
 // Movimento codes que indicam publicação/intimação com prazo processual
@@ -231,6 +235,85 @@ export async function buscarMovimentosPorProcesso(
   } catch (err) {
     console.error(`Erro DataJud processo ${numeroProcesso}:`, err);
     return 0;
+  }
+}
+
+export interface DadosProcessoCNJ {
+  tribunal: string;
+  orgaoJulgador: string | null;
+  classe: string | null;
+  assuntos: string[];
+  dataAjuizamento: string | null;
+  grau: string | null;
+  partes: { tipo: string; nome: string }[];
+}
+
+// Busca dados de cadastro (não publicações) de um processo pelo número CNJ —
+// usado pelo "Cadastro automático CNJ" pra pré-preencher órgão/vara, assunto
+// e data de distribuição. IMPORTANTE: a API pública do CNJ tem uma limitação
+// conhecida (confirmada em produção) — pra vários tribunais, entre eles
+// TJAL/TRF5/TRT19, o campo "partes" costuma vir vazio mesmo quando o processo
+// existe. Por isso `partes` aqui é só informativo (o usuário confere e copia
+// manualmente) — nunca deve ser usado pra preencher/decidir o cliente sozinho.
+export async function buscarProcessoPorCNJ(
+  numeroProcesso: string,
+  apiKey: string
+): Promise<DadosProcessoCNJ | null> {
+  const tribunalIndex = tribunalIndexDoCNJ(numeroProcesso);
+  if (!tribunalIndex) return null;
+
+  const numDigits = numeroProcesso.replace(/\D/g, "");
+  if (numDigits.length !== 20) return null;
+
+  try {
+    const res = await fetch(`${DATAJUD_BASE}/${tribunalIndex}/_search`, {
+      method: "POST",
+      headers: {
+        Authorization: `ApiKey ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: { term: { numeroProcesso: numDigits } },
+        size: 1,
+        _source: true,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const src: DatajudProcesso = data?.hits?.hits?.[0]?._source;
+    if (!src) return null;
+
+    const tribunalNome =
+      src.tribunal ??
+      tribunalIndex
+        .replace("api_publica_", "")
+        .toUpperCase()
+        .replace(/^TJ([A-Z]+)$/, "TJ-$1")
+        .replace(/^TRT(\d+)$/, "TRT $1ª Região");
+
+    return {
+      tribunal: tribunalNome,
+      orgaoJulgador: src.orgaoJulgador?.nome ?? null,
+      classe: src.classe?.nome ?? null,
+      assuntos: (src.assuntos ?? [])
+        .map((a) => a.nome)
+        .filter(Boolean) as string[],
+      dataAjuizamento: src.dataAjuizamento
+        ? src.dataAjuizamento.slice(0, 10)
+        : null,
+      grau: src.grau ?? null,
+      partes: (src.partes ?? [])
+        .filter((p) => p.nome)
+        .map((p) => ({ tipo: p.tipo ?? "Parte", nome: p.nome as string })),
+    };
+  } catch (err) {
+    console.error(
+      `Erro DataJud (buscarProcessoPorCNJ) ${numeroProcesso}:`,
+      err
+    );
+    return null;
   }
 }
 

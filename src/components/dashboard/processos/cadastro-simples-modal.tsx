@@ -9,7 +9,6 @@ import {
   CheckIcon,
   GlobeAltIcon,
   BuildingOfficeIcon,
-  WifiIcon,
 } from "@/components/icons";
 import { createProcessoAction } from "@/lib/processo-actions";
 
@@ -55,6 +54,32 @@ const INSTANCIAS = [
 
 const ENVOLVIMENTOS = ["Autor", "Réu", "Interessado", "Terceiro", "Testemunha"];
 
+// Mapeia o dígito "J" do número CNJ (posição 14, resolução CNJ 65/2008) pro
+// texto do select "Justiça" — só cobre os ramos que já existem na lista
+// JUSTICAS; os demais (Militar, CNJ) ficam sem sugestão automática.
+function justicaDoCNJ(numeroDigits: string): string | null {
+  const j = numeroDigits[13];
+  const mapa: Record<string, string> = {
+    "1": "Supremo Tribunal Federal",
+    "3": "Superior Tribunal de Justiça",
+    "4": "Justiça Federal",
+    "5": "Justiça do Trabalho",
+    "6": "Justiça Eleitoral",
+    "8": "Justiça dos Estados",
+  };
+  return mapa[j] ?? null;
+}
+
+interface DadosProcessoCNJ {
+  tribunal: string;
+  orgaoJulgador: string | null;
+  classe: string | null;
+  assuntos: string[];
+  dataAjuizamento: string | null;
+  grau: string | null;
+  partes: { tipo: string; nome: string }[];
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -90,38 +115,6 @@ function Field({
   );
 }
 
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-slate-50 px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        <WifiIcon className="h-4 w-4 text-muted" />
-        <span className="font-body text-sm text-fg">{label}</span>
-      </div>
-      <button
-        type="button"
-        onClick={onChange}
-        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-          checked ? "bg-primary" : "bg-slate-200"
-        }`}
-      >
-        <span
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-            checked ? "translate-x-4" : "translate-x-0"
-          }`}
-        />
-      </button>
-    </div>
-  );
-}
-
 export default function CadastroSimplesModal({
   open,
   onClose,
@@ -131,13 +124,16 @@ export default function CadastroSimplesModal({
 }: Props) {
   const [aba, setAba] = useState<Aba>("judicial");
   const [criarOutro, setCriarOutro] = useState(false);
-  const [monitorar, setMonitorar] = useState(false);
-  const [isCliente, setIsCliente] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [tipoAcaoSel, setTipoAcaoSel] = useState("");
   const [tipoAcaoManual, setTipoAcaoManual] = useState("");
   const [cnj, setCnj] = useState("");
+  const [justica, setJustica] = useState("");
+  const [comarca, setComarca] = useState("");
+  const [capturaInfo, setCapturaInfo] = useState<DadosProcessoCNJ | null>(null);
+  const [capturaErro, setCapturaErro] = useState<string | null>(null);
+  const [capturando, setCapturando] = useState(false);
 
   if (!open) return null;
 
@@ -145,7 +141,10 @@ export default function CadastroSimplesModal({
     setTipoAcaoSel("");
     setTipoAcaoManual("");
     setCnj("");
-    setMonitorar(false);
+    setJustica("");
+    setComarca("");
+    setCapturaInfo(null);
+    setCapturaErro(null);
     setError(null);
   }
 
@@ -170,9 +169,37 @@ export default function CadastroSimplesModal({
     });
   }
 
-  function handleCnjCapture() {
-    // Placeholder for CNJ auto-capture
-    alert("Captura automática via CNJ será integrada com a API do Tribunal.");
+  async function handleCnjCapture() {
+    const digits = cnj.replace(/\D/g, "");
+    if (digits.length !== 20) {
+      setCapturaErro("Digite o número CNJ completo (20 dígitos) primeiro.");
+      setCapturaInfo(null);
+      return;
+    }
+    setCapturando(true);
+    setCapturaErro(null);
+    setCapturaInfo(null);
+    try {
+      const res = await fetch("/api/processos/buscar-cnj", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ numero: cnj }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setCapturaErro(json?.error ?? "Não foi possível buscar o processo.");
+        return;
+      }
+      const dados = json.dados as DadosProcessoCNJ;
+      setCapturaInfo(dados);
+      if (dados.orgaoJulgador) setComarca(dados.orgaoJulgador);
+      const justicaSugerida = justicaDoCNJ(digits);
+      if (justicaSugerida) setJustica(justicaSugerida);
+    } catch {
+      setCapturaErro("Erro de conexão ao consultar o tribunal.");
+    } finally {
+      setCapturando(false);
+    }
   }
 
   const tipoAcaoFinal = tipoAcaoSel === "outro" ? tipoAcaoManual : tipoAcaoSel;
@@ -283,12 +310,60 @@ export default function CadastroSimplesModal({
                     <button
                       type="button"
                       onClick={handleCnjCapture}
-                      title="Captura automática via CNJ"
-                      className="flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted transition-colors hover:border-primary hover:text-primary"
+                      disabled={capturando || isPending}
+                      title="Buscar órgão/vara e dados do processo no tribunal"
+                      className="flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-white text-muted transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <GlobeAltIcon className="h-4 w-4" />
+                      {capturando ? (
+                        <SpinnerIcon className="h-4 w-4" />
+                      ) : (
+                        <GlobeAltIcon className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
+                  {capturaErro && (
+                    <p className="mt-1.5 font-body text-xs text-red-600">
+                      {capturaErro}
+                    </p>
+                  )}
+                  {capturaInfo && (
+                    <div className="mt-2 space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-body text-xs text-emerald-800">
+                      <p>
+                        Encontrado no {capturaInfo.tribunal}
+                        {capturaInfo.dataAjuizamento
+                          ? ` — distribuído em ${new Date(capturaInfo.dataAjuizamento + "T12:00:00").toLocaleDateString("pt-BR")}`
+                          : ""}
+                        . Órgão/vara e justiça preenchidos abaixo — confira.
+                      </p>
+                      {capturaInfo.classe && (
+                        <p>
+                          <strong>Classe no tribunal:</strong>{" "}
+                          {capturaInfo.classe} — escolha o Assunto
+                          correspondente abaixo manualmente.
+                        </p>
+                      )}
+                      {capturaInfo.assuntos.length > 0 && (
+                        <p>
+                          <strong>Assuntos:</strong>{" "}
+                          {capturaInfo.assuntos.join(", ")}
+                        </p>
+                      )}
+                      {capturaInfo.partes.length > 0 ? (
+                        <p>
+                          <strong>Partes (conferir manualmente):</strong>{" "}
+                          {capturaInfo.partes
+                            .map((p) => `${p.nome} (${p.tipo})`)
+                            .join("; ")}
+                        </p>
+                      ) : (
+                        <p className="text-emerald-700/80">
+                          O tribunal não disponibilizou o nome das partes nesta
+                          consulta pública — comum em TJAL/TRF5/TRT19. Confira o
+                          cliente/parte contrária manualmente.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </Field>
 
                 {/* Assunto */}
@@ -328,9 +403,10 @@ export default function CadastroSimplesModal({
                   <Field label="Justiça">
                     <select
                       name="vara"
+                      value={justica}
+                      onChange={(e) => setJustica(e.target.value)}
                       disabled={isPending}
                       className={selectCls}
-                      defaultValue=""
                     >
                       <option value="">Justiça dos Estados</option>
                       {JUSTICAS.map((j) => (
@@ -362,6 +438,8 @@ export default function CadastroSimplesModal({
                     name="comarca"
                     type="text"
                     placeholder="Nome, sigla, cidade ou estado…"
+                    value={comarca}
+                    onChange={(e) => setComarca(e.target.value)}
                     disabled={isPending}
                     className={inputCls}
                   />
@@ -459,29 +537,13 @@ export default function CadastroSimplesModal({
               </select>
             </Field>
 
-            {/* Monitorar toggle */}
-            <Toggle
-              label="Monitorar processo (Push)"
-              checked={monitorar}
-              onChange={() => setMonitorar((p) => !p)}
-            />
-
-            {/* É cliente */}
-            <label className="flex cursor-pointer items-center gap-3">
-              <div
-                className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
-                  isCliente
-                    ? "border-primary bg-primary"
-                    : "border-border bg-white"
-                }`}
-                onClick={() => setIsCliente((p) => !p)}
-              >
-                {isCliente && <CheckIcon className="h-3 w-3 text-white" />}
-              </div>
-              <span className="font-body text-sm text-fg">
-                A parte é cliente do escritório
-              </span>
-            </label>
+            {aba === "judicial" && cnj && (
+              <p className="rounded-lg border border-border bg-slate-50 px-3 py-2 font-body text-xs text-muted">
+                Todo processo com número CNJ completo já é monitorado
+                automaticamente (novas publicações entram sozinhas em
+                Publicações) — não precisa ativar nada.
+              </p>
+            )}
           </div>
 
           {/* Footer */}

@@ -2,6 +2,8 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarEntidade } from "@/lib/acesso";
 import { prepararAnalise, salvarAnalise } from "@/lib/cerebroJuridico";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 
@@ -10,7 +12,7 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session?.id) {
+  if (!session?.id || !hasPermission(session, "processos", "ver")) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
@@ -40,6 +42,14 @@ export async function POST(req: NextRequest) {
       { error: "processo_id obrigatório e deve ser UUID válido" },
       { status: 400 }
     );
+  }
+
+  // Sem isto, qualquer usuário logado (mesmo sem nenhum acesso a
+  // "processos") conseguia gerar e ler via streaming a análise jurídica
+  // completa de QUALQUER processo do escritório só sabendo/adivinhando o
+  // UUID — inclui CPF, CID/diagnóstico, benefício e valor da causa.
+  if (!(await podeAcessarEntidade(session, "processo", processo_id))) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   // Preparação síncrona (DB queries + build prompt) — rápido, < 2s

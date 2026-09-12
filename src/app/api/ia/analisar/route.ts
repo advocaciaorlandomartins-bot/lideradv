@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarEntidade } from "@/lib/acesso";
 import { analisarDocumentoExtendido } from "@/lib/ai-juridico";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { getClientFull } from "@/lib/clients-db";
@@ -181,6 +182,23 @@ export async function POST(req: Request) {
     clienteId = sanitizeUuid(form.get("clienteId"));
     processoId = sanitizeUuid(form.get("processoId"));
     tipoAnalise = (form.get("tipoAnalise") as string | null) ?? "completa";
+  }
+
+  // Sem isto, qualquer usuário com "processos:ver" (concedido a
+  // Advogado(a)/Estagiário(a)/Colaborador(a) mesmo sem "processos_ver_todos")
+  // conseguia passar o processoId/clienteId de OUTRO colaborador e receber de
+  // volta CPF, endereço, CID/diagnóstico, benefício e senha_cliente/senha_inss.
+  if (
+    processoId &&
+    !(await podeAcessarEntidade(session, "processo", processoId))
+  ) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  }
+  if (
+    clienteId &&
+    !(await podeAcessarEntidade(session, "cliente", clienteId))
+  ) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   const [escritorio, cliente, processo] = await Promise.all([

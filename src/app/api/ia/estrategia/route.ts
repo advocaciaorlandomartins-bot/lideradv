@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarEntidade } from "@/lib/acesso";
 import { estrategiaProcessual, SKILLS, type SkillId } from "@/lib/ai-juridico";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { getClientFull } from "@/lib/clients-db";
@@ -57,6 +58,19 @@ export async function POST(req: Request) {
 
   if (!SKILLS[skill as SkillId]) {
     return NextResponse.json({ error: "Skill inválida." }, { status: 400 });
+  }
+
+  if (
+    processoId &&
+    !(await podeAcessarEntidade(session, "processo", processoId))
+  ) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  }
+  if (
+    clienteId &&
+    !(await podeAcessarEntidade(session, "cliente", clienteId))
+  ) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   const [escritorio, cliente, processo] = await Promise.all([

@@ -14,7 +14,8 @@ import { enviarMensagemDireta } from "./prevbot-outbound";
  * Chame isto depois de qualquer UPDATE em `pericias` que mude data/hora/
  * local — só age quando a perícia já está ligada a um compromisso
  * (`pericias.compromisso_id`); perícias criadas antes desse vínculo existir
- * precisam ser ligadas manualmente uma vez (ver scripts/vincula-pericias-compromissos-orfaos.ts).
+ * (ou sem compromisso correspondente na Agenda) precisam ser ligadas
+ * manualmente uma vez — ver o caso do Anthony corrigido em 11/09/2026.
  *
  * IMPORTANTE: o telefone usado pra avisar é sempre o CADASTRADO no cliente
  * (respeitando o redirecionamento pra responsável legal quando

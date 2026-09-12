@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { head } from "@vercel/blob";
 import { getSession } from "@/lib/session";
 import { podeAcessarEntidade } from "@/lib/acesso";
 import sql from "@/lib/db";
@@ -24,7 +23,7 @@ export async function GET(request: Request) {
 
   // Verifica que o documento existe e pertence a uma entidade ativa do sistema
   const rows = await sql`
-    SELECT d.url, d.nome, d.entity_type, d.entity_id::text
+    SELECT d.url, d.nome, d.tipo, d.entity_type, d.entity_id::text
     FROM documentos d
     WHERE d.id = ${id}::uuid
       AND (
@@ -56,9 +55,10 @@ export async function GET(request: Request) {
     );
   }
 
-  const { url, entity_type, entity_id } = rows[0] as {
+  const { url, nome, tipo, entity_type, entity_id } = rows[0] as {
     url: string;
     nome: string;
+    tipo: string | null;
     entity_type: "processo" | "cliente" | "pericia";
     entity_id: string;
   };
@@ -67,16 +67,51 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
+  const contentDisposition = (nomeArquivo: string) => {
+    const ascii = nomeArquivo.replace(/[^\x20-\x7E]/g, "_");
+    return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nomeArquivo)}`;
+  };
+
   try {
-    // Para blobs privados, head() retorna um downloadUrl assinado
-    const blob = await head(url);
-    return NextResponse.redirect(blob.downloadUrl ?? url);
+    // Blob privado: a URL crua (e o "downloadUrl" que head() devolve — que
+    // na prática é só a mesma URL com ?download=1, não uma URL assinada)
+    // exige o header Authorization pra ser lida — um redirect manda o
+    // navegador pra lá sem esse header, e ele recebe "Forbidden" puro, sem
+    // explicação nenhuma. Busca o conteúdo aqui no servidor (com o token) e
+    // devolve os bytes direto pro navegador — mesmo padrão já usado em
+    // src/app/api/ia/analisar/route.ts pra blob privado.
+    if (url.includes(".private.blob.vercel-storage.com")) {
+      const token = process.env.BLOB_READ_WRITE_TOKEN;
+      const blobRes = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!blobRes.ok || !blobRes.body) {
+        console.error(
+          `[documentos/download] fetch do blob privado falhou (${blobRes.status}) para ${id}`
+        );
+        return NextResponse.json(
+          {
+            error:
+              "Não foi possível abrir este arquivo no armazenamento. Ele pode ter sido corrompido ou removido — tente novamente ou contate o suporte.",
+          },
+          { status: 502 }
+        );
+      }
+      return new NextResponse(blobRes.body, {
+        headers: {
+          "Content-Type":
+            blobRes.headers.get("content-type") ??
+            tipo ??
+            "application/octet-stream",
+          "Content-Disposition": contentDisposition(nome),
+        },
+      });
+    }
+
+    // Blob público — sempre acessível direto, redirect é suficiente.
+    return NextResponse.redirect(url);
   } catch (err) {
-    // Blob privado sem downloadUrl válido não é acessível pela URL crua —
-    // redirecionar pra ela só trocaria "erro claro" por "Forbidden" sem
-    // explicação. Loga pra investigar (token expirado, blob removido, etc.)
-    // e devolve uma mensagem que a pessoa consegue entender.
-    console.error(`[documentos/download] head() falhou para ${id}:`, err);
+    console.error(`[documentos/download] falha inesperada para ${id}:`, err);
     return NextResponse.json(
       {
         error:

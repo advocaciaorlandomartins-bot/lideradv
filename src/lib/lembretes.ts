@@ -870,14 +870,19 @@ export async function agendarNotificacoesCompromisso(opts: {
   if (opts.cliente?.telefone || opts.clienteResponsavel?.telefone) {
     // Responsável legal tem prioridade — mensagem não vai para o menor
     const resp = opts.clienteResponsavel;
-    const destTelefone = resp?.telefone ?? opts.cliente!.telefone;
-    const destNome = resp?.nome ?? opts.cliente!.nome;
+    // Sem "!" — chamador pode legitimamente passar só clienteResponsavel
+    // (ex.: sincronização de perícia remarcada, que não busca o cliente
+    // inteiro) sem também preencher `cliente`; usar "!" aqui derrubava a
+    // função inteira com "Cannot read properties of null" nesse caso.
+    const destTelefone = resp?.telefone ?? opts.cliente?.telefone ?? "";
+    const destNome = resp?.nome ?? opts.cliente?.nome ?? "";
     const destTipo = resp ? "responsavel" : "cliente";
     const primeiroNomeDest = primeiroNome(destNome);
     // Prefixo identifica de quem é o compromisso quando endereçado ao responsável
-    const prefixoCliente = resp
-      ? `*Compromisso de: ${opts.cliente!.nome}*\n\n`
-      : "";
+    const prefixoCliente =
+      resp && opts.cliente?.nome
+        ? `*Compromisso de: ${opts.cliente.nome}*\n\n`
+        : "";
 
     // Confirmação imediata — com pedido de confirmação
     {

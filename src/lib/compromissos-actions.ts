@@ -138,17 +138,21 @@ async function agendarAvisosCompromisso(
       cliente ? ` — ${cliente.nome}` : ""
     }`;
 
+    // tipo_demanda é varchar(20) com vocabulário fixo (Judicial/
+    // Extrajudicial/Consultiva, ver TIPOS_DEMANDA) — não cabe (e não faz
+    // sentido) usar o título livre do compromisso ali. Botado sem querer
+    // antes: TODA tarefa de agenda vinha derrubando esse INSERT inteiro em
+    // silêncio ("value too long for type character varying(20)"), por isso
+    // "Minhas Tarefas" nunca mostrava nada vindo da Agenda.
     await sql`
       INSERT INTO controles
-        (tipo, data_evento, descricao, responsavel_id, cliente_id,
-         tipo_demanda, prioridade)
+        (tipo, data_evento, descricao, responsavel_id, cliente_id, prioridade)
       VALUES
         ('agenda',
          ${data.dataInicio}::date,
          ${descricao},
          ${usuarioId}::uuid,
          ${data.clienteId ? sql`${data.clienteId}::uuid` : sql`NULL`},
-         ${data.titulo},
          'normal')
     `.catch((e) => {
       console.error(

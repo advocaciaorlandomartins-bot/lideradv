@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { head } from "@vercel/blob";
 import JSZip from "jszip";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
@@ -125,10 +124,19 @@ export async function POST(request: Request) {
   const usados = new Set<string>();
   const falhas: string[] = [];
 
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
   for (const doc of selecionados) {
     try {
-      const blob = await head(doc.url);
-      const res = await fetch(blob.downloadUrl ?? doc.url);
+      // Blob privado exige o header Authorization — head().downloadUrl não
+      // é uma URL assinada de verdade (mesmo engano corrigido em
+      // /api/documentos/download), então buscar sem o token sempre falhava
+      // com 403 aqui, caindo silenciosamente em "falhas" pra todo documento
+      // privado do ZIP.
+      const headers: Record<string, string> =
+        doc.url.includes(".private.blob.vercel-storage.com") && blobToken
+          ? { Authorization: `Bearer ${blobToken}` }
+          : {};
+      const res = await fetch(doc.url, { headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const bytes = new Uint8Array(await res.arrayBuffer());
       zip.file(nomeUnico(doc.nome, usados), bytes);

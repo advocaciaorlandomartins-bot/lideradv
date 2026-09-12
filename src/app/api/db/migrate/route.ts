@@ -311,6 +311,16 @@ export async function GET() {
       sql`CREATE INDEX IF NOT EXISTS cron_execucoes_rota_idx ON cron_execucoes (rota, executado_em DESC)`
   );
 
+  // Liga perícia ao compromisso da agenda que representa o mesmo evento —
+  // sem isso, editar a data de uma perícia (Controles → Perícias) não tinha
+  // como refletir no compromisso correspondente na Agenda, nem avisar o
+  // cliente da remarcação (cada um vivia em tabela própria, sem vínculo).
+  await run(
+    "pericias.compromisso_id",
+    () =>
+      sql`ALTER TABLE pericias ADD COLUMN IF NOT EXISTS compromisso_id UUID REFERENCES compromissos(id) ON DELETE SET NULL`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

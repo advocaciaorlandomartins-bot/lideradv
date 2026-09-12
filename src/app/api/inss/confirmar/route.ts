@@ -215,7 +215,7 @@ export async function POST(req: NextRequest) {
 
       await sql`
         INSERT INTO pericias
-          (tipo, client_id, processo_id, data_pericia, hora_pericia, local_pericia, status, observacoes)
+          (tipo, client_id, processo_id, data_pericia, hora_pericia, local_pericia, status, observacoes, compromisso_id)
         VALUES
           (${tipoPericia},
            ${clienteId}::uuid,
@@ -224,7 +224,8 @@ export async function POST(req: NextRequest) {
            ${hora}::time,
            ${localCompleto},
            'agendado',
-           ${protocoloSeguro ? `Protocolo INSS: ${protocoloSeguro}` : null})
+           ${protocoloSeguro ? `Protocolo INSS: ${protocoloSeguro}` : null},
+           ${compromissoId}::uuid)
       `.catch((e) => {
         console.error("[inss/confirmar] falha ao inserir pericia:", e);
         return null;
@@ -232,7 +233,7 @@ export async function POST(req: NextRequest) {
 
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda, prioridade)
+          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, prioridade)
         VALUES
           ('pericias',
            ${dataRef}::date,
@@ -240,7 +241,6 @@ export async function POST(req: NextRequest) {
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
            ${session.id}::uuid,
-           ${tipoServicoSeguro},
            'alta')
       `.catch((e) => {
         console.error(
@@ -263,7 +263,7 @@ export async function POST(req: NextRequest) {
 
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda, prioridade, dados)
+          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, prioridade, dados)
         VALUES
           ('alvaras',
            ${dataRef}::date,
@@ -271,7 +271,6 @@ export async function POST(req: NextRequest) {
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
            ${session.id}::uuid,
-           ${tipoServicoSeguro},
            'alta',
            ${valor ? JSON.stringify({ valor }) : null}::jsonb)
       `.catch((e) => {
@@ -292,7 +291,7 @@ export async function POST(req: NextRequest) {
 
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda, prioridade, dados)
+          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, prioridade, dados)
         VALUES
           ('implantados',
            ${dataRef}::date,
@@ -300,7 +299,6 @@ export async function POST(req: NextRequest) {
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
            ${session.id}::uuid,
-           ${tipoServicoSeguro},
            'alta',
            ${valor ? JSON.stringify({ valor }) : null}::jsonb)
       `.catch((e) => {
@@ -316,7 +314,7 @@ export async function POST(req: NextRequest) {
     if (tipoDocumento === "resultado_pericia") {
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda, prioridade)
+          (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, prioridade)
         VALUES
           ('pericias',
            ${dataRef}::date,
@@ -324,7 +322,6 @@ export async function POST(req: NextRequest) {
            ${clienteId}::uuid,
            ${processoId ?? null}::uuid,
            ${session.id}::uuid,
-           ${tipoServicoSeguro},
            'alta')
       `.catch((e) => {
         console.error(

@@ -6,6 +6,7 @@ import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { logAction } from "./audit";
+import { sincronizarCompromissoDaPericia } from "./pericia-agenda-sync";
 
 export type PericiaFormState = { error: string } | null;
 
@@ -104,6 +105,25 @@ export async function updatePericiaAction(
   if (!f.clientId) return { error: "Selecione o cliente." };
   if (!f.dataPericia) return { error: "Informe a data da perícia." };
 
+  // Só dispara a remarcação (sincroniza agenda + avisa cliente) se algo que
+  // afeta o compromisso de fato mudou — não a cada edição de observação.
+  const [antes] = await sql`
+    SELECT data_pericia::text, hora_pericia::text, local_pericia
+    FROM pericias WHERE id = ${id}::uuid
+  `.catch(
+    () =>
+      [] as {
+        data_pericia: string;
+        hora_pericia: string | null;
+        local_pericia: string | null;
+      }[]
+  );
+  const remarcou =
+    !!antes &&
+    (antes.data_pericia !== f.dataPericia ||
+      (antes.hora_pericia?.slice(0, 5) ?? null) !== f.horaPericia ||
+      antes.local_pericia !== f.localPericia);
+
   try {
     await sql`
       UPDATE pericias SET
@@ -136,6 +156,13 @@ export async function updatePericiaAction(
     entidadeId: id,
     descricao: `Editou perícia: ${f.tipo}`,
   });
+
+  if (remarcou) {
+    await sincronizarCompromissoDaPericia(id).catch((err) => {
+      console.error("[updatePericiaAction] falha ao sincronizar agenda:", err);
+      return null;
+    });
+  }
 
   redirect(`/dashboard/pericias/${id}`);
 }

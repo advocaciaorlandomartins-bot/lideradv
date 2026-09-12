@@ -262,17 +262,19 @@ export async function POST(req: NextRequest) {
         clienteNome ? ` — ${clienteNome}` : ""
       }`;
 
+      // tipo_demanda é varchar(20) de vocabulário fixo (Judicial/
+      // Extrajudicial/Consultiva) — usar o título livre do compromisso ali
+      // (como estava) derrubava o INSERT inteiro em silêncio sempre que o
+      // título passava de 20 caracteres, praticamente sempre.
       await sql`
         INSERT INTO controles
-          (tipo, data_evento, descricao, responsavel_id, cliente_id,
-           tipo_demanda, prioridade)
+          (tipo, data_evento, descricao, responsavel_id, cliente_id, prioridade)
         VALUES
           ('agenda',
            ${data}::date,
            ${descricaoControle},
            ${usuarioId}::uuid,
            ${clienteId ? sql`${clienteId}::uuid` : sql`NULL`},
-           ${titulo},
            'normal')
       `.catch(() => null);
     }

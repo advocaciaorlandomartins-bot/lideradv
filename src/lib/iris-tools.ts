@@ -31,6 +31,7 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   consultar_saude_financeira: "Consultou a saúde financeira",
   listar_clientes_sem_resposta: "Consultou clientes sem resposta no WhatsApp",
   remarcar_pericia: "Remarcou uma perícia/avaliação",
+  cadastrar_cliente: "Cadastrou um novo cliente",
 };
 
 export const IRIS_TOOLS: Anthropic.Tool[] = [
@@ -322,6 +323,58 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["cliente_busca", "nova_data"],
+    },
+  },
+  {
+    name: "cadastrar_cliente",
+    description:
+      "Cadastra um novo cliente (Pessoa Física ou Jurídica) direto pelo chat, no mesmo padrão do 'cadastro rápido' da tela de Clientes: nome, documento e tipo são obrigatórios; endereço fica com placeholder até alguém completar depois na tela do cliente. SEMPRE confirme nome completo e CPF/CNPJ com quem está pedindo antes de chamar esta ferramenta — nunca invente ou arredonde um documento. Se o cliente for menor de idade ou incapaz, informe menor_incapaz=true e os dados do responsável legal (nome e telefone são obrigatórios nesse caso) — é pra esse telefone que todo aviso automático desse cliente vai, nunca pro documento/CPF do próprio menor.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tipo: {
+          type: "string",
+          description: "'PF' (pessoa física) ou 'PJ' (pessoa jurídica).",
+        },
+        name: {
+          type: "string",
+          description: "Nome completo (PF) ou razão social (PJ).",
+        },
+        doc: { type: "string", description: "CPF (PF) ou CNPJ (PJ)." },
+        email: { type: "string", description: "E-mail do cliente. Opcional." },
+        phone: {
+          type: "string",
+          description:
+            "Telefone/WhatsApp do cliente. Opcional, mas recomendado.",
+        },
+        city: { type: "string", description: "Cidade. Opcional." },
+        state: { type: "string", description: "UF (2 letras). Opcional." },
+        notes: {
+          type: "string",
+          description: "Observações rápidas. Opcional.",
+        },
+        menor_incapaz: {
+          type: "string",
+          description:
+            "'true' se o cliente é menor de idade ou incapaz. Opcional, padrão false.",
+        },
+        responsavel_nome: {
+          type: "string",
+          description:
+            "Nome do responsável legal. Obrigatório se menor_incapaz=true.",
+        },
+        responsavel_telefone: {
+          type: "string",
+          description:
+            "Telefone do responsável legal. Obrigatório se menor_incapaz=true.",
+        },
+        responsavel_parentesco: {
+          type: "string",
+          description:
+            "Parentesco do responsável (ex: mãe, pai, tutor). Opcional.",
+        },
+      },
+      required: ["tipo", "name", "doc"],
     },
   },
 ];
@@ -1248,6 +1301,113 @@ export async function executarFerramentaIris(
         observacao: resultado.sincronizado
           ? undefined
           : "Essa perícia não tem um compromisso vinculado na Agenda (perícia antiga, criada antes desse vínculo existir) — a data foi atualizada só em Perícias, sem sincronizar a Agenda nem avisar o cliente automaticamente. Avise o usuário disso.",
+      });
+    }
+
+    case "cadastrar_cliente": {
+      if (!hasPermission(session, "clientes", "criar")) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem permissão pra cadastrar clientes. Explique isso educadamente e não tente de novo.",
+        });
+      }
+
+      const tipo = String(input.tipo ?? "")
+        .trim()
+        .toUpperCase();
+      const nome = String(input.name ?? "").trim();
+      const docBruto = String(input.doc ?? "").trim();
+      if (!["PF", "PJ"].includes(tipo) || !nome || !docBruto) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Informe tipo ('PF' ou 'PJ'), name e doc.",
+        });
+      }
+      const docDigits = docBruto.replace(/\D/g, "");
+      if (!docDigits) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Documento (CPF/CNPJ) inválido.",
+        });
+      }
+
+      const menorIncapaz = String(input.menor_incapaz ?? "").trim() === "true";
+      const responsavelNome =
+        String(input.responsavel_nome ?? "").trim() || null;
+      const responsavelTelefone =
+        String(input.responsavel_telefone ?? "").trim() || null;
+      if (menorIncapaz && (!responsavelNome || !responsavelTelefone)) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Cliente marcado como menor/incapaz precisa de responsavel_nome e responsavel_telefone — é pra esse telefone que os avisos automáticos vão.",
+        });
+      }
+      const responsavelParentesco =
+        String(input.responsavel_parentesco ?? "").trim() || null;
+
+      const email = String(input.email ?? "").trim() || null;
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return JSON.stringify({ ok: false, erro: "E-mail inválido." });
+      }
+      const phone = String(input.phone ?? "").trim() || null;
+      const city = String(input.city ?? "").trim() || "—";
+      const state =
+        String(input.state ?? "")
+          .trim()
+          .toUpperCase() || "SP";
+      const notes = String(input.notes ?? "").trim() || null;
+
+      // Evita duplicar cliente já cadastrado com o mesmo CPF/CNPJ.
+      const existentes = await sql`
+        SELECT id::text, name FROM clients
+        WHERE deleted_at IS NULL AND regexp_replace(doc, '\D', '', 'g') = ${docDigits}
+        LIMIT 1
+      `;
+      if (existentes.length > 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Já existe um cliente cadastrado com esse documento: ${existentes[0].name}. Não crie duplicado — se for atualização de dados, isso precisa ser feito na tela do cliente.`,
+        });
+      }
+      if (email) {
+        const dupEmail =
+          await sql`SELECT id FROM clients WHERE email = ${email} AND deleted_at IS NULL LIMIT 1`;
+        if (dupEmail.length > 0) {
+          return JSON.stringify({
+            ok: false,
+            erro: "Esse e-mail já está cadastrado em outro cliente.",
+          });
+        }
+      }
+
+      let novoId: string;
+      try {
+        const rows = await sql`
+          INSERT INTO clients
+            (type, name, doc, email, phone, notes,
+             cep, street, addr_number, neighborhood, city, state,
+             menor_incapaz, responsavel_nome, responsavel_telefone, responsavel_parentesco)
+          VALUES
+            (${tipo}, ${nome}, ${docBruto}, ${email}, ${phone}, ${notes},
+             '00000-000', '—', 'S/N', '—', ${city}, ${state},
+             ${menorIncapaz}, ${responsavelNome}, ${responsavelTelefone}, ${responsavelParentesco})
+          RETURNING id::text
+        `;
+        novoId = String(rows[0].id);
+      } catch (err) {
+        console.error("[iris-tools] falha ao cadastrar cliente:", err);
+        return JSON.stringify({
+          ok: false,
+          erro: "Erro ao salvar o cliente no banco de dados.",
+        });
+      }
+
+      return JSON.stringify({
+        ok: true,
+        mensagem: `Cliente ${nome} cadastrado com sucesso (${tipo}).`,
+        cliente_id: novoId,
+        observacao:
+          "Endereço completo ficou com placeholder — peça pra alguém completar isso na tela do cliente quando tiver os dados.",
       });
     }
 

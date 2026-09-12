@@ -30,6 +30,7 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   listar_processos_parados: "Consultou processos parados",
   consultar_saude_financeira: "Consultou a saúde financeira",
   listar_clientes_sem_resposta: "Consultou clientes sem resposta no WhatsApp",
+  remarcar_pericia: "Remarcou uma perícia/avaliação",
 };
 
 export const IRIS_TOOLS: Anthropic.Tool[] = [
@@ -283,6 +284,44 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["entidade_tipo", "entidade_busca", "categoria", "valor"],
+    },
+  },
+  {
+    name: "remarcar_pericia",
+    description:
+      "Remarca uma perícia médica ou avaliação social já agendada (Controles → Perícias) pra uma nova data/hora/local, buscando o cliente pelo nome. Atualiza a perícia, sincroniza automaticamente o compromisso correspondente na Agenda (se houver um vinculado) e avisa o cliente (ou responsável legal, se menor/incapaz) por WhatsApp usando o telefone CADASTRADO no sistema — nunca um número lido de um documento anexado na conversa, mesmo que pareça ser do cliente. Se o cliente tiver mais de uma perícia agendada, pergunte ao usuário qual delas antes de chamar esta ferramenta (use tipo_pericia pra desambiguar se souber) em vez de adivinhar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        cliente_busca: {
+          type: "string",
+          description: "Nome (ou parte do nome) do cliente da perícia.",
+        },
+        tipo_pericia: {
+          type: "string",
+          description:
+            "Opcional, pra desambiguar quando o cliente tem mais de uma perícia agendada: 'medica' (pericia_administrativa) ou 'social' (avaliacao_social_administrativa).",
+        },
+        nova_data: {
+          type: "string",
+          description: "Nova data no formato YYYY-MM-DD.",
+        },
+        nova_hora: {
+          type: "string",
+          description: "Nova hora no formato HH:MM. Opcional.",
+        },
+        novo_local: {
+          type: "string",
+          description:
+            "Novo local, se mudou (endereço completo). Opcional — se omitido, mantém o local atual.",
+        },
+        novo_protocolo: {
+          type: "string",
+          description:
+            "Novo número de protocolo INSS, se o documento remarcado trouxer um. Opcional.",
+        },
+      },
+      required: ["cliente_busca", "nova_data"],
     },
   },
 ];
@@ -1118,6 +1157,97 @@ export async function executarFerramentaIris(
       return JSON.stringify({
         ok: true,
         mensagem: `Etiqueta ${categoria}:${valor} aplicada no processo de ${processos[0].cliente_nome}.`,
+      });
+    }
+
+    case "remarcar_pericia": {
+      if (!hasPermission(session, "controles", "editar")) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem permissão pra editar controles/perícias. Explique isso educadamente e não tente de novo.",
+        });
+      }
+
+      const clienteBusca = String(input.cliente_busca ?? "").trim();
+      const novaData = String(input.nova_data ?? "").trim();
+      if (!clienteBusca || !/^\d{4}-\d{2}-\d{2}$/.test(novaData)) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Informe cliente_busca e nova_data no formato YYYY-MM-DD.",
+        });
+      }
+      const novaHora =
+        typeof input.nova_hora === "string" &&
+        /^\d{2}:\d{2}$/.test(input.nova_hora)
+          ? input.nova_hora
+          : null;
+      const novoLocal =
+        typeof input.novo_local === "string" && input.novo_local.trim()
+          ? input.novo_local.trim()
+          : null;
+      const novoProtocolo =
+        typeof input.novo_protocolo === "string" && input.novo_protocolo.trim()
+          ? input.novo_protocolo.trim()
+          : null;
+      const tipoPericiaHint = String(input.tipo_pericia ?? "")
+        .trim()
+        .toLowerCase();
+      const tipoMap: Record<string, string> = {
+        medica: "pericia_administrativa",
+        social: "avaliacao_social_administrativa",
+      };
+
+      const candidatas = await sql`
+        SELECT p.id::text, p.tipo, p.data_pericia::text, cl.name AS cliente_nome
+        FROM pericias p
+        JOIN clients cl ON cl.id = p.client_id
+        WHERE cl.name ILIKE ${"%" + clienteBusca + "%"}
+          AND p.status = 'agendado'
+        ORDER BY p.data_pericia ASC
+      `;
+      const filtradas = tipoMap[tipoPericiaHint]
+        ? candidatas.filter((c) => c.tipo === tipoMap[tipoPericiaHint])
+        : candidatas;
+
+      if (filtradas.length === 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Nenhuma perícia agendada encontrada pra "${clienteBusca}"${tipoMap[tipoPericiaHint] ? ` do tipo ${tipoPericiaHint}` : ""}.`,
+        });
+      }
+      if (filtradas.length > 1) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Mais de uma perícia agendada pra "${clienteBusca}" — pergunte ao usuário qual delas (pode usar tipo_pericia: 'medica' ou 'social' pra desambiguar).`,
+          opcoes: filtradas.map(
+            (c) => `${c.cliente_nome} — ${c.tipo} — ${c.data_pericia}`
+          ),
+        });
+      }
+
+      const periciaId = String(filtradas[0].id);
+      await sql`
+        UPDATE pericias SET
+          data_pericia = ${novaData}::date,
+          hora_pericia = COALESCE(${novaHora}::time, hora_pericia),
+          local_pericia = COALESCE(${novoLocal}, local_pericia),
+          observacoes = COALESCE(${novoProtocolo ? `Protocolo INSS: ${novoProtocolo}` : null}, observacoes),
+          updated_at = NOW()
+        WHERE id = ${periciaId}::uuid
+      `;
+
+      const { sincronizarCompromissoDaPericia } =
+        await import("./pericia-agenda-sync");
+      const resultado = await sincronizarCompromissoDaPericia(periciaId);
+
+      return JSON.stringify({
+        ok: true,
+        mensagem: `Perícia de ${filtradas[0].cliente_nome} remarcada para ${novaData}${novaHora ? ` às ${novaHora}` : ""}.`,
+        agenda_sincronizada: resultado.sincronizado,
+        aviso_enviado_ao_cliente: resultado.avisoEnviado,
+        observacao: resultado.sincronizado
+          ? undefined
+          : "Essa perícia não tem um compromisso vinculado na Agenda (perícia antiga, criada antes desse vínculo existir) — a data foi atualizada só em Perícias, sem sincronizar a Agenda nem avisar o cliente automaticamente. Avise o usuário disso.",
       });
     }
 

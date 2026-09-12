@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 import type { AiExtractedData } from "@/app/api/clientes/importacao-ia/route";
 import {
   DocumentArrowUpIcon,
@@ -714,13 +715,29 @@ export default function AiDocumentImport({
       // um upload falho aqui não deve impedir o cliente de ter sido criado.
       for (const { file, label } of arquivosParaAnexar) {
         try {
-          const docFd = new FormData();
-          docFd.set("file", file);
-          docFd.set("entityType", "cliente");
-          docFd.set("entityId", result.id);
-          await fetch("/api/documentos/upload", {
+          const blob = await upload(
+            `documentos/clientes/${result.id}/${file.name}`,
+            file,
+            {
+              access: "private",
+              handleUploadUrl: "/api/documentos/upload",
+              clientPayload: JSON.stringify({
+                entityType: "cliente",
+                entityId: result.id,
+              }),
+            }
+          );
+          await fetch("/api/documentos/confirmar", {
             method: "POST",
-            body: docFd,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              entityType: "cliente",
+              entityId: result.id,
+              nome: file.name,
+              tipo: file.type || null,
+              tamanho: file.size,
+              url: blob.url,
+            }),
           });
         } catch (e) {
           console.error(`Falha ao anexar "${label}":`, e);

@@ -2,11 +2,16 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 import { deleteDocumentoAction } from "@/lib/document-actions";
 import type { Documento } from "@/lib/documents-db";
 import { PlusIcon, SpinnerIcon, ArrowDownTrayIcon } from "@/components/icons";
 
-const MAX_FILE_MB = 5;
+// Upload vai direto do navegador pro Vercel Blob (não passa pelo corpo de
+// nenhuma rota normal) — mesmo motivo do anexo da Íris: Serverless
+// Functions da Vercel têm um teto fixo de 4,5 MB de corpo de requisição,
+// bem abaixo de documentos de processo reais digitalizados.
+const MAX_FILE_MB = 25;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 
 // ── Helpers ────────────────────────────────────────────────
@@ -154,27 +159,40 @@ export default function DocumentsSection({
         continue;
       }
 
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("entityType", entityType);
-      fd.append("entityId", entityId);
-
       try {
-        const res = await fetch("/api/documentos/upload", {
+        const blob = await upload(
+          `documentos/${entityType}s/${entityId}/${file.name}`,
+          file,
+          {
+            access: "private",
+            handleUploadUrl: "/api/documentos/upload",
+            clientPayload: JSON.stringify({ entityType, entityId }),
+          }
+        );
+
+        const res = await fetch("/api/documentos/confirmar", {
           method: "POST",
-          body: fd,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            entityType,
+            entityId,
+            nome: file.name,
+            tipo: file.type || null,
+            tamanho: file.size,
+            url: blob.url,
+          }),
         });
-        const data: { id?: string; url?: string; error?: string } = await res
+        const data: { id?: string; error?: string } = await res
           .json()
           .catch(() => ({}));
         if (!res.ok || data.error) {
           setUploadError(
-            `Erro ao enviar "${file.name}": ${data.error ?? `HTTP ${res.status}`}`
+            `Erro ao registrar "${file.name}": ${data.error ?? `HTTP ${res.status}`}`
           );
         }
-      } catch {
+      } catch (err) {
         setUploadError(
-          `Erro ao enviar "${file.name}": sem conexão com o servidor.`
+          `Erro ao enviar "${file.name}": ${err instanceof Error ? err.message : "sem conexão com o servidor."}`
         );
       }
     }

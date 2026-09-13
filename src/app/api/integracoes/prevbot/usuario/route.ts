@@ -513,6 +513,7 @@ export async function POST(req: NextRequest) {
           local,
           colaboradorTelefone: normalizarTelefone(body.telefone),
           colaboradorNome,
+          clienteNome: pessoa || null,
         }).catch((e) => console.error("[prevbot/lembrete-comp]", e));
       }
 

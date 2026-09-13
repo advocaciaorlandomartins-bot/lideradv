@@ -657,11 +657,16 @@ export async function agendarLembretesCompromissoPrevBot(opts: {
   local: string | null;
   colaboradorTelefone: string;
   colaboradorNome: string;
+  // Nome da pessoa/cliente envolvida, quando a IA identificou uma — sem
+  // isso o lembrete só mostrava o título, e quando o título ficava genérico
+  // (ex.: "Avaliação") o colaborador não tinha como saber de quem era.
+  clienteNome?: string | null;
 }): Promise<void> {
   const diaSemana = formatarDiaSemana(opts.dataEvento);
   const data = formatarData(opts.dataEvento);
   const horaStr = opts.hora ? ` às ${opts.hora}` : "";
   const localStr = opts.local ? `\n📍 ${opts.local}` : "";
+  const clienteStr = opts.clienteNome ? `\n👤 ${opts.clienteNome}` : "";
 
   const lembretes: Array<{ tipo: string; enviarEm: Date; mensagem: string }> = [
     {
@@ -669,7 +674,7 @@ export async function agendarLembretesCompromissoPrevBot(opts: {
       enviarEm: diasAntes(opts.dataEvento, 1, 8),
       mensagem:
         `📅 *Lembrete para amanhã!*\n\n` +
-        `*${opts.titulo}*\n` +
+        `*${opts.titulo}*${clienteStr}\n` +
         `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}\n\n` +
         `_Acesse a Agenda no LiderAdv para mais detalhes._`,
     },
@@ -678,7 +683,7 @@ export async function agendarLembretesCompromissoPrevBot(opts: {
       enviarEm: mesmoDia(opts.dataEvento, 7),
       mensagem:
         `⏰ *Compromisso hoje!*\n\n` +
-        `*${opts.titulo}*\n` +
+        `*${opts.titulo}*${clienteStr}\n` +
         `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}\n\n` +
         `_Boa sorte! 💼_`,
     },
@@ -694,7 +699,7 @@ export async function agendarLembretesCompromissoPrevBot(opts: {
       enviarEm: avisoHoras,
       mensagem:
         `⏰ *Está chegando a hora!*\n\n` +
-        `*${opts.titulo}*\n` +
+        `*${opts.titulo}*${clienteStr}\n` +
         `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}\n\n` +
         `_Faltam cerca de 2h._`,
     });

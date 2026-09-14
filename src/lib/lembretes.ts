@@ -291,13 +291,16 @@ export async function agendarLembretesInss(opts: {
       prefixo: "",
     });
   }
-  // Staff responsável sempre notificado (independente do guardião)
+  // Staff responsável sempre notificado (independente do guardião) — precisa
+  // do prefixo com o nome do cliente igual ao guardião recebe, senão o
+  // colaborador (que cuida de vários casos) recebe "amanhã é o grande dia!"
+  // sem nenhuma pista de qual cliente é.
   if (opts.telefoneResponsavel && opts.nomeResponsavel) {
     destinos.push({
       tipo: "responsavel",
       telefone: opts.telefoneResponsavel,
       nome: opts.nomeResponsavel,
-      prefixo: "",
+      prefixo: `*Agendamento de: ${opts.clienteNome}*\n\n`,
     });
   }
 

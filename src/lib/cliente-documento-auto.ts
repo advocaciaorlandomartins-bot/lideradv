@@ -132,30 +132,45 @@ export async function aplicarCamposClienteSeVazios(
     v === "" ||
     (typeof v === "string" && PLACEHOLDERS.has(v));
 
-  const preenchidos: (keyof DadosClienteExtraidos)[] = [];
+  const elegiveis: (keyof DadosClienteExtraidos)[] = [];
   for (const campo of campos) {
     const novoValor = dados[campo];
     if (novoValor === null || novoValor === undefined || novoValor === "")
       continue;
     if (!vazio(atual[campo])) continue;
-    preenchidos.push(campo);
+    elegiveis.push(campo);
   }
-  if (preenchidos.length === 0) return [];
+  if (elegiveis.length === 0) return [];
 
-  for (const campo of preenchidos) {
+  // Só entra na lista devolvida (e no que é anunciado como "preenchido")
+  // se o UPDATE realmente confirmou — antes o campo era considerado
+  // preenchido só por ELEGIBILIDADE, mesmo quando o UPDATE falhava e o
+  // erro era engolido: a Íris/o cadastro diziam "atualizado" pro usuário
+  // sem o dado ter sido gravado de verdade.
+  const preenchidos: (keyof DadosClienteExtraidos)[] = [];
+  for (const campo of elegiveis) {
     const valor = dados[campo];
     const cast = CAMPOS_DATA.has(campo)
       ? "::date"
       : CAMPOS_NUMERICOS.has(campo)
         ? "::numeric"
         : "";
-    await sql
+    const ok = await sql
       .query(`UPDATE clients SET ${campo} = $1${cast} WHERE id = $2::uuid`, [
         valor,
         clienteId,
       ])
-      .catch(() => null);
+      .then(() => true)
+      .catch((e) => {
+        console.error(
+          `[cliente-documento-auto] falha ao gravar campo "${campo}":`,
+          e
+        );
+        return false;
+      });
+    if (ok) preenchidos.push(campo);
   }
+  if (preenchidos.length === 0) return [];
 
   await logAction({
     acao: "editar",

@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade } from "@/lib/acesso";
 import { analisarDocumento } from "@/lib/cerebroJuridico";
 import { analisarDocumentoCliente } from "@/lib/cliente-documento-auto";
+import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -103,7 +104,19 @@ export async function POST(request: Request) {
     // de nunca sobrescrever campo que já tem valor real.
     const isPdfOrImage =
       (tipo ?? "").includes("pdf") || (tipo ?? "").startsWith("image/");
-    if (isPdfOrImage && entityType === "processo") {
+    const vaiChamarIa =
+      isPdfOrImage && (entityType === "processo" || entityType === "cliente");
+    // Sem isso, subir vários arquivos em sequência disparava uma chamada de
+    // IA por arquivo sem nenhum limite — cada confirmação aciona análise
+    // automática sozinha, diferente das rotas /api/ia/* (que já checam
+    // isso antes de qualquer chamada). Só checa quando de fato vai chamar a
+    // IA (senão consumiria cota do usuário à toa em upload de .docx/pericia
+    // que nunca dispara análise). Só pula a análise, não o upload — o
+    // documento já foi salvo normalmente acima.
+    const dentroDoLimite =
+      vaiChamarIa &&
+      !(await iaRateLimitExcedido(session.login).catch(() => false));
+    if (isPdfOrImage && dentroDoLimite && entityType === "processo") {
       after(async () => {
         try {
           await analisarDocumento(documentoId, entityId);
@@ -114,7 +127,7 @@ export async function POST(request: Request) {
           );
         }
       });
-    } else if (isPdfOrImage && entityType === "cliente") {
+    } else if (isPdfOrImage && dentroDoLimite && entityType === "cliente") {
       after(async () => {
         try {
           await analisarDocumentoCliente(documentoId, entityId);

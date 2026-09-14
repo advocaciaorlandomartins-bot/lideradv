@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { buscarProcessoPorCNJ } from "@/lib/datajud";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,18 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "criar")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  }
+
+  // DATAJUD_API_KEY é uma cota diária compartilhada pelo escritório inteiro
+  // (não por usuário) — sem isso, um clique repetido no botão consumiria
+  // a cota de todo mundo sozinho.
+  if (await iaRateLimitExcedido(session.login)) {
+    return NextResponse.json(
+      {
+        error: "Limite de requisições excedido. Tente novamente em 1 hora.",
+      },
+      { status: 429 }
+    );
   }
 
   const apiKey = process.env.DATAJUD_API_KEY;

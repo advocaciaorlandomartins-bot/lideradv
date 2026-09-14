@@ -70,6 +70,21 @@ function justicaDoCNJ(numeroDigits: string): string | null {
   return mapa[j] ?? null;
 }
 
+// DataJud devolve "grau" em formatos variados conforme o tribunal (ex: "G1",
+// "GRAU_1", "1º Grau") — extrai só o dígito 1/2/3 e mapeia pro texto do
+// select "Instância"; formato não reconhecido fica sem sugestão automática.
+function instanciaDoGrau(grau: string | null): string | null {
+  if (!grau) return null;
+  const m = grau.match(/[123]/);
+  if (!m) return null;
+  const mapa: Record<string, string> = {
+    "1": "1ª Instância",
+    "2": "2ª Instância",
+    "3": "3ª Instância",
+  };
+  return mapa[m[0]] ?? null;
+}
+
 interface DadosProcessoCNJ {
   tribunal: string;
   orgaoJulgador: string | null;
@@ -130,6 +145,7 @@ export default function CadastroSimplesModal({
   const [tipoAcaoManual, setTipoAcaoManual] = useState("");
   const [cnj, setCnj] = useState("");
   const [justica, setJustica] = useState("");
+  const [instancia, setInstancia] = useState("");
   const [comarca, setComarca] = useState("");
   const [capturaInfo, setCapturaInfo] = useState<DadosProcessoCNJ | null>(null);
   const [capturaErro, setCapturaErro] = useState<string | null>(null);
@@ -142,6 +158,7 @@ export default function CadastroSimplesModal({
     setTipoAcaoManual("");
     setCnj("");
     setJustica("");
+    setInstancia("");
     setComarca("");
     setCapturaInfo(null);
     setCapturaErro(null);
@@ -195,6 +212,8 @@ export default function CadastroSimplesModal({
       if (dados.orgaoJulgador) setComarca(dados.orgaoJulgador);
       const justicaSugerida = justicaDoCNJ(digits);
       if (justicaSugerida) setJustica(justicaSugerida);
+      const instanciaSugerida = instanciaDoGrau(dados.grau);
+      if (instanciaSugerida) setInstancia(instanciaSugerida);
     } catch {
       setCapturaErro("Erro de conexão ao consultar o tribunal.");
     } finally {
@@ -419,9 +438,10 @@ export default function CadastroSimplesModal({
                   <Field label="Instância">
                     <select
                       name="fase"
+                      value={instancia}
+                      onChange={(e) => setInstancia(e.target.value)}
                       disabled={isPending}
                       className={selectCls}
-                      defaultValue=""
                     >
                       <option value="">Selecione…</option>
                       {INSTANCIAS.map((i) => (
@@ -491,22 +511,13 @@ export default function CadastroSimplesModal({
                 </Field>
 
                 <Field label="Órgão">
-                  <div className="flex gap-2">
-                    <input
-                      name="vara"
-                      type="text"
-                      placeholder="Nome do órgão…"
-                      disabled={isPending}
-                      className={inputCls + " flex-1"}
-                    />
-                    <button
-                      type="button"
-                      className="flex h-10 items-center gap-1.5 rounded-lg border border-border bg-white px-3 font-body text-xs font-semibold text-muted hover:border-primary hover:text-primary cursor-pointer"
-                    >
-                      <PlusIcon className="h-3.5 w-3.5" />
-                      Criar
-                    </button>
-                  </div>
+                  <input
+                    name="vara"
+                    type="text"
+                    placeholder="Nome do órgão…"
+                    disabled={isPending}
+                    className={inputCls}
+                  />
                 </Field>
               </>
             )}

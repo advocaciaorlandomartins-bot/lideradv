@@ -442,6 +442,41 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
           type: "string",
           description: "Data de afastamento do trabalho YYYY-MM-DD. Opcional.",
         },
+        naturalidade_cidade: {
+          type: "string",
+          description: "Cidade de nascimento (naturalidade). Opcional.",
+        },
+        naturalidade_estado: {
+          type: "string",
+          description: "UF de nascimento (naturalidade). Opcional.",
+        },
+        status_beneficio: {
+          type: "string",
+          description: "ativo, suspenso, cessado ou nao_recebe. Opcional.",
+        },
+        data_inicio_beneficio: {
+          type: "string",
+          description:
+            "Data de início do benefício (DIB) YYYY-MM-DD. Opcional.",
+        },
+        valor_beneficio: {
+          type: "string",
+          description:
+            "Valor do benefício em reais, só número (ex: 1518.00). Opcional.",
+        },
+        categoria_contribuinte: {
+          type: "string",
+          description:
+            "empregado, individual, especial, avulso ou facultativo. Opcional.",
+        },
+        data_diagnostico: {
+          type: "string",
+          description: "Data do diagnóstico médico YYYY-MM-DD. Opcional.",
+        },
+        num_contribuicoes: {
+          type: "string",
+          description: "Número de contribuições/carência, só número. Opcional.",
+        },
       },
       required: ["cliente_busca"],
     },
@@ -1535,6 +1570,14 @@ export async function executarFerramentaIris(
         "cid_principal",
         "tipo_incapacidade",
         "data_afastamento",
+        "naturalidade_cidade",
+        "naturalidade_estado",
+        "status_beneficio",
+        "data_inicio_beneficio",
+        "valor_beneficio",
+        "categoria_contribuinte",
+        "data_diagnostico",
+        "num_contribuicoes",
       ] as const;
 
       const dados: Record<string, string> = {};

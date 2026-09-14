@@ -260,7 +260,9 @@ export async function analisarDocumento(
 
   const res = await client.messages.create(
     {
-      model: "claude-haiku-4-5-20251001",
+      // Sonnet: pede fundamento legal, riscos jurídicos e cláusulas
+      // abusivas — raciocínio jurídico de verdade, não extração de dado.
+      model: "claude-sonnet-5",
       max_tokens: 1200,
       system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
       messages: [
@@ -397,7 +399,10 @@ Exemplos de preenchimento:
 
   const res = await client.messages.create(
     {
-      model: "claude-haiku-4-5-20251001",
+      // Sonnet: mesmo motivo de analisarDocumento — raciocínio jurídico
+      // real (fundamento legal, riscos), não só extração dos dados
+      // previdenciários que vêm junto no mesmo prompt.
+      model: "claude-sonnet-5",
       max_tokens: 1800,
       system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
       messages: [
@@ -489,7 +494,11 @@ export async function revisarPeticao(
   const ctxTexto = buildContextoTexto(params.contexto);
 
   const res = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    // Sonnet: revisão crítica de mérito (fragilidade jurídica, jurisprudência
+    // ausente, nota 0-10) — a etapa seguinte (corrigirPeticao, que só aplica
+    // o que foi apontado aqui) já era Sonnet; deixar o apontamento em Haiku
+    // e a aplicação em Sonnet estava ao contrário do que faz sentido.
+    model: "claude-sonnet-5",
     max_tokens: 1500,
     system: skill.systemPrompt,
     messages: [

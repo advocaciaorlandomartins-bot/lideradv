@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade } from "@/lib/acesso";
 import { analisarDocumento } from "@/lib/cerebroJuridico";
+import { analisarDocumentoCliente } from "@/lib/cliente-documento-auto";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -93,19 +94,33 @@ export async function POST(request: Request) {
     `;
     const documentoId = rows[0].id as string;
 
-    // Análise automática pelo Cérebro Jurídico — roda em segundo plano
-    // depois da resposta já ter sido enviada. Só PDF/imagem (os únicos
-    // formatos que analisarDocumento sabe ler) e só quando anexado direto
-    // a um processo (é o que a função espera receber).
+    // Análise automática — roda em segundo plano depois da resposta já ter
+    // sido enviada. Só PDF/imagem (os únicos formatos que a extração sabe
+    // ler). Em processo, o Cérebro Jurídico gera a análise completa e
+    // preenche campos vazios do processo/cliente; em cliente (sem processo
+    // ainda, ou documento avulso tipo RG/comprovante), preenche direto o
+    // cadastro do cliente a partir do que o documento trouxer — mesma regra
+    // de nunca sobrescrever campo que já tem valor real.
     const isPdfOrImage =
       (tipo ?? "").includes("pdf") || (tipo ?? "").startsWith("image/");
-    if (entityType === "processo" && isPdfOrImage) {
+    if (isPdfOrImage && entityType === "processo") {
       after(async () => {
         try {
           await analisarDocumento(documentoId, entityId);
         } catch (e) {
           console.error(
             "[documentos/confirmar] falha na análise automática:",
+            e
+          );
+        }
+      });
+    } else if (isPdfOrImage && entityType === "cliente") {
+      after(async () => {
+        try {
+          await analisarDocumentoCliente(documentoId, entityId);
+        } catch (e) {
+          console.error(
+            "[documentos/confirmar] falha no preenchimento automático do cliente:",
             e
           );
         }

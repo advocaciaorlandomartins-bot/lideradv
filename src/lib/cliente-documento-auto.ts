@@ -4,16 +4,169 @@ import sql from "./db";
 import { logAction } from "./audit";
 
 /**
- * Preenchimento automático do cadastro do cliente a partir de QUALQUER
- * documento anexado depois (RG, comprovante de residência, carta do INSS,
- * laudo médico etc.) — mesmo princípio do write-back que já existe pra
- * documento de processo em cerebroJuridico.ts (analisarDocumento), só que
- * aqui não depende de o cliente já ter um processo cadastrado.
+ * Preenchimento automático do cadastro do cliente a partir de dado
+ * reconhecido depois do cadastro inicial — documento anexado (RG,
+ * comprovante de residência, carta do INSS, laudo médico etc.) ou dado
+ * reconhecido pela Íris numa conversa. Mesmo princípio do write-back que já
+ * existe pra documento de processo em cerebroJuridico.ts (analisarDocumento),
+ * só que aqui não depende de o cliente já ter um processo cadastrado.
  *
  * Regra de segurança: só preenche campo que está NULO/vazio hoje — nunca
  * sobrescreve um dado que já existe (mesmo que a IA leia algo diferente),
  * porque não tem como saber qual das duas versões está certa.
  */
+
+export interface DadosClienteExtraidos {
+  doc?: string | null;
+  rg?: string | null;
+  rg_orgao?: string | null;
+  birth_date?: string | null;
+  genero?: string | null;
+  filiacao_mae?: string | null;
+  filiacao_pai?: string | null;
+  naturalidade_cidade?: string | null;
+  naturalidade_estado?: string | null;
+  cep?: string | null;
+  street?: string | null;
+  addr_number?: string | null;
+  complement?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  nis?: string | null;
+  num_beneficio?: string | null;
+  status_beneficio?: string | null;
+  tipo_beneficio?: string | null;
+  data_inicio_beneficio?: string | null;
+  valor_beneficio?: number | null;
+  categoria_contribuinte?: string | null;
+  cid_principal?: string | null;
+  tipo_incapacidade?: string | null;
+  data_diagnostico?: string | null;
+  data_afastamento?: string | null;
+  atividade_anterior?: string | null;
+  num_contribuicoes?: number | null;
+}
+
+const CAMPOS_DATA = new Set([
+  "birth_date",
+  "data_inicio_beneficio",
+  "data_diagnostico",
+  "data_afastamento",
+]);
+const CAMPOS_NUMERICOS = new Set(["valor_beneficio", "num_contribuicoes"]);
+// Campos onde o cadastro/importação automática grava um placeholder em vez
+// de deixar NULL — sem tratar isso como "vazio", o dado real nunca entraria
+// por cima do "PENDENTE"/"--".
+const PLACEHOLDERS = new Set(["PENDENTE", "--"]);
+
+// Uso de sql.query (placeholders $1/$2 reais, não sql`` do Neon) exige
+// interpolar o NOME da coluna direto na string — só é seguro porque todo
+// `campo` é validado contra esta whitelist antes de entrar na query, nunca
+// vem direto de input externo sem passar por essa checagem.
+const CAMPOS_PERMITIDOS = new Set<keyof DadosClienteExtraidos>([
+  "doc",
+  "rg",
+  "rg_orgao",
+  "birth_date",
+  "genero",
+  "filiacao_mae",
+  "filiacao_pai",
+  "naturalidade_cidade",
+  "naturalidade_estado",
+  "cep",
+  "street",
+  "addr_number",
+  "complement",
+  "neighborhood",
+  "city",
+  "state",
+  "phone",
+  "email",
+  "nis",
+  "num_beneficio",
+  "status_beneficio",
+  "tipo_beneficio",
+  "data_inicio_beneficio",
+  "valor_beneficio",
+  "categoria_contribuinte",
+  "cid_principal",
+  "tipo_incapacidade",
+  "data_diagnostico",
+  "data_afastamento",
+  "atividade_anterior",
+  "num_contribuicoes",
+]);
+
+/**
+ * Aplica os campos de `dados` no cliente `clienteId`, um por um, só quando
+ * o campo atual estiver vazio (NULL, string vazia ou placeholder). Devolve
+ * a lista dos campos que de fato mudaram. Usada tanto pela extração
+ * automática de documento quanto pela ferramenta da Íris — mesma regra,
+ * um lugar só.
+ */
+export async function aplicarCamposClienteSeVazios(
+  clienteId: string,
+  dados: DadosClienteExtraidos,
+  origem: string
+): Promise<string[]> {
+  const campos = (Object.keys(dados) as (keyof DadosClienteExtraidos)[]).filter(
+    (c) => CAMPOS_PERMITIDOS.has(c)
+  );
+  if (campos.length === 0) return [];
+
+  const colunas = campos.join(", ");
+  const [atual] = (await sql
+    .query(
+      `SELECT ${colunas} FROM clients WHERE id = $1::uuid AND deleted_at IS NULL`,
+      [clienteId]
+    )
+    .catch(() => [null])) as [Record<string, unknown> | null];
+  if (!atual) return [];
+
+  const vazio = (v: unknown) =>
+    v === null ||
+    v === undefined ||
+    v === "" ||
+    (typeof v === "string" && PLACEHOLDERS.has(v));
+
+  const preenchidos: (keyof DadosClienteExtraidos)[] = [];
+  for (const campo of campos) {
+    const novoValor = dados[campo];
+    if (novoValor === null || novoValor === undefined || novoValor === "")
+      continue;
+    if (!vazio(atual[campo])) continue;
+    preenchidos.push(campo);
+  }
+  if (preenchidos.length === 0) return [];
+
+  for (const campo of preenchidos) {
+    const valor = dados[campo];
+    const cast = CAMPOS_DATA.has(campo)
+      ? "::date"
+      : CAMPOS_NUMERICOS.has(campo)
+        ? "::numeric"
+        : "";
+    await sql
+      .query(`UPDATE clients SET ${campo} = $1${cast} WHERE id = $2::uuid`, [
+        valor,
+        clienteId,
+      ])
+      .catch(() => null);
+  }
+
+  await logAction({
+    acao: "editar",
+    entidade: "cliente",
+    entidadeId: clienteId,
+    descricao: `Preenchimento automático (${origem}): ${preenchidos.join(", ")}`,
+    _login: "sistema (IA)",
+  }).catch(() => null);
+
+  return preenchidos;
+}
 
 const EXTRACTION_PROMPT = `Extraia todos os dados deste documento brasileiro e retorne SOMENTE o JSON abaixo. Pode ser um documento de identificação, um comprovante de residência (conta de água/luz/telefone, contrato de aluguel) ou um documento médico/previdenciário (carta de concessão/indeferimento do INSS, extrato do CNIS, laudo médico, atestado). Preencha só os campos que existirem nesse tipo de documento — campos ausentes, ilegíveis ou que não se aplicam ao documento devem ter valor null. Nunca invente dado que não esteja explícito no documento.
 
@@ -139,133 +292,47 @@ export async function analisarDocumentoCliente(
     return { camposPreenchidos: [] };
   }
 
-  const [atual] = await sql`
-    SELECT doc, rg, rg_orgao, birth_date, genero, filiacao_mae, filiacao_pai,
-           naturalidade_cidade, naturalidade_estado,
-           cep, street, addr_number, complement, neighborhood, city, state,
-           nis, num_beneficio, status_beneficio, tipo_beneficio,
-           data_inicio_beneficio, valor_beneficio, categoria_contribuinte,
-           cid_principal, tipo_incapacidade, data_diagnostico,
-           data_afastamento, atividade_anterior, num_contribuicoes
-    FROM clients WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
-  `;
-  if (!atual) return { camposPreenchidos: [] };
-
-  // Placeholder do import automático (ver client-actions/api/inss confirmar)
-  // conta como "vazio" — senão o dado real nunca entraria por cima do "PENDENTE".
-  const vazio = (v: unknown) =>
-    v === null || v === undefined || v === "" || v === "PENDENTE" || v === "--";
-
-  const candidatos: Array<{
-    campo: string;
-    valor: string | number | null;
-  }> = [
-    { campo: "doc", valor: strOrNull(extracted.cpf) },
-    { campo: "rg", valor: strOrNull(extracted.rg) },
-    { campo: "rg_orgao", valor: strOrNull(extracted.rg_orgao) },
-    { campo: "birth_date", valor: normDate(extracted.birth_date) },
-    { campo: "genero", valor: strOrNull(extracted.genero) },
-    { campo: "filiacao_mae", valor: strOrNull(extracted.mother_name) },
-    { campo: "filiacao_pai", valor: strOrNull(extracted.father_name) },
-    {
-      campo: "naturalidade_cidade",
-      valor: strOrNull(extracted.naturalidade_city),
-    },
-    {
-      campo: "naturalidade_estado",
-      valor: strOrNull(extracted.naturalidade_state),
-    },
-    { campo: "cep", valor: strOrNull(extracted.zipcode) },
-    { campo: "street", valor: strOrNull(extracted.street) },
-    { campo: "addr_number", valor: strOrNull(extracted.addr_number) },
-    { campo: "complement", valor: strOrNull(extracted.complement) },
-    { campo: "neighborhood", valor: strOrNull(extracted.neighborhood) },
-    { campo: "city", valor: strOrNull(extracted.city) },
-    { campo: "state", valor: strOrNull(extracted.state) },
-    { campo: "nis", valor: strOrNull(extracted.nis) },
-    { campo: "num_beneficio", valor: strOrNull(extracted.num_beneficio) },
-    { campo: "status_beneficio", valor: strOrNull(extracted.status_beneficio) },
-    { campo: "tipo_beneficio", valor: strOrNull(extracted.tipo_beneficio) },
-    {
-      campo: "data_inicio_beneficio",
-      valor: normDate(extracted.data_inicio_beneficio),
-    },
-    { campo: "valor_beneficio", valor: numOrNull(extracted.valor_beneficio) },
-    {
-      campo: "categoria_contribuinte",
-      valor: strOrNull(extracted.categoria_contribuinte),
-    },
-    { campo: "cid_principal", valor: strOrNull(extracted.cid_principal) },
-    {
-      campo: "tipo_incapacidade",
-      valor: strOrNull(extracted.tipo_incapacidade),
-    },
-    { campo: "data_diagnostico", valor: normDate(extracted.data_diagnostico) },
-    { campo: "data_afastamento", valor: normDate(extracted.data_afastamento) },
-    {
-      campo: "atividade_anterior",
-      valor: strOrNull(extracted.atividade_anterior),
-    },
-    {
-      campo: "num_contribuicoes",
-      valor: numOrNull(extracted.num_contribuicoes),
-    },
-  ];
-
-  const preenchidos: string[] = [];
-  for (const { campo, valor } of candidatos) {
-    if (valor === null) continue;
-    if (!vazio((atual as Record<string, unknown>)[campo])) continue;
-    preenchidos.push(campo);
+  const dados: DadosClienteExtraidos = {
+    doc: strOrNull(extracted.cpf),
+    rg: strOrNull(extracted.rg),
+    rg_orgao: strOrNull(extracted.rg_orgao),
+    birth_date: normDate(extracted.birth_date),
+    genero: strOrNull(extracted.genero),
+    filiacao_mae: strOrNull(extracted.mother_name),
+    filiacao_pai: strOrNull(extracted.father_name),
+    naturalidade_cidade: strOrNull(extracted.naturalidade_city),
+    naturalidade_estado: strOrNull(extracted.naturalidade_state),
+    cep: strOrNull(extracted.zipcode),
+    street: strOrNull(extracted.street),
+    addr_number: strOrNull(extracted.addr_number),
+    complement: strOrNull(extracted.complement),
+    neighborhood: strOrNull(extracted.neighborhood),
+    city: strOrNull(extracted.city),
+    state: strOrNull(extracted.state),
+    nis: strOrNull(extracted.nis),
+    num_beneficio: strOrNull(extracted.num_beneficio),
+    status_beneficio: strOrNull(extracted.status_beneficio),
+    tipo_beneficio: strOrNull(extracted.tipo_beneficio),
+    data_inicio_beneficio: normDate(extracted.data_inicio_beneficio),
+    valor_beneficio: numOrNull(extracted.valor_beneficio),
+    categoria_contribuinte: strOrNull(extracted.categoria_contribuinte),
+    cid_principal: strOrNull(extracted.cid_principal),
+    tipo_incapacidade: strOrNull(extracted.tipo_incapacidade),
+    data_diagnostico: normDate(extracted.data_diagnostico),
+    data_afastamento: normDate(extracted.data_afastamento),
+    atividade_anterior: strOrNull(extracted.atividade_anterior),
+    num_contribuicoes: numOrNull(extracted.num_contribuicoes),
+  };
+  // Remove chaves null pra aplicarCamposClienteSeVazios só considerar o que
+  // o documento realmente trouxe.
+  for (const k of Object.keys(dados) as (keyof DadosClienteExtraidos)[]) {
+    if (dados[k] === null) delete dados[k];
   }
-  if (preenchidos.length === 0) return { camposPreenchidos: [] };
 
-  // COALESCE trata "PENDENTE"/"--" como se fosse null via NULLIF, mantendo
-  // o valor real se já não for placeholder.
-  await sql`
-    UPDATE clients SET
-      doc                    = COALESCE(NULLIF(NULLIF(doc, 'PENDENTE'), ''),                       ${candidatos.find((c) => c.campo === "doc")!.valor as string | null}),
-      rg                     = COALESCE(rg,                                                          ${candidatos.find((c) => c.campo === "rg")!.valor as string | null}),
-      rg_orgao               = COALESCE(rg_orgao,                                                    ${candidatos.find((c) => c.campo === "rg_orgao")!.valor as string | null}),
-      birth_date             = COALESCE(birth_date,                                                  ${candidatos.find((c) => c.campo === "birth_date")!.valor as string | null}::date),
-      genero                 = COALESCE(genero,                                                      ${candidatos.find((c) => c.campo === "genero")!.valor as string | null}),
-      filiacao_mae           = COALESCE(filiacao_mae,                                                ${candidatos.find((c) => c.campo === "filiacao_mae")!.valor as string | null}),
-      filiacao_pai           = COALESCE(filiacao_pai,                                                ${candidatos.find((c) => c.campo === "filiacao_pai")!.valor as string | null}),
-      naturalidade_cidade    = COALESCE(naturalidade_cidade,                                         ${candidatos.find((c) => c.campo === "naturalidade_cidade")!.valor as string | null}),
-      naturalidade_estado    = COALESCE(naturalidade_estado,                                         ${candidatos.find((c) => c.campo === "naturalidade_estado")!.valor as string | null}),
-      cep                    = COALESCE(NULLIF(NULLIF(cep, 'PENDENTE'), ''),                         ${candidatos.find((c) => c.campo === "cep")!.valor as string | null}),
-      street                 = COALESCE(NULLIF(NULLIF(street, 'PENDENTE'), ''),                      ${candidatos.find((c) => c.campo === "street")!.valor as string | null}),
-      addr_number            = COALESCE(NULLIF(NULLIF(addr_number, 'PENDENTE'), ''),                 ${candidatos.find((c) => c.campo === "addr_number")!.valor as string | null}),
-      complement             = COALESCE(complement,                                                  ${candidatos.find((c) => c.campo === "complement")!.valor as string | null}),
-      neighborhood           = COALESCE(NULLIF(NULLIF(neighborhood, 'PENDENTE'), ''),                ${candidatos.find((c) => c.campo === "neighborhood")!.valor as string | null}),
-      city                   = COALESCE(NULLIF(NULLIF(city, 'PENDENTE'), ''),                        ${candidatos.find((c) => c.campo === "city")!.valor as string | null}),
-      state                  = COALESCE(NULLIF(NULLIF(state, '--'), ''),                             ${candidatos.find((c) => c.campo === "state")!.valor as string | null}),
-      nis                    = COALESCE(nis,                                                          ${candidatos.find((c) => c.campo === "nis")!.valor as string | null}),
-      num_beneficio          = COALESCE(num_beneficio,                                                ${candidatos.find((c) => c.campo === "num_beneficio")!.valor as string | null}),
-      status_beneficio       = COALESCE(status_beneficio,                                             ${candidatos.find((c) => c.campo === "status_beneficio")!.valor as string | null}),
-      tipo_beneficio         = COALESCE(tipo_beneficio,                                               ${candidatos.find((c) => c.campo === "tipo_beneficio")!.valor as string | null}),
-      data_inicio_beneficio  = COALESCE(data_inicio_beneficio,                                        ${candidatos.find((c) => c.campo === "data_inicio_beneficio")!.valor as string | null}::date),
-      valor_beneficio        = COALESCE(valor_beneficio,                                              ${candidatos.find((c) => c.campo === "valor_beneficio")!.valor as number | null}),
-      categoria_contribuinte = COALESCE(categoria_contribuinte,                                       ${candidatos.find((c) => c.campo === "categoria_contribuinte")!.valor as string | null}),
-      cid_principal          = COALESCE(cid_principal,                                                ${candidatos.find((c) => c.campo === "cid_principal")!.valor as string | null}),
-      tipo_incapacidade      = COALESCE(tipo_incapacidade,                                            ${candidatos.find((c) => c.campo === "tipo_incapacidade")!.valor as string | null}),
-      data_diagnostico       = COALESCE(data_diagnostico,                                             ${candidatos.find((c) => c.campo === "data_diagnostico")!.valor as string | null}::date),
-      data_afastamento       = COALESCE(data_afastamento,                                             ${candidatos.find((c) => c.campo === "data_afastamento")!.valor as string | null}::date),
-      atividade_anterior     = COALESCE(atividade_anterior,                                           ${candidatos.find((c) => c.campo === "atividade_anterior")!.valor as string | null}),
-      num_contribuicoes      = COALESCE(num_contribuicoes,                                            ${candidatos.find((c) => c.campo === "num_contribuicoes")!.valor as number | null})
-    WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
-  `.catch((e) => {
-    console.error("[cliente-documento-auto] falha ao atualizar cliente:", e);
-    return null;
-  });
-
-  await logAction({
-    acao: "editar",
-    entidade: "cliente",
-    entidadeId: clienteId,
-    descricao: `Preenchimento automático a partir do documento "${doc.nome}": ${preenchidos.join(", ")}`,
-    _login: "sistema (IA)",
-  }).catch(() => null);
-
+  const preenchidos = await aplicarCamposClienteSeVazios(
+    clienteId,
+    dados,
+    `documento "${doc.nome}"`
+  );
   return { camposPreenchidos: preenchidos };
 }

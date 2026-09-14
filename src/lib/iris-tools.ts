@@ -32,6 +32,7 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   listar_clientes_sem_resposta: "Consultou clientes sem resposta no WhatsApp",
   remarcar_pericia: "Remarcou uma perícia/avaliação",
   cadastrar_cliente: "Cadastrou um novo cliente",
+  complementar_cliente: "Completou dados do cadastro de um cliente",
 };
 
 export const IRIS_TOOLS: Anthropic.Tool[] = [
@@ -375,6 +376,74 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["tipo", "name", "doc"],
+    },
+  },
+  {
+    name: "complementar_cliente",
+    description:
+      "Preenche automaticamente campos VAZIOS no cadastro de um cliente JÁ EXISTENTE, a partir de dado reconhecido num documento anexado na conversa ou informado pelo usuário no texto. Use isto PROATIVAMENTE, sem esperar o usuário pedir, sempre que reconhecer dado novo de identificação/endereço/benefício/saúde de um cliente que já existe no sistema (não é pra cadastro novo — pra isso use cadastrar_cliente). Só preenche campo que estiver vazio — nunca sobrescreve dado que já existe, mesmo que pareça diferente do que você leu; se notar uma divergência entre o que já está cadastrado e o que o documento mostra, avise o usuário em texto em vez de tentar corrigir sozinho. Não invente valor nenhum — só informe campos que você viu de verdade no documento/mensagem.",
+    input_schema: {
+      type: "object",
+      properties: {
+        cliente_busca: {
+          type: "string",
+          description: "Nome (ou parte do nome) do cliente a completar.",
+        },
+        doc: { type: "string", description: "CPF/CNPJ. Opcional." },
+        rg: { type: "string", description: "RG. Opcional." },
+        rg_orgao: {
+          type: "string",
+          description: "Órgão expedidor do RG. Opcional.",
+        },
+        birth_date: {
+          type: "string",
+          description: "Data de nascimento YYYY-MM-DD. Opcional.",
+        },
+        genero: {
+          type: "string",
+          description: "Masculino ou Feminino. Opcional.",
+        },
+        filiacao_mae: { type: "string", description: "Nome da mãe. Opcional." },
+        filiacao_pai: { type: "string", description: "Nome do pai. Opcional." },
+        cep: { type: "string", description: "CEP. Opcional." },
+        street: { type: "string", description: "Logradouro. Opcional." },
+        addr_number: {
+          type: "string",
+          description: "Número do endereço. Opcional.",
+        },
+        complement: {
+          type: "string",
+          description: "Complemento do endereço. Opcional.",
+        },
+        neighborhood: { type: "string", description: "Bairro. Opcional." },
+        city: { type: "string", description: "Cidade. Opcional." },
+        state: { type: "string", description: "UF. Opcional." },
+        phone: { type: "string", description: "Telefone/WhatsApp. Opcional." },
+        email: { type: "string", description: "E-mail. Opcional." },
+        nis: { type: "string", description: "NIS/PIS/PASEP. Opcional." },
+        num_beneficio: {
+          type: "string",
+          description: "Número do benefício INSS. Opcional.",
+        },
+        tipo_beneficio: {
+          type: "string",
+          description:
+            "Tipo de benefício, ex: Auxílio-doença, BPC/LOAS. Opcional.",
+        },
+        cid_principal: {
+          type: "string",
+          description: "Código CID-10 do diagnóstico principal. Opcional.",
+        },
+        tipo_incapacidade: {
+          type: "string",
+          description: "permanente, temporaria ou nao_se_aplica. Opcional.",
+        },
+        data_afastamento: {
+          type: "string",
+          description: "Data de afastamento do trabalho YYYY-MM-DD. Opcional.",
+        },
+      },
+      required: ["cliente_busca"],
     },
   },
 ];
@@ -1408,6 +1477,101 @@ export async function executarFerramentaIris(
         cliente_id: novoId,
         observacao:
           "Endereço completo ficou com placeholder — peça pra alguém completar isso na tela do cliente quando tiver os dados.",
+      });
+    }
+
+    case "complementar_cliente": {
+      if (!hasPermission(session, "clientes", "editar")) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem permissão pra editar clientes. Explique isso educadamente e não tente de novo.",
+        });
+      }
+
+      const clienteBusca = String(input.cliente_busca ?? "").trim();
+      if (!clienteBusca) {
+        return JSON.stringify({ ok: false, erro: "Informe cliente_busca." });
+      }
+
+      const candidatos = await sql`
+        SELECT id::text, name FROM clients
+        WHERE deleted_at IS NULL AND name ILIKE ${"%" + clienteBusca + "%"}
+        LIMIT 5
+      `;
+      if (candidatos.length === 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Nenhum cliente encontrado com "${clienteBusca}". Se for pra cadastrar um cliente novo, use cadastrar_cliente em vez disso.`,
+        });
+      }
+      if (candidatos.length > 1) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Mais de um cliente encontrado com "${clienteBusca}" — pergunte ao usuário qual, ou seja mais específico.`,
+          opcoes: candidatos.map((c) => c.name),
+        });
+      }
+
+      const CAMPOS_TEXTO = [
+        "doc",
+        "rg",
+        "rg_orgao",
+        "birth_date",
+        "genero",
+        "filiacao_mae",
+        "filiacao_pai",
+        "cep",
+        "street",
+        "addr_number",
+        "complement",
+        "neighborhood",
+        "city",
+        "state",
+        "phone",
+        "email",
+        "nis",
+        "num_beneficio",
+        "tipo_beneficio",
+        "cid_principal",
+        "tipo_incapacidade",
+        "data_afastamento",
+      ] as const;
+
+      const dados: Record<string, string> = {};
+      for (const campo of CAMPOS_TEXTO) {
+        const valor = String(input[campo] ?? "").trim();
+        if (valor) dados[campo] = valor;
+      }
+      if (Object.keys(dados).length === 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Nenhum dado novo informado pra preencher.",
+        });
+      }
+
+      const { aplicarCamposClienteSeVazios } =
+        await import("./cliente-documento-auto");
+      const preenchidos = await aplicarCamposClienteSeVazios(
+        String(candidatos[0].id),
+        dados,
+        "informado pela Íris no chat"
+      ).catch((e) => {
+        console.error("[iris-tools] falha ao complementar cliente:", e);
+        return [] as string[];
+      });
+
+      if (preenchidos.length === 0) {
+        return JSON.stringify({
+          ok: true,
+          mensagem: `Nenhum campo novo pra preencher em ${candidatos[0].name} — os dados informados já estavam cadastrados (não sobrescrevo dado existente).`,
+          campos_preenchidos: [],
+        });
+      }
+
+      return JSON.stringify({
+        ok: true,
+        mensagem: `Cadastro de ${candidatos[0].name} atualizado: ${preenchidos.join(", ")}.`,
+        campos_preenchidos: preenchidos,
       });
     }
 

@@ -741,6 +741,21 @@ const TIPO_ICON_COMP: Record<string, string> = {
   consulta: "👥",
   outro: "📅",
 };
+// Gênero gramatical do label — "Videochamada"/"Reunião"/"Consulta" são
+// femininas ("a Consulta", "uma Consulta"); sem isso, o texto saía sempre
+// no masculino ("confirmar o Consulta", "há um Consulta"), erro de
+// concordância que pega justamente os tipos mais usados no dia a dia.
+const TIPO_GENERO_COMP: Record<string, "m" | "f"> = {
+  videochamada: "f",
+  reuniao: "f",
+  fechamento: "m",
+  consulta: "f",
+  outro: "m",
+};
+function artigos(tipo: string): { o: string; um: string } {
+  const genero = TIPO_GENERO_COMP[tipo] ?? "m";
+  return genero === "f" ? { o: "a", um: "uma" } : { o: "o", um: "um" };
+}
 
 export async function agendarNotificacoesCompromisso(opts: {
   compromissoId: string;
@@ -763,6 +778,7 @@ export async function agendarNotificacoesCompromisso(opts: {
   const linkStr = opts.link ? `\n🔗 ${opts.link}` : "";
   const label = TIPO_LABEL_COMP[opts.tipo] ?? "Compromisso";
   const icon = TIPO_ICON_COMP[opts.tipo] ?? "📅";
+  const art = artigos(opts.tipo);
 
   // Helper para inserir lembrete com ou sem clienteId
   const inserirLembrete = async (row: {
@@ -904,10 +920,10 @@ export async function agendarNotificacoesCompromisso(opts: {
         enviarEm: new Date(agora.getTime() + 60_000),
         mensagem:
           prefixoCliente +
-          `${icon} Olá, ${primeiroNomeDest}! Gostaríamos de confirmar o *${label}* com o *Orlando Martins Advocacia*:\n\n` +
+          `${icon} Olá, ${primeiroNomeDest}! 👋 Gostaríamos de confirmar ${art.o} *${label}* com o *Orlando Martins Advocacia*:\n\n` +
           `📌 *${opts.titulo}*\n` +
           `🗓️ ${diaSemana}, ${data}${horaStr}${localOuLink}\n\n` +
-          `Por favor, *confirme respondendo SIM* se esse horário está bom. Se precisar remarcar, é só nos chamar! 😊`,
+          `Por favor, *confirme respondendo SIM* se esse horário está bom pra você. Se precisar remarcar, é só nos chamar! 😊`,
         destinatarioTipo: destTipo,
         destinatarioTelefone: destTelefone,
         destinatarioNome: destNome,
@@ -923,9 +939,9 @@ export async function agendarNotificacoesCompromisso(opts: {
       mensagem:
         prefixoCliente +
         `📅 *Lembrete para amanhã!*\n\n` +
-        `${icon} Olá, ${primeiroNomeDest}! Há um *${label}* com nosso escritório amanhã:\n\n` +
+        `${icon} Olá, ${primeiroNomeDest}! Passando pra lembrar que amanhã tem ${art.um} *${label}* marcad${art.o} com a gente:\n\n` +
         `🗓️ ${diaSemana}, ${data}${horaStr}${localStr}${linkStr}\n\n` +
-        `_Qualquer imprevisto, nos avise com antecedência._`,
+        `_Qualquer imprevisto, nos avise com antecedência! 😊_`,
       destinatarioTipo: destTipo,
       destinatarioTelefone: destTelefone,
       destinatarioNome: destNome,
@@ -940,9 +956,9 @@ export async function agendarNotificacoesCompromisso(opts: {
       mensagem:
         prefixoCliente +
         `⏰ *${label} hoje!*\n\n` +
-        `${icon} Olá, ${primeiroNomeDest}! Lembrando que há um *${label}* com nosso escritório *hoje*:\n\n` +
+        `${icon} Bom dia, ${primeiroNomeDest}! Lembrando que hoje tem ${art.um} *${label}* marcad${art.o} com a gente:\n\n` +
         `🗓️ ${data}${horaStr}${localStr}${linkStr}\n\n` +
-        `_Até logo! 😊_`,
+        `_Até já! 😊_`,
       destinatarioTipo: destTipo,
       destinatarioTelefone: destTelefone,
       destinatarioNome: destNome,

@@ -31,6 +31,7 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   consultar_saude_financeira: "Consultou a saúde financeira",
   listar_clientes_sem_resposta: "Consultou clientes sem resposta no WhatsApp",
   remarcar_pericia: "Remarcou uma perícia/avaliação",
+  agendar_pericia: "Agendou uma perícia/avaliação nova",
   cadastrar_cliente: "Cadastrou um novo cliente",
   complementar_cliente: "Completou dados do cadastro de um cliente",
 };
@@ -324,6 +325,44 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["cliente_busca", "nova_data"],
+    },
+  },
+  {
+    name: "agendar_pericia",
+    description:
+      "Agenda uma perícia médica ou avaliação social NOVA do zero (diferente de remarcar_pericia, que só reagenda uma que já existe) — buscando o cliente pelo nome. Cria o compromisso na Agenda, o registro em Perícias, o prazo em Controles, e agenda os lembretes automáticos (15/5/2 dias antes, véspera e dia) pro cliente ou responsável legal usando o telefone CADASTRADO no sistema — nunca um número lido de um documento anexado, mesmo que pareça ser do cliente. Também manda um aviso imediato confirmando o agendamento. Use isto quando o usuário mandar um comprovante de agendamento do INSS (avaliação social, perícia médica) que ainda NÃO está no sistema e pedir pra agendar/marcar. Se já existir uma perícia igual (mesmo cliente, mesma data, mesmo tipo, ainda agendada), a ferramenta recusa como duplicata — nesse caso avise o usuário em vez de insistir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        cliente_busca: {
+          type: "string",
+          description: "Nome (ou parte do nome) do cliente.",
+        },
+        tipo_pericia: {
+          type: "string",
+          description:
+            "'medica' (perícia médica) ou 'social' (avaliação social BPC/LOAS).",
+        },
+        data: { type: "string", description: "Data no formato YYYY-MM-DD." },
+        hora: {
+          type: "string",
+          description: "Hora no formato HH:MM. Opcional, padrão 09:00.",
+        },
+        local: {
+          type: "string",
+          description: "Local completo (agência/endereço). Opcional.",
+        },
+        protocolo: {
+          type: "string",
+          description: "Número de protocolo do INSS, se houver. Opcional.",
+        },
+        descricao_servico: {
+          type: "string",
+          description:
+            "Descrição do serviço como consta no documento, ex: 'AVALIAÇÃO SOCIAL BPC/LOAS - INICIAL (PRESENCIAL)'. Opcional — se omitido, usa um texto padrão pro tipo.",
+        },
+      },
+      required: ["cliente_busca", "tipo_pericia", "data"],
     },
   },
   {
@@ -1452,6 +1491,113 @@ export async function executarFerramentaIris(
         observacao: resultado.sincronizado
           ? undefined
           : "Essa perícia não tem um compromisso vinculado na Agenda (perícia antiga, criada antes desse vínculo existir) — a data foi atualizada só em Perícias, sem sincronizar a Agenda nem avisar o cliente automaticamente. Avise o usuário disso.",
+      });
+    }
+
+    case "agendar_pericia": {
+      if (!hasPermission(session, "controles", "criar")) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem permissão pra criar controles/perícias. Explique isso educadamente e não tente de novo.",
+        });
+      }
+
+      const clienteBusca = String(input.cliente_busca ?? "").trim();
+      const tipoHint = String(input.tipo_pericia ?? "")
+        .trim()
+        .toLowerCase();
+      const data = String(input.data ?? "").trim();
+      if (!clienteBusca || !tipoHint || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Informe cliente_busca, tipo_pericia ('medica' ou 'social') e data no formato YYYY-MM-DD.",
+        });
+      }
+      const tipoMap: Record<string, string> = {
+        medica: "pericia_administrativa",
+        social: "avaliacao_social_administrativa",
+      };
+      const tipoPericia = tipoMap[tipoHint];
+      if (!tipoPericia) {
+        return JSON.stringify({
+          ok: false,
+          erro: "tipo_pericia precisa ser 'medica' ou 'social'.",
+        });
+      }
+      const hora =
+        typeof input.hora === "string" && /^\d{2}:\d{2}$/.test(input.hora)
+          ? input.hora
+          : "09:00";
+      const local =
+        typeof input.local === "string" && input.local.trim()
+          ? input.local.trim()
+          : "A definir";
+      const protocolo =
+        typeof input.protocolo === "string" && input.protocolo.trim()
+          ? input.protocolo.trim()
+          : null;
+      const descricaoLabel: Record<string, string> = {
+        medica: "Perícia Médica",
+        social: "Avaliação Social BPC/LOAS",
+      };
+      const tipoServico =
+        typeof input.descricao_servico === "string" &&
+        input.descricao_servico.trim()
+          ? input.descricao_servico.trim().slice(0, 200)
+          : descricaoLabel[tipoHint];
+
+      const candidatosCliente = await sql`
+        SELECT id::text, name FROM clients
+        WHERE deleted_at IS NULL AND name ILIKE ${"%" + clienteBusca + "%"}
+        LIMIT 5
+      `;
+      if (candidatosCliente.length === 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Nenhum cliente encontrado com "${clienteBusca}". Se for cliente novo, use cadastrar_cliente antes.`,
+        });
+      }
+      if (candidatosCliente.length > 1) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Mais de um cliente encontrado com "${clienteBusca}" — pergunte ao usuário qual, ou seja mais específico.`,
+          opcoes: candidatosCliente.map((c) => c.name),
+        });
+      }
+
+      const { criarNovoAgendamentoPericia } =
+        await import("./pericia-novo-agendamento");
+      type ResultadoAgendamento = Awaited<
+        ReturnType<typeof criarNovoAgendamentoPericia>
+      >;
+      const resultado: ResultadoAgendamento = await criarNovoAgendamentoPericia(
+        {
+          clienteId: String(candidatosCliente[0].id),
+          tipoPericia: tipoPericia as
+            | "avaliacao_social_administrativa"
+            | "pericia_administrativa",
+          tipoServico,
+          data,
+          hora,
+          local,
+          protocolo,
+          criadoPorLogin: session.login,
+          criadoPorUserId: session.id,
+        }
+      ).catch((e): ResultadoAgendamento => {
+        console.error("[iris-tools] falha ao agendar pericia:", e);
+        return { ok: false, erro: "Erro ao salvar o agendamento." };
+      });
+
+      if (!resultado.ok) {
+        return JSON.stringify(resultado);
+      }
+
+      return JSON.stringify({
+        ok: true,
+        mensagem: `${descricaoLabel[tipoHint]} agendada pra ${resultado.clienteNome} em ${data}${hora ? ` às ${hora}` : ""}. Já criei o compromisso na Agenda, o prazo em Controles e programei os lembretes automáticos.`,
+        aviso_enviado_ao_cliente: resultado.avisoEnviado,
+        compromisso_id: resultado.compromissoId,
       });
     }
 

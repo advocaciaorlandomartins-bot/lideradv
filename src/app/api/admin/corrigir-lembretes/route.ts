@@ -38,6 +38,26 @@ export async function POST() {
 
   const textosCorridos = Array.isArray(fixResult) ? fixResult.length : 0;
 
+  // ── 1b. Lembretes INSS pro colaborador sem o prefixo com o nome do cliente ──
+  // agendarLembretesInss guarda o texto já pronto no momento da criação — o fix
+  // que adicionou "*Agendamento de: {cliente}*" pro colaborador só vale pra
+  // compromissos criados DEPOIS do fix. Os já agendados antes continuam com o
+  // texto antigo até serem enviados; corrige o que ainda está pendente.
+  const prefixoResult = await sql`
+    UPDATE lembretes_agendados
+    SET mensagem = '*Agendamento de: ' || cliente_nome || '*' || E'\n\n' || mensagem
+    WHERE enviado = false
+      AND tipo LIKE 'inss_%'
+      AND destinatario_tipo = 'responsavel'
+      AND cliente_nome IS NOT NULL
+      AND mensagem NOT LIKE '*Agendamento de:%'
+    RETURNING id::text
+  `.catch(() => [] as Record<string, unknown>[]);
+
+  const prefixosCorrigidos = Array.isArray(prefixoResult)
+    ? prefixoResult.length
+    : 0;
+
   // ── 2. Compromissos futuros sem nenhum lembrete ──────────────────────────────
   const semLembrete = await sql`
     SELECT
@@ -130,6 +150,7 @@ export async function POST() {
   return NextResponse.json({
     ok: true,
     textos_corrigidos: textosCorridos,
+    prefixos_cliente_corrigidos: prefixosCorrigidos,
     compromissos_sem_lembrete_encontrados: semLembrete.length,
     reagendados,
     detalhe: semLembrete.map((r) => ({

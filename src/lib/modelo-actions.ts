@@ -50,6 +50,8 @@ export async function createModeloAction(
   const descricao =
     ((formData.get("descricao") as string) ?? "").trim() || null;
   const usarTimbrado = formData.get("usar_timbrado") === "true";
+  const requerResponsavelLegal =
+    formData.get("requer_responsavel_legal") === "true";
   const { blocks, corrompido } = parseBlocksField(formData);
   if (corrompido)
     return {
@@ -65,8 +67,10 @@ export async function createModeloAction(
 
   try {
     await sql`
-      INSERT INTO modelos_documento (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado)
-      VALUES (${titulo}, ${categoria}, ${descricao}, ${conteudo}, ${blocks ? JSON.stringify(blocks) : null}, ${usarTimbrado})
+      INSERT INTO modelos_documento
+        (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado, requer_responsavel_legal)
+      VALUES
+        (${titulo}, ${categoria}, ${descricao}, ${conteudo}, ${blocks ? JSON.stringify(blocks) : null}, ${usarTimbrado}, ${requerResponsavelLegal})
     `;
   } catch (err) {
     console.error("createModeloAction error:", err);
@@ -92,6 +96,8 @@ export async function updateModeloAction(
     ((formData.get("descricao") as string) ?? "").trim() || null;
   const ativo = formData.get("ativo") === "true";
   const usarTimbrado = formData.get("usar_timbrado") === "true";
+  const requerResponsavelLegal =
+    formData.get("requer_responsavel_legal") === "true";
   const { blocks, corrompido } = parseBlocksField(formData);
   if (corrompido)
     return {
@@ -108,14 +114,15 @@ export async function updateModeloAction(
   try {
     await sql`
       UPDATE modelos_documento SET
-        titulo          = ${titulo},
-        categoria       = ${categoria},
-        descricao       = ${descricao},
-        conteudo        = ${conteudo},
-        conteudo_blocks = ${blocks ? JSON.stringify(blocks) : null},
-        ativo           = ${ativo},
-        usar_timbrado   = ${usarTimbrado},
-        updated_at      = NOW()
+        titulo                    = ${titulo},
+        categoria                 = ${categoria},
+        descricao                 = ${descricao},
+        conteudo                  = ${conteudo},
+        conteudo_blocks           = ${blocks ? JSON.stringify(blocks) : null},
+        ativo                     = ${ativo},
+        usar_timbrado             = ${usarTimbrado},
+        requer_responsavel_legal  = ${requerResponsavelLegal},
+        updated_at                = NOW()
       WHERE id = ${id}::uuid
     `;
   } catch (err) {

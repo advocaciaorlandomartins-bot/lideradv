@@ -321,6 +321,17 @@ export async function GET() {
       sql`ALTER TABLE pericias ADD COLUMN IF NOT EXISTS compromisso_id UUID REFERENCES compromissos(id) ON DELETE SET NULL`
   );
 
+  // Sem isso, quando um cliente é menor/incapaz não havia como o sistema
+  // saber sozinho qual dos modelos (com/sem responsável legal) usar na
+  // tela de Assinaturas — a escolha era 100% manual mesmo quando o
+  // conteúdo dos dois modelos já é sempre o mesmo, só muda a presença do
+  // responsável.
+  await run(
+    "modelos_documento.requer_responsavel_legal",
+    () =>
+      sql`ALTER TABLE modelos_documento ADD COLUMN IF NOT EXISTS requer_responsavel_legal BOOLEAN NOT NULL DEFAULT FALSE`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

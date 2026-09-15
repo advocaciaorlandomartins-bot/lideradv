@@ -33,12 +33,18 @@ interface ModeloOpt {
   id: string;
   titulo: string;
   categoria: string | null;
+  requerResponsavelLegal: boolean;
 }
 
 interface Props {
   userLogin: string;
   colaboradores: { id: string; nome: string; email: string }[];
-  clientes: { id: string; nome: string; email: string }[];
+  clientes: {
+    id: string;
+    nome: string;
+    email: string;
+    menorIncapaz: boolean;
+  }[];
   modelos: ModeloOpt[];
 }
 
@@ -229,6 +235,26 @@ export default function NovoEnvelope({
     m.titulo.toLowerCase().includes(buscaModelo.trim().toLowerCase())
   );
 
+  const clienteSelecionado = clientes.find((c) => c.id === clienteId);
+  const clienteMenorIncapaz = clienteSelecionado?.menorIncapaz ?? false;
+
+  // Sem isso, sempre que o cliente era menor/incapaz alguém tinha que
+  // lembrar manualmente de escolher a versão "com responsável legal" do
+  // modelo — mesmo quando os dois modelos existem só pra essa distinção.
+  // Só sugere automaticamente na primeira entrada no passo 2 (nada
+  // selecionado ainda); depois disso a escolha do usuário nunca é mexida
+  // sozinha.
+  function irParaModelos() {
+    if (modelosSelecionados.length === 0) {
+      const sugeridos = modelos.filter(
+        (m) => m.requerResponsavelLegal === clienteMenorIncapaz
+      );
+      if (sugeridos.length > 0)
+        setModelosSelecionados(sugeridos.map((m) => m.id));
+    }
+    setStep(2);
+  }
+
   /* ─── add signer ─── */
   function fillFromRef(tipo: SigTipo, refId: string) {
     if (tipo === "eu_mesmo") {
@@ -379,7 +405,7 @@ export default function NovoEnvelope({
           <div className="pt-2 flex justify-end">
             <button
               onClick={() => {
-                if (nome.trim() && clienteId) setStep(2);
+                if (nome.trim() && clienteId) irParaModelos();
               }}
               disabled={!nome.trim() || !clienteId}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 font-body text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-40"
@@ -400,6 +426,13 @@ export default function NovoEnvelope({
             Selecione um ou mais modelos — as variáveis são preenchidas
             automaticamente com os dados do cliente escolhido.
           </p>
+          {clienteMenorIncapaz && (
+            <p className="-mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 font-body text-xs text-amber-800">
+              Este cliente é menor/incapaz — já pré-selecionamos os modelos
+              marcados como &ldquo;requer responsável legal&rdquo;. Confira
+              antes de continuar.
+            </p>
+          )}
 
           <input
             type="text"
@@ -418,6 +451,8 @@ export default function NovoEnvelope({
             <ul className="max-h-96 space-y-1.5 overflow-y-auto">
               {modelosFiltrados.map((m) => {
                 const checked = modelosSelecionados.includes(m.id);
+                const sugerido =
+                  m.requerResponsavelLegal === clienteMenorIncapaz;
                 return (
                   <li key={m.id}>
                     <label
@@ -437,12 +472,24 @@ export default function NovoEnvelope({
                         <p className="font-body text-sm font-semibold text-fg truncate">
                           {m.titulo}
                         </p>
-                        {m.categoria && (
+                        {(m.categoria || m.requerResponsavelLegal) && (
                           <p className="font-body text-xs text-muted">
-                            {m.categoria}
+                            {[
+                              m.categoria,
+                              m.requerResponsavelLegal
+                                ? "Requer responsável legal"
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </p>
                         )}
                       </div>
+                      {!checked && sugerido && (
+                        <span className="flex-shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 font-body text-[11px] font-semibold text-emerald-700">
+                          Sugerido
+                        </span>
+                      )}
                       {checked && (
                         <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary text-white">
                           <CheckIcon className="h-3 w-3" />

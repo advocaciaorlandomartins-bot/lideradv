@@ -45,6 +45,9 @@ export default function ModeloForm({ action, modelo }: Props) {
   const [usarTimbrado, setUsarTimbrado] = useState(
     modelo?.usar_timbrado ?? true
   );
+  const [requerResponsavelLegal, setRequerResponsavelLegal] = useState(
+    modelo?.requer_responsavel_legal ?? false
+  );
 
   function insertVariable(tag: string) {
     editorRef.current?.insertVariable(tag);
@@ -181,6 +184,41 @@ export default function ModeloForm({ action, modelo }: Props) {
           type="hidden"
           name="usar_timbrado"
           value={usarTimbrado ? "true" : "false"}
+        />
+      </div>
+
+      {/* Requer responsável legal */}
+      <div className="flex items-center justify-between rounded-xl border border-border bg-slate-50 px-4 py-3">
+        <div>
+          <p className="font-body text-sm font-semibold text-fg">
+            Requer responsável legal
+          </p>
+          <p className="font-body text-xs text-muted mt-0.5">
+            Marque se este modelo é a versão com responsável legal (cliente
+            menor de idade ou incapaz) — na tela de Assinaturas, o sistema
+            sugere este modelo sozinho quando o cliente selecionado for
+            menor/incapaz.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={requerResponsavelLegal}
+          onClick={() => setRequerResponsavelLegal((v) => !v)}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+            requerResponsavelLegal ? "bg-primary" : "bg-slate-300"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+              requerResponsavelLegal ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+        <input
+          type="hidden"
+          name="requer_responsavel_legal"
+          value={requerResponsavelLegal ? "true" : "false"}
         />
       </div>
 

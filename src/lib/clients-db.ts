@@ -18,6 +18,7 @@ export interface Client {
   indicador_nome: string | null;
   /** Etiquetas no formato "CATEGORIA:VALOR". */
   etiquetas: string[];
+  menor_incapaz: boolean;
 }
 
 function formatSince(date: Date): string {
@@ -42,6 +43,7 @@ export async function getAllClients(): Promise<Client[]> {
       c.state,
       c.status,
       c.created_at,
+      c.menor_incapaz,
       col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
       (
@@ -72,6 +74,7 @@ export async function getAllClients(): Promise<Client[]> {
     processes: r.process_count ?? 0,
     indicador_nome: r.indicador_nome ?? null,
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
+    menor_incapaz: r.menor_incapaz ?? false,
   }));
 }
 
@@ -410,6 +413,7 @@ export async function getClientById(id: string): Promise<Client | null> {
       c.state,
       c.status,
       c.created_at,
+      c.menor_incapaz,
       col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
       (
@@ -441,5 +445,6 @@ export async function getClientById(id: string): Promise<Client | null> {
     processes: r.process_count ?? 0,
     indicador_nome: r.indicador_nome ?? null,
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
+    menor_incapaz: r.menor_incapaz ?? false,
   };
 }

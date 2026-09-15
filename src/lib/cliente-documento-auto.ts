@@ -48,6 +48,13 @@ export interface DadosClienteExtraidos {
   data_afastamento?: string | null;
   atividade_anterior?: string | null;
   num_contribuicoes?: number | null;
+  responsavel_nome?: string | null;
+  responsavel_telefone?: string | null;
+  responsavel_parentesco?: string | null;
+  responsavel_cpf?: string | null;
+  responsavel_rg?: string | null;
+  responsavel_rg_orgao?: string | null;
+  responsavel_email?: string | null;
 }
 
 const CAMPOS_DATA = new Set([
@@ -98,6 +105,13 @@ const CAMPOS_PERMITIDOS = new Set<keyof DadosClienteExtraidos>([
   "data_afastamento",
   "atividade_anterior",
   "num_contribuicoes",
+  "responsavel_nome",
+  "responsavel_telefone",
+  "responsavel_parentesco",
+  "responsavel_cpf",
+  "responsavel_rg",
+  "responsavel_rg_orgao",
+  "responsavel_email",
 ]);
 
 /**

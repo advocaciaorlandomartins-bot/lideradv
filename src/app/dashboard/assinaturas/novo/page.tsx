@@ -26,6 +26,7 @@ export default async function NovoEnvelopePage() {
     id: m.id,
     titulo: m.titulo,
     categoria: m.categoria,
+    requerResponsavelLegal: m.requer_responsavel_legal,
   }));
 
   const colaboradoresOpts = colaboradores
@@ -36,6 +37,7 @@ export default async function NovoEnvelopePage() {
     id: c.id,
     nome: c.name,
     email: c.email ?? "",
+    menorIncapaz: c.menor_incapaz ?? false,
   }));
 
   return (

@@ -374,6 +374,23 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
           description:
             "Parentesco do responsável (ex: mãe, pai, tutor). Opcional.",
         },
+        responsavel_cpf: {
+          type: "string",
+          description:
+            "CPF do responsável legal. Opcional, mas necessário pra gerar contrato com responsável — peça se estiver tratando de um caso assim.",
+        },
+        responsavel_rg: {
+          type: "string",
+          description: "RG do responsável legal. Opcional.",
+        },
+        responsavel_rg_orgao: {
+          type: "string",
+          description: "Órgão expedidor do RG do responsável legal. Opcional.",
+        },
+        responsavel_email: {
+          type: "string",
+          description: "E-mail do responsável legal. Opcional.",
+        },
       },
       required: ["tipo", "name", "doc"],
     },
@@ -381,7 +398,7 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
   {
     name: "complementar_cliente",
     description:
-      "Preenche automaticamente campos VAZIOS no cadastro de um cliente JÁ EXISTENTE, a partir de dado reconhecido num documento anexado na conversa ou informado pelo usuário no texto. Use isto PROATIVAMENTE, sem esperar o usuário pedir, sempre que reconhecer dado novo de identificação/endereço/benefício/saúde de um cliente que já existe no sistema (não é pra cadastro novo — pra isso use cadastrar_cliente). Só preenche campo que estiver vazio — nunca sobrescreve dado que já existe, mesmo que pareça diferente do que você leu; se notar uma divergência entre o que já está cadastrado e o que o documento mostra, avise o usuário em texto em vez de tentar corrigir sozinho. Não invente valor nenhum — só informe campos que você viu de verdade no documento/mensagem.",
+      "Preenche automaticamente campos VAZIOS no cadastro de um cliente JÁ EXISTENTE, a partir de dado reconhecido num documento anexado na conversa ou informado pelo usuário no texto. Use isto PROATIVAMENTE, sem esperar o usuário pedir, sempre que reconhecer dado novo de identificação/endereço/benefício/saúde de um cliente que já existe no sistema (não é pra cadastro novo — pra isso use cadastrar_cliente). Só preenche campo que estiver vazio — nunca sobrescreve dado que já existe, mesmo que pareça diferente do que você leu; se notar uma divergência entre o que já está cadastrado e o que o documento mostra, avise o usuário em texto em vez de tentar corrigir sozinho. Não invente valor nenhum — só informe campos que você viu de verdade no documento/mensagem. IMPORTANTE pra clientes menor/incapaz: a tela de Assinaturas escolhe sozinha entre o modelo de contrato 'com responsável legal' e o 'sem responsável' — mas só funciona direito se o CPF e RG do responsável também estiverem cadastrados (não só nome/telefone). Se perceber que o cliente é menor_incapaz e faltam responsavel_cpf/responsavel_rg, pergunte proativamente por esses dados quando fizer sentido na conversa.",
     input_schema: {
       type: "object",
       properties: {
@@ -476,6 +493,36 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         num_contribuicoes: {
           type: "string",
           description: "Número de contribuições/carência, só número. Opcional.",
+        },
+        responsavel_nome: {
+          type: "string",
+          description: "Nome do responsável legal (menor/incapaz). Opcional.",
+        },
+        responsavel_telefone: {
+          type: "string",
+          description: "Telefone do responsável legal. Opcional.",
+        },
+        responsavel_parentesco: {
+          type: "string",
+          description:
+            "Parentesco do responsável, ex: mãe, pai, tutor. Opcional.",
+        },
+        responsavel_cpf: {
+          type: "string",
+          description:
+            "CPF do responsável legal — necessário pra gerar contrato com responsável. Opcional.",
+        },
+        responsavel_rg: {
+          type: "string",
+          description: "RG do responsável legal. Opcional.",
+        },
+        responsavel_rg_orgao: {
+          type: "string",
+          description: "Órgão expedidor do RG do responsável legal. Opcional.",
+        },
+        responsavel_email: {
+          type: "string",
+          description: "E-mail do responsável legal. Opcional.",
         },
       },
       required: ["cliente_busca"],
@@ -1448,6 +1495,12 @@ export async function executarFerramentaIris(
       }
       const responsavelParentesco =
         String(input.responsavel_parentesco ?? "").trim() || null;
+      const responsavelCpf = String(input.responsavel_cpf ?? "").trim() || null;
+      const responsavelRg = String(input.responsavel_rg ?? "").trim() || null;
+      const responsavelRgOrgao =
+        String(input.responsavel_rg_orgao ?? "").trim() || null;
+      const responsavelEmail =
+        String(input.responsavel_email ?? "").trim() || null;
 
       const email = String(input.email ?? "").trim() || null;
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1490,11 +1543,13 @@ export async function executarFerramentaIris(
           INSERT INTO clients
             (type, name, doc, email, phone, notes,
              cep, street, addr_number, neighborhood, city, state,
-             menor_incapaz, responsavel_nome, responsavel_telefone, responsavel_parentesco)
+             menor_incapaz, responsavel_nome, responsavel_telefone, responsavel_parentesco,
+             responsavel_cpf, responsavel_rg, responsavel_rg_orgao, responsavel_email)
           VALUES
             (${tipo}, ${nome}, ${docBruto}, ${email}, ${phone}, ${notes},
              '00000-000', '—', 'S/N', '—', ${city}, ${state},
-             ${menorIncapaz}, ${responsavelNome}, ${responsavelTelefone}, ${responsavelParentesco})
+             ${menorIncapaz}, ${responsavelNome}, ${responsavelTelefone}, ${responsavelParentesco},
+             ${responsavelCpf}, ${responsavelRg}, ${responsavelRgOrgao}, ${responsavelEmail})
           RETURNING id::text
         `;
         novoId = String(rows[0].id);
@@ -1578,6 +1633,13 @@ export async function executarFerramentaIris(
         "categoria_contribuinte",
         "data_diagnostico",
         "num_contribuicoes",
+        "responsavel_nome",
+        "responsavel_telefone",
+        "responsavel_parentesco",
+        "responsavel_cpf",
+        "responsavel_rg",
+        "responsavel_rg_orgao",
+        "responsavel_email",
       ] as const;
 
       const dados: Record<string, string> = {};

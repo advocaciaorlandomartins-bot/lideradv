@@ -639,6 +639,30 @@ export async function executarFerramentaIris(
     });
   }
 
+  // Rede de segurança: qualquer query sem .catch() próprio (várias existem
+  // nos casos de busca de cliente/processo) que lançar uma exceção aqui
+  // subia sem tratamento até a rota do chat, que só tem um catch GERAL em
+  // volta de toda a conversa — resultado: "Erro ao gerar resposta" genérico
+  // pro usuário, sem log específico de qual ferramenta/linha falhou.
+  try {
+    return await executarFerramentaIrisInterno(session, name, input);
+  } catch (err) {
+    console.error(
+      `[iris-tools] exceção não tratada na ferramenta "${name}":`,
+      err
+    );
+    return JSON.stringify({
+      ok: false,
+      erro: `Erro interno ao executar "${name}". Avise o usuário que algo falhou e ele pode tentar de novo ou fazer manualmente pela tela.`,
+    });
+  }
+}
+
+async function executarFerramentaIrisInterno(
+  session: SessionUser,
+  name: string,
+  input: Record<string, string>
+): Promise<string> {
   switch (name) {
     case "verificar_saude": {
       const checks: { componente: string; ok: boolean; detalhe: string }[] = [];

@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       contrato_assinado_em = COALESCE(contrato_assinado_em, now()),
       updated_at           = now()
     WHERE contrato_id = ${String(contratoId)}
-    RETURNING id::text, nome, telefone, contrato_url
+    RETURNING id::text, nome, telefone, contrato_url, prevbot_lead_id
   `;
 
   if (updated.length === 0) {
@@ -134,6 +134,7 @@ export async function POST(request: Request) {
     nome: string;
     telefone: string;
     contrato_url: string | null;
+    prevbot_lead_id: string | null;
   };
 
   const { clientId, processoId, documentoId } = await converterLeadAssinado(
@@ -156,6 +157,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           contrato_id: contratoId,
           document_id: contratoId,
+          prevbot_lead_id: lead.prevbot_lead_id,
         }),
         signal: AbortSignal.timeout(8000),
       });

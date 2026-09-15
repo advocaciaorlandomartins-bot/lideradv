@@ -236,7 +236,15 @@ ${LIDERADV_DOCS}`;
     for (let i = 0; i < MAX_LOOP; i++) {
       const response = await client.messages.create(
         {
-          model: "claude-sonnet-5",
+          // Voltou pra Haiku: o mesmo teto fixo de 60s da Vercel (não dá
+          // pra aumentar) que já causou um 504 real em gerar-com-ia hoje
+          // é um risco aqui também — PDF grande + system prompt grande
+          // (~28KB de documentação) + até 6 chamadas em loop quando usa
+          // ferramenta somam rápido com um modelo mais lento. Erro real
+          // reportado em produção logo após um anexo de PDF pedindo pra
+          // agendar avaliação (fluxo que usa ferramenta). Sem acesso ao
+          // log exato do erro pra confirmar 100%, mas o padrão bate.
+          model: "claude-haiku-4-5-20251001",
           max_tokens: 2048,
           temperature: 0,
           system: systemPrompt,
@@ -298,7 +306,14 @@ ${LIDERADV_DOCS}`;
       return NextResponse.json({ reply, conversaId, toolTrace });
     }
   } catch (err) {
-    console.error("[iris/chat] Anthropic API error:", err);
+    // Loga tipo/status/mensagem separado (não só o objeto err) — Vercel só
+    // guarda log por 12h, então na próxima vez que isso acontecer precisa
+    // dar pra entender a causa rápido sem precisar reproduzir.
+    const info =
+      err instanceof Error
+        ? { name: err.name, message: err.message }
+        : { raw: String(err) };
+    console.error("[iris/chat] Anthropic API error:", info, err);
     return NextResponse.json(
       { error: "Erro ao gerar resposta. Tente novamente." },
       { status: 500 }

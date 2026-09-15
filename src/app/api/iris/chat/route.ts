@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarEntidade } from "@/lib/acesso";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { buildIrisContextText } from "@/lib/iris-context";
+import sql from "@/lib/db";
 import {
   IRIS_TOOLS,
   IRIS_TOOL_LABELS,
@@ -100,6 +102,30 @@ export async function POST(req: NextRequest) {
     typeof body.conversaId === "string" && body.conversaId.trim()
       ? body.conversaId.trim()
       : null;
+
+  // Cliente da página onde o usuário abriu a Íris (widget flutuante em
+  // /dashboard/clientes/[id]) — usado pra dar contexto de "esse cliente" e
+  // pra anexar automaticamente documento no arquivo dele. Revalida acesso
+  // aqui: o front manda o id lido da própria URL, nunca confia sem checar.
+  const UUID_RE_BODY =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const paginaClienteIdRaw =
+    typeof body.paginaClienteId === "string" ? body.paginaClienteId.trim() : "";
+  let paginaCliente: { id: string; nome: string } | null = null;
+  if (paginaClienteIdRaw && UUID_RE_BODY.test(paginaClienteIdRaw)) {
+    const podeVer = await podeAcessarEntidade(
+      session,
+      "cliente",
+      paginaClienteIdRaw
+    ).catch(() => false);
+    if (podeVer) {
+      const [row] = await sql`
+        SELECT id::text, name FROM clients
+        WHERE id = ${paginaClienteIdRaw}::uuid AND deleted_at IS NULL
+      `.catch(() => []);
+      if (row) paginaCliente = { id: String(row.id), nome: String(row.name) };
+    }
+  }
 
   const attachmentsRaw = Array.isArray(body.attachments)
     ? (body.attachments as unknown[])
@@ -220,6 +246,11 @@ REGRAS GERAIS:
 - ANÁLISE DE DOCUMENTOS ANEXADOS: quando o usuário anexar PDF ou imagem pedindo análise, leia tudo com atenção e estruture a resposta em seções claras (ex: o que foi encontrado, ponto crítico, possibilidades, recomendação) citando trechos, datas e números concretos dos documentos — nunca genérico. Se faltar informação para concluir algo com segurança, diga exatamente o que falta.
 - HISTÓRICO: cada conversa fica salva (botão de relógio/histórico na tela) e pode ser retomada depois; um botão "Nova conversa" inicia outra do zero. Se o usuário perguntar se você "lembra" de algo de outra conversa: você só enxerga o histórico da conversa atualmente aberta, não de outras conversas salvas — oriente a abrir a conversa antiga pelo histórico se for isso que ele quer.
 - Seja direta e organizada — liste itens por data quando fizer sentido, cite nomes e números concretos, sem enrolação.
+${
+  paginaCliente
+    ? `- CONTEXTO DE PÁGINA: o usuário está vendo agora a página do cliente **${paginaCliente.nome}** no sistema. Se ele disser "esse cliente"/"este cliente"/"ele"/"ela" sem nomear, é dessa pessoa que está falando — não peça pra ele repetir o nome. Documento PDF/imagem anexado nesta conversa é salvo automaticamente na pasta de Documentos desse cliente (você não precisa fazer nada pra isso acontecer, já é automático) — se o pedido também envolver agendar/cadastrar/completar dado, ainda assim use as ferramentas normalmente, o cliente_busca dessas ferramentas pode usar o nome "${paginaCliente.nome}" diretamente.`
+    : ""
+}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 DADOS ATUAIS DO ESCRITÓRIO
@@ -303,6 +334,48 @@ ${LIDERADV_DOCS}`;
         null,
         toolTrace.length ? toolTrace : null
       );
+
+      // Documento anexado numa conversa aberta na página de um cliente:
+      // salva no arquivo dele automaticamente (Documentos), sem precisar
+      // que o usuário peça — mesmo espírito das outras automações da Íris.
+      // Roda depois da resposta já ter sido enviada.
+      if (paginaCliente && anexosRequest.length > 0) {
+        const clienteIdParaAnexo = paginaCliente.id;
+        after(async () => {
+          const { analisarDocumentoCliente } =
+            await import("@/lib/cliente-documento-auto");
+          for (const a of anexosRequest) {
+            try {
+              const rows = await sql`
+                INSERT INTO documentos (entity_type, entity_id, nome, tipo, caminho, url)
+                VALUES ('cliente', ${clienteIdParaAnexo}::uuid, ${a.nome}, ${a.mimeType},
+                        ${new URL(a.url).pathname.replace(/^\//, "")}, ${a.url})
+                RETURNING id::text
+              `;
+              const documentoId = rows[0]?.id as string | undefined;
+              const isPdfOrImage =
+                a.mimeType === "application/pdf" ||
+                a.mimeType.startsWith("image/");
+              if (documentoId && isPdfOrImage) {
+                await analisarDocumentoCliente(
+                  documentoId,
+                  clienteIdParaAnexo
+                ).catch((e) =>
+                  console.error(
+                    "[iris/chat] falha no preenchimento automático via anexo:",
+                    e
+                  )
+                );
+              }
+            } catch (e) {
+              console.error(
+                "[iris/chat] falha ao salvar anexo no arquivo do cliente:",
+                e
+              );
+            }
+          }
+        });
+      }
 
       return NextResponse.json({ reply, conversaId, toolTrace });
     }

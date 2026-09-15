@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import {
   SparklesIcon,
   XMarkIcon,
@@ -58,12 +59,21 @@ const SUGESTOES = [
   "Quem está sobrecarregado agora?",
 ];
 
+const CLIENTE_PATH_RE =
+  /^\/dashboard\/clientes\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
+
 export default function IrisFloating() {
   const [open, setOpen] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const pathname = usePathname();
+  // Quando o usuário está numa página de cliente, avisa a Íris — ela usa
+  // isso pra saber "de quem" o usuário está falando sem precisar nomear, e
+  // pra já anexar automaticamente o documento no arquivo desse cliente
+  // quando ele mandar um PDF/imagem pedindo pra guardar.
+  const paginaClienteId = pathname?.match(CLIENTE_PATH_RE)?.[1] ?? null;
 
   const {
     conversaId,
@@ -79,7 +89,7 @@ export default function IrisFloating() {
     loadConversation,
     startNewConversation,
     deleteConversation,
-  } = useIrisChat(WELCOME, "lideradv-iris-conversa-flutuante");
+  } = useIrisChat(WELCOME, "lideradv-iris-conversa-flutuante", paginaClienteId);
 
   useEffect(() => {
     if (open) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

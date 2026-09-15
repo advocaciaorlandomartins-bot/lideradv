@@ -47,7 +47,11 @@ export const IRIS_MIME_SUPORTADOS = new Set([
 export const IRIS_ACCEPT_ATTR =
   "application/pdf,image/jpeg,image/png,image/webp";
 
-export function useIrisChat(welcome: IrisMessage, storageKey: string) {
+export function useIrisChat(
+  welcome: IrisMessage,
+  storageKey: string,
+  paginaClienteId?: string | null
+) {
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [messages, setMessages] = useState<IrisMessage[]>([welcome]);
   const [loading, setLoading] = useState(false);
@@ -250,6 +254,7 @@ export function useIrisChat(welcome: IrisMessage, storageKey: string) {
               nome: p.nome,
               mimeType: p.mimeType,
             })),
+            paginaClienteId: paginaClienteId ?? null,
           }),
         });
         const data = await res.json();
@@ -303,7 +308,7 @@ export function useIrisChat(welcome: IrisMessage, storageKey: string) {
         setLoading(false);
       }
     },
-    [loading, pendingFiles, conversaId, storageKey]
+    [loading, pendingFiles, conversaId, storageKey, paginaClienteId]
   );
 
   return {

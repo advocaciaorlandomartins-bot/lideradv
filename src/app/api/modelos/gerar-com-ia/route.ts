@@ -183,8 +183,13 @@ export async function POST(request: Request) {
 
   try {
     const client = new Anthropic({ apiKey });
+    // Voltou pra Haiku: Sonnet estourava os 60s de teto fixo do plano
+    // Vercel (não dá pra aumentar) numa geração que pode chegar a 8192
+    // tokens de resposta — causou 504 real em produção. A instrução tem
+    // várias regras rígidas de fidelidade, mas o teto de tempo da
+    // plataforma pesa mais aqui do que o ganho de qualidade do Sonnet.
     const res = await client.messages.create({
-      model: "claude-sonnet-5",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 8192,
       messages: [{ role: "user", content }],
     });

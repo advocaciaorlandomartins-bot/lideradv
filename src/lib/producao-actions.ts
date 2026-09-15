@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
 
 function revalidate(id?: string) {
   revalidatePath("/dashboard/producao");
@@ -98,6 +99,8 @@ export async function registrarResultadoAdminAction(
         data_estagio_at          = NOW()
     WHERE id = ${id}::uuid
   `;
+  if (arquivando)
+    await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
   await concluirTarefasCerebroObsoletas(id);
   revalidate(id);
   return {};
@@ -120,6 +123,7 @@ export async function registrarResultadoJudicialAction(
         data_estagio_at    = NOW()
     WHERE id = ${id}::uuid
   `;
+  await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
   await concluirTarefasCerebroObsoletas(id);
   revalidate(id);
   return {};
@@ -207,6 +211,7 @@ export async function arquivarProcessoAction(
           data_estagio_at  = NOW()
       WHERE id = ${id}::uuid
     `;
+    await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
     await concluirTarefasCerebroObsoletas(id);
     revalidate(id);
     return {};
@@ -271,6 +276,7 @@ export async function reabrirProcessoAction(
           data_estagio_at               = NOW()
       WHERE id = ${id}::uuid
     `;
+    await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
     revalidate(id);
     return {};
   } catch {

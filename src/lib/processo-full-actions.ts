@@ -9,6 +9,7 @@ import { podeEditarProcesso } from "./processo-ownership";
 import { interpretarAndamento } from "./cerebroJuridico";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
+import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
 
 // ── Fase / Status ──────────────────────────────────────────────
 
@@ -58,6 +59,9 @@ export async function arquivarProcessoAction(
         updated_at         = NOW()
       WHERE id = ${processoId}::uuid
     `;
+    await sincronizarStatusClienteAposMudarProcesso(processoId).catch(
+      () => null
+    );
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {

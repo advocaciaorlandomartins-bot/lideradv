@@ -32,6 +32,7 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   listar_clientes_sem_resposta: "Consultou clientes sem resposta no WhatsApp",
   remarcar_pericia: "Remarcou uma perícia/avaliação",
   agendar_pericia: "Agendou uma perícia/avaliação nova",
+  criar_controle_pericia: "Criou um controle de perícia/prorrogação",
   cadastrar_cliente: "Cadastrou um novo cliente",
   complementar_cliente: "Completou dados do cadastro de um cliente",
 };
@@ -363,6 +364,67 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["cliente_busca", "tipo_pericia", "data"],
+    },
+  },
+  {
+    name: "criar_controle_pericia",
+    description:
+      "Cria um registro em Controles → Perícias pra qualquer um dos 5 tipos: perícia médica administrativa/judicial, avaliação social administrativa/judicial, ou PRORROGAÇÃO DE BENEFÍCIO. Diferente de agendar_pericia (só pra agendamento novo do INSS, com compromisso na Agenda e lembretes automáticos por WhatsApp) — este é o registro manual de controle/prazo, sem compromisso na Agenda nem lembrete automático, igual ao formulário 'Nova Perícia' da tela Controles. Use isto pra prorrogação de benefício, perícia/avaliação judicial, ou qualquer perícia que o usuário queira registrar sem os lembretes automáticos do fluxo INSS. Pra prorrogação, sempre pergunte a data-limite pra requerer a prorrogação (campo 'data'), número e tipo do benefício, data fim atual e nova data fim pretendida, se o usuário não tiver informado.",
+    input_schema: {
+      type: "object",
+      properties: {
+        cliente_busca: {
+          type: "string",
+          description: "Nome (ou parte do nome) do cliente.",
+        },
+        tipo: {
+          type: "string",
+          description:
+            "Um exatamente destes valores: 'pericia_administrativa', 'pericia_judicial', 'avaliacao_social_administrativa', 'avaliacao_social_judicial', 'prorrogacao_beneficio'.",
+        },
+        data: {
+          type: "string",
+          description:
+            "Data da perícia/prazo no formato YYYY-MM-DD. Pra prorrogação, é a data-limite pra requerer.",
+        },
+        hora: { type: "string", description: "Hora HH:MM. Opcional." },
+        local: { type: "string", description: "Local. Opcional." },
+        perito: { type: "string", description: "Nome do perito. Opcional." },
+        especialidade: {
+          type: "string",
+          description: "Especialidade médica, ex: Ortopedia. Opcional.",
+        },
+        status: {
+          type: "string",
+          description:
+            "agendado, realizado, remarcado ou cancelado. Opcional, padrão agendado.",
+        },
+        beneficio_numero: {
+          type: "string",
+          description:
+            "Número do benefício (NB). Só pra prorrogação. Opcional.",
+        },
+        beneficio_tipo: {
+          type: "string",
+          description:
+            "Tipo do benefício, ex: Auxílio-doença. Só pra prorrogação. Opcional.",
+        },
+        data_fim_beneficio: {
+          type: "string",
+          description:
+            "Data fim ATUAL do benefício YYYY-MM-DD. Só pra prorrogação. Opcional.",
+        },
+        nova_data_fim: {
+          type: "string",
+          description:
+            "Nova data fim PRETENDIDA YYYY-MM-DD. Só pra prorrogação. Opcional.",
+        },
+        observacoes: {
+          type: "string",
+          description: "Observações internas. Opcional.",
+        },
+      },
+      required: ["cliente_busca", "tipo", "data"],
     },
   },
   {
@@ -1622,6 +1684,112 @@ async function executarFerramentaIrisInterno(
         mensagem: `${descricaoLabel[tipoHint]} agendada pra ${resultado.clienteNome} em ${data}${hora ? ` às ${hora}` : ""}. Já criei o compromisso na Agenda, o prazo em Controles e programei os lembretes automáticos.`,
         aviso_enviado_ao_cliente: resultado.avisoEnviado,
         compromisso_id: resultado.compromissoId,
+      });
+    }
+
+    case "criar_controle_pericia": {
+      if (!hasPermission(session, "controles", "criar")) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem permissão pra criar controles/perícias. Explique isso educadamente e não tente de novo.",
+        });
+      }
+
+      const clienteBusca = String(input.cliente_busca ?? "").trim();
+      const tipo = String(input.tipo ?? "").trim();
+      const data = String(input.data ?? "").trim();
+      const TIPOS_VALIDOS = new Set([
+        "pericia_administrativa",
+        "pericia_judicial",
+        "avaliacao_social_administrativa",
+        "avaliacao_social_judicial",
+        "prorrogacao_beneficio",
+      ]);
+      if (
+        !clienteBusca ||
+        !TIPOS_VALIDOS.has(tipo) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(data)
+      ) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Informe cliente_busca, tipo (um de: pericia_administrativa, pericia_judicial, avaliacao_social_administrativa, avaliacao_social_judicial, prorrogacao_beneficio) e data no formato YYYY-MM-DD.",
+        });
+      }
+
+      const candidatosCliente2 = await sql`
+        SELECT id::text, name FROM clients
+        WHERE deleted_at IS NULL AND name ILIKE ${"%" + clienteBusca + "%"}
+        LIMIT 5
+      `;
+      if (candidatosCliente2.length === 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Nenhum cliente encontrado com "${clienteBusca}". Se for cliente novo, use cadastrar_cliente antes.`,
+        });
+      }
+      if (candidatosCliente2.length > 1) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Mais de um cliente encontrado com "${clienteBusca}" — pergunte ao usuário qual, ou seja mais específico.`,
+          opcoes: candidatosCliente2.map((c) => c.name),
+        });
+      }
+
+      const hora =
+        typeof input.hora === "string" && /^\d{2}:\d{2}$/.test(input.hora)
+          ? input.hora
+          : null;
+      const strOrNullCP = (v: unknown) =>
+        typeof v === "string" && v.trim() ? v.trim() : null;
+      const dataOrNullCP = (v: unknown) =>
+        typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())
+          ? v.trim()
+          : null;
+      const local = strOrNullCP(input.local);
+      const perito = strOrNullCP(input.perito);
+      const especialidade = strOrNullCP(input.especialidade);
+      const status =
+        typeof input.status === "string" &&
+        ["agendado", "realizado", "remarcado", "cancelado"].includes(
+          input.status.trim()
+        )
+          ? input.status.trim()
+          : "agendado";
+      const beneficioNumero = strOrNullCP(input.beneficio_numero);
+      const beneficioTipo = strOrNullCP(input.beneficio_tipo);
+      const dataFimBeneficio = dataOrNullCP(input.data_fim_beneficio);
+      const novaDataFim = dataOrNullCP(input.nova_data_fim);
+      const observacoes = strOrNullCP(input.observacoes);
+
+      let novaPericiaId: string;
+      try {
+        const rows = await sql`
+          INSERT INTO pericias (
+            tipo, client_id, data_pericia, hora_pericia,
+            local_pericia, perito, especialidade, status,
+            beneficio_numero, beneficio_tipo,
+            data_fim_beneficio, nova_data_fim, observacoes
+          ) VALUES (
+            ${tipo}, ${candidatosCliente2[0].id}::uuid, ${data}::date, ${hora}::time,
+            ${local}, ${perito}, ${especialidade}, ${status},
+            ${beneficioNumero}, ${beneficioTipo},
+            ${dataFimBeneficio}::date, ${novaDataFim}::date, ${observacoes}
+          )
+          RETURNING id::text
+        `;
+        novaPericiaId = String(rows[0].id);
+      } catch (e) {
+        console.error("[iris-tools] falha ao criar controle de pericia:", e);
+        return JSON.stringify({
+          ok: false,
+          erro: "Erro ao salvar o controle no banco de dados.",
+        });
+      }
+
+      return JSON.stringify({
+        ok: true,
+        mensagem: `Controle criado pra ${candidatosCliente2[0].name} (${tipo}), data ${data}. Isto fica em Controles → Perícias — não cria compromisso na Agenda nem lembrete automático por WhatsApp, é só o registro/prazo.`,
+        pericia_id: novaPericiaId,
       });
     }
 

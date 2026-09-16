@@ -1875,6 +1875,12 @@ async function executarFerramentaIrisInterno(
         }
       }
 
+      // clients.email e clients.phone são NOT NULL no banco (sem default) —
+      // passar null (em vez de string vazia) quando não informado derrubava
+      // o INSERT inteiro com "violates not-null constraint", e a Íris só via
+      // um erro genérico, sem conseguir dizer a causa real pro usuário. O
+      // formulário manual de cadastro nunca bate nisso porque sempre lê o
+      // campo do form como string (vazia, não null).
       let novoId: string;
       try {
         const rows = await sql`
@@ -1884,7 +1890,7 @@ async function executarFerramentaIrisInterno(
              menor_incapaz, responsavel_nome, responsavel_telefone, responsavel_parentesco,
              responsavel_cpf, responsavel_rg, responsavel_rg_orgao, responsavel_email)
           VALUES
-            (${tipo}, ${nome}, ${docBruto}, ${email}, ${phone}, ${notes},
+            (${tipo}, ${nome}, ${docBruto}, ${email ?? ""}, ${phone ?? ""}, ${notes},
              '00000-000', '—', 'S/N', '—', ${city}, ${state},
              ${menorIncapaz}, ${responsavelNome}, ${responsavelTelefone}, ${responsavelParentesco},
              ${responsavelCpf}, ${responsavelRg}, ${responsavelRgOrgao}, ${responsavelEmail})

@@ -430,7 +430,7 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
   {
     name: "cadastrar_cliente",
     description:
-      "Cadastra um novo cliente (Pessoa Física ou Jurídica) direto pelo chat, no mesmo padrão do 'cadastro rápido' da tela de Clientes: nome, documento e tipo são obrigatórios; endereço fica com placeholder até alguém completar depois na tela do cliente. SEMPRE confirme nome completo e CPF/CNPJ com quem está pedindo antes de chamar esta ferramenta — nunca invente ou arredonde um documento. Se o cliente for menor de idade ou incapaz, informe menor_incapaz=true e os dados do responsável legal (nome e telefone são obrigatórios nesse caso) — é pra esse telefone que todo aviso automático desse cliente vai, nunca pro documento/CPF do próprio menor.",
+      "Cadastra um novo cliente (Pessoa Física ou Jurídica) direto pelo chat, no mesmo padrão do 'cadastro rápido' da tela de Clientes: nome, documento e tipo são obrigatórios; endereço fica com placeholder até alguém completar depois na tela do cliente. SEMPRE confirme nome completo e CPF/CNPJ com quem está pedindo antes de chamar esta ferramenta — nunca invente ou arredonde um documento. Se o cliente for menor de idade ou incapaz, informe menor_incapaz=true e os dados do responsável legal (nome e telefone são obrigatórios nesse caso) — é pra esse telefone que todo aviso automático desse cliente vai, nunca pro documento/CPF do próprio menor. Se o documento/mensagem que originou o cadastro já trouxer dado de RG, nascimento, NIS, benefício, CID ou incapacidade (comum quando o cadastro vem de uma decisão/comunicação do INSS), preencha os campos previdenciários abaixo NA HORA do cadastro — não deixe pra uma chamada separada de complementar_cliente depois, ela é só pra cliente que já existe.",
     input_schema: {
       type: "object",
       properties: {
@@ -454,6 +454,78 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         notes: {
           type: "string",
           description: "Observações rápidas. Opcional.",
+        },
+        rg: { type: "string", description: "RG. Opcional." },
+        rg_orgao: {
+          type: "string",
+          description: "Órgão expedidor do RG. Opcional.",
+        },
+        birth_date: {
+          type: "string",
+          description: "Data de nascimento YYYY-MM-DD. Opcional.",
+        },
+        genero: {
+          type: "string",
+          description: "Masculino ou Feminino. Opcional.",
+        },
+        filiacao_mae: { type: "string", description: "Nome da mãe. Opcional." },
+        filiacao_pai: { type: "string", description: "Nome do pai. Opcional." },
+        naturalidade_cidade: {
+          type: "string",
+          description: "Cidade de nascimento (naturalidade). Opcional.",
+        },
+        naturalidade_estado: {
+          type: "string",
+          description: "UF de nascimento (naturalidade). Opcional.",
+        },
+        nis: { type: "string", description: "NIS/PIS/PASEP. Opcional." },
+        num_beneficio: {
+          type: "string",
+          description: "Número do benefício INSS. Opcional.",
+        },
+        tipo_beneficio: {
+          type: "string",
+          description:
+            "Tipo de benefício, ex: Auxílio-doença, BPC/LOAS. Opcional.",
+        },
+        status_beneficio: {
+          type: "string",
+          description: "ativo, suspenso, cessado ou nao_recebe. Opcional.",
+        },
+        data_inicio_beneficio: {
+          type: "string",
+          description:
+            "Data de início do benefício (DIB) YYYY-MM-DD. Opcional.",
+        },
+        valor_beneficio: {
+          type: "string",
+          description:
+            "Valor do benefício em reais, só número (ex: 1518.00). Opcional.",
+        },
+        cid_principal: {
+          type: "string",
+          description: "Código CID-10 do diagnóstico principal. Opcional.",
+        },
+        tipo_incapacidade: {
+          type: "string",
+          description: "permanente, temporaria ou nao_se_aplica. Opcional.",
+        },
+        data_diagnostico: {
+          type: "string",
+          description: "Data do diagnóstico médico YYYY-MM-DD. Opcional.",
+        },
+        data_afastamento: {
+          type: "string",
+          description: "Data de afastamento do trabalho YYYY-MM-DD. Opcional.",
+        },
+        categoria_contribuinte: {
+          type: "string",
+          description:
+            "empregado, individual, especial, avulso ou facultativo. Opcional.",
+        },
+        num_contribuicoes: {
+          type: "string",
+          description: "Número de contribuições/carência, só número. Opcional.",
         },
         menor_incapaz: {
           type: "string",
@@ -1527,7 +1599,7 @@ async function executarFerramentaIrisInterno(
       };
 
       const candidatas = await sql`
-        SELECT p.id::text, p.tipo, p.data_pericia::text, cl.name AS cliente_nome
+        SELECT p.id::text, p.tipo, p.data_pericia::text, cl.id::text AS cliente_id, cl.name AS cliente_nome
         FROM pericias p
         JOIN clients cl ON cl.id = p.client_id
         WHERE cl.name ILIKE ${"%" + clienteBusca + "%"}
@@ -1577,6 +1649,7 @@ async function executarFerramentaIrisInterno(
         observacao: resultado.sincronizado
           ? undefined
           : "Essa perícia não tem um compromisso vinculado na Agenda (perícia antiga, criada antes desse vínculo existir) — a data foi atualizada só em Perícias, sem sincronizar a Agenda nem avisar o cliente automaticamente. Avise o usuário disso.",
+        cliente_id: String(filtradas[0].cliente_id),
       });
     }
 
@@ -1684,6 +1757,7 @@ async function executarFerramentaIrisInterno(
         mensagem: `${descricaoLabel[tipoHint]} agendada pra ${resultado.clienteNome} em ${data}${hora ? ` às ${hora}` : ""}. Já criei o compromisso na Agenda, o prazo em Controles e programei os lembretes automáticos.`,
         aviso_enviado_ao_cliente: resultado.avisoEnviado,
         compromisso_id: resultado.compromissoId,
+        cliente_id: String(candidatosCliente[0].id),
       });
     }
 
@@ -1790,6 +1864,7 @@ async function executarFerramentaIrisInterno(
         ok: true,
         mensagem: `Controle criado pra ${candidatosCliente2[0].name} (${tipo}), data ${data}. Isto fica em Controles → Perícias — não cria compromisso na Agenda nem lembrete automático por WhatsApp, é só o registro/prazo.`,
         pericia_id: novaPericiaId,
+        cliente_id: String(candidatosCliente2[0].id),
       });
     }
 
@@ -1852,6 +1927,49 @@ async function executarFerramentaIrisInterno(
           .toUpperCase() || "SP";
       const notes = String(input.notes ?? "").trim() || null;
 
+      // Dados previdenciários/pessoais que já costumam vir junto no mesmo
+      // documento que originou o cadastro (ex: comunicação de decisão do
+      // INSS) — gravados direto aqui em vez de depender de uma segunda
+      // chamada a complementar_cliente, que a Íris às vezes pula mesmo
+      // tendo o dado em mãos (achava que "cadastrar" já bastava e citava
+      // esses campos na resposta sem eles terem sido salvos de verdade).
+      const strOrNullCC = (v: unknown) =>
+        typeof v === "string" && v.trim() ? v.trim() : null;
+      const dataOrNullCC = (v: unknown) =>
+        typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())
+          ? v.trim()
+          : null;
+      const numOrNullCC = (v: unknown) => {
+        if (typeof v !== "string" || !v.trim()) return null;
+        const n = Number(v.trim().replace(",", "."));
+        return Number.isFinite(n) ? n : null;
+      };
+      const intOrNullCC = (v: unknown) => {
+        if (typeof v !== "string" || !v.trim()) return null;
+        const n = Number.parseInt(v.trim(), 10);
+        return Number.isFinite(n) ? n : null;
+      };
+      const rg = strOrNullCC(input.rg);
+      const rgOrgao = strOrNullCC(input.rg_orgao);
+      const birthDate = dataOrNullCC(input.birth_date);
+      const genero = strOrNullCC(input.genero);
+      const filiacaoMae = strOrNullCC(input.filiacao_mae);
+      const filiacaoPai = strOrNullCC(input.filiacao_pai);
+      const naturalidadeCidade = strOrNullCC(input.naturalidade_cidade);
+      const naturalidadeEstado = strOrNullCC(input.naturalidade_estado);
+      const nis = strOrNullCC(input.nis);
+      const numBeneficio = strOrNullCC(input.num_beneficio);
+      const tipoBeneficio = strOrNullCC(input.tipo_beneficio);
+      const statusBeneficio = strOrNullCC(input.status_beneficio);
+      const dataInicioBeneficio = dataOrNullCC(input.data_inicio_beneficio);
+      const valorBeneficio = numOrNullCC(input.valor_beneficio);
+      const cidPrincipal = strOrNullCC(input.cid_principal);
+      const tipoIncapacidade = strOrNullCC(input.tipo_incapacidade);
+      const dataDiagnostico = dataOrNullCC(input.data_diagnostico);
+      const dataAfastamento = dataOrNullCC(input.data_afastamento);
+      const categoriaContribuinte = strOrNullCC(input.categoria_contribuinte);
+      const numContribuicoes = intOrNullCC(input.num_contribuicoes);
+
       // Evita duplicar cliente já cadastrado com o mesmo CPF/CNPJ.
       const existentes = await sql`
         SELECT id::text, name FROM clients
@@ -1888,12 +2006,22 @@ async function executarFerramentaIrisInterno(
             (type, name, doc, email, phone, notes,
              cep, street, addr_number, neighborhood, city, state,
              menor_incapaz, responsavel_nome, responsavel_telefone, responsavel_parentesco,
-             responsavel_cpf, responsavel_rg, responsavel_rg_orgao, responsavel_email)
+             responsavel_cpf, responsavel_rg, responsavel_rg_orgao, responsavel_email,
+             rg, rg_orgao, birth_date, genero, filiacao_mae, filiacao_pai,
+             naturalidade_cidade, naturalidade_estado,
+             nis, num_beneficio, tipo_beneficio, status_beneficio, data_inicio_beneficio,
+             valor_beneficio, cid_principal, tipo_incapacidade, data_diagnostico,
+             data_afastamento, categoria_contribuinte, num_contribuicoes)
           VALUES
             (${tipo}, ${nome}, ${docBruto}, ${email ?? ""}, ${phone ?? ""}, ${notes},
              '00000-000', '—', 'S/N', '—', ${city}, ${state},
              ${menorIncapaz}, ${responsavelNome}, ${responsavelTelefone}, ${responsavelParentesco},
-             ${responsavelCpf}, ${responsavelRg}, ${responsavelRgOrgao}, ${responsavelEmail})
+             ${responsavelCpf}, ${responsavelRg}, ${responsavelRgOrgao}, ${responsavelEmail},
+             ${rg}, ${rgOrgao}, ${birthDate}::date, ${genero}, ${filiacaoMae}, ${filiacaoPai},
+             ${naturalidadeCidade}, ${naturalidadeEstado},
+             ${nis}, ${numBeneficio}, ${tipoBeneficio}, ${statusBeneficio}, ${dataInicioBeneficio}::date,
+             ${valorBeneficio}, ${cidPrincipal}, ${tipoIncapacidade}, ${dataDiagnostico}::date,
+             ${dataAfastamento}::date, ${categoriaContribuinte}, ${numContribuicoes})
           RETURNING id::text
         `;
         novoId = String(rows[0].id);
@@ -2014,6 +2142,7 @@ async function executarFerramentaIrisInterno(
           ok: true,
           mensagem: `Nenhum campo novo pra preencher em ${candidatos[0].name} — os dados informados já estavam cadastrados (não sobrescrevo dado existente).`,
           campos_preenchidos: [],
+          cliente_id: String(candidatos[0].id),
         });
       }
 
@@ -2021,6 +2150,7 @@ async function executarFerramentaIrisInterno(
         ok: true,
         mensagem: `Cadastro de ${candidatos[0].name} atualizado: ${preenchidos.join(", ")}.`,
         campos_preenchidos: preenchidos,
+        cliente_id: String(candidatos[0].id),
       });
     }
 

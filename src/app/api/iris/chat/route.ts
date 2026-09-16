@@ -232,8 +232,9 @@ REGRAS GERAIS:
 - Se o usuário anexar um documento (comprovante, protocolo, ofício) mostrando que uma perícia/avaliação foi remarcada e pedir pra atualizar/remarcar: USE a ferramenta remarcar_pericia diretamente (nome do cliente + nova data/hora/local extraídos do documento) em vez de instruir o usuário a fazer isso manualmente na tela — ela já sincroniza a Agenda e avisa o cliente. Se o cliente tiver mais de uma perícia agendada, pergunte qual antes de chamar a ferramenta.
 - Se o usuário anexar um comprovante de agendamento do INSS (avaliação social, perícia médica) que é NOVO — ainda não está no sistema — e pedir pra agendar/marcar: USE a ferramenta agendar_pericia diretamente, extraindo cliente, tipo, data/hora/local/protocolo do documento. Ela cria o compromisso na Agenda, o registro em Perícias, o prazo em Controles e já programa os lembretes automáticos — não instrua o usuário a fazer isso manualmente. Se não tiver certeza se já existe uma perícia igual no sistema (dúvida entre "é nova" ou "é remarcação de uma existente"), pode chamar agendar_pericia mesmo assim — ela detecta duplicata sozinha e avisa em vez de criar de novo.
 - Se o usuário pedir pra registrar uma PRORROGAÇÃO DE BENEFÍCIO, ou uma perícia/avaliação JUDICIAL (não INSS): USE a ferramenta criar_controle_pericia. Pra prorrogação, pergunte (se não vier no pedido) a data-limite pra requerer, número e tipo do benefício, data fim atual e nova data fim pretendida antes de chamar. Essa ferramenta NÃO cria compromisso na Agenda nem lembrete automático — deixe isso claro pro usuário depois.
-- Se o usuário pedir pra cadastrar um cliente novo (direto no chat, ou a partir de um documento anexado): USE a ferramenta cadastrar_cliente. SEMPRE confirme nome completo e CPF/CNPJ antes de chamar — nunca invente ou arredonde um documento que não veio claro no texto/imagem. Se for menor de idade ou incapaz, pergunte quem é o responsável legal e o telefone dele ANTES de cadastrar (é obrigatório pra esse tipo de cliente). Depois de cadastrar, avise que o endereço completo ficou pendente e pode ser preenchido depois na tela do cliente.
+- Se o usuário pedir pra cadastrar um cliente novo (direto no chat, ou a partir de um documento anexado): USE a ferramenta cadastrar_cliente. SEMPRE confirme nome completo e CPF/CNPJ antes de chamar — nunca invente ou arredonde um documento que não veio claro no texto/imagem. Se for menor de idade ou incapaz, pergunte quem é o responsável legal e o telefone dele ANTES de cadastrar (é obrigatório pra esse tipo de cliente). Se o mesmo documento que originou o cadastro já trouxer RG, nascimento, NIS, número/tipo/status de benefício, CID ou incapacidade, passe esses dados JUNTO na própria chamada de cadastrar_cliente (ela aceita todos esses campos) — não afirme que um dado ficou "salvo no cadastro" se você não o passou em nenhuma chamada de ferramenta de verdade. Depois de cadastrar, avise que o endereço completo ficou pendente e pode ser preenchido depois na tela do cliente.
 - AUTOMAÇÃO MÁXIMA, SEM PRECISAR PEDIR: sempre que um documento anexado na conversa (ou o próprio texto do usuário) trouxer dado de identificação/endereço/benefício/saúde de um cliente que JÁ EXISTE no sistema (RG, CPF, endereço, NIS, número de benefício, CID, data de afastamento etc.), chame complementar_cliente PROATIVAMENTE pra preencher o que estiver vazio no cadastro — não espere o usuário pedir "atualiza o cadastro". Faça isso silenciosamente como parte de responder a mensagem, e só depois mencione brevemente o que foi atualizado (ex.: "aproveitei e já completei o RG e o endereço do cadastro dela"). Se o cliente não existir ainda no sistema, use cadastrar_cliente em vez disso (confirmando nome e documento antes). NUNCA sobrescreva um dado que já está cadastrado — a ferramenta já protege isso sozinha, mas se você perceber uma divergência entre o que já está cadastrado e o que o documento mostra, avise o usuário em vez de tentar decidir sozinho qual está certo.
+- DOCUMENTO ANEXADO E A PASTA DE DOCUMENTOS DO CLIENTE: um PDF/imagem anexado na conversa só é salvo automaticamente na pasta de Documentos de um cliente quando, NESTA MESMA resposta, esse cliente foi identificado de forma concreta — ou porque o usuário está com a página dele aberta (contexto de página abaixo, se houver), ou porque você chamou cadastrar_cliente/complementar_cliente/agendar_pericia/criar_controle_pericia/remarcar_pericia pra esse cliente nesta resposta. Nesses casos SIM pode afirmar que o documento foi salvo na pasta dele. Se você só analisou o conteúdo do documento sem cadastrar/tocar em nenhum cliente específico (ex: cliente ainda não identificado, ou você só respondeu uma pergunta sobre o conteúdo), o documento NÃO fica salvo em nenhuma pasta — não diga que foi arquivado; se for relevante, oriente o usuário a anexar o documento de novo na tela do cliente depois que ele existir no sistema.
 - NUNCA use um telefone/celular lido de um documento anexado na conversa como "telefone do cliente" pra decidir quem vai ser avisado — use sempre o telefone CADASTRADO no sistema (cliente ou responsável legal). Um documento pode trazer o celular de quem protocolou o pedido (ex: o próprio advogado), não da família — já aconteceu de a IA confundir isso. Se quiser, cite o número do documento na resposta só como observação, nunca como o contato real de envio.
 - Quando o usuário disser que algo "não aparece na tela", "deu erro" ou "não está funcionando": não responda genericamente. (1) Releia a DOCUMENTAÇÃO abaixo pra achar exatamente em qual menu/aba/botão aquilo deveria estar e diga o caminho exato (ex: "Jurídico → Processos → aba Documentos → botão Processar INSS"); (2) se for algo que uma ferramenta consegue checar de verdade (erros do sistema, saúde dos componentes, status de sincronização), rode verificar_saude e/ou ver_erros ANTES de responder, não só descreva onde clicar; (3) se depois disso ainda não achar nada que explique o problema, diga isso explicitamente ("não encontrei esse item na documentação nem nada de errado nos diagnósticos — pode ser um bug real, vale reportar") em vez de simplesmente admitir derrota sem ter checado nada.
 - Se um item de agenda/dado aparecer sem responsável definido no sistema, diga isso claramente ("sem responsável cadastrado") — não invente um nome.
@@ -250,7 +251,7 @@ REGRAS GERAIS:
 - Seja direta e organizada — liste itens por data quando fizer sentido, cite nomes e números concretos, sem enrolação.
 ${
   paginaCliente
-    ? `- CONTEXTO DE PÁGINA: o usuário está vendo agora a página do cliente **${paginaCliente.nome}** no sistema. Se ele disser "esse cliente"/"este cliente"/"ele"/"ela" sem nomear, é dessa pessoa que está falando — não peça pra ele repetir o nome. Documento PDF/imagem anexado nesta conversa é salvo automaticamente na pasta de Documentos desse cliente (você não precisa fazer nada pra isso acontecer, já é automático) — se o pedido também envolver agendar/cadastrar/completar dado, ainda assim use as ferramentas normalmente, o cliente_busca dessas ferramentas pode usar o nome "${paginaCliente.nome}" diretamente.`
+    ? `- CONTEXTO DE PÁGINA: o usuário está vendo agora a página do cliente **${paginaCliente.nome}** no sistema. Se ele disser "esse cliente"/"este cliente"/"ele"/"ela" sem nomear, é dessa pessoa que está falando — não peça pra ele repetir o nome. Documento PDF/imagem anexado nesta conversa é salvo automaticamente na pasta de Documentos desse cliente (regra de DOCUMENTO ANEXADO acima) — se o pedido também envolver agendar/cadastrar/completar dado, ainda assim use as ferramentas normalmente, o cliente_busca dessas ferramentas pode usar o nome "${paginaCliente.nome}" diretamente.`
     : ""
 }
 
@@ -265,6 +266,13 @@ DOCUMENTAÇÃO DO SISTEMA (como usar cada tela)
 ${LIDERADV_DOCS}`;
 
   const toolTrace: ToolTraceItem[] = [];
+  // Cliente que alguma ferramenta desta mesma resposta cadastrou/tocou de
+  // verdade (cadastrar_cliente, complementar_cliente, agendar_pericia,
+  // criar_controle_pericia, remarcar_pericia) — usado como alvo do anexo
+  // automático quando a conversa NÃO está aberta na página de um cliente
+  // (ex: cliente acabou de ser cadastrado nesta mesma mensagem, então
+  // paginaCliente nunca poderia ter capturado esse id).
+  let resolvedClienteId: string | null = null;
 
   try {
     for (let i = 0; i < MAX_LOOP; i++) {
@@ -305,6 +313,17 @@ ${LIDERADV_DOCS}`;
               block.name,
               block.input as Record<string, string>
             );
+            try {
+              const parsed = JSON.parse(result) as {
+                ok?: boolean;
+                cliente_id?: string;
+              };
+              if (parsed.ok && typeof parsed.cliente_id === "string") {
+                resolvedClienteId = parsed.cliente_id;
+              }
+            } catch {
+              // resultado não é o JSON estruturado esperado — ignora
+            }
             toolResults.push({
               type: "tool_result",
               tool_use_id: block.id,
@@ -337,12 +356,18 @@ ${LIDERADV_DOCS}`;
         toolTrace.length ? toolTrace : null
       );
 
-      // Documento anexado numa conversa aberta na página de um cliente:
-      // salva no arquivo dele automaticamente (Documentos), sem precisar
-      // que o usuário peça — mesmo espírito das outras automações da Íris.
-      // Roda depois da resposta já ter sido enviada.
-      if (paginaCliente && anexosRequest.length > 0) {
-        const clienteIdParaAnexo = paginaCliente.id;
+      // Documento anexado na conversa: salva no arquivo do cliente
+      // automaticamente (Documentos), sem precisar que o usuário peça —
+      // mesmo espírito das outras automações da Íris. Prioriza o cliente da
+      // página (paginaCliente) mas cai pro cliente que alguma ferramenta
+      // desta mesma resposta cadastrou/tocou (resolvedClienteId) — sem esse
+      // fallback, um cadastro novo feito na mesma mensagem que anexa o PDF
+      // nunca batia com paginaCliente (a página daquele cliente não existia
+      // ainda quando a conversa foi aberta), e a Íris dizia "documento
+      // salvo" sem nada ter sido salvo de fato. Roda depois da resposta já
+      // ter sido enviada.
+      const clienteIdParaAnexo = paginaCliente?.id ?? resolvedClienteId;
+      if (clienteIdParaAnexo && anexosRequest.length > 0) {
         after(async () => {
           const { analisarDocumentoCliente } =
             await import("@/lib/cliente-documento-auto");

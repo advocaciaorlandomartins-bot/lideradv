@@ -111,7 +111,7 @@ export async function GET(req: Request) {
     try {
       const [jaEnviadoHoje] = await sql`
         SELECT id FROM cron_execucoes
-        WHERE rota = ${ROTA_RESUMO} AND executado_em::date = CURRENT_DATE
+        WHERE rota = ${ROTA_RESUMO} AND executado_em::date = (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
         LIMIT 1
       `;
       if (!jaEnviadoHoje) {

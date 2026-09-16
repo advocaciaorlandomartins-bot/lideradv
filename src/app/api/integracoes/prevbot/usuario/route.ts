@@ -336,7 +336,7 @@ export async function POST(req: NextRequest) {
         SELECT tipo, categoria, descricao, valor, data::text AS data, status
         FROM meu_financeiro_lancamentos
         WHERE usuario_id = ${usuarioId}::uuid
-          AND data >= CURRENT_DATE - INTERVAL '60 days'
+          AND data >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '60 days'
         ORDER BY data DESC
         LIMIT 60
       `,

@@ -476,11 +476,11 @@ export async function getRelatorioJuridico(): Promise<RelatorioJuridico> {
         ) AS concluidos_atrasados,
         COUNT(*) FILTER (
           WHERE status NOT IN ('concluido','cancelado')
-            AND COALESCE(prazo_interno, data_evento) >= CURRENT_DATE
+            AND COALESCE(prazo_interno, data_evento) >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
         ) AS pendentes,
         COUNT(*) FILTER (
           WHERE status NOT IN ('concluido','cancelado')
-            AND COALESCE(prazo_interno, data_evento) < CURRENT_DATE
+            AND COALESCE(prazo_interno, data_evento) < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
         ) AS vencidos
       FROM controles
     `,
@@ -495,7 +495,7 @@ export async function getRelatorioJuridico(): Promise<RelatorioJuridico> {
       SELECT
         (SELECT COUNT(*) FROM processos WHERE deleted_at IS NULL)::int AS total_processos,
         (SELECT COUNT(*) FROM clients WHERE deleted_at IS NULL)::int AS total_clientes,
-        (SELECT COUNT(*) FROM clients WHERE deleted_at IS NULL AND created_at >= date_trunc('month', CURRENT_DATE))::int AS novos_clientes_mes
+        (SELECT COUNT(*) FROM clients WHERE deleted_at IS NULL AND created_at >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date))::int AS novos_clientes_mes
     `,
   ]);
 

@@ -1260,7 +1260,7 @@ async function executarFerramentaIrisInterno(
         SELECT COALESCE(SUM(valor), 0) AS total
         FROM lancamentos
         WHERE tipo = 'entrada' AND status = 'pendente'
-          AND data_vencimento < CURRENT_DATE
+          AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
           AND data_vencimento < '9998-01-01'
       `;
       return JSON.stringify({ ...kpis, valor_atrasado: Number(valorAtrasado) });

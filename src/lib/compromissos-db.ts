@@ -85,8 +85,8 @@ export async function listarCompromissosProximos(
     LEFT JOIN clients cl ON cl.id = comp.cliente_id
     WHERE comp.criado_por  = ${criadoPor}
       AND comp.status      = 'pendente'
-      AND comp.data_inicio >= CURRENT_DATE
-      AND comp.data_inicio <= CURRENT_DATE + (${dias} || ' days')::interval
+      AND comp.data_inicio >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
+      AND comp.data_inicio <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + (${dias} || ' days')::interval
     ORDER BY comp.data_inicio, comp.hora_inicio NULLS LAST
     LIMIT 20
   `;

@@ -68,7 +68,7 @@ export async function montarResumoDiario(): Promise<string | null> {
         WHERE c.status IS NULL
           AND c.fatal = TRUE
           AND c.data_evento IS NOT NULL
-          AND c.data_evento <= CURRENT_DATE + INTERVAL '2 days'
+          AND c.data_evento <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '2 days'
         ORDER BY c.data_evento ASC
         LIMIT 15
       `,
@@ -86,7 +86,7 @@ export async function montarResumoDiario(): Promise<string | null> {
         SELECT COALESCE(SUM(valor), 0) AS total
         FROM lancamentos
         WHERE tipo = 'entrada' AND status = 'pendente'
-          AND data_vencimento < CURRENT_DATE
+          AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
           AND data_vencimento < '9998-01-01'
       `,
   ]);

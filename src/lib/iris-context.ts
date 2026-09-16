@@ -44,7 +44,7 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
       LEFT JOIN usuarios u ON u.id = c.responsavel_id
       WHERE c.status IS NULL
         AND c.data_evento IS NOT NULL
-        AND c.data_evento BETWEEN CURRENT_DATE AND CURRENT_DATE + (${dias} || ' days')::interval
+        AND c.data_evento BETWEEN (NOW() AT TIME ZONE 'America/Sao_Paulo')::date AND (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + (${dias} || ' days')::interval
       ORDER BY c.data_evento ASC
       LIMIT 80
     `,
@@ -56,7 +56,7 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
       LEFT JOIN clients cl ON cl.id = comp.cliente_id
       LEFT JOIN usuarios u ON u.login = comp.criado_por
       WHERE comp.status = 'pendente'
-        AND comp.data_inicio BETWEEN CURRENT_DATE AND CURRENT_DATE + (${dias} || ' days')::interval
+        AND comp.data_inicio BETWEEN (NOW() AT TIME ZONE 'America/Sao_Paulo')::date AND (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + (${dias} || ' days')::interval
       ORDER BY comp.data_inicio ASC, comp.hora_inicio ASC NULLS LAST
       LIMIT 80
     `,

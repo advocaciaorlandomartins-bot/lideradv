@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       WHERE regexp_replace(cl.phone, '\D', '', 'g') LIKE ${"%" + telefone.slice(-9)}
         AND comp.status = 'pendente'
         AND comp.confirmado_em IS NULL
-        AND comp.data_inicio >= CURRENT_DATE
+        AND comp.data_inicio >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
       ORDER BY comp.data_inicio ASC, comp.hora_inicio ASC NULLS LAST
       LIMIT 1
     `;

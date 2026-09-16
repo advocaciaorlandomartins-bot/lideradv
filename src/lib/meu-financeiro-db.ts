@@ -229,8 +229,8 @@ export async function getMeuFinanceiroInitial(
           FROM remuneracoes r
           WHERE r.colaborador_id = ${colaboradorId}::uuid
             AND r.status = 'pendente'
-            AND r.competencia >= date_trunc('month', CURRENT_DATE)
-            AND r.competencia <  date_trunc('month', CURRENT_DATE) + INTERVAL '12 months'
+            AND r.competencia >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
+            AND r.competencia <  date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date) + INTERVAL '12 months'
           GROUP BY 1
           ORDER BY 1
         `
@@ -289,8 +289,8 @@ export async function getMeuFinanceiroInitial(
           WHERE p.responsavel_id = ${colaboradorId}::uuid
             AND l.status = 'pendente'
             AND l.tipo = 'entrada'
-            AND l.data_vencimento >= date_trunc('month', CURRENT_DATE)
-            AND l.data_vencimento <  date_trunc('month', CURRENT_DATE) + INTERVAL '12 months'
+            AND l.data_vencimento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
+            AND l.data_vencimento <  date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date) + INTERVAL '12 months'
         `
       : sql`
           SELECT
@@ -305,8 +305,8 @@ export async function getMeuFinanceiroInitial(
           FROM lancamentos l
           WHERE l.status = 'pendente'
             AND l.tipo = 'entrada'
-            AND l.data_vencimento >= date_trunc('month', CURRENT_DATE)
-            AND l.data_vencimento <  date_trunc('month', CURRENT_DATE) + INTERVAL '12 months'
+            AND l.data_vencimento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
+            AND l.data_vencimento <  date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date) + INTERVAL '12 months'
         `,
     // Contagem de processos ativos como responsável (status ativo/em_andamento)
     colaboradorId

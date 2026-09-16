@@ -86,8 +86,8 @@ export async function POST() {
       LIMIT 1
     ) lp ON true
     LEFT JOIN colaboradores col ON col.id = lp.responsavel_id AND col.status = 'ativo'
-    WHERE c.data_inicio >= CURRENT_DATE
-      AND c.data_inicio <= CURRENT_DATE + 14
+    WHERE c.data_inicio >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
+      AND c.data_inicio <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + 14
       AND c.status != 'concluido'
       AND NOT EXISTS (
         SELECT 1 FROM lembretes_agendados la

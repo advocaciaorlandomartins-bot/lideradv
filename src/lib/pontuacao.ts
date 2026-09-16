@@ -252,7 +252,7 @@ export async function getRankingDetalhado(
           SELECT u.colaborador_id::text AS colaborador_id, COUNT(*)::int AS total
           FROM controles c
           JOIN usuarios u ON u.id = c.responsavel_id
-          WHERE c.fatal = TRUE AND c.status IS NULL AND c.data_evento < CURRENT_DATE
+          WHERE c.fatal = TRUE AND c.status IS NULL AND c.data_evento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
             AND u.colaborador_id = ${colaboradorId}::uuid
           GROUP BY u.colaborador_id
         `
@@ -260,7 +260,7 @@ export async function getRankingDetalhado(
           SELECT u.colaborador_id::text AS colaborador_id, COUNT(*)::int AS total
           FROM controles c
           JOIN usuarios u ON u.id = c.responsavel_id
-          WHERE c.fatal = TRUE AND c.status IS NULL AND c.data_evento < CURRENT_DATE
+          WHERE c.fatal = TRUE AND c.status IS NULL AND c.data_evento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
           GROUP BY u.colaborador_id
         `,
     colaboradorId

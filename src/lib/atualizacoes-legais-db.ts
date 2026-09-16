@@ -55,7 +55,7 @@ export async function getAtualizacoesLegaisRecentes(
           SELECT id::text, titulo, resumo, data_publicacao::text, orgao,
                  impacto, o_que_muda, acao_recomendada, tipos_afetados, url
           FROM atualizacoes_legais
-          WHERE data_publicacao >= CURRENT_DATE - (${dias} || ' days')::interval
+          WHERE data_publicacao >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - (${dias} || ' days')::interval
             AND impacto IN ('alto', 'medio')
             AND tipos_afetados && ${tiposAfetados}::text[]
           ORDER BY data_publicacao DESC
@@ -65,7 +65,7 @@ export async function getAtualizacoesLegaisRecentes(
           SELECT id::text, titulo, resumo, data_publicacao::text, orgao,
                  impacto, o_que_muda, acao_recomendada, tipos_afetados, url
           FROM atualizacoes_legais
-          WHERE data_publicacao >= CURRENT_DATE - (${dias} || ' days')::interval
+          WHERE data_publicacao >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - (${dias} || ' days')::interval
             AND impacto IN ('alto', 'medio')
           ORDER BY data_publicacao DESC
           LIMIT ${limite}

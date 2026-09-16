@@ -166,7 +166,7 @@ export async function getLancamentoKpis(): Promise<LancamentoKpis> {
       COALESCE(SUM(valor) FILTER (WHERE remuneracao_id IS NOT NULL AND status = 'pago'),     0) AS folha_paga,
       COALESCE(COUNT(*)   FILTER (
         WHERE tipo = 'entrada' AND status = 'pendente'
-          AND data_vencimento < CURRENT_DATE
+          AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
           AND data_vencimento < '9998-01-01'
       ), 0)::int AS atrasados
     FROM lancamentos
@@ -197,7 +197,7 @@ export async function getMonthlyChart(): Promise<MonthlyChartPoint[]> {
       COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada'), 0)::numeric AS receitas,
       COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'),   0)::numeric AS despesas
     FROM lancamentos
-    WHERE data_vencimento >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'
+    WHERE data_vencimento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date) - INTERVAL '11 months'
       AND data_vencimento < '9998-01-01'::date
       AND status != 'cancelado'
       AND status != 'aguardando_resultado'
@@ -471,8 +471,8 @@ export async function getMeuFinanceiroDados(): Promise<MeuFinanceiroDados> {
         COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'),   0) AS saidas
       FROM lancamentos
       WHERE status IN ('pendente', 'pago')
-        AND data_vencimento >= date_trunc('month', CURRENT_DATE)
-        AND data_vencimento <  date_trunc('month', CURRENT_DATE) + INTERVAL '6 months'
+        AND data_vencimento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
+        AND data_vencimento <  date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date) + INTERVAL '6 months'
       GROUP BY 1
       ORDER BY 1
     `,

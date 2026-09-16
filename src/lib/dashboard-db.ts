@@ -71,12 +71,12 @@ async function _getDashboardData(login?: string) {
           c.name               AS client_name,
           SUM(l.valor)::numeric AS total_vencido,
           COUNT(*)::int         AS count_vencidos,
-          MAX((CURRENT_DATE - l.data_vencimento)::int) AS max_dias_atraso
+          MAX(((NOW() AT TIME ZONE 'America/Sao_Paulo')::date - l.data_vencimento)::int) AS max_dias_atraso
         FROM lancamentos l
         JOIN clients c ON c.id = l.client_id
         WHERE l.status = 'pendente'
           AND l.tipo   = 'entrada'
-          AND l.data_vencimento < CURRENT_DATE
+          AND l.data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
         GROUP BY c.id, c.name
         ORDER BY total_vencido DESC
         LIMIT 8
@@ -92,11 +92,11 @@ async function _getDashboardData(login?: string) {
           l.valor,
           l.tipo,
           to_char(l.data_vencimento, 'DD/MM/YYYY')        AS data_vencimento,
-          (CURRENT_DATE - l.data_vencimento)::int          AS dias_atraso
+          ((NOW() AT TIME ZONE 'America/Sao_Paulo')::date - l.data_vencimento)::int          AS dias_atraso
         FROM lancamentos l
         LEFT JOIN clients c ON c.id = l.client_id
         WHERE l.status = 'pendente'
-          AND l.data_vencimento < CURRENT_DATE
+          AND l.data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
         ORDER BY l.data_vencimento ASC
         LIMIT 20
       `,
@@ -112,13 +112,13 @@ async function _getDashboardData(login?: string) {
           cl.name                                           AS cliente_nome,
           p.id::text                                        AS processo_id,
           p.numero                                          AS processo_numero,
-          (c.data_evento - CURRENT_DATE)::int               AS dias_restantes
+          (c.data_evento - (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)::int               AS dias_restantes
         FROM controles c
         LEFT JOIN clients   cl ON cl.id = c.cliente_id
         LEFT JOIN processos p  ON p.id  = c.processo_id
         WHERE c.status IS NULL
-          AND c.data_evento >= CURRENT_DATE
-          AND c.data_evento <= CURRENT_DATE + INTERVAL '14 days'
+          AND c.data_evento >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
+          AND c.data_evento <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '14 days'
           AND (cl.deleted_at IS NULL OR cl.id IS NULL)
           AND (p.deleted_at IS NULL OR p.id IS NULL)
 
@@ -133,12 +133,12 @@ async function _getDashboardData(login?: string) {
           cl.name                                           AS cliente_nome,
           p.id::text                                        AS processo_id,
           p.numero                                          AS processo_numero,
-          (ec.data - CURRENT_DATE)::int                     AS dias_restantes
+          (ec.data - (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)::int                     AS dias_restantes
         FROM eventos_controles ec
         JOIN processos p   ON p.id  = ec.processo_id AND p.deleted_at IS NULL
         LEFT JOIN clients cl ON cl.id = p.client_id AND cl.deleted_at IS NULL
-        WHERE ec.data >= CURRENT_DATE
-          AND ec.data <= CURRENT_DATE + INTERVAL '14 days'
+        WHERE ec.data >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
+          AND ec.data <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '14 days'
 
         ORDER BY data_evento ASC
         LIMIT 20
@@ -291,11 +291,11 @@ async function _getAlertasPrevidenciarios(): Promise<AlertaPrevidenciario[]> {
       p.tipo_acao,
       'dcb_proxima'        AS tipo,
       to_char(p.dcb, 'DD/MM/YYYY') AS data_ref,
-      (p.dcb - CURRENT_DATE)::int  AS dias
+      (p.dcb - (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)::int  AS dias
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.dcb IS NOT NULL
-      AND p.dcb BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE + INTERVAL '60 days'
+      AND p.dcb BETWEEN (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '7 days' AND (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '60 days'
       AND p.status = 'ativo'
       AND p.deleted_at IS NULL
 

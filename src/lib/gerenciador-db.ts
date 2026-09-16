@@ -255,24 +255,24 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
       SELECT
         COALESCE(SUM(valor) FILTER (
           WHERE tipo = 'entrada' AND status = 'pago'
-          AND date_trunc('month', COALESCE(data_pagamento, data_vencimento)) = date_trunc('month', CURRENT_DATE)
+          AND date_trunc('month', COALESCE(data_pagamento, data_vencimento)) = date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
         ), 0) AS recebido_mes,
         COALESCE(SUM(valor) FILTER (
           WHERE tipo = 'saida' AND status = 'pago'
-          AND date_trunc('month', COALESCE(data_pagamento, data_vencimento)) = date_trunc('month', CURRENT_DATE)
+          AND date_trunc('month', COALESCE(data_pagamento, data_vencimento)) = date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
         ), 0) AS pago_mes,
         COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada' AND status = 'pendente'), 0) AS a_receber,
         COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'   AND status = 'pendente'), 0) AS a_pagar,
         COALESCE(SUM(valor) FILTER (
           WHERE tipo = 'entrada' AND status = 'pago'
-          AND date_trunc('year', COALESCE(data_pagamento, data_vencimento)) = date_trunc('year', CURRENT_DATE)
+          AND date_trunc('year', COALESCE(data_pagamento, data_vencimento)) = date_trunc('year', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
         ), 0) AS recebido_ano,
         COALESCE(SUM(valor) FILTER (
           WHERE tipo = 'saida' AND status = 'pago'
-          AND date_trunc('year', COALESCE(data_pagamento, data_vencimento)) = date_trunc('year', CURRENT_DATE)
+          AND date_trunc('year', COALESCE(data_pagamento, data_vencimento)) = date_trunc('year', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
         ), 0) AS pago_ano,
-        COALESCE(SUM(valor) FILTER (WHERE status = 'pendente' AND data_vencimento < CURRENT_DATE), 0) AS vencidos_valor,
-        COUNT(*)  FILTER (WHERE status = 'pendente' AND data_vencimento < CURRENT_DATE) AS vencidos_count
+        COALESCE(SUM(valor) FILTER (WHERE status = 'pendente' AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date), 0) AS vencidos_valor,
+        COUNT(*)  FILTER (WHERE status = 'pendente' AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date) AS vencidos_count
       FROM lancamentos
       WHERE status != 'cancelado'
     `,
@@ -284,7 +284,7 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
         COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada'), 0) AS receitas,
         COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'),   0) AS despesas
       FROM lancamentos
-      WHERE data_vencimento >= date_trunc('month', CURRENT_DATE - INTERVAL '11 months')
+      WHERE data_vencimento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '11 months')
         AND status != 'cancelado'
       GROUP BY mes
       ORDER BY mes ASC
@@ -300,11 +300,11 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
         to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
         c.name AS client_name,
         l.client_id::text AS client_id,
-        (CURRENT_DATE - l.data_vencimento)::int AS dias_atraso
+        ((NOW() AT TIME ZONE 'America/Sao_Paulo')::date - l.data_vencimento)::int AS dias_atraso
       FROM lancamentos l
       LEFT JOIN clients c ON c.id = l.client_id
       WHERE l.status = 'pendente'
-        AND l.data_vencimento < CURRENT_DATE
+        AND l.data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
       ORDER BY l.data_vencimento ASC
       LIMIT 20
     `,
@@ -320,13 +320,13 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
         cl.id::text AS cliente_id,
         p.numero  AS processo_numero,
         p.id::text AS processo_id,
-        (c.data_evento - CURRENT_DATE)::int AS dias_restantes
+        (c.data_evento - (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)::int AS dias_restantes
       FROM controles c
       LEFT JOIN clients   cl ON cl.id = c.cliente_id
       LEFT JOIN processos p  ON p.id  = c.processo_id
       WHERE c.status IS NULL
-        AND c.data_evento >= CURRENT_DATE
-        AND c.data_evento <= CURRENT_DATE + INTERVAL '14 days'
+        AND c.data_evento >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
+        AND c.data_evento <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '14 days'
         AND (cl.deleted_at IS NULL OR cl.id IS NULL)
         AND (p.deleted_at IS NULL OR p.id IS NULL)
       ORDER BY c.data_evento ASC
@@ -341,11 +341,11 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
         (SELECT COUNT(*)::int FROM colaboradores) AS total_colaboradores,
         (SELECT COUNT(*)::int FROM controles
          WHERE status IS NULL
-           AND data_evento >= CURRENT_DATE
-           AND data_evento <= CURRENT_DATE + 7)  AS controles_proximos,
+           AND data_evento >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
+           AND data_evento <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + 7)  AS controles_proximos,
         (SELECT COUNT(*)::int FROM lancamentos
          WHERE status = 'pendente'
-           AND data_vencimento < CURRENT_DATE)   AS vencidos_count
+           AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)   AS vencidos_count
     `,
 
     // 6. Top 5 clientes por receita recebida
@@ -397,7 +397,7 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
         COUNT(*)::int AS count
       FROM clients
       WHERE deleted_at IS NULL
-        AND created_at >= date_trunc('month', CURRENT_DATE - INTERVAL '11 months')
+        AND created_at >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '11 months')
       GROUP BY mes
       ORDER BY mes ASC
     `,
@@ -410,14 +410,14 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
         COUNT(*) FILTER (WHERE estagio = 'fechado')::int AS fechados,
         COUNT(*) FILTER (WHERE estagio = 'perdido')::int AS perdidos,
         COUNT(*) FILTER (
-          WHERE date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
+          WHERE date_trunc('month', created_at) = date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
         )::int AS leads_mes,
         (SELECT COUNT(*)::int FROM crm_tarefas
-         WHERE concluida = FALSE AND data_vencimento < CURRENT_DATE) AS tarefas_vencidas,
+         WHERE concluida = FALSE AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date) AS tarefas_vencidas,
         (SELECT COUNT(*)::int FROM crm_tarefas
          WHERE concluida = FALSE
-           AND data_vencimento >= CURRENT_DATE
-           AND data_vencimento <= CURRENT_DATE + 7) AS tarefas_proximas_7d
+           AND data_vencimento >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
+           AND data_vencimento <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + 7) AS tarefas_proximas_7d
       FROM crm_leads
     `,
 
@@ -437,14 +437,14 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
         t.lead_id::text,
         l.nome AS lead_nome,
         to_char(t.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
-        (t.data_vencimento - CURRENT_DATE)::int AS dias_restantes,
+        (t.data_vencimento - (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)::int AS dias_restantes,
         col.nome AS responsavel_nome
       FROM crm_tarefas t
       JOIN crm_leads l ON l.id = t.lead_id
       LEFT JOIN colaboradores col ON col.id = t.responsavel_id
       WHERE t.concluida = FALSE
         AND t.data_vencimento IS NOT NULL
-        AND t.data_vencimento <= CURRENT_DATE + 7
+        AND t.data_vencimento <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + 7
       ORDER BY t.data_vencimento ASC
       LIMIT 15
     `,

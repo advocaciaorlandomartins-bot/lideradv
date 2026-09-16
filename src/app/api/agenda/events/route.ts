@@ -94,6 +94,15 @@ export async function GET(req: NextRequest) {
             LEFT JOIN processos p  ON p.id  = c.processo_id
             WHERE c.data_evento >= ${startDate}::date
               AND c.data_evento <  ${endDate}::date
+              -- Toda perícia agendada (INSS "Processar" ou a ferramenta
+              -- agendar_pericia da Íris) já cria um compromisso próprio na
+              -- Agenda (mais completo: tem hora, local etc.) além do
+              -- controle de prazo — sem excluir aqui, a mesma perícia
+              -- aparecia DUAS VEZES no mesmo dia do calendário. Os outros
+              -- tipos de controle (prazo, audiência, DCB, benefício,
+              -- implantado, alvará) não têm compromisso correspondente,
+              -- continuam aparecendo normalmente.
+              AND c.tipo != 'pericias'
               ${showArchived ? sql`` : sql`AND (c.status IS NULL OR c.status = 'pendente')`}
             ORDER BY c.data_evento
           `

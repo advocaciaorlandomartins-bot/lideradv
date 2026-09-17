@@ -805,9 +805,21 @@ export default function NovoEnvelope({
             </button>
             <button
               onClick={() => {
+                // Preenche nome+email no formulário mas esquece de clicar
+                // "+ Adicionar assinante" antes de "Próximo" — o botão ficava
+                // desabilitado em silêncio (a lista de assinantes continuava
+                // vazia) e parecia travado sem motivo aparente. Adiciona
+                // sozinho o que estiver pendente e válido antes de avançar.
+                if (newNome.trim() && newEmail.trim()) {
+                  addAssinante();
+                  setStep(4);
+                  return;
+                }
                 if (assinantes.length > 0) setStep(4);
               }}
-              disabled={assinantes.length === 0}
+              disabled={
+                assinantes.length === 0 && !(newNome.trim() && newEmail.trim())
+              }
               className="flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 font-body text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-40"
             >
               Próximo <ChevronRightIcon className="h-4 w-4" />

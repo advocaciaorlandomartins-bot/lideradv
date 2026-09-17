@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session) {
+  if (!session || !hasPermission(session, "disc", "ver")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
@@ -41,7 +42,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session) {
+  if (!session || !hasPermission(session, "disc", "excluir")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

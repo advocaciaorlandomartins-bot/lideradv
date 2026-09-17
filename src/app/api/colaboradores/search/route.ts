@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session) return NextResponse.json([], { status: 401 });
+  if (!session || !hasPermission(session, "colaboradores", "ver"))
+    return NextResponse.json([], { status: 401 });
 
   const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
   if (q.length < 1) return NextResponse.json([]);

@@ -235,7 +235,12 @@ export async function deleteHistoricoRegistroAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`DELETE FROM historico_registros WHERE id = ${id}::uuid`;
+    // AND processo_id trava o DELETE ao processo já verificado acima — sem
+    // isso, alguém com acesso a um processo próprio podia excluir o registro
+    // de OUTRO processo só passando o id certo (o processoId servia pra
+    // passar na checagem de permissão, mas o DELETE não conferia se o id
+    // realmente pertencia a ele).
+    await sql`DELETE FROM historico_registros WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -292,7 +297,9 @@ export async function deleteEventoControleAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`DELETE FROM eventos_controles WHERE id = ${id}::uuid`;
+    // AND processo_id trava ao processo já verificado — ver comentário em
+    // deleteHistoricoRegistroAction.
+    await sql`DELETE FROM eventos_controles WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -323,7 +330,7 @@ export async function updateEventoControleAction(data: {
           data   = ${data.data ? data.data : null}::date,
           hora   = ${data.hora ? data.hora : null}::time,
           local  = ${data.local || null}
-      WHERE id = ${data.id}::uuid
+      WHERE id = ${data.id}::uuid AND processo_id = ${data.processoId}::uuid
     `;
     revalidatePath(`/dashboard/processos/${data.processoId}`);
     return {};
@@ -342,7 +349,7 @@ export async function darBaixaEventoControleAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`UPDATE eventos_controles SET status = 'concluido' WHERE id = ${id}::uuid`;
+    await sql`UPDATE eventos_controles SET status = 'concluido' WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard");
     return {};
@@ -361,7 +368,7 @@ export async function reabrirEventoControleAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`UPDATE eventos_controles SET status = NULL WHERE id = ${id}::uuid`;
+    await sql`UPDATE eventos_controles SET status = NULL WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard");
     return {};
@@ -448,7 +455,7 @@ export async function updateTarefaStatusAction(
   )
     return { error: "Marque todos os itens do checklist antes de concluir." };
   try {
-    await sql`UPDATE tarefas_processo SET status = ${status}, updated_at = NOW() WHERE id = ${id}::uuid`;
+    await sql`UPDATE tarefas_processo SET status = ${status}, updated_at = NOW() WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     if (status === "Concluída") {
       await registrarPontosConclusao("tarefa_processo", id);
     } else {
@@ -476,7 +483,7 @@ export async function darBaixaTarefaProcessoAction(
   if (!(await checklistCompleto("tarefa_processo", id)))
     return { error: "Marque todos os itens do checklist antes de concluir." };
   try {
-    await sql`UPDATE tarefas_processo SET status = 'Concluída', updated_at = NOW() WHERE id = ${id}::uuid`;
+    await sql`UPDATE tarefas_processo SET status = 'Concluída', updated_at = NOW() WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     await registrarPontosConclusao("tarefa_processo", id);
 
     // Auto-avanço: se todas as tarefas do processo estão concluídas e está em analise → producao
@@ -513,7 +520,7 @@ export async function reabrirTarefaProcessoAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`UPDATE tarefas_processo SET status = 'Pendente', updated_at = NOW() WHERE id = ${id}::uuid`;
+    await sql`UPDATE tarefas_processo SET status = 'Pendente', updated_at = NOW() WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     await reverterPontosConclusao("tarefa_processo", id);
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard/minhas-tarefas");
@@ -534,7 +541,7 @@ export async function deleteTarefaAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`DELETE FROM tarefas_processo WHERE id = ${id}::uuid`;
+    await sql`DELETE FROM tarefas_processo WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -578,7 +585,7 @@ export async function updatePendenciaStatusAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`UPDATE pendencias_cliente SET status = ${status} WHERE id = ${id}::uuid`;
+    await sql`UPDATE pendencias_cliente SET status = ${status} WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -596,7 +603,7 @@ export async function deletePendenciaAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
-    await sql`DELETE FROM pendencias_cliente WHERE id = ${id}::uuid`;
+    await sql`DELETE FROM pendencias_cliente WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {

@@ -11,7 +11,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    configured: !!process.env.ANTHROPIC_API_KEY,
-    provider: "anthropic",
+    configured: !!process.env.OPENAI_API_KEY,
+    provider: "openai",
   });
 }

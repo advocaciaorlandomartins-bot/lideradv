@@ -16,6 +16,14 @@ export async function adicionarResponsavelAction(
     return { error: "Sem permissão." };
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
+  // tarefa_responsaveis_adicionais não tem processo_id próprio — confirma que
+  // a tarefa é MESMO do processo já verificado acima antes de mexer nela, senão
+  // dava pra passar o id de uma tarefa de OUTRO processo junto com um
+  // processoId próprio e a checagem de permissão passava sem validar nada.
+  const [tarefa] = await sql`
+    SELECT id FROM tarefas_processo WHERE id = ${tarefaId}::uuid AND processo_id = ${processoId}::uuid
+  `;
+  if (!tarefa) return { error: "Tarefa não encontrada neste processo." };
 
   try {
     await sql`
@@ -42,6 +50,10 @@ export async function removerResponsavelAction(
     return { error: "Sem permissão." };
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
+  const [tarefa] = await sql`
+    SELECT id FROM tarefas_processo WHERE id = ${tarefaId}::uuid AND processo_id = ${processoId}::uuid
+  `;
+  if (!tarefa) return { error: "Tarefa não encontrada neste processo." };
 
   try {
     await sql`

@@ -165,8 +165,17 @@ export async function POST(req: Request) {
       err instanceof Error ? err.message : String(err)
     );
     const raw = err instanceof Error ? err.message : String(err);
-    let msg = raw || "Erro ao gerar os quesitos.";
+    // Mensagem genérica por padrão (não ecoa a exceção crua pro cliente —
+    // mesmo padrão das outras rotas ia/*). Só as duas mensagens específicas
+    // dos "throw new Error" acima (download/tamanho do documento) e os dois
+    // casos conhecidos de erro de provedor de IA são repassados como estão.
+    let msg = "Erro ao gerar os quesitos.";
     if (
+      raw.includes("Não foi possível baixar") ||
+      raw.includes("é grande demais")
+    )
+      msg = raw;
+    else if (
       raw.includes("credit balance is too low") ||
       raw.includes("insufficient_quota")
     )

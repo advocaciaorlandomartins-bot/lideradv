@@ -310,7 +310,11 @@ export async function deleteAtividadeAction(
   if (!UUID_RE.test(id) || !UUID_RE.test(leadId)) return;
   if (!(await podeGerenciarLead(session, leadId))) return;
 
-  await sql`DELETE FROM crm_atividades WHERE id = ${id}::uuid`;
+  // AND lead_id trava ao lead já verificado acima — sem isso, quem gerencia
+  // um lead próprio podia excluir a atividade de OUTRO lead só passando o id
+  // certo (a checagem de permissão validava o leadId, mas o DELETE não
+  // conferia se o id de fato pertencia a ele).
+  await sql`DELETE FROM crm_atividades WHERE id = ${id}::uuid AND lead_id = ${leadId}::uuid`;
   revalidatePath(`/dashboard/crm/leads/${leadId}`);
 }
 
@@ -379,7 +383,7 @@ export async function toggleTarefaAction(
 
   await sql`
     UPDATE crm_tarefas SET concluida = ${concluida}, updated_at = NOW()
-    WHERE id = ${id}::uuid
+    WHERE id = ${id}::uuid AND lead_id = ${leadId}::uuid
   `;
   // Mesma tarefa também pode ser concluída/reaberta pelo kanban de Minhas
   // Tarefas (darBaixaCrmTarefaAction/reabrirCrmTarefaAction) — os dois
@@ -404,6 +408,6 @@ export async function deleteTarefaAction(
   if (!UUID_RE.test(id) || !UUID_RE.test(leadId)) return;
   if (!(await podeGerenciarLead(session, leadId))) return;
 
-  await sql`DELETE FROM crm_tarefas WHERE id = ${id}::uuid`;
+  await sql`DELETE FROM crm_tarefas WHERE id = ${id}::uuid AND lead_id = ${leadId}::uuid`;
   revalidatePath(`/dashboard/crm/leads/${leadId}`);
 }

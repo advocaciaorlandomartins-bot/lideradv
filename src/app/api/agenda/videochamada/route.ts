@@ -41,6 +41,12 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "criar"))
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  // Essa rota lê nome/telefone do cliente (e do responsável legal) pra
+  // montar a mensagem de WhatsApp — checar só "controles:criar" deixava
+  // passar sem checar "clientes:ver", então um perfil com controles liberado
+  // mas clientes restrito ainda conseguia puxar o PII de qualquer cliente.
+  if (!hasPermission(session, "clientes", "ver"))
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as {
     clienteId?: string;

@@ -105,13 +105,18 @@ export async function adicionarChecklistItemAction(
   texto: string
 ): Promise<{ error?: string; checklist?: ChecklistItem[] }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "controles", "editar"))
-    return { error: "Sem permissão." };
+  if (!session) return { error: "Sem permissão." };
   const textoLimpo = texto.trim().slice(0, 200);
   if (!textoLimpo) return { error: "Informe o texto do item." };
 
   try {
     const tabela = TABELA_CHECKLIST[origemTipo];
+    // Mesma checagem por dono do toggleChecklistItemAction — checar só
+    // "controles:editar" deixava qualquer Advogado(a)/Estagiário(a) (que tem
+    // esse módulo liberado por padrão) adicionar item em checklist de tarefa
+    // de processo de outra pessoa, sem ser dono nem ter processos_ver_todos.
+    if (!(await podeAlterarChecklist(session, tabela, origemId)))
+      return { error: "Sem permissão." };
     const [row] =
       tabela === "controles"
         ? await sql`SELECT checklist FROM controles WHERE id = ${origemId}::uuid`
@@ -144,11 +149,12 @@ export async function removerChecklistItemAction(
   index: number
 ): Promise<{ error?: string; checklist?: ChecklistItem[] }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "controles", "editar"))
-    return { error: "Sem permissão." };
+  if (!session) return { error: "Sem permissão." };
 
   try {
     const tabela = TABELA_CHECKLIST[origemTipo];
+    if (!(await podeAlterarChecklist(session, tabela, origemId)))
+      return { error: "Sem permissão." };
     const [row] =
       tabela === "controles"
         ? await sql`SELECT checklist FROM controles WHERE id = ${origemId}::uuid`
@@ -182,7 +188,9 @@ export async function salvarChecklistAction(
   itens: string[]
 ): Promise<{ error?: string }> {
   const session = await getSession();
-  if (!session || !hasPermission(session, "controles", "editar"))
+  if (!session) return { error: "Sem permissão." };
+  const tabelaCheck = TABELA_CHECKLIST[origemTipo];
+  if (!(await podeAlterarChecklist(session, tabelaCheck, origemId)))
     return { error: "Sem permissão." };
 
   const checklist: ChecklistItem[] = itens

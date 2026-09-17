@@ -208,7 +208,7 @@ export default function DocumentsSection({
     setDeletingId(doc.id);
 
     startTransition(async () => {
-      const result = await deleteDocumentoAction(doc.id, doc.url, entityType);
+      const result = await deleteDocumentoAction(doc.id, doc.url);
       setDeletingId(null);
       if (result?.error) {
         setUploadError(result.error);

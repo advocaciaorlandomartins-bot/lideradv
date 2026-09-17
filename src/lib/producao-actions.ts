@@ -5,6 +5,7 @@ import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
+import { podeEditarProcesso } from "./processo-ownership";
 
 function revalidate(id?: string) {
   revalidatePath("/dashboard/producao");
@@ -43,6 +44,13 @@ export async function moverParaProducaoAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
     return { error: "Sem permissão." };
+  // hasPermission só checa o módulo ("producao:editar") — sem isso, qualquer
+  // Advogado(a) (que tem producao FULL por padrão, mas não processos_ver_todos)
+  // podia mover, arquivar ou registrar resultado de um processo de OUTRO
+  // colaborador só sabendo o id, inclusive falsificando resultado administrativo/
+  // judicial que alimenta o cálculo de comissão.
+  if (!(await podeEditarProcesso(session, id)))
+    return { error: "Sem permissão." };
   try {
     await sql`
       UPDATE processos
@@ -62,6 +70,8 @@ export async function moverParaAdministrativoAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
+    return { error: "Sem permissão." };
+  if (!(await podeEditarProcesso(session, id)))
     return { error: "Sem permissão." };
   try {
     await sql`
@@ -86,6 +96,8 @@ export async function registrarResultadoAdminAction(
   if (!user || !hasPermission(user, "producao", "editar")) {
     return { error: "Sem permissão para registrar resultado administrativo." };
   }
+  if (!(await podeEditarProcesso(user, id)))
+    return { error: "Sem permissão para registrar resultado administrativo." };
   // Quando o próximo passo é arquivar, processos.status precisa refletir isso —
   // senão o caso continua contando como "ativo" nos KPIs/listas que filtram
   // por status, mesmo já concluído na Linha de Produção.
@@ -114,6 +126,8 @@ export async function registrarResultadoJudicialAction(
   if (!user || !hasPermission(user, "producao", "editar")) {
     return { error: "Sem permissão para registrar resultado judicial." };
   }
+  if (!(await podeEditarProcesso(user, id)))
+    return { error: "Sem permissão para registrar resultado judicial." };
   await sql`
     UPDATE processos
     SET resultado_judicial = ${resultado},
@@ -141,6 +155,8 @@ export async function registrarProtocoloAdminAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
+    return { error: "Sem permissão." };
+  if (!(await podeEditarProcesso(session, id)))
     return { error: "Sem permissão." };
   // Registra quem é o responsável NESTE momento como "dono" da fase
   // administrativa — se o processo for reatribuído depois (ex: pra alguém
@@ -170,6 +186,8 @@ export async function registrarDistribuicaoJudicialAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
     return { error: "Sem permissão." };
+  if (!(await podeEditarProcesso(session, id)))
+    return { error: "Sem permissão." };
   // Mesma lógica do protocolo administrativo: quem é responsável na hora de
   // distribuir a ação fica marcado como dono da fase judicial pra fins de
   // comissão, mesmo que o responsável do processo mude depois disso.
@@ -198,6 +216,8 @@ export async function arquivarProcessoAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
+    return { error: "Sem permissão." };
+  if (!(await podeEditarProcesso(session, id)))
     return { error: "Sem permissão." };
   const notas = observacao?.trim() || null;
   try {
@@ -233,6 +253,8 @@ export async function voltarEstagioAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
     return { error: "Sem permissão." };
+  if (!(await podeEditarProcesso(session, id)))
+    return { error: "Sem permissão." };
   try {
     const rows =
       await sql`SELECT estagio_producao FROM processos WHERE id = ${id}::uuid`;
@@ -261,6 +283,8 @@ export async function reabrirProcessoAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "producao", "editar"))
+    return { error: "Sem permissão." };
+  if (!(await podeEditarProcesso(session, id)))
     return { error: "Sem permissão." };
   try {
     await sql`

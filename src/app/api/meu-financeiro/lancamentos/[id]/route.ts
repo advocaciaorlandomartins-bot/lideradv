@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import {
   atualizarLancamentoPessoal,
   deletarLancamentoPessoal,
@@ -7,13 +8,16 @@ import {
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TIPOS_VALIDOS = ["receita", "despesa"] as const;
+const STATUS_VALIDOS = ["recebido", "a_receber", "pago", "pendente"] as const;
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session)
+  // "ver" de propósito — ver comentário em lancamentos/route.ts POST.
+  if (!session || !hasPermission(session, "meu_financeiro", "ver"))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
@@ -32,6 +36,19 @@ export async function PUT(
       recorrente,
       periodicidade,
     } = body;
+
+    if (!TIPOS_VALIDOS.includes(tipo)) {
+      return NextResponse.json(
+        { error: `Campo 'tipo' inválido. Use: ${TIPOS_VALIDOS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+    if (!STATUS_VALIDOS.includes(status)) {
+      return NextResponse.json(
+        { error: `Status inválido. Use: ${STATUS_VALIDOS.join(", ")}` },
+        { status: 400 }
+      );
+    }
 
     const parsed = parseFloat(String(valor));
     if (isNaN(parsed) || parsed <= 0) {
@@ -65,7 +82,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session)
+  // "ver" de propósito — ver comentário em lancamentos/route.ts POST.
+  if (!session || !hasPermission(session, "meu_financeiro", "ver"))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;

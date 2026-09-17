@@ -17,6 +17,12 @@ export async function getBonusMetaStatus(
   colaboradorId: string,
   competencia?: string
 ): Promise<BonusMetaStatus | null> {
+  // "use server" torna toda função exportada aqui uma Server Action invocável
+  // diretamente do cliente — sem essa checagem, qualquer chamada direta (sem
+  // passar pela página que hoje já valida sessão) vazaria a meta/bônus de
+  // comissão de qualquer colaborador só com o UUID.
+  const session = await getSession();
+  if (!session || !hasPermission(session, "colaboradores", "ver")) return null;
   const comp = competencia ?? competenciaAtual();
 
   const [colab] = await sql`

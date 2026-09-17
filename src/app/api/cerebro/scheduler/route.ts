@@ -1,4 +1,5 @@
 import "server-only";
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { aprenderComResultado } from "@/lib/cerebroJuridico";
@@ -6,10 +7,23 @@ import { aprenderComResultado } from "@/lib/cerebroJuridico";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+function cronSecretConfere(recebido: string, esperado: string): boolean {
+  try {
+    const a = Buffer.from(recebido);
+    const b = Buffer.from(esperado);
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization") ?? "";
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  // timingSafeEqual em vez de !== — o resto do app já usa comparação em
+  // tempo constante pra qualquer segredo (getSession, webhooks); esta era a
+  // única exceção, com um side-channel teórico de timing sobre o CRON_SECRET.
+  if (!cronSecret || !cronSecretConfere(authHeader, `Bearer ${cronSecret}`)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

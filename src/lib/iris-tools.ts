@@ -4,6 +4,7 @@ import { enviarMensagemDireta } from "./prevbot-outbound";
 import { getLancamentoKpis, getContasAReceber } from "./lancamentos-db";
 import { hasPermission } from "./permissoes";
 import { getColaboradorIdForUser } from "./usuarios-db";
+import { getTipoConfig } from "./controles-types";
 import type { SessionUser } from "./session";
 
 // Rótulo amigável exibido na tela como "trace" de consultas (ex: "Consultou o
@@ -35,6 +36,7 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   criar_controle_pericia: "Criou um controle de perícia/prorrogação",
   cadastrar_cliente: "Cadastrou um novo cliente",
   complementar_cliente: "Completou dados do cadastro de um cliente",
+  criar_controle: "Criou um controle (audiência/prazo/DCB/benefício/alvará)",
 };
 
 export const IRIS_TOOLS: Anthropic.Tool[] = [
@@ -699,6 +701,83 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["cliente_busca"],
+    },
+  },
+  {
+    name: "criar_controle",
+    description:
+      "Cria um item na tela Controles (fora de Perícias — pra isso use agendar_pericia/criar_controle_pericia). Cobre os tipos: 'audiencias' (Audiências), 'prazos' (Prazos Processuais), 'dcb' (Prorrogação/DCB — prazo pra requerer prorrogação antes da cessação do benefício), 'beneficios' (Benefícios — Ag. Implantação), 'implantados' (Benefícios Implantados (1° Pag.)), 'implantados-data' (Benefícios Implantados — informar data_1pag e/ou data_cessacao cria também, automaticamente, um controle 'implantados' e um 'dcb' vinculados, 15 dias antes da cessação, mesmo comportamento da tela manual), 'alvaras' (Alvarás/RPVs). Sempre vinculado a um cliente; processo é opcional mas recomendado quando o prazo for de um processo específico.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tipo: {
+          type: "string",
+          description:
+            "Um de: audiencias, prazos, dcb, beneficios, implantados, implantados-data, alvaras.",
+        },
+        cliente_busca: {
+          type: "string",
+          description: "Nome (ou parte do nome) do cliente.",
+        },
+        processo_busca: {
+          type: "string",
+          description:
+            "Número (ou parte) do processo do cliente pra vincular. Opcional.",
+        },
+        data_evento: {
+          type: "string",
+          description:
+            "Data do prazo/evento, YYYY-MM-DD. Obrigatório pra todos os tipos exceto 'implantados-data' (que usa data_1pag/data_cessacao).",
+        },
+        descricao: {
+          type: "string",
+          description:
+            "Descrição do item (ex: 'Audiência de instrução', 'Prazo para recurso', 'RPV expedido'). Obrigatório pra prazos/beneficios/implantados/alvaras; opcional pra audiencias/dcb/implantados-data.",
+        },
+        prazo_interno: {
+          type: "string",
+          description:
+            "Data-limite interna do escritório pra agir, se diferente da data_evento (YYYY-MM-DD). Opcional.",
+        },
+        prioridade: {
+          type: "string",
+          description: "baixa, media ou alta. Opcional, padrão media.",
+        },
+        fatal: {
+          type: "string",
+          description:
+            "'true' se perder esse prazo encerra direito do cliente (ex: prazo recursal, DCB) — dispara alerta imediato por WhatsApp pro escritório. Opcional, padrão false.",
+        },
+        observacoes: {
+          type: "string",
+          description: "Observações livres. Opcional.",
+        },
+        tipo_demanda: {
+          type: "string",
+          description: "Judicial, Extrajudicial ou Consultiva. Opcional.",
+        },
+        hora: {
+          type: "string",
+          description:
+            "Hora da audiência, HH:MM. Só pra tipo=audiencias. Opcional.",
+        },
+        local_titulo: {
+          type: "string",
+          description:
+            "Local/vara da audiência (texto livre). Só pra tipo=audiencias. Opcional.",
+        },
+        data_1pag: {
+          type: "string",
+          description:
+            "Data do 1° pagamento do benefício, YYYY-MM-DD. Só pra tipo=implantados-data. Opcional.",
+        },
+        data_cessacao: {
+          type: "string",
+          description:
+            "Data em que o benefício cessa, YYYY-MM-DD. Só pra tipo=implantados-data — cria automaticamente um DCB 15 dias antes dessa data. Opcional.",
+        },
+      },
+      required: ["tipo", "cliente_busca"],
     },
   },
 ];
@@ -2209,6 +2288,234 @@ async function executarFerramentaIrisInterno(
         mensagem: `Cadastro de ${candidatos[0].name} atualizado: ${preenchidos.join(", ")}.`,
         campos_preenchidos: preenchidos,
         cliente_id: String(candidatos[0].id),
+      });
+    }
+
+    case "criar_controle": {
+      if (!hasPermission(session, "controles", "criar")) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem permissão pra criar controles. Explique isso educadamente e não tente de novo.",
+        });
+      }
+
+      const TIPOS_VALIDOS_CTRL = new Set([
+        "audiencias",
+        "prazos",
+        "dcb",
+        "beneficios",
+        "implantados",
+        "implantados-data",
+        "alvaras",
+      ]);
+      const tipo = String(input.tipo ?? "").trim();
+      const clienteBusca = String(input.cliente_busca ?? "").trim();
+      if (!TIPOS_VALIDOS_CTRL.has(tipo) || !clienteBusca) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Informe tipo (audiencias, prazos, dcb, beneficios, implantados, implantados-data, alvaras) e cliente_busca.",
+        });
+      }
+
+      const candidatosCliente3 = await sql`
+        SELECT id::text, name FROM clients
+        WHERE deleted_at IS NULL AND name ILIKE ${"%" + clienteBusca + "%"}
+        LIMIT 5
+      `;
+      if (candidatosCliente3.length === 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Nenhum cliente encontrado com "${clienteBusca}". Se for cliente novo, use cadastrar_cliente antes.`,
+        });
+      }
+      if (candidatosCliente3.length > 1) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Mais de um cliente encontrado com "${clienteBusca}" — pergunte ao usuário qual, ou seja mais específico.`,
+          opcoes: candidatosCliente3.map((c) => c.name),
+        });
+      }
+      const clienteId3 = String(candidatosCliente3[0].id);
+      const clienteNome3 = String(candidatosCliente3[0].name);
+
+      let processoId3: string | null = null;
+      const processoBusca = String(input.processo_busca ?? "").trim();
+      if (processoBusca) {
+        const candidatosProcesso = await sql`
+          SELECT id::text, numero FROM processos
+          WHERE client_id = ${clienteId3}::uuid AND deleted_at IS NULL
+            AND numero ILIKE ${"%" + processoBusca + "%"}
+          LIMIT 5
+        `;
+        if (candidatosProcesso.length === 1) {
+          processoId3 = String(candidatosProcesso[0].id);
+        } else if (candidatosProcesso.length > 1) {
+          return JSON.stringify({
+            ok: false,
+            erro: `Mais de um processo de ${clienteNome3} bate com "${processoBusca}" — seja mais específico.`,
+            opcoes: candidatosProcesso.map((p) => p.numero),
+          });
+        }
+        // 0 encontrados: segue sem processo_id, não bloqueia o controle
+      }
+
+      const strOrNullCtrl = (v: unknown) =>
+        typeof v === "string" && v.trim() ? v.trim() : null;
+      const dataOrNullCtrl = (v: unknown) =>
+        typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())
+          ? v.trim()
+          : null;
+
+      const dataEvento = dataOrNullCtrl(input.data_evento);
+      const descricaoInput = strOrNullCtrl(input.descricao);
+      const prazoInterno = dataOrNullCtrl(input.prazo_interno);
+      const prioridade = ["baixa", "media", "alta"].includes(
+        String(input.prioridade ?? "").trim()
+      )
+        ? String(input.prioridade).trim()
+        : "media";
+      const fatal = String(input.fatal ?? "").trim() === "true";
+      const observacoes = strOrNullCtrl(input.observacoes);
+      const tipoDemanda = strOrNullCtrl(input.tipo_demanda);
+
+      const DESCRICAO_OPCIONAL = new Set([
+        "audiencias",
+        "dcb",
+        "implantados-data",
+      ]);
+      if (tipo !== "implantados-data" && !dataEvento) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Informe data_evento no formato YYYY-MM-DD.",
+        });
+      }
+      if (!DESCRICAO_OPCIONAL.has(tipo) && !descricaoInput) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Descrição é obrigatória pra tipo "${tipo}".`,
+        });
+      }
+
+      let dadosJson: string | null = null;
+      if (tipo === "audiencias") {
+        const hora = strOrNullCtrl(input.hora);
+        const localTitulo = strOrNullCtrl(input.local_titulo);
+        const dados = {
+          hora,
+          link_virtual: null,
+          local_id: null,
+          local_titulo: localTitulo,
+        };
+        dadosJson = Object.values(dados).some((v) => v !== null)
+          ? JSON.stringify(dados)
+          : null;
+      }
+
+      let novoId: string;
+      let implantadosCascataId: string | null = null;
+      let dcbCascataId: string | null = null;
+      try {
+        if (tipo === "implantados-data") {
+          const data1pag = dataOrNullCtrl(input.data_1pag);
+          const dataCessacao = dataOrNullCtrl(input.data_cessacao);
+          if (!data1pag && !dataCessacao) {
+            return JSON.stringify({
+              ok: false,
+              erro: "Informe data_1pag e/ou data_cessacao.",
+            });
+          }
+
+          // Mesma cascata da tela manual: informar data de 1° pagamento e/ou
+          // de cessação cria automaticamente os controles vinculados
+          // 'implantados' e 'dcb' (15 dias antes da cessação) — sem isso, o
+          // prazo de prorrogação mais crítico do escritório ficava sem
+          // nenhum rastro quando criado pela Íris.
+          if (data1pag) {
+            const rows = await sql`
+              INSERT INTO controles (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda)
+              VALUES ('implantados', ${data1pag}::date,
+                      ${descricaoInput || "Benefício implantado (1° Pagamento)"},
+                      ${clienteId3}::uuid, ${processoId3}::uuid, ${tipoDemanda})
+              RETURNING id::text
+            `;
+            implantadosCascataId = String(rows[0].id);
+          }
+          if (dataCessacao) {
+            const dDcb = new Date(dataCessacao + "T12:00:00");
+            dDcb.setDate(dDcb.getDate() - 15);
+            const dcbData = dDcb.toISOString().slice(0, 10);
+            const rows = await sql`
+              INSERT INTO controles (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda)
+              VALUES ('dcb', ${dcbData}::date,
+                      ${descricaoInput || "DCB — Prorrogação automática"},
+                      ${clienteId3}::uuid, ${processoId3}::uuid, ${tipoDemanda})
+              RETURNING id::text
+            `;
+            dcbCascataId = String(rows[0].id);
+          }
+
+          const dados = {
+            data_1pag: data1pag,
+            data_cessacao: dataCessacao,
+            implantados_id: implantadosCascataId,
+            dcb_id: dcbCascataId,
+          };
+          dadosJson = JSON.stringify(dados);
+
+          const rows = await sql`
+            INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, tipo_demanda, observacoes, dados)
+            VALUES ('implantados-data', ${data1pag ?? dataCessacao}::date, ${prazoInterno}::date,
+                    ${descricaoInput ?? ""}, ${prioridade}, ${fatal},
+                    ${clienteId3}::uuid, ${processoId3}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb)
+            RETURNING id::text
+          `;
+          novoId = String(rows[0].id);
+        } else {
+          const rows = await sql`
+            INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, tipo_demanda, observacoes, dados)
+            VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date,
+                    ${descricaoInput ?? ""}, ${prioridade}, ${fatal},
+                    ${clienteId3}::uuid, ${processoId3}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb)
+            RETURNING id::text
+          `;
+          novoId = String(rows[0].id);
+        }
+      } catch (e) {
+        console.error("[iris-tools] falha ao criar controle:", e);
+        return JSON.stringify({
+          ok: false,
+          erro: "Erro ao salvar o controle no banco de dados.",
+        });
+      }
+
+      if (fatal) {
+        try {
+          const { alertarPrazoFatalNovo } = await import("./resumo-diario");
+          await alertarPrazoFatalNovo(
+            descricaoInput ?? getTipoConfig(tipo).label,
+            dataEvento ?? input.data_cessacao ?? null,
+            clienteNome3
+          );
+        } catch (e) {
+          console.error("[iris-tools] falha ao alertar prazo fatal:", e);
+        }
+      }
+
+      const cascataMsg =
+        tipo === "implantados-data"
+          ? ` Também criei automaticamente: ${[
+              implantadosCascataId ? "Benefício Implantado (1° Pag.)" : null,
+              dcbCascataId ? "DCB (15 dias antes da cessação)" : null,
+            ]
+              .filter(Boolean)
+              .join(" e ")}.`
+          : "";
+
+      return JSON.stringify({
+        ok: true,
+        mensagem: `Controle "${getTipoConfig(tipo).label}" criado pra ${clienteNome3}${processoId3 ? " (processo vinculado)" : ""}.${cascataMsg}`,
+        controle_id: novoId,
+        cliente_id: clienteId3,
       });
     }
 

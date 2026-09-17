@@ -179,6 +179,13 @@ interface Props {
   locaisPericia: LocalAudiencia[];
   carga?: CargaColaborador[];
   prefill?: ControlePrefill;
+  // Só administrador escolhe/reatribui o responsável — pra qualquer outro
+  // usuário o campo fica travado (ele mesmo, ou quem já estava salvo, se
+  // for edição). A ação do servidor já reforça essa regra por conta
+  // própria, isto aqui é só pra não oferecer uma opção que vai ser
+  // ignorada/bloqueada, o que já causou confusão real.
+  isAdmin?: boolean;
+  meuNome?: string;
 }
 
 export default function ControleForm({
@@ -191,6 +198,8 @@ export default function ControleForm({
   locaisPericia,
   carga = [],
   prefill,
+  isAdmin = false,
+  meuNome,
 }: Props) {
   const isEdit = !!controle;
   const router = useRouter();
@@ -416,16 +425,39 @@ export default function ControleForm({
           {/* Responsável */}
           <div>
             <label className={labelCls}>Responsável</label>
-            <ResponsavelSelect
-              usuarios={usuarios}
-              carga={carga}
-              defaultValue={controle?.responsavel_id ?? ""}
-            />
-            {carga.length > 0 && (
-              <p className="mt-1 font-body text-xs text-muted">
-                Abertas por categoria e vencidas de cada um — clique pra
-                escolher ou buscar por nome.
-              </p>
+            {isAdmin ? (
+              <>
+                <ResponsavelSelect
+                  usuarios={usuarios}
+                  carga={carga}
+                  defaultValue={controle?.responsavel_id ?? ""}
+                />
+                {carga.length > 0 && (
+                  <p className="mt-1 font-body text-xs text-muted">
+                    Abertas por categoria e vencidas de cada um — clique pra
+                    escolher ou buscar por nome.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <input
+                  type="hidden"
+                  name="responsavel_id"
+                  value={controle?.responsavel_id ?? ""}
+                />
+                <div className={`${selectCls} bg-slate-50 text-muted`}>
+                  {controle?.responsavel_id
+                    ? (usuarios.find((u) => u.id === controle.responsavel_id)
+                        ?.nome ??
+                      controle.responsavel_login ??
+                      "—")
+                    : (meuNome ?? "Você")}
+                </div>
+                <p className="mt-1 font-body text-xs text-muted">
+                  Só um administrador pode alterar o responsável.
+                </p>
+              </>
             )}
           </div>
         </div>

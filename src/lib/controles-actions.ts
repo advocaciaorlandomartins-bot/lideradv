@@ -237,8 +237,21 @@ export async function createControleAction(
     ((formData.get("cliente_id") as string) ?? "").trim() || null;
   const processoId =
     ((formData.get("processo_id") as string) ?? "").trim() || null;
-  const responsavelId =
-    ((formData.get("responsavel_id") as string) ?? "").trim() || null;
+  // Só administrador escolhe/reatribui responsável — um usuário comum
+  // (ex: um Advogado(a) sem esse privilégio) sempre vira responsável de
+  // qualquer controle que ele criar, mesmo que a tela mande outro id (o
+  // campo do formulário é ignorado nesse caso). Regra de negócio pedida
+  // explicitamente pelo dono do escritório, não só uma preferência de UI.
+  // controles.responsavel_id referencia usuarios(id), não colaboradores
+  // (id) — usar session.id direto, não getColaboradorIdForUser.
+  const podeEscolherResponsavel = hasPermission(
+    session,
+    "configuracoes",
+    "editar"
+  );
+  const responsavelId = podeEscolherResponsavel
+    ? ((formData.get("responsavel_id") as string) ?? "").trim() || null
+    : session.id;
   const tipoDemanda =
     ((formData.get("tipo_demanda") as string) ?? "").trim() || null;
   const observacoes =
@@ -394,8 +407,6 @@ export async function updateControleAction(
     ((formData.get("cliente_id") as string) ?? "").trim() || null;
   const processoId =
     ((formData.get("processo_id") as string) ?? "").trim() || null;
-  const responsavelId =
-    ((formData.get("responsavel_id") as string) ?? "").trim() || null;
   const tipoDemanda =
     ((formData.get("tipo_demanda") as string) ?? "").trim() || null;
   const observacoes =
@@ -427,9 +438,27 @@ export async function updateControleAction(
   const dbStatus = status === "pendente" || !status ? null : status;
 
   const [antes] = await sql`
-    SELECT fatal FROM controles WHERE id = ${id}::uuid
-  `.catch(() => [] as { fatal: boolean }[]);
+    SELECT fatal, responsavel_id::text FROM controles WHERE id = ${id}::uuid
+  `.catch(() => [] as { fatal: boolean; responsavel_id: string | null }[]);
   const eraFatal = !!antes?.fatal;
+
+  // Só administrador reatribui responsável — mesma regra de
+  // createControleAction. Ignora o que veio no formulário e mantém o que
+  // já estava salvo; sem isso, um usuário comum editando o próprio
+  // controle pra "dar baixa" (mudar status) conseguia de quebra trocar o
+  // responsável pra qualquer outra pessoa, e a tela nem escondia essa
+  // opção — reportado de verdade pelo dono do escritório. Exceção: se
+  // ainda não tinha ninguém responsável, quem está editando assume
+  // (equivalente a "pegar" a tarefa), em vez de continuar sem dono.
+  // controles.responsavel_id referencia usuarios(id) — session.id direto.
+  const podeEscolherResponsavel = hasPermission(
+    session,
+    "configuracoes",
+    "editar"
+  );
+  const responsavelId = podeEscolherResponsavel
+    ? ((formData.get("responsavel_id") as string) ?? "").trim() || null
+    : (antes?.responsavel_id ?? session.id);
 
   let dadosJson: string | null = null;
   try {

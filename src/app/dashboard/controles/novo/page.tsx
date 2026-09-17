@@ -109,6 +109,8 @@ export default async function NovoControlePage({
         locais={locais}
         locaisPericia={locaisPericia}
         carga={cargaFiltrada}
+        isAdmin={hasPermission(session, "configuracoes", "editar")}
+        meuNome={session.nome}
         prefill={{
           publicacaoId: publicacao_id ?? null,
           descricao: descricao ?? null,

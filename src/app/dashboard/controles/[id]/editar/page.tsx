@@ -102,6 +102,8 @@ export default async function EditarControlePage({
         locais={locais}
         locaisPericia={locaisPericia}
         carga={cargaFiltrada}
+        isAdmin={hasPermission(session, "configuracoes", "editar")}
+        meuNome={session.nome}
       />
     </div>
   );

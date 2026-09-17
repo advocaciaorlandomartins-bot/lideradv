@@ -1835,19 +1835,45 @@ async function executarFerramentaIrisInterno(
       const novaDataFim = dataOrNullCP(input.nova_data_fim);
       const observacoes = strOrNullCP(input.observacoes);
 
+      // Prorrogação de benefício é prazo interno (o escritório precisa agir
+      // antes do INSS cessar o benefício), não um compromisso do cliente —
+      // diferente das perícias/avaliações judiciais, aqui dá pra saber com
+      // certeza que quem precisa ser avisado é sempre o escritório. Cria
+      // compromisso na Agenda (senão o registro fica só em Controles →
+      // Perícias, invisível na Agenda de verdade) e agenda lembrete
+      // automático por WhatsApp perto da data, mesmo padrão já usado pras
+      // perícias do INSS (agendarLembretesCompromissoPrevBot).
+      const clienteNome2 = candidatosCliente2[0].name as string;
+      const clienteId2 = candidatosCliente2[0].id as string;
+
       let novaPericiaId: string;
+      let compromissoIdProrrogacao: string | null = null;
       try {
+        if (tipo === "prorrogacao_beneficio") {
+          const tituloComp = `Prorrogação de benefício — ${clienteNome2}`;
+          const [compromisso] = await sql`
+            INSERT INTO compromissos
+              (titulo, tipo, data_inicio, criado_por, cliente_id, descricao)
+            VALUES
+              (${tituloComp}, 'outro', ${data}::date, ${session.login},
+               ${clienteId2}::uuid, ${observacoes})
+            RETURNING id::text
+          `;
+          compromissoIdProrrogacao = String(compromisso.id);
+        }
+
         const rows = await sql`
           INSERT INTO pericias (
             tipo, client_id, data_pericia, hora_pericia,
             local_pericia, perito, especialidade, status,
             beneficio_numero, beneficio_tipo,
-            data_fim_beneficio, nova_data_fim, observacoes
+            data_fim_beneficio, nova_data_fim, observacoes, compromisso_id
           ) VALUES (
-            ${tipo}, ${candidatosCliente2[0].id}::uuid, ${data}::date, ${hora}::time,
+            ${tipo}, ${clienteId2}::uuid, ${data}::date, ${hora}::time,
             ${local}, ${perito}, ${especialidade}, ${status},
             ${beneficioNumero}, ${beneficioTipo},
-            ${dataFimBeneficio}::date, ${novaDataFim}::date, ${observacoes}
+            ${dataFimBeneficio}::date, ${novaDataFim}::date, ${observacoes},
+            ${compromissoIdProrrogacao}::uuid
           )
           RETURNING id::text
         `;
@@ -1860,11 +1886,43 @@ async function executarFerramentaIrisInterno(
         });
       }
 
+      let lembreteAgendado = false;
+      if (compromissoIdProrrogacao) {
+        try {
+          const [escritorio] =
+            await sql`SELECT nome, telefone FROM escritorio_config LIMIT 1`;
+          const telefoneEscritorio = String(escritorio?.telefone ?? "").trim();
+          if (telefoneEscritorio) {
+            const { agendarLembretesCompromissoPrevBot } =
+              await import("./lembretes");
+            await agendarLembretesCompromissoPrevBot({
+              compromissoId: compromissoIdProrrogacao,
+              titulo: `Prorrogação de benefício — ${clienteNome2}`,
+              dataEvento: new Date(data + "T12:00:00"),
+              hora: null,
+              local: null,
+              colaboradorTelefone: telefoneEscritorio,
+              colaboradorNome: String(escritorio?.nome ?? "Escritório"),
+              clienteNome: clienteNome2,
+            });
+            lembreteAgendado = true;
+          }
+        } catch (e) {
+          console.error(
+            "[iris-tools] falha ao agendar lembrete de prorrogação:",
+            e
+          );
+        }
+      }
+
       return JSON.stringify({
         ok: true,
-        mensagem: `Controle criado pra ${candidatosCliente2[0].name} (${tipo}), data ${data}. Isto fica em Controles → Perícias — não cria compromisso na Agenda nem lembrete automático por WhatsApp, é só o registro/prazo.`,
+        mensagem:
+          tipo === "prorrogacao_beneficio"
+            ? `Controle de prorrogação criado pra ${clienteNome2}, data ${data}. Já apareceu na Agenda${lembreteAgendado ? " e programei lembrete automático por WhatsApp pro escritório perto da data" : " (não consegui programar o lembrete automático — confirme o telefone do escritório em Configurações)"}.`
+            : `Controle criado pra ${clienteNome2} (${tipo}), data ${data}. Isto fica em Controles → Perícias — não cria compromisso na Agenda nem lembrete automático por WhatsApp, é só o registro/prazo.`,
         pericia_id: novaPericiaId,
-        cliente_id: String(candidatosCliente2[0].id),
+        cliente_id: clienteId2,
       });
     }
 

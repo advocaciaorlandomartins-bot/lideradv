@@ -17,6 +17,7 @@ import {
   blocksToHtml,
   textToHtml,
   substituteVariablesInBlocks,
+  escapeHtml,
 } from "./modelo-blocks";
 import { enviarEmailEnvelopeEnviado } from "./email";
 import { revalidatePath } from "next/cache";
@@ -124,7 +125,7 @@ export async function salvarEnvelopeAction(
       .sort((a, b) => a.ordem - b.ordem)
       .map(
         (d) =>
-          `<h2>${d.nome}</h2>\n${d.htmlContent}\n<div style="margin:24px 0"><hr></div>`
+          `<h2>${escapeHtml(d.nome)}</h2>\n${d.htmlContent}\n<div style="margin:24px 0"><hr></div>`
       )
       .join("\n");
 

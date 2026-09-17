@@ -10,6 +10,7 @@ import {
   listarCompromissosProximos,
   TIPO_LABELS_COMP,
 } from "@/lib/compromissos-db";
+import { iaRateLimitExcedido } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -327,6 +328,20 @@ export async function POST(req: NextRequest) {
     const { usuarioId, usuarioLogin, colaboradorNome } = await resolverUsuario(
       body.telefone
     );
+
+    // Esta rota é autenticada por PREVBOT_API_KEY (servidor a servidor), não
+    // por sessão de usuário — sem isso, nenhuma chamada de IA aqui tinha
+    // limite nenhum. Se a chave vazar, ou o bot entrar num loop de retry,
+    // o custo da Anthropic sobe sem teto. Mesmo limite por usuário/hora já
+    // usado nas rotas de IA autenticadas por sessão.
+    if (await iaRateLimitExcedido(usuarioLogin)) {
+      return NextResponse.json({
+        ok: false,
+        acao: "limite_excedido",
+        resposta:
+          "⚠️ Muitas mensagens em pouco tempo — aguarde um pouco antes de mandar outra.",
+      });
+    }
 
     // Retrato atual da agenda e do financeiro — dá à IA dados reais pra
     // responder perguntas, em vez de só reconhecer frases específicas.

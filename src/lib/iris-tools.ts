@@ -371,7 +371,7 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
   {
     name: "criar_controle_pericia",
     description:
-      "Cria um registro em Controles → Perícias pra qualquer um dos 5 tipos: perícia médica administrativa/judicial, avaliação social administrativa/judicial, ou PRORROGAÇÃO DE BENEFÍCIO. Diferente de agendar_pericia (só pra agendamento novo do INSS, com compromisso na Agenda e lembretes automáticos por WhatsApp) — este é o registro manual de controle/prazo, sem compromisso na Agenda nem lembrete automático, igual ao formulário 'Nova Perícia' da tela Controles. Use isto pra prorrogação de benefício, perícia/avaliação judicial, ou qualquer perícia que o usuário queira registrar sem os lembretes automáticos do fluxo INSS. Pra prorrogação, sempre pergunte a data-limite pra requerer a prorrogação (campo 'data'), número e tipo do benefício, data fim atual e nova data fim pretendida, se o usuário não tiver informado.",
+      "Cria um registro em Controles → aba 'Perícias e Av. Sociais' pra: perícia médica administrativa/judicial, avaliação social administrativa/judicial, ou o tipo prorrogacao_beneficio (legado — PREFIRA criar_controle com tipo=dcb pra prorrogação de benefício, que grava na aba 'Prorrogação (DCB)', que é onde o usuário de fato confere; só use prorrogacao_beneficio aqui se o usuário pedir explicitamente pra registrar junto de um processo/perícia já existente nesta aba). Diferente de agendar_pericia (só pra agendamento novo do INSS, com compromisso na Agenda e lembretes automáticos por WhatsApp) — este é o registro manual de controle/prazo, igual ao formulário 'Nova Perícia' da tela Controles. Use isto principalmente pra perícia/avaliação JUDICIAL (não INSS) — essas não geram compromisso na Agenda nem lembrete automático.",
     input_schema: {
       type: "object",
       properties: {
@@ -868,6 +868,59 @@ export async function executarFerramentaIris(
       ok: false,
       erro: `Erro interno ao executar "${name}". Avise o usuário que algo falhou e ele pode tentar de novo ou fazer manualmente pela tela.`,
     });
+  }
+}
+
+/**
+ * DCB (Prorrogação — Controles → aba "Prorrogação (DCB)") é o prazo mais
+ * crítico do escritório (perder = cliente perde o benefício), mas até
+ * aqui só existia como registro passivo — sem aparecer na Agenda nem
+ * gerar lembrete automático. Cria compromisso + agenda lembrete pro
+ * escritório, mesmo padrão já usado pra prorrogacao_beneficio em
+ * criar_controle_pericia. Usada tanto pra DCB manual quanto pro DCB
+ * criado em cascata a partir de implantados-data.
+ */
+async function criarCompromissoLembreteDcb(opts: {
+  controleId: string;
+  clienteId: string;
+  clienteNome: string;
+  data: string;
+  criadoPorLogin: string;
+}): Promise<boolean> {
+  try {
+    const titulo = `Prorrogação (DCB) — ${opts.clienteNome}`;
+    const [compromisso] = await sql`
+      INSERT INTO compromissos (titulo, tipo, data_inicio, criado_por, cliente_id)
+      VALUES (${titulo}, 'outro', ${opts.data}::date, ${opts.criadoPorLogin}, ${opts.clienteId}::uuid)
+      RETURNING id::text
+    `;
+    const compromissoId = String(compromisso.id);
+    await sql`
+      UPDATE controles
+      SET dados = COALESCE(dados, '{}'::jsonb) || jsonb_build_object('compromisso_id', ${compromissoId}::text)
+      WHERE id = ${opts.controleId}::uuid
+    `;
+
+    const [escritorio] =
+      await sql`SELECT nome, telefone FROM escritorio_config LIMIT 1`;
+    const telefoneEscritorio = String(escritorio?.telefone ?? "").trim();
+    if (!telefoneEscritorio) return false;
+
+    const { agendarLembretesCompromissoPrevBot } = await import("./lembretes");
+    await agendarLembretesCompromissoPrevBot({
+      compromissoId,
+      titulo,
+      dataEvento: new Date(opts.data + "T12:00:00"),
+      hora: null,
+      local: null,
+      colaboradorTelefone: telefoneEscritorio,
+      colaboradorNome: String(escritorio?.nome ?? "Escritório"),
+      clienteNome: opts.clienteNome,
+    });
+    return true;
+  } catch (e) {
+    console.error("[iris-tools] falha ao agendar lembrete de DCB:", e);
+    return false;
   }
 }
 
@@ -2396,6 +2449,27 @@ async function executarFerramentaIrisInterno(
         });
       }
 
+      // Sem isso, pedir a mesma coisa duas vezes (ou a Íris tentar de novo
+      // depois de um "não tenho certeza se já fiz") criava controle
+      // repetido — já aconteceu de verdade com prorrogação de benefício,
+      // gerando 2-3 lembretes de WhatsApp iguais pra cada data.
+      if (tipo !== "implantados-data" && dataEvento) {
+        const duplicata = await sql`
+          SELECT id FROM controles
+          WHERE cliente_id = ${clienteId3}::uuid AND tipo = ${tipo}
+            AND data_evento = ${dataEvento}::date
+            AND (status IS NULL OR status != 'cancelado')
+          LIMIT 1
+        `;
+        if (duplicata.length > 0) {
+          return JSON.stringify({
+            ok: false,
+            erro: `Já existe um controle "${getTipoConfig(tipo).label}" pra ${clienteNome3} nessa data (${dataEvento}). Não crie duplicado — se for outra informação, atualize o controle existente pela tela.`,
+            duplicataDetectada: true,
+          });
+        }
+      }
+
       let dadosJson: string | null = null;
       if (tipo === "audiencias") {
         const hora = strOrNullCtrl(input.hora);
@@ -2414,6 +2488,7 @@ async function executarFerramentaIrisInterno(
       let novoId: string;
       let implantadosCascataId: string | null = null;
       let dcbCascataId: string | null = null;
+      let dcbCascataData: string | null = null;
       try {
         if (tipo === "implantados-data") {
           const data1pag = dataOrNullCtrl(input.data_1pag);
@@ -2452,6 +2527,7 @@ async function executarFerramentaIrisInterno(
               RETURNING id::text
             `;
             dcbCascataId = String(rows[0].id);
+            dcbCascataData = dcbData;
           }
 
           const dados = {
@@ -2501,19 +2577,54 @@ async function executarFerramentaIrisInterno(
         }
       }
 
+      // DCB é o prazo mais crítico do fluxo de benefício (não a Agenda nem
+      // lembrete, sem isso o cliente pode perder o benefício por prazo
+      // perdido) — cria compromisso + lembrete tanto pro DCB criado direto
+      // quanto pro DCB criado em cascata a partir de implantados-data.
+      let lembreteDcbAgendado = false;
+      if (tipo === "dcb" && dataEvento) {
+        lembreteDcbAgendado = await criarCompromissoLembreteDcb({
+          controleId: novoId,
+          clienteId: clienteId3,
+          clienteNome: clienteNome3,
+          data: dataEvento,
+          criadoPorLogin: session.login,
+        });
+      } else if (
+        tipo === "implantados-data" &&
+        dcbCascataId &&
+        dcbCascataData
+      ) {
+        lembreteDcbAgendado = await criarCompromissoLembreteDcb({
+          controleId: dcbCascataId,
+          clienteId: clienteId3,
+          clienteNome: clienteNome3,
+          data: dcbCascataData,
+          criadoPorLogin: session.login,
+        });
+      }
+
       const cascataMsg =
         tipo === "implantados-data"
           ? ` Também criei automaticamente: ${[
               implantadosCascataId ? "Benefício Implantado (1° Pag.)" : null,
-              dcbCascataId ? "DCB (15 dias antes da cessação)" : null,
+              dcbCascataId
+                ? `DCB (15 dias antes da cessação${lembreteDcbAgendado ? ", com lembrete automático agendado" : ""})`
+                : null,
             ]
               .filter(Boolean)
               .join(" e ")}.`
           : "";
+      const dcbMsg =
+        tipo === "dcb"
+          ? lembreteDcbAgendado
+            ? " Já apareceu na Agenda e programei lembrete automático por WhatsApp pro escritório perto da data."
+            : " Não consegui programar o lembrete automático — confirme o telefone do escritório em Configurações."
+          : "";
 
       return JSON.stringify({
         ok: true,
-        mensagem: `Controle "${getTipoConfig(tipo).label}" criado pra ${clienteNome3}${processoId3 ? " (processo vinculado)" : ""}.${cascataMsg}`,
+        mensagem: `Controle "${getTipoConfig(tipo).label}" criado pra ${clienteNome3}${processoId3 ? " (processo vinculado)" : ""}.${cascataMsg}${dcbMsg}`,
         controle_id: novoId,
         cliente_id: clienteId3,
       });

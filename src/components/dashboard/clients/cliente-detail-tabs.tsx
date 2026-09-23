@@ -241,6 +241,7 @@ interface Props {
   inboundAddress: InboundEmailAddress | null;
   inboundEmails: InboundEmail[];
   initialTab?: Tab;
+  podeVerFinanceiro?: boolean;
 }
 
 export default function ClienteDetailTabs({
@@ -251,8 +252,12 @@ export default function ClienteDetailTabs({
   inboundAddress,
   inboundEmails,
   initialTab,
+  podeVerFinanceiro = true,
 }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "geral");
+  const tabsVisiveis = podeVerFinanceiro
+    ? TABS
+    : TABS.filter((t) => t.key !== "financeiro");
   const [inssModalAberto, setInssModalAberto] = useState(false);
   const [judicialModalAberto, setJudicialModalAberto] = useState(false);
   const naoLidos = inboundEmails.filter((e) => !e.lida).length;
@@ -266,7 +271,7 @@ export default function ClienteDetailTabs({
     <div className="space-y-4">
       {/* Tab bar */}
       <div className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-white p-1 shadow-sm">
-        {TABS.map(({ key, label, icon: Icon }) => {
+        {tabsVisiveis.map(({ key, label, icon: Icon }) => {
           const active = tab === key;
           let badge = 0;
           if (key === "processos") badge = processes.length;
@@ -323,22 +328,31 @@ export default function ClienteDetailTabs({
                   bg: "bg-emerald-50",
                   tab: "processos",
                 },
-                {
-                  icon: AlertIcon,
-                  label: "Débito pendente",
-                  value:
-                    debito.totalPendente > 0
-                      ? formatCurrency(debito.totalPendente)
-                      : "Quitado",
-                  sub:
-                    debito.totalPendente > 0 ? "Em aberto" : "Sem pendências",
-                  color:
-                    debito.totalPendente > 0
-                      ? "text-red-600"
-                      : "text-emerald-600",
-                  bg: debito.totalPendente > 0 ? "bg-red-50" : "bg-emerald-50",
-                  tab: "financeiro",
-                },
+                ...(podeVerFinanceiro
+                  ? [
+                      {
+                        icon: AlertIcon,
+                        label: "Débito pendente",
+                        value:
+                          debito.totalPendente > 0
+                            ? formatCurrency(debito.totalPendente)
+                            : "Quitado",
+                        sub:
+                          debito.totalPendente > 0
+                            ? "Em aberto"
+                            : "Sem pendências",
+                        color:
+                          debito.totalPendente > 0
+                            ? "text-red-600"
+                            : "text-emerald-600",
+                        bg:
+                          debito.totalPendente > 0
+                            ? "bg-red-50"
+                            : "bg-emerald-50",
+                        tab: "financeiro" as const,
+                      },
+                    ]
+                  : []),
                 {
                   icon: DocumentTextIcon,
                   label: "Documentos",

@@ -3,6 +3,7 @@ import { getAllClients } from "@/lib/clients-db";
 import ClientsContent from "@/components/dashboard/clients/clients-content";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 
 export const metadata = {
   title: "Clientes — LiderAdv",
@@ -14,7 +15,11 @@ export default async function ClientesPage() {
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "ver")) notFound();
 
-  const clientsRaw = await getAllClients();
+  const podeVerTodos = hasPermission(session, "clientes_ver_todos", "ver");
+  const colaboradorId = podeVerTodos
+    ? null
+    : await getColaboradorIdForUser(session.id);
+  const clientsRaw = await getAllClients(podeVerTodos, colaboradorId);
   const ativos = clientsRaw.filter((c) => c.status === "ativo").length;
   const total = clientsRaw.length;
 

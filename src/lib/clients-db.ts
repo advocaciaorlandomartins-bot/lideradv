@@ -21,6 +21,35 @@ export interface Client {
   menor_incapaz: boolean;
 }
 
+/**
+ * Contagem rápida pro KPI do Dashboard — mesmo critério de posse de
+ * getAllClients (sem "clientes_ver_todos" só conta cliente com processo
+ * próprio, ou sem processo nenhum ainda), só que sem trazer as linhas
+ * inteiras.
+ */
+export async function getClientesCount(
+  podeVerTodos: boolean,
+  colaboradorId: string | null
+): Promise<number> {
+  const rows = await sql`
+    SELECT COUNT(*)::int AS total
+    FROM clients c
+    WHERE c.deleted_at IS NULL
+      AND (
+        ${podeVerTodos}
+        OR NOT EXISTS (
+          SELECT 1 FROM processos p2 WHERE p2.client_id = c.id AND p2.deleted_at IS NULL
+        )
+        OR EXISTS (
+          SELECT 1 FROM processos p2
+          WHERE p2.client_id = c.id AND p2.deleted_at IS NULL
+            AND p2.responsavel_id = ${colaboradorId}::uuid
+        )
+      )
+  `;
+  return Number(rows[0]?.total ?? 0);
+}
+
 function formatSince(date: Date): string {
   return date.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
 }
@@ -29,7 +58,18 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString("pt-BR");
 }
 
-export async function getAllClients(): Promise<Client[]> {
+/**
+ * Sem "clientes_ver_todos", só entra cliente com pelo menos um processo em
+ * que o colaborador é responsável — cliente sem processo nenhum ainda
+ * (ninguém "dono" ainda) fica visível pra todo mundo, mesmo critério já
+ * usado em podeAcessarCliente (acesso.ts) e em controle sem responsável
+ * no Minhas Tarefas. podeVerTodos=true (padrão) preserva o comportamento
+ * anterior pra quem chama sem passar os novos parâmetros.
+ */
+export async function getAllClients(
+  podeVerTodos: boolean = true,
+  colaboradorId: string | null = null
+): Promise<Client[]> {
   const rows = await sql`
     SELECT
       c.id::text,
@@ -55,6 +95,17 @@ export async function getAllClients(): Promise<Client[]> {
     FROM clients c
     LEFT JOIN colaboradores col ON col.id = c.indicador_id
     WHERE c.deleted_at IS NULL
+      AND (
+        ${podeVerTodos}
+        OR NOT EXISTS (
+          SELECT 1 FROM processos p2 WHERE p2.client_id = c.id AND p2.deleted_at IS NULL
+        )
+        OR EXISTS (
+          SELECT 1 FROM processos p2
+          WHERE p2.client_id = c.id AND p2.deleted_at IS NULL
+            AND p2.responsavel_id = ${colaboradorId}::uuid
+        )
+      )
     ORDER BY c.created_at DESC
   `;
 

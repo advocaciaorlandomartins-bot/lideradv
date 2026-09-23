@@ -5,6 +5,7 @@ import { getClientFull } from "@/lib/clients-db";
 export const metadata = { title: "Cliente — LiderAdv" };
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarCliente } from "@/lib/acesso";
 import { getProcessosByClientId } from "@/lib/processos-db";
 import { getDocumentosAllByClientId } from "@/lib/documents-db";
 import { getClientDebito } from "@/lib/lancamentos-db";
@@ -56,6 +57,9 @@ export default async function ClienteDetailPage({
   if (!session || !hasPermission(session, "clientes", "ver")) notFound();
 
   const { id } = await params;
+  if (!(await podeAcessarCliente(session, id))) notFound();
+
+  const podeVerFinanceiro = hasPermission(session, "financeiro", "ver");
   const { tab: tabParam } = await searchParams;
   const validTabs = [
     "geral",
@@ -65,9 +69,14 @@ export default async function ClienteDetailPage({
     "email",
   ] as const;
   type Tab = (typeof validTabs)[number];
-  const initialTab: Tab = validTabs.includes(tabParam as Tab)
+  const tabPedida = validTabs.includes(tabParam as Tab)
     ? (tabParam as Tab)
     : "geral";
+  // Aba Financeiro dentro do cliente ignorava a permissão de Financeiro —
+  // quem tinha "financeiro" desmarcado ainda via débito/valor em causa de
+  // qualquer cliente só indo direto pra ?tab=financeiro.
+  const initialTab: Tab =
+    tabPedida === "financeiro" && !podeVerFinanceiro ? "geral" : tabPedida;
   // Garantir que as tabelas de inbound email existam (idempotente)
   await setupInboundEmailTables().catch(() => null);
 
@@ -83,7 +92,11 @@ export default async function ClienteDetailPage({
     getClientFull(id),
     getProcessosByClientId(id),
     getDocumentosAllByClientId(id),
-    getClientDebito(id),
+    // Sem permissão de Financeiro, nem busca o valor real — passar pra um
+    // Client Component e só esconder na UI ainda vaza o dado no payload.
+    podeVerFinanceiro
+      ? getClientDebito(id)
+      : Promise.resolve({ totalPendente: 0, totalPago: 0, items: [] }),
     getAddressByClientId(id).catch(() => null),
     getEtiquetasDeCliente(id),
     getCatalogoEtiquetas(),
@@ -199,6 +212,7 @@ export default async function ClienteDetailPage({
         inboundAddress={inboundAddress}
         inboundEmails={inboundEmails}
         initialTab={initialTab}
+        podeVerFinanceiro={podeVerFinanceiro}
       />
 
       {/* LGPD — only for Administrador */}

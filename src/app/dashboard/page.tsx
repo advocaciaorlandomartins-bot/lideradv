@@ -14,6 +14,7 @@ import { TIPO_LABELS_COMP, TIPO_ICONS_COMP } from "@/lib/compromissos-db";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { getProcessosCount } from "@/lib/processos-db";
+import { getClientesCount } from "@/lib/clients-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import MiniCalendar from "@/components/dashboard/mini-calendar";
 import DashboardAniversariosCard from "@/components/dashboard/dashboard-aniversarios-card";
@@ -227,6 +228,17 @@ export default async function DashboardPage() {
         )
     : 0;
 
+  // Mesmo raciocínio pro KPI de Clientes: gerData.counts.totalClientes é o
+  // total do escritório inteiro, mas sem "clientes_ver_todos" a lista de
+  // Clientes já mostra só os que têm processo com o colaborador como
+  // responsável (ou sem processo nenhum ainda) — o card precisa bater.
+  const verTodosClientes = hasPermission(session, "clientes_ver_todos", "ver");
+  const clientesVisiveisCount = perm.clientes
+    ? verTodosClientes
+      ? (gerData?.counts.totalClientes ?? 0)
+      : await getClientesCount(false, await getColaboradorIdForUser(session.id))
+    : 0;
+
   const kpis = gerData?.kpis;
   const counts = gerData?.counts;
   const receitasPorMes = gerData?.receitasPorMes ?? [];
@@ -429,7 +441,7 @@ export default async function DashboardPage() {
               </span>
             </div>
             <p className="mt-3 font-heading text-3xl font-bold text-fg">
-              {counts.totalClientes}
+              {clientesVisiveisCount}
             </p>
             <p className="mt-0.5 font-body text-xs font-semibold text-muted">
               Clientes

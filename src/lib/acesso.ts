@@ -32,9 +32,11 @@ export async function podeAcessarProcesso(
 }
 
 /**
- * Acesso a um cliente. Clientes não são restritos por responsável no sistema
- * (a listagem mostra todos para quem tem "clientes:ver"), então a checagem é
- * de permissão + existência do registro.
+ * Acesso a um cliente. Mesmo padrão de podeAcessarProcesso: sem
+ * "clientes_ver_todos", só vê clientes com pelo menos um processo em que
+ * é responsável — cliente sem processo nenhum ainda (ex: acabou de ser
+ * cadastrado, ninguém "dono" ainda) fica visível pra todo mundo, mesmo
+ * critério já usado pra controle sem responsável em Minhas Tarefas.
  */
 export async function podeAcessarCliente(
   session: SessionUser,
@@ -47,7 +49,23 @@ export async function podeAcessarCliente(
     WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
     LIMIT 1
   `;
-  return rows.length > 0;
+  if (rows.length === 0) return false;
+
+  if (hasPermission(session, "clientes_ver_todos", "ver")) return true;
+
+  const colaboradorId = await getColaboradorIdForUser(session.id);
+  const dono = await sql`
+    SELECT
+      NOT EXISTS (
+        SELECT 1 FROM processos WHERE client_id = ${clienteId}::uuid AND deleted_at IS NULL
+      )
+      OR EXISTS (
+        SELECT 1 FROM processos
+        WHERE client_id = ${clienteId}::uuid AND deleted_at IS NULL
+          AND responsavel_id = ${colaboradorId}::uuid
+      ) AS pode
+  `;
+  return !!dono[0]?.pode;
 }
 
 /**

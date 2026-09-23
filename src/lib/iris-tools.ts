@@ -2507,10 +2507,10 @@ async function executarFerramentaIrisInterno(
           // nenhum rastro quando criado pela Íris.
           if (data1pag) {
             const rows = await sql`
-              INSERT INTO controles (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda)
+              INSERT INTO controles (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda)
               VALUES ('implantados', ${data1pag}::date,
                       ${descricaoInput || "Benefício implantado (1° Pagamento)"},
-                      ${clienteId3}::uuid, ${processoId3}::uuid, ${tipoDemanda})
+                      ${clienteId3}::uuid, ${processoId3}::uuid, ${session.id}::uuid, ${tipoDemanda})
               RETURNING id::text
             `;
             implantadosCascataId = String(rows[0].id);
@@ -2520,10 +2520,10 @@ async function executarFerramentaIrisInterno(
             dDcb.setDate(dDcb.getDate() - 15);
             const dcbData = dDcb.toISOString().slice(0, 10);
             const rows = await sql`
-              INSERT INTO controles (tipo, data_evento, descricao, cliente_id, processo_id, tipo_demanda)
+              INSERT INTO controles (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, tipo_demanda)
               VALUES ('dcb', ${dcbData}::date,
                       ${descricaoInput || "DCB — Prorrogação automática"},
-                      ${clienteId3}::uuid, ${processoId3}::uuid, ${tipoDemanda})
+                      ${clienteId3}::uuid, ${processoId3}::uuid, ${session.id}::uuid, ${tipoDemanda})
               RETURNING id::text
             `;
             dcbCascataId = String(rows[0].id);
@@ -2539,19 +2539,19 @@ async function executarFerramentaIrisInterno(
           dadosJson = JSON.stringify(dados);
 
           const rows = await sql`
-            INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, tipo_demanda, observacoes, dados)
+            INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, responsavel_id, tipo_demanda, observacoes, dados)
             VALUES ('implantados-data', ${data1pag ?? dataCessacao}::date, ${prazoInterno}::date,
                     ${descricaoInput ?? ""}, ${prioridade}, ${fatal},
-                    ${clienteId3}::uuid, ${processoId3}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb)
+                    ${clienteId3}::uuid, ${processoId3}::uuid, ${session.id}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb)
             RETURNING id::text
           `;
           novoId = String(rows[0].id);
         } else {
           const rows = await sql`
-            INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, tipo_demanda, observacoes, dados)
+            INSERT INTO controles (tipo, data_evento, prazo_interno, descricao, prioridade, fatal, cliente_id, processo_id, responsavel_id, tipo_demanda, observacoes, dados)
             VALUES (${tipo}, ${dataEvento}::date, ${prazoInterno}::date,
                     ${descricaoInput ?? ""}, ${prioridade}, ${fatal},
-                    ${clienteId3}::uuid, ${processoId3}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb)
+                    ${clienteId3}::uuid, ${processoId3}::uuid, ${session.id}::uuid, ${tipoDemanda}, ${observacoes}, ${dadosJson}::jsonb)
             RETURNING id::text
           `;
           novoId = String(rows[0].id);

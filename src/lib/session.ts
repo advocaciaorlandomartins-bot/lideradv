@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
+import sql from "./db";
 import type { Permissoes } from "./permissoes";
 
 const COOKIE = "adv_session";
@@ -59,20 +60,44 @@ export async function getSession(): Promise<SessionUser | null> {
     return null;
   }
 
+  let data: { id?: string; login?: string; exp?: number };
   try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
-    if (typeof data.exp !== "number" || data.exp < Date.now() / 1000)
-      return null;
-    return {
-      id: data.id,
-      login: data.login,
-      nome: data.nome ?? data.login,
-      categoria: data.categoria,
-      permissoes: data.permissoes ?? {},
-    };
+    data = JSON.parse(Buffer.from(payload, "base64url").toString());
   } catch {
     return null;
   }
+  if (typeof data.exp !== "number" || data.exp < Date.now() / 1000 || !data.id)
+    return null;
+
+  // O cookie assinado só prova QUEM é o usuário (autenticação) — categoria
+  // e permissões sempre vêm frescas do banco a cada chamada, nunca do que
+  // foi gravado no cookie no momento do login. Sem isso, um admin
+  // revogava/reduzia a permissão de alguém na tela de Usuários e isso só
+  // valia depois da sessão atual daquela pessoa expirar sozinha (até 8h) —
+  // achado de verdade: financeiro desmarcado pra uma colaboradora que
+  // continuava vendo a aba Financeiro do cliente, porque o cookie dela já
+  // tinha sido emitido antes da permissão ser corrigida. De quebra, também
+  // derruba na hora quem for desativado (usuarios.ativo = false).
+  const rows = await sql`
+    SELECT nome, categoria, permissoes, ativo FROM usuarios WHERE id = ${data.id}::uuid
+  `.catch(() => []);
+  const row = rows[0] as
+    | {
+        nome: string;
+        categoria: string;
+        permissoes: Permissoes;
+        ativo: boolean;
+      }
+    | undefined;
+  if (!row || row.ativo === false) return null;
+
+  return {
+    id: data.id,
+    login: data.login ?? "",
+    nome: row.nome ?? data.login ?? "",
+    categoria: row.categoria,
+    permissoes: row.permissoes ?? {},
+  };
 }
 
 export async function destroySession(): Promise<void> {

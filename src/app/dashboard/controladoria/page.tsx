@@ -190,7 +190,10 @@ export default async function ControladoriaPage({
         />
       )}
       {tab === "economica" && (
-        <CarteiraEconomicaContent resumo={carteiraResumoEconomica!} />
+        <CarteiraEconomicaContent
+          resumo={carteiraResumoEconomica!}
+          podeVerFinanceiro={hasPermission(session, "financeiro", "ver")}
+        />
       )}
       {tab === "clientes" && (
         <CarteiraClientesContent

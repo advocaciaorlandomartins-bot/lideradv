@@ -58,6 +58,12 @@ export default async function FinanceiroPage({
 
   const session = await getSession();
   if (!session) redirect("/login");
+  // Faltava por completo — a página só checava sessão, nunca a permissão
+  // de Financeiro. Qualquer usuário logado (mesmo com "financeiro"
+  // totalmente desmarcado) acessava KPIs, lançamentos, remunerações da
+  // equipe e contas a receber/pagar direto pela URL. canEdit só
+  // controlava os botões de editar/excluir, não o acesso à página.
+  if (!hasPermission(session, "financeiro", "ver")) redirect("/dashboard");
   const canEdit = hasPermission(session, "financeiro", "editar");
 
   // Carrega apenas os dados necessários para cada aba

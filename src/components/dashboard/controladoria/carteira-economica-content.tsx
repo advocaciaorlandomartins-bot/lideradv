@@ -8,8 +8,10 @@ function fmtBRL(v: number): string {
 
 export default function CarteiraEconomicaContent({
   resumo,
+  podeVerFinanceiro = true,
 }: {
   resumo: CarteiraResumo;
+  podeVerFinanceiro?: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -72,35 +74,39 @@ export default function CarteiraEconomicaContent({
         </div>
       )}
 
-      <div>
-        <h2 className="font-heading text-base font-bold text-fg">
-          02 · O caixa do escritório
-        </h2>
-        <p className="font-body text-xs italic text-muted">
-          Sem relação com o recorte acima — todos os lançamentos do financeiro,
-          sem filtro de processo/responsável.
-        </p>
-      </div>
-      <Link
-        href="/dashboard/financeiro"
-        className="flex items-center justify-between rounded-xl border border-border bg-white p-5 shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50">
-            <BanknotesIcon className="h-4.5 w-4.5 text-emerald-600" />
-          </div>
+      {podeVerFinanceiro && (
+        <>
           <div>
-            <p className="font-body text-sm font-semibold text-fg">
-              A receber, recebido, vencidas e fluxo de caixa
-            </p>
-            <p className="font-body text-xs text-muted">
-              Já existe no módulo Financeiro — sem duplicar aqui, pra nunca
-              divergir de um lugar pro outro.
+            <h2 className="font-heading text-base font-bold text-fg">
+              02 · O caixa do escritório
+            </h2>
+            <p className="font-body text-xs italic text-muted">
+              Sem relação com o recorte acima — todos os lançamentos do
+              financeiro, sem filtro de processo/responsável.
             </p>
           </div>
-        </div>
-        <ArrowRightIcon className="h-4 w-4 flex-shrink-0 text-muted" />
-      </Link>
+          <Link
+            href="/dashboard/financeiro"
+            className="flex items-center justify-between rounded-xl border border-border bg-white p-5 shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50">
+                <BanknotesIcon className="h-4.5 w-4.5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="font-body text-sm font-semibold text-fg">
+                  A receber, recebido, vencidas e fluxo de caixa
+                </p>
+                <p className="font-body text-xs text-muted">
+                  Já existe no módulo Financeiro — sem duplicar aqui, pra nunca
+                  divergir de um lugar pro outro.
+                </p>
+              </div>
+            </div>
+            <ArrowRightIcon className="h-4 w-4 flex-shrink-0 text-muted" />
+          </Link>
+        </>
+      )}
     </div>
   );
 }

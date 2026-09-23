@@ -98,9 +98,9 @@ export default async function ControladoriaPage({
     tab === "clientes"
       ? await Promise.all([
           getClientesResumo(colaboradorIdParaFiltro),
-          getClientesPorMes(24),
-          getClientesPorUF(),
-          getClientesPorOrigem(),
+          getClientesPorMes(24, colaboradorIdParaFiltro),
+          getClientesPorUF(colaboradorIdParaFiltro),
+          getClientesPorOrigem(colaboradorIdParaFiltro),
         ])
       : [null, [], null, null];
 

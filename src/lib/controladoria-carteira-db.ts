@@ -145,15 +145,31 @@ export interface ClientesResumo {
   novosUltimos30d: number;
 }
 
+// Mesmo critério de posse de getAllClients/getClientesCount (clients-db.ts):
+// sem "ver todos", só conta cliente com processo próprio, ou sem processo
+// nenhum ainda (ninguém "dono" ainda). Reaproveitado em todas as consultas
+// de clientes da Controladoria — a versão anterior deixava tudo sempre no
+// número do escritório inteiro, inconsistente com /dashboard/clientes.
+function donoClauseFor(cid: string | null) {
+  return sql`
+    (
+      ${cid}::uuid IS NULL
+      OR NOT EXISTS (SELECT 1 FROM processos p2 WHERE p2.client_id = clients.id AND p2.deleted_at IS NULL)
+      OR EXISTS (
+        SELECT 1 FROM processos p2
+        WHERE p2.client_id = clients.id AND p2.deleted_at IS NULL AND p2.responsavel_id = ${cid}::uuid
+      )
+    )
+  `;
+}
+
 export async function getClientesResumo(
   colaboradorId?: string | null
 ): Promise<ClientesResumo> {
   const cid = colaboradorId ?? null;
-  // Sem processos_ver_todos, "clientes" continua não-restrito (mesma regra
-  // já usada em /dashboard/clientes) — só "com processo ativo" é que
-  // precisa saber de responsável, porque é derivado de processos.
+  const donoClause = donoClauseFor(cid);
   const [totalRows, ativosRows, novosRows] = await Promise.all([
-    sql`SELECT COUNT(*)::int AS n FROM clients WHERE deleted_at IS NULL`,
+    sql`SELECT COUNT(*)::int AS n FROM clients WHERE deleted_at IS NULL AND ${donoClause}`,
     sql`
       SELECT COUNT(DISTINCT client_id)::int AS n
       FROM processos
@@ -163,7 +179,7 @@ export async function getClientesResumo(
     `,
     sql`
       SELECT COUNT(*)::int AS n FROM clients
-      WHERE deleted_at IS NULL AND created_at >= NOW() - INTERVAL '30 days'
+      WHERE deleted_at IS NULL AND created_at >= NOW() - INTERVAL '30 days' AND ${donoClause}
     `,
   ]);
   return {
@@ -178,12 +194,17 @@ export interface ClientesPorMes {
   novos: number;
 }
 
-export async function getClientesPorMes(meses = 24): Promise<ClientesPorMes[]> {
+export async function getClientesPorMes(
+  meses = 24,
+  colaboradorId?: string | null
+): Promise<ClientesPorMes[]> {
+  const donoClause = donoClauseFor(colaboradorId ?? null);
   const rows = await sql`
     SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS mes, COUNT(*)::int AS n
     FROM clients
     WHERE deleted_at IS NULL
       AND created_at >= date_trunc('month', NOW()) - (${meses - 1} || ' months')::interval
+      AND ${donoClause}
     GROUP BY 1
     ORDER BY 1
   `;
@@ -202,25 +223,26 @@ export interface CidadeRanking {
   total: number;
 }
 
-export async function getClientesPorUF(): Promise<{
+export async function getClientesPorUF(colaboradorId?: string | null): Promise<{
   porUF: UFRanking[];
   cidades: CidadeRanking[];
   semUF: number;
 }> {
+  const donoClause = donoClauseFor(colaboradorId ?? null);
   const [ufRows, cidadeRows, semUFRows] = await Promise.all([
     sql`
       SELECT state, COUNT(*)::int AS n FROM clients
-      WHERE deleted_at IS NULL AND state IS NOT NULL AND state != '' AND state != '--'
+      WHERE deleted_at IS NULL AND state IS NOT NULL AND state != '' AND state != '--' AND ${donoClause}
       GROUP BY state ORDER BY n DESC
     `,
     sql`
       SELECT city, state, COUNT(*)::int AS n FROM clients
-      WHERE deleted_at IS NULL AND city IS NOT NULL AND city != '' AND city != 'PENDENTE'
+      WHERE deleted_at IS NULL AND city IS NOT NULL AND city != '' AND city != 'PENDENTE' AND ${donoClause}
       GROUP BY city, state ORDER BY n DESC LIMIT 10
     `,
     sql`
       SELECT COUNT(*)::int AS n FROM clients
-      WHERE deleted_at IS NULL AND (state IS NULL OR state = '' OR state = '--')
+      WHERE deleted_at IS NULL AND (state IS NULL OR state = '' OR state = '--') AND ${donoClause}
     `,
   ]);
   const total = ufRows.reduce((s, r) => s + Number(r.n), 0);
@@ -254,19 +276,22 @@ const ORIGEM_LABEL: Record<string, string> = {
   outro: "Outro",
 };
 
-export async function getClientesPorOrigem(): Promise<{
+export async function getClientesPorOrigem(
+  colaboradorId?: string | null
+): Promise<{
   ranking: OrigemRanking[];
   semOrigem: number;
 }> {
+  const donoClause = donoClauseFor(colaboradorId ?? null);
   const [rows, semRows] = await Promise.all([
     sql`
       SELECT origem_tipo, COUNT(*)::int AS n FROM clients
-      WHERE deleted_at IS NULL AND origem_tipo IS NOT NULL
+      WHERE deleted_at IS NULL AND origem_tipo IS NOT NULL AND ${donoClause}
       GROUP BY origem_tipo ORDER BY n DESC
     `,
     sql`
       SELECT COUNT(*)::int AS n FROM clients
-      WHERE deleted_at IS NULL AND origem_tipo IS NULL
+      WHERE deleted_at IS NULL AND origem_tipo IS NULL AND ${donoClause}
     `,
   ]);
   const total = rows.reduce((s, r) => s + Number(r.n), 0);

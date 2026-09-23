@@ -332,6 +332,16 @@ export async function GET() {
       sql`ALTER TABLE modelos_documento ADD COLUMN IF NOT EXISTS requer_responsavel_legal BOOLEAN NOT NULL DEFAULT FALSE`
   );
 
+  // OAB sozinho (só o número) não identifica o advogado de verdade — cada UF
+  // tem sua própria numeração, então "9244" existe repetido em vários
+  // estados. Necessário pra montar corretamente "Nome, OAB/UF nº" nos
+  // modelos de documento (contrato, procuração etc.).
+  await run(
+    "colaboradores.oab_uf",
+    () =>
+      sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS oab_uf VARCHAR(2)`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

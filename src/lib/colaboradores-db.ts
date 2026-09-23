@@ -10,6 +10,7 @@ export interface Colaborador {
   email: string | null;
   telefone: string | null;
   oab: string | null;
+  oab_uf: string | null;
   salario_mensal: number | null;
   data_admissao: string | null;
   data_demissao: string | null;
@@ -44,6 +45,7 @@ function mapRow(r: any): Colaborador {
     email: r.email ?? null,
     telefone: r.telefone ?? null,
     oab: r.oab ?? null,
+    oab_uf: r.oab_uf ?? null,
     salario_mensal: r.salario_mensal != null ? Number(r.salario_mensal) : null,
     data_admissao: r.data_admissao ?? null,
     data_demissao: r.data_demissao ?? null,
@@ -76,6 +78,7 @@ export async function getAllColaboradores(): Promise<Colaborador[]> {
       email,
       telefone,
       oab,
+      oab_uf,
       salario_mensal,
       to_char(data_admissao, 'DD/MM/YYYY') AS data_admissao,
       to_char(data_demissao, 'DD/MM/YYYY') AS data_demissao,
@@ -92,6 +95,38 @@ export async function getAllColaboradores(): Promise<Colaborador[]> {
   return rows.map(mapRow);
 }
 
+export interface AdvogadoParaDocumento {
+  nome: string;
+  oab: string;
+  oab_uf: string;
+}
+
+/**
+ * Advogados ativos com OAB completa (número + UF) — usado pra montar a
+ * variável {{advogados}} nos modelos de documento (contrato, procuração
+ * etc.). Só entra quem tem os dois campos preenchidos: "OAB (sem UF)" ou
+ * "UF sem número" não formam uma inscrição válida pra citar num documento
+ * jurídico, melhor ficar de fora do que aparecer incompleto/errado.
+ */
+export async function getAdvogadosParaDocumento(): Promise<
+  AdvogadoParaDocumento[]
+> {
+  const rows = await sql`
+    SELECT nome, oab, oab_uf
+    FROM colaboradores
+    WHERE status = 'ativo'
+      AND cargo IN ('advogado', 'advogado_associado')
+      AND oab IS NOT NULL AND oab != ''
+      AND oab_uf IS NOT NULL AND oab_uf != ''
+    ORDER BY nome ASC
+  `;
+  return rows.map((r) => ({
+    nome: String(r.nome),
+    oab: String(r.oab),
+    oab_uf: String(r.oab_uf).toUpperCase(),
+  }));
+}
+
 export async function getColaboradorFull(
   id: string
 ): Promise<ColaboradorFull | null> {
@@ -103,6 +138,7 @@ export async function getColaboradorFull(
       email,
       telefone,
       oab,
+      oab_uf,
       salario_mensal,
       to_char(data_admissao, 'DD/MM/YYYY')  AS data_admissao,
       to_char(data_admissao, 'YYYY-MM-DD')  AS data_admissao_iso,

@@ -62,13 +62,128 @@ const SUGESTOES = [
 const CLIENTE_PATH_RE =
   /^\/dashboard\/clientes\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
 
+// Posição arrastada, salva por dispositivo — só existe quando o usuário
+// já moveu o botão alguma vez; enquanto isso fica null e usa a posição
+// padrão (as classes fixed bottom-right do Tailwind).
+const POS_KEY = "lideradv-iris-pos";
+interface IrisPos {
+  right: number;
+  bottom: number;
+}
+const BUTTON_SIZE = 52; // 3.25rem
+const PANEL_GAP = 68; // altura do botão + respiro até o painel abrir acima
+
+function clampPos(pos: IrisPos): IrisPos {
+  if (typeof window === "undefined") return pos;
+  const maxRight = Math.max(8, window.innerWidth - BUTTON_SIZE - 8);
+  const maxBottom = Math.max(8, window.innerHeight - BUTTON_SIZE - 8);
+  return {
+    right: Math.min(Math.max(8, pos.right), maxRight),
+    bottom: Math.min(Math.max(8, pos.bottom), maxBottom),
+  };
+}
+
 export default function IrisFloating() {
   const [open, setOpen] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [input, setInput] = useState("");
+  // Botão fixo sempre no mesmo canto tampava conteúdo real da tela (ex:
+  // paginação da lista de Clientes) sem nenhum jeito de tirar do caminho —
+  // agora dá pra arrastar pra qualquer lugar, e a posição fica salva só
+  // neste navegador. Lazy initializer (não useEffect) pro mesmo padrão já
+  // usado em dashboard-shell.tsx — evita setState redundante logo após o
+  // primeiro render.
+  const [pos, setPos] = useState<IrisPos | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem(POS_KEY);
+      return saved ? clampPos(JSON.parse(saved)) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    startRight: number;
+    startBottom: number;
+    moved: boolean;
+  } | null>(null);
+  const justDraggedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const pathname = usePathname();
+
+  useEffect(() => {
+    function handleResize() {
+      setPos((p) => (p ? clampPos(p) : p));
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  function handlePointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    if (e.button !== undefined && e.button !== 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startRight: window.innerWidth - rect.right,
+      startBottom: window.innerHeight - rect.bottom,
+      moved: false,
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    const ds = dragRef.current;
+    if (!ds) return;
+    const dx = e.clientX - ds.startX;
+    const dy = e.clientY - ds.startY;
+    if (!ds.moved && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+    if (!ds.moved) setDragging(true);
+    ds.moved = true;
+    setPos(
+      clampPos({ right: ds.startRight - dx, bottom: ds.startBottom - dy })
+    );
+  }
+
+  function handlePointerUp() {
+    window.removeEventListener("pointermove", handlePointerMove);
+    window.removeEventListener("pointerup", handlePointerUp);
+    const ds = dragRef.current;
+    dragRef.current = null;
+    setDragging(false);
+    if (ds?.moved) {
+      // Depois de um pointerup com movimento, o navegador ainda dispara um
+      // evento click sintético em seguida — sem essa trava ele abriria o
+      // painel na hora, cancelando o efeito de "só arrastei, não cliquei".
+      justDraggedRef.current = true;
+      setPos((p) => {
+        if (p) {
+          try {
+            localStorage.setItem(POS_KEY, JSON.stringify(p));
+          } catch {
+            // sem espaço/permissão — não impede o uso, só não persiste
+          }
+        }
+        return p;
+      });
+    }
+  }
+
+  function handleButtonClick() {
+    // Clique real (mouse sem arrastar, toque, Enter/Espaço pelo teclado)
+    // sempre chega aqui — dragging é só rastreado via pointer events, que
+    // não existem pra ativação por teclado.
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false;
+      return;
+    }
+    setOpen((v) => !v);
+  }
   // Quando o usuário está numa página de cliente, avisa a Íris — ela usa
   // isso pra saber "de quem" o usuário está falando sem precisar nomear, e
   // pra já anexar automaticamente o documento no arquivo desse cliente
@@ -116,14 +231,21 @@ export default function IrisFloating() {
   return (
     <>
       <button
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Abrir Íris"
-        className={`fixed bottom-[4.75rem] right-4 z-40 flex h-13 w-13 items-center justify-center rounded-full shadow-lg transition-all duration-200 cursor-pointer lg:bottom-6 lg:right-6 ${
+        onPointerDown={handlePointerDown}
+        onClick={handleButtonClick}
+        aria-label="Abrir Íris (arraste pra mover)"
+        className={`fixed z-40 flex h-13 w-13 items-center justify-center rounded-full shadow-lg transition-colors duration-200 touch-none select-none ${
+          pos ? "" : "bottom-[4.75rem] right-4 lg:bottom-6 lg:right-6"
+        } ${dragging ? "cursor-grabbing" : "cursor-grab"} ${
           open
             ? "bg-slate-700 text-white scale-95"
             : "bg-violet-600 text-white hover:bg-violet-700 hover:scale-105"
         }`}
-        style={{ width: "3.25rem", height: "3.25rem" }}
+        style={{
+          width: "3.25rem",
+          height: "3.25rem",
+          ...(pos ? { right: pos.right, bottom: pos.bottom } : {}),
+        }}
       >
         {open ? (
           <XMarkIcon className="h-5 w-5" />
@@ -134,8 +256,15 @@ export default function IrisFloating() {
 
       {open && (
         <div
-          className="fixed bottom-[8.5rem] right-4 z-40 flex w-[calc(100vw-2rem)] max-w-sm flex-col rounded-2xl bg-white shadow-2xl border border-border overflow-hidden lg:bottom-20 lg:right-6"
-          style={{ height: "min(560px, calc(100dvh - 10rem))" }}
+          className={`fixed z-40 flex w-[calc(100vw-2rem)] max-w-sm flex-col rounded-2xl bg-white shadow-2xl border border-border overflow-hidden ${
+            pos ? "" : "bottom-[8.5rem] right-4 lg:bottom-20 lg:right-6"
+          }`}
+          style={{
+            height: "min(560px, calc(100dvh - 10rem))",
+            ...(pos
+              ? { right: pos.right, bottom: pos.bottom + PANEL_GAP }
+              : {}),
+          }}
         >
           <div className="flex items-center gap-3 border-b border-border bg-gradient-to-r from-violet-600 to-indigo-700 px-4 py-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20">

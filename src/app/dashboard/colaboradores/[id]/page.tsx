@@ -160,7 +160,16 @@ export default async function ColaboradorDetailPage({
           {colaborador.telefone && (
             <InfoRow label="Telefone" value={colaborador.telefone} />
           )}
-          {colaborador.oab && <InfoRow label="OAB" value={colaborador.oab} />}
+          {colaborador.oab && (
+            <InfoRow
+              label="OAB"
+              value={
+                colaborador.oab_uf
+                  ? `${colaborador.oab}/${colaborador.oab_uf}`
+                  : colaborador.oab
+              }
+            />
+          )}
           {colaborador.data_admissao && (
             <InfoRow label="Admissão" value={colaborador.data_admissao} />
           )}

@@ -6,6 +6,7 @@ import { createElement, type ReactElement } from "react";
 import { getModeloById } from "@/lib/modelos-db";
 import { getClientFull } from "@/lib/clients-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
+import { getAdvogadosParaDocumento } from "@/lib/colaboradores-db";
 import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
 import { applyFundoTimbrado } from "@/lib/pdf-fundo";
 import { ModeloPdfDoc } from "@/lib/modelo-pdf";
@@ -71,7 +72,8 @@ export async function GET(request: Request) {
   });
 
   // Build variable map
-  const vars = buildModeloVars(client, escritorioConfig, date);
+  const advogados = await getAdvogadosParaDocumento().catch(() => []);
+  const vars = buildModeloVars(client, escritorioConfig, date, advogados);
 
   // Replace all variables in content
   let conteudo = modelo.conteudo;

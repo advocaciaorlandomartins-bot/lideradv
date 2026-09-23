@@ -1,5 +1,19 @@
 import type { ClientFull } from "./clients-db";
 import type { EscritorioConfig } from "./escritorio-db";
+import type { AdvogadoParaDocumento } from "./colaboradores-db";
+
+function formatAdvogado(a: AdvogadoParaDocumento): string {
+  return `${a.nome}, inscrito(a) na OAB/${a.oab_uf} sob o nº ${a.oab}`;
+}
+
+// Junta em texto corrido no padrão jurídico ("Fulano, Ciclano e Beltrano")
+// em vez de vírgula solta no fim — usado quando mais de um advogado
+// precisa aparecer citado no mesmo parágrafo (contrato, procuração etc.).
+function joinComE(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  return `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}`;
+}
 
 /**
  * Mapa {{variavel}} → valor, usado tanto na geração de PDF (gerar-modelo)
@@ -10,7 +24,8 @@ import type { EscritorioConfig } from "./escritorio-db";
 export function buildModeloVars(
   client: ClientFull,
   escritorioConfig: EscritorioConfig,
-  date: string
+  date: string,
+  advogados: AdvogadoParaDocumento[] = []
 ): Record<string, string> {
   const addrParts = [
     client.street,
@@ -57,5 +72,9 @@ export function buildModeloVars(
     "{{responsavel_parentesco}}": client.responsavel_parentesco ?? "",
     "{{data_hoje}}": date,
     "{{advogado}}": escritorioConfig.nome,
+    // Todos os advogados/advogadas ativos com OAB completa (número + UF)
+    // cadastrada, prontos pra citar em procuração/contrato — antes só
+    // existia {{advogado}}, que é o nome do escritório, sem OAB nenhuma.
+    "{{advogados}}": joinComE(advogados.map(formatAdvogado)),
   };
 }

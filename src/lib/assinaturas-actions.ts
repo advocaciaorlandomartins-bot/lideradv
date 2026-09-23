@@ -12,6 +12,7 @@ import {
 import { getClientFull } from "./clients-db";
 import { getModeloById } from "./modelos-db";
 import { getEscritorioConfig } from "./escritorio-db";
+import { getAdvogadosParaDocumento } from "./colaboradores-db";
 import { buildModeloVars } from "./modelo-vars";
 import {
   blocksToHtml,
@@ -75,7 +76,8 @@ export async function salvarEnvelopeAction(
     year: "numeric",
     timeZone: "America/Sao_Paulo",
   });
-  const vars = buildModeloVars(client, escritorioConfig, date);
+  const advogados = await getAdvogadosParaDocumento().catch(() => []);
+  const vars = buildModeloVars(client, escritorioConfig, date, advogados);
 
   // A ordem de seleção no wizard já é a ordem de envio — só respeitamos o
   // "ordem" enviado por cada item, sem reordenar aqui.

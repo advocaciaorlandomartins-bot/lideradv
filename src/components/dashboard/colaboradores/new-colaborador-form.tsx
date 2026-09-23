@@ -203,9 +203,22 @@ export default function NewColaboradorForm() {
               <input
                 name="oab"
                 type="text"
-                placeholder="Ex: SP 123.456"
+                placeholder="Ex: 123456"
                 disabled={isPending}
                 className={inputClass}
+              />
+            </Field>
+          )}
+          {showOab && (
+            <Field label="UF da OAB">
+              <input
+                name="oab_uf"
+                type="text"
+                placeholder="Ex: AL"
+                maxLength={2}
+                disabled={isPending}
+                className={`${inputClass} uppercase`}
+                style={{ textTransform: "uppercase" }}
               />
             </Field>
           )}

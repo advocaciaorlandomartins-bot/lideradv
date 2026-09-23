@@ -34,6 +34,11 @@ function getFields(formData: FormData) {
     telefone:
       ((formData.get("telefone") as string | null) ?? "").trim() || null,
     oab: ((formData.get("oab") as string | null) ?? "").trim() || null,
+    oabUf:
+      ((formData.get("oab_uf") as string | null) ?? "")
+        .trim()
+        .toUpperCase()
+        .slice(0, 2) || null,
     salarioMensal: salarioRaw && Number(salarioRaw) > 0 ? salarioRaw : null,
     dataAdmissao: (formData.get("data_admissao") as string | null) || null,
     dataDemissao:
@@ -88,7 +93,7 @@ export async function createColaboradorAction(
   try {
     const rows = await sql`
       INSERT INTO colaboradores (
-        nome, cargo, email, telefone, oab, salario_mensal, data_admissao,
+        nome, cargo, email, telefone, oab, oab_uf, salario_mensal, data_admissao,
         data_demissao, status, observacoes,
         comissao_administrativo_pct, comissao_judicial_pct, comissao_ambos_pct,
         meta1_valor, meta1_bonus, meta2_valor, meta2_bonus, meta3_valor, meta3_bonus
@@ -99,6 +104,7 @@ export async function createColaboradorAction(
         ${f.email},
         ${f.telefone},
         ${f.oab},
+        ${f.oabUf},
         ${f.salarioMensal ? f.salarioMensal : null}::numeric,
         ${f.dataAdmissao ? f.dataAdmissao : null}::date,
         ${f.dataDemissao ? f.dataDemissao : null}::date,
@@ -181,6 +187,7 @@ export async function updateColaboradorAction(
         email                        = ${f.email},
         telefone                     = ${f.telefone},
         oab                          = ${f.oab},
+        oab_uf                       = ${f.oabUf},
         salario_mensal               = ${f.salarioMensal ? f.salarioMensal : null}::numeric,
         data_admissao                = ${f.dataAdmissao ? f.dataAdmissao : null}::date,
         data_demissao                = ${f.dataDemissao ? f.dataDemissao : null}::date,

@@ -5,6 +5,7 @@ import sql from "@/lib/db";
 import { getClientFull } from "@/lib/clients-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
+import { getAdvogadosParaDocumento } from "@/lib/colaboradores-db";
 import { buildModeloVars } from "@/lib/modelo-vars";
 import {
   blocksToHtml,
@@ -186,7 +187,8 @@ export async function POST(req: NextRequest) {
       year: "numeric",
       timeZone: "America/Sao_Paulo",
     });
-    const vars = buildModeloVars(client, escritorioConfig, dataHoje);
+    const advogados = await getAdvogadosParaDocumento().catch(() => []);
+    const vars = buildModeloVars(client, escritorioConfig, dataHoje, advogados);
     const html = modelo.conteudo_blocks
       ? blocksToHtml(substituteVariablesInBlocks(modelo.conteudo_blocks, vars))
       : (() => {

@@ -146,15 +146,14 @@ export interface ClientesResumo {
 }
 
 // Mesmo critério de posse de getAllClients/getClientesCount (clients-db.ts):
-// sem "ver todos", só conta cliente com processo próprio, ou sem processo
-// nenhum ainda (ninguém "dono" ainda). Reaproveitado em todas as consultas
-// de clientes da Controladoria — a versão anterior deixava tudo sempre no
-// número do escritório inteiro, inconsistente com /dashboard/clientes.
+// sem "ver todos", só conta cliente com processo próprio — sem exceção
+// pra cliente sem processo nenhum (esses ficam só pra quem tem "ver
+// todos"). Reaproveitado em todas as consultas de clientes da
+// Controladoria, pra bater com /dashboard/clientes.
 function donoClauseFor(cid: string | null) {
   return sql`
     (
       ${cid}::uuid IS NULL
-      OR NOT EXISTS (SELECT 1 FROM processos p2 WHERE p2.client_id = clients.id AND p2.deleted_at IS NULL)
       OR EXISTS (
         SELECT 1 FROM processos p2
         WHERE p2.client_id = clients.id AND p2.deleted_at IS NULL AND p2.responsavel_id = ${cid}::uuid

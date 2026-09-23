@@ -289,6 +289,10 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
       pj: clients.filter((c) => c.type === "PJ").length,
       inativos: clients.filter((c) => c.status === "inativo").length,
       comProcessos: clients.filter((c) => c.processes > 0).length,
+      // "Sem responsável" (0 processos) — pedido explícito do dono do
+      // sistema: ele quer ver de cara quantos clientes ainda não têm
+      // ninguém definido como responsável, pra ir e atribuir.
+      semProcesso: clients.filter((c) => c.processes === 0).length,
     }),
     [clients]
   );
@@ -492,10 +496,22 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
       count: kpiCounts.comProcessos,
       color: "text-emerald-600",
     },
+    {
+      key: "semProcesso" as const,
+      label: "Sem responsável",
+      count: kpiCounts.semProcesso,
+      color: "text-amber-600",
+    },
   ];
 
   // KPI card click maps to status/type filter
-  type KpiKey = "todos" | "pf" | "pj" | "inativos" | "comProcessos";
+  type KpiKey =
+    | "todos"
+    | "pf"
+    | "pj"
+    | "inativos"
+    | "comProcessos"
+    | "semProcesso";
   const [activeKpi, setActiveKpi] = useState<KpiKey>("todos");
 
   function handleKpi(k: KpiKey) {
@@ -522,13 +538,18 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
       const f = { ...FILTRO_CLIENTE_INICIAL, comProcessos: "sim" as const };
       setFiltrosAtivos(f);
       setFiltroLocal(f);
+    } else if (k === "semProcesso") {
+      setStatusFilter("todos");
+      const f = { ...FILTRO_CLIENTE_INICIAL, comProcessos: "nao" as const };
+      setFiltrosAtivos(f);
+      setFiltroLocal(f);
     }
   }
 
   return (
     <div className="space-y-4">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {KPI_ITEMS.map((k) => (
           <KpiCard
             key={k.key}

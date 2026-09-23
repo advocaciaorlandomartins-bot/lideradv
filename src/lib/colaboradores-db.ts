@@ -104,9 +104,12 @@ export interface AdvogadoParaDocumento {
 /**
  * Advogados ativos com OAB completa (número + UF) — usado pra montar a
  * variável {{advogados}} nos modelos de documento (contrato, procuração
- * etc.). Só entra quem tem os dois campos preenchidos: "OAB (sem UF)" ou
- * "UF sem número" não formam uma inscrição válida pra citar num documento
- * jurídico, melhor ficar de fora do que aparecer incompleto/errado.
+ * etc.). Não filtra por cargo: quem administra o escritório também pode
+ * ser advogado(a) inscrito(a) (cargo "Administrador" não é sinônimo de
+ * "não é advogado") — o próprio preenchimento da OAB já é o sinal de que
+ * a pessoa deve entrar na lista. Só entra quem tem os dois campos
+ * preenchidos: "OAB (sem UF)" ou "UF sem número" não formam uma
+ * inscrição válida pra citar num documento jurídico.
  */
 export async function getAdvogadosParaDocumento(): Promise<
   AdvogadoParaDocumento[]
@@ -115,7 +118,6 @@ export async function getAdvogadosParaDocumento(): Promise<
     SELECT nome, oab, oab_uf
     FROM colaboradores
     WHERE status = 'ativo'
-      AND cargo IN ('advogado', 'advogado_associado')
       AND oab IS NOT NULL AND oab != ''
       AND oab_uf IS NOT NULL AND oab_uf != ''
     ORDER BY nome ASC

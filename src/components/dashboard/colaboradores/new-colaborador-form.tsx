@@ -68,8 +68,6 @@ const CARGO_DESCS: Record<CargoColaborador, string> = {
   comercial: "Captação e relacionamento comercial",
 };
 
-const CARGOS_COM_OAB: CargoColaborador[] = ["advogado", "advogado_associado"];
-
 export default function NewColaboradorForm() {
   const [state, formAction, isPending] = useActionState<
     ColaboradorFormState,
@@ -85,7 +83,11 @@ export default function NewColaboradorForm() {
 
   const isCustom = selectedCargo === "__custom__";
   const cargoValue = isCustom ? customCargo.trim() : selectedCargo;
-  const showOab = CARGOS_COM_OAB.includes(selectedCargo as CargoColaborador);
+  // OAB não é exclusivo de cargo "advogado" — quem administra o
+  // escritório também pode ser advogado(a) inscrito(a) (ex: sócio(a)
+  // fundador(a) com cargo "Administrador"), e cargo aceita texto livre
+  // (isCustom acima), então travar por uma lista fixa de cargos sempre
+  // vai deixar alguém de fora. Campo opcional, mostrado pra todo mundo.
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
@@ -198,30 +200,26 @@ export default function NewColaboradorForm() {
               className={inputClass}
             />
           </Field>
-          {showOab && (
-            <Field label="Número OAB">
-              <input
-                name="oab"
-                type="text"
-                placeholder="Ex: 123456"
-                disabled={isPending}
-                className={inputClass}
-              />
-            </Field>
-          )}
-          {showOab && (
-            <Field label="UF da OAB">
-              <input
-                name="oab_uf"
-                type="text"
-                placeholder="Ex: AL"
-                maxLength={2}
-                disabled={isPending}
-                className={`${inputClass} uppercase`}
-                style={{ textTransform: "uppercase" }}
-              />
-            </Field>
-          )}
+          <Field label="Número OAB">
+            <input
+              name="oab"
+              type="text"
+              placeholder="Ex: 123456"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="UF da OAB">
+            <input
+              name="oab_uf"
+              type="text"
+              placeholder="Ex: AL"
+              maxLength={2}
+              disabled={isPending}
+              className={`${inputClass} uppercase`}
+              style={{ textTransform: "uppercase" }}
+            />
+          </Field>
         </div>
       </div>
 

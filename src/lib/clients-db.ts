@@ -37,9 +37,6 @@ export async function getClientesCount(
     WHERE c.deleted_at IS NULL
       AND (
         ${podeVerTodos}
-        OR NOT EXISTS (
-          SELECT 1 FROM processos p2 WHERE p2.client_id = c.id AND p2.deleted_at IS NULL
-        )
         OR EXISTS (
           SELECT 1 FROM processos p2
           WHERE p2.client_id = c.id AND p2.deleted_at IS NULL
@@ -60,11 +57,12 @@ function formatDate(date: Date): string {
 
 /**
  * Sem "clientes_ver_todos", só entra cliente com pelo menos um processo em
- * que o colaborador é responsável — cliente sem processo nenhum ainda
- * (ninguém "dono" ainda) fica visível pra todo mundo, mesmo critério já
- * usado em podeAcessarCliente (acesso.ts) e em controle sem responsável
- * no Minhas Tarefas. podeVerTodos=true (padrão) preserva o comportamento
- * anterior pra quem chama sem passar os novos parâmetros.
+ * que o colaborador é responsável — cliente sem processo nenhum ainda não
+ * aparece (fica só pra quem tem "ver todos"). Já teve uma versão que
+ * deixava cliente sem dono visível pra todo mundo, mas o dono do sistema
+ * corrigiu: "só os que são realmente dela" é pra valer sem exceção.
+ * podeVerTodos=true (padrão) preserva o comportamento anterior pra quem
+ * chama sem passar os novos parâmetros.
  */
 export async function getAllClients(
   podeVerTodos: boolean = true,
@@ -97,9 +95,6 @@ export async function getAllClients(
     WHERE c.deleted_at IS NULL
       AND (
         ${podeVerTodos}
-        OR NOT EXISTS (
-          SELECT 1 FROM processos p2 WHERE p2.client_id = c.id AND p2.deleted_at IS NULL
-        )
         OR EXISTS (
           SELECT 1 FROM processos p2
           WHERE p2.client_id = c.id AND p2.deleted_at IS NULL

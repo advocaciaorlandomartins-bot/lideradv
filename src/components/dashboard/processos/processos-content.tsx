@@ -910,16 +910,7 @@ export default function ProcessosContent({
                   <tr className="border-b border-border bg-slate-50/50">
                     <th className="px-5 py-3 text-left">
                       <SortButton
-                        label="Processo"
-                        sortKey="tipo_acao"
-                        current={sortKey}
-                        dir={sortDir}
-                        onChange={handleSort}
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left">
-                      <SortButton
-                        label="Cliente"
+                        label="Cliente / Processo"
                         sortKey="client_name"
                         current={sortKey}
                         dir={sortDir}
@@ -927,10 +918,7 @@ export default function ProcessosContent({
                       />
                     </th>
                     <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      Vara / Comarca
-                    </th>
-                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                      Distribuição
+                      Vara / Distribuição
                     </th>
                     <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
                       Status
@@ -989,25 +977,41 @@ export default function ProcessosContent({
                                 }`}
                               />
                             </div>
-                            <div className="min-w-0">
-                              {p.numero ? (
-                                <p className="font-mono text-xs text-muted">
-                                  {p.numero}
-                                </p>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded px-1 py-0.5 font-body text-[10px] font-semibold text-amber-600 bg-amber-50">
-                                  <ExclamationCircleIcon className="h-2.5 w-2.5" />
-                                  Sem CNJ
+                            <div className="min-w-0 flex-1">
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(
+                                    `/dashboard/clientes/${p.client_id}`
+                                  );
+                                }}
+                                className="flex cursor-pointer items-center gap-1.5 font-body text-sm font-semibold text-fg hover:text-primary"
+                              >
+                                <UsersIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted" />
+                                <span className="truncate">
+                                  {p.client_name}
                                 </span>
-                              )}
-                              <p className="truncate font-body text-sm font-semibold text-fg">
+                              </span>
+                              <p className="mt-0.5 truncate font-body text-xs text-muted">
                                 {p.tipo_acao}
                               </p>
-                              <span
-                                className={`mt-0.5 inline-block rounded px-1.5 py-0.5 font-body text-[11px] font-bold ${areaColor(p.area)}`}
-                              >
-                                {p.area}
-                              </span>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                {p.numero ? (
+                                  <span className="font-mono text-[11px] text-muted">
+                                    {p.numero}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded px-1 py-0.5 font-body text-[10px] font-semibold text-amber-600 bg-amber-50">
+                                    <ExclamationCircleIcon className="h-2.5 w-2.5" />
+                                    Sem CNJ
+                                  </span>
+                                )}
+                                <span
+                                  className={`inline-block rounded px-1.5 py-0.5 font-body text-[11px] font-bold ${areaColor(p.area)}`}
+                                >
+                                  {p.area}
+                                </span>
+                              </div>
                               {p.cid_principal && (
                                 <p
                                   className="mt-0.5 truncate font-body text-[11px] font-semibold text-violet-700"
@@ -1022,20 +1026,6 @@ export default function ProcessosContent({
                           </div>
                         </td>
                         <td className="px-4 py-3.5">
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/dashboard/clientes/${p.client_id}`);
-                            }}
-                            className="flex cursor-pointer items-center gap-1.5 font-body text-sm text-fg hover:text-primary"
-                          >
-                            <UsersIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted" />
-                            <span className="max-w-[140px] truncate">
-                              {p.client_name}
-                            </span>
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
                           <div className="font-body text-sm">
                             {p.vara ? (
                               <span className="block max-w-[160px] truncate text-fg">
@@ -1045,23 +1035,17 @@ export default function ProcessosContent({
                               <span className="text-muted">—</span>
                             )}
                             {p.comarca && (
-                              <span className="text-xs text-muted">
+                              <span className="block text-xs text-muted">
                                 {p.comarca}
                               </span>
                             )}
+                            {p.data_distribuicao && (
+                              <span className="mt-0.5 flex items-center gap-1.5 font-body text-xs text-muted">
+                                <CalendarIcon className="h-3 w-3" />
+                                {p.data_distribuicao}
+                              </span>
+                            )}
                           </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          {p.data_distribuicao ? (
-                            <span className="flex items-center gap-1.5 font-body text-sm text-fg">
-                              <CalendarIcon className="h-3.5 w-3.5 text-muted" />
-                              {p.data_distribuicao}
-                            </span>
-                          ) : (
-                            <span className="font-body text-sm text-muted">
-                              —
-                            </span>
-                          )}
                         </td>
                         <td className="px-4 py-3.5">
                           <StatusBadge status={p.status} />
@@ -1119,8 +1103,11 @@ export default function ProcessosContent({
                       <FolderOpenIcon className="h-5 w-5 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-body text-sm font-semibold text-fg">
+                      <p className="truncate font-body text-sm font-semibold text-fg">
+                        {p.client_name}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <p className="truncate font-body text-xs text-muted">
                           {p.tipo_acao}
                         </p>
                         <span
@@ -1129,9 +1116,6 @@ export default function ProcessosContent({
                           {p.area}
                         </span>
                       </div>
-                      <p className="truncate font-body text-xs text-muted">
-                        {p.client_name}
-                      </p>
                       {p.numero && (
                         <p className="font-mono text-xs text-slate-400">
                           {p.numero}

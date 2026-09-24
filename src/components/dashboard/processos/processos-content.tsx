@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Processo } from "@/lib/processos-db";
+import { descreverCid } from "@/lib/cid-map";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -1007,6 +1008,16 @@ export default function ProcessosContent({
                               >
                                 {p.area}
                               </span>
+                              {p.cid_principal && (
+                                <p
+                                  className="mt-0.5 truncate font-body text-[11px] font-semibold text-violet-700"
+                                  title={`CID ${p.cid_principal}${descreverCid(p.cid_principal) ? ` — ${descreverCid(p.cid_principal)}` : ""}`}
+                                >
+                                  CID {p.cid_principal}
+                                  {descreverCid(p.cid_principal) &&
+                                    ` — ${descreverCid(p.cid_principal)}`}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1124,6 +1135,13 @@ export default function ProcessosContent({
                       {p.numero && (
                         <p className="font-mono text-xs text-slate-400">
                           {p.numero}
+                        </p>
+                      )}
+                      {p.cid_principal && (
+                        <p className="truncate font-body text-[11px] font-semibold text-violet-700">
+                          CID {p.cid_principal}
+                          {descreverCid(p.cid_principal) &&
+                            ` — ${descreverCid(p.cid_principal)}`}
                         </p>
                       )}
                       <div className="mt-1">

@@ -38,6 +38,9 @@ export interface Processo {
   dcb: string | null;
   /** Etiquetas no formato "CATEGORIA:VALOR" — próprias do processo + herdadas do cliente vinculado. */
   etiquetas: string[];
+  // Diagnóstico herdado do cadastro do cliente, pra priorizar visualmente
+  // qual processo tratar primeiro direto na listagem.
+  cid_principal: string | null;
 }
 
 export interface ProcessoFull extends Processo {
@@ -93,6 +96,7 @@ function mapRow(r: any): Processo {
     dib: r.dib ? String(r.dib).slice(0, 10) : null,
     dcb: r.dcb ? String(r.dcb).slice(0, 10) : null,
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
+    cid_principal: r.cid_principal ?? null,
   };
 }
 
@@ -154,6 +158,7 @@ export async function getAllProcessos(
           to_char(p.der, 'YYYY-MM-DD') AS der,
           to_char(p.dib, 'YYYY-MM-DD') AS dib,
           to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+          c.cid_principal,
           (
             SELECT COALESCE(array_agg(DISTINCT e.categoria || ':' || e.valor), ARRAY[]::text[])
             FROM etiquetas e
@@ -198,6 +203,7 @@ export async function getAllProcessos(
           to_char(p.der, 'YYYY-MM-DD') AS der,
           to_char(p.dib, 'YYYY-MM-DD') AS dib,
           to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+          c.cid_principal,
           (
             SELECT COALESCE(array_agg(DISTINCT e.categoria || ':' || e.valor), ARRAY[]::text[])
             FROM etiquetas e

@@ -1,5 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { extractText } from "./anthropic-text";
 
 function getClient(): Anthropic {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -93,7 +94,7 @@ Retorne APENAS um JSON com a estrutura EXATA abaixo (nenhum texto fora do JSON, 
     temPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
   );
 
-  const fullText = res.content[0]?.type === "text" ? res.content[0].text : "{}";
+  const fullText = extractText(res) || "{}";
 
   // Normaliza um item de "quesitos" pra string legível mesmo se a IA
   // devolver um objeto em vez de string (ex: {texto: "..."}) — sem isso

@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "./db";
 import { logAction } from "./audit";
+import { extractText } from "./anthropic-text";
 
 /**
  * Preenchimento automático do cadastro do cliente a partir de dado
@@ -309,8 +310,7 @@ export async function analisarDocumentoCliente(
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
   );
-  const rawText =
-    aiResp.content[0].type === "text" ? aiResp.content[0].text : "";
+  const rawText = extractText(aiResp);
   const match = rawText.match(/\{[\s\S]*\}/);
   if (!match) return { camposPreenchidos: [] };
 

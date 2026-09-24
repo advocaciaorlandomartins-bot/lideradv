@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
+import { extractText } from "@/lib/anthropic-text";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -210,10 +211,7 @@ Retorne APENAS um JSON válido com esta estrutura (sem markdown, sem explicaçõ
         ],
       });
 
-      const text =
-        response.content[0].type === "text"
-          ? response.content[0].text.trim()
-          : "";
+      const text = extractText(response).trim();
       const jsonStr = text
         .replace(/^```json\s*/i, "")
         .replace(/```\s*$/, "")

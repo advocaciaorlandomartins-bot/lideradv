@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
 import { aplicarCamposClienteSeVazios } from "./cliente-documento-auto";
+import { extractText } from "./anthropic-text";
 
 function getClaudeClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -2298,9 +2299,7 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
   );
 
   const rawAnalise =
-    aiResp.content[0].type === "text"
-      ? aiResp.content[0].text
-      : "Não foi possível analisar o documento.";
+    extractText(aiResp) || "Não foi possível analisar o documento.";
 
   // Extrai o bloco JSON de CAMPOS_JSON e separa do texto narrativo
   let extracted: Record<string, unknown> = {};
@@ -2472,7 +2471,7 @@ Dispositivo que fundamenta a providência.`;
     messages: [{ role: "user", content: prompt }],
   });
 
-  const texto = resp.content[0].type === "text" ? resp.content[0].text : "";
+  const texto = extractText(resp);
   const urgente = /URGENTE:\s*Sim/i.test(texto);
   const prazo =
     texto.match(/## PRAZO\n([\s\S]*?)(?=\n##|$)/i)?.[1]?.trim() ?? null;
@@ -2619,7 +2618,7 @@ Responda SOMENTE o JSON abaixo (sem markdown, sem texto fora do JSON):
     messages: [{ role: "user", content: prompt }],
   });
 
-  const texto = resp.content[0].type === "text" ? resp.content[0].text : "{}";
+  const texto = extractText(resp) || "{}";
   let ap: {
     argumentos_vencedores?: string[];
     erros_cometidos?: string[];

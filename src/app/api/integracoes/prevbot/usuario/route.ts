@@ -11,6 +11,7 @@ import {
   TIPO_LABELS_COMP,
 } from "@/lib/compromissos-db";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
+import { extractText } from "@/lib/anthropic-text";
 
 export const dynamic = "force-dynamic";
 
@@ -400,8 +401,7 @@ export async function POST(req: NextRequest) {
       messages: [{ role: "user", content: userContent }],
     });
 
-    const rawText =
-      aiResp.content[0].type === "text" ? aiResp.content[0].text.trim() : "{}";
+    const rawText = extractText(aiResp).trim() || "{}";
 
     let result: AIResult;
     try {

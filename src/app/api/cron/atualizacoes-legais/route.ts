@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { extractText } from "@/lib/anthropic-text";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -191,8 +192,7 @@ impacto baixo = informativo sem efeito prático imediato`,
       ],
     });
 
-    const raw =
-      msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
+    const raw = extractText(msg).trim();
     const jsonStr = raw.includes("{")
       ? raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)
       : raw;

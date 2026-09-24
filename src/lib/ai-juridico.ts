@@ -10,6 +10,7 @@ import type { ProcessoFull } from "./processos-db";
 import type { EscritorioConfig } from "./escritorio-db";
 import type { SkillId } from "./ai-juridico-skills";
 import { SKILLS } from "./ai-juridico-skills";
+import { extractText } from "./anthropic-text";
 
 export type { SkillId, Skill, EstrategiaResult } from "./ai-juridico-skills";
 export { SKILLS } from "./ai-juridico-skills";
@@ -294,10 +295,7 @@ Responda em português, com formatação markdown clara.`,
   );
   const res = await stream.finalMessage();
 
-  const block = res.content[0];
-  return block?.type === "text"
-    ? block.text
-    : "Não foi possível analisar o documento.";
+  return extractText(res) || "Não foi possível analisar o documento.";
 }
 
 // ─── Análise com extração de dados previdenciários ──────────────────────────────
@@ -443,10 +441,7 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
   );
   const res = await stream.finalMessage();
 
-  const fullText =
-    res.content[0]?.type === "text"
-      ? res.content[0].text
-      : "Não foi possível analisar o documento.";
+  const fullText = extractText(res) || "Não foi possível analisar o documento.";
 
   // Extrai o bloco JSON de dados previdenciários
   // Tenta múltiplos padrões para robustez contra variações de formatação do AI
@@ -539,10 +534,7 @@ Seja objetivo e cirúrgico — o advogado precisa saber exatamente o que melhora
     ],
   });
 
-  const block = res.content[0];
-  return block?.type === "text"
-    ? block.text
-    : "Não foi possível revisar a petição.";
+  return extractText(res) || "Não foi possível revisar a petição.";
 }
 
 // ─── Correção de petição ────────────────────────────────────────────────────────
@@ -591,8 +583,7 @@ Responda APENAS com a petição corrigida completa, sem comentários ou explica�
     ],
   });
 
-  const block = res.content[0];
-  return block?.type === "text" ? block.text : params.textoPeticao;
+  return extractText(res) || params.textoPeticao;
 }
 
 // ─── Estratégia processual ──────────────────────────────────────────────────────
@@ -643,8 +634,7 @@ Base a análise em TODOS os dados disponíveis acima. Seja realista e específic
   });
   const res = await stream.finalMessage();
 
-  const block = res.content[0];
-  const raw = block?.type === "text" ? block.text : "{}";
+  const raw = extractText(res) || "{}";
 
   try {
     const match = raw.match(/\{[\s\S]*\}/);

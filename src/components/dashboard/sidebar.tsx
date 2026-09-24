@@ -155,6 +155,12 @@ const GROUPS: {
         modulo: null,
       },
       {
+        href: "/dashboard/meus-dados",
+        icon: UsersIcon,
+        label: "Meus Dados",
+        modulo: null,
+      },
+      {
         href: "/dashboard/meu-financeiro",
         icon: CurrencyIcon,
         label: "Meu Financeiro",

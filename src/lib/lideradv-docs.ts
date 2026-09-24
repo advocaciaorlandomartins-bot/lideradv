@@ -10,7 +10,7 @@ MENU LATERAL — ITENS EXATOS
 Grupo Jurídico: Agenda · Clientes · Processos · Publicações · Controles (inclui aba Perícias) · Leis & DOU
 Grupo Negócios: CRM · Produção · Financeiro
 Grupo Documentos: Modelos · Assinaturas · PDFs
-Grupo Equipe: Minhas Tarefas · Meu Financeiro · Colaboradores · Teste DISC
+Grupo Equipe: Minhas Tarefas · Meu Financeiro · Meus Dados · Colaboradores · Teste DISC
 Grupo Sistema: Gerenciador · Controladoria · Auditoria · Relatórios · Integrações · Usuários · Configurações
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -21,6 +21,7 @@ MÓDULOS DO SISTEMA
 - Página inicial com saudação + data
 - Ações rápidas: "Novo cliente", "Novo processo", "Novo lead", "Financeiro", "Gerenciador"
 - Mostra: alertas previdenciários (DCB próxima), KPI cards, aniversariantes, funil CRM, próximos prazos, resumo financeiro, gráfico receitas×despesas, clientes em débito, e-mails recentes, lançamentos vencidos, mini-calendário com prazos/controles (pontinho âmbar) e compromissos (pontinho azul)
+- O resumo financeiro do Dashboard só mostra os números do escritório inteiro (receita/saldo/gráfico/clientes em débito) pra quem tem a permissão "ver financeiro no dashboard" (por padrão, só Administrador/Sócio). Quem não tem — ex: Advogado(a) — vê em vez disso um card "Meu Resumo Financeiro" com os valores pessoais dele (via Meu Financeiro), nunca o agregado do escritório
 - Banner de tarefas pendentes atribuídas ao usuário
 
 ## CLIENTES (menu: Jurídico → Clientes)
@@ -172,6 +173,7 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Quando lançamento de honorário tem cliente com telefone cadastrado: sistema agenda lembretes de cobrança por WhatsApp automaticamente (antes do vencimento)
 - Registrar pagamento: no lançamento → "Registrar Pagamento" → sistema envia confirmação ao cliente por WhatsApp
 - Quando um lançamento de honorário do cliente (vinculado a um processo) é marcado como pago, o sistema gera automaticamente a comissão do colaborador responsável (percentual configurado no cadastro dele, pela fase do processo) como uma remuneração "Pendente" em Remunerações — se o cliente pagar parcelado, cada parcela paga gera sua própria comissão pendente, na mesma cadência
+- "Aguardando resultado" (checkbox ao lançar uma receita): pra honorário combinado mas cujo valor final só se sabe quando sair o resultado (judicial/administrativo) — fica sem data de vencimento, listado numa seção separada em Lançamentos. Botão "Registrar resultado" reabre o lançamento com o detalhamento originalmente combinado (percentual, retroativo, salários) pré-preenchido, pra ajustar só o que mudou; ao salvar, cancela o "aguardando" e cria o lançamento final. Botão "Corrigir valor combinado" edita o valor/categoria do próprio lançamento aguardando, sem mudar o status
 
 ## MEU FINANCEIRO (menu: Equipe → Meu Financeiro)
 - Visão financeira pessoal do colaborador logado
@@ -182,7 +184,7 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Documentos padrão do escritório: procurações, contratos, declarações, petições, etc. — mala-direta com variáveis {{nome}} etc, diferente do "Dr. Lex" do Cérebro Jurídico (que gera peça específica com dados reais e argumentação, não um molde)
 - Botão "Novo Modelo" → formulário com título, categoria, editor de texto rico, toggle "Papel timbrado"
 - Categorias: Contratos · Procurações · Declarações · Notificações · Petições · Previdenciário · Família · Trabalhista · Outro
-- Variáveis automáticas: Cliente ({{nome}}, {{cpf_cnpj}}, {{email}}, {{telefone}}, {{data_nascimento}}, {{rg}}, {{estado_civil}}, {{profissao}}, {{nacionalidade}}), Responsável ({{responsavel_nome}}, {{responsavel_cpf}}, {{responsavel_rg}}, {{responsavel_telefone}}, {{responsavel_parentesco}}), Endereço ({{endereco}}, {{endereco_completo}}, {{bairro}}, {{cidade}}, {{estado}}, {{cep}}), Geral ({{data_hoje}}, {{advogado}})
+- Variáveis automáticas: Cliente ({{nome}}, {{cpf_cnpj}}, {{email}}, {{telefone}}, {{data_nascimento}}, {{rg}}, {{estado_civil}}, {{profissao}}, {{nacionalidade}}), Responsável ({{responsavel_nome}}, {{responsavel_cpf}}, {{responsavel_rg}}, {{responsavel_telefone}}, {{responsavel_parentesco}}), Endereço ({{endereco}}, {{endereco_completo}}, {{bairro}}, {{cidade}}, {{estado}}, {{cep}}), Geral ({{data_hoje}}, {{advogado}} = nome do escritório, {{advogados}} = todos os advogados ativos com OAB/UF e cidade cadastrados, em texto corrido pronto pra citar numa procuração/contrato)
 - Gerar modelo com IA: botão "Gerar com IA" → envia arquivo de exemplo (PDF/imagem) ou cola texto → a IA reconstrói o documento em blocos formatados e insere as variáveis certas, preservando ao máximo a redação original (inclusive caixas em formato pergunta/resposta, se o exemplo tiver) — documentos gerados são sempre em preto e branco, sem cor de destaque
 - Para usar com um cliente: aba Documentos do cliente → "Gerar Documento" → escolhe o modelo → variáveis preenchidas automaticamente
 
@@ -205,8 +207,15 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 ## COLABORADORES (menu: Equipe → Colaboradores)
 - Lista de todos os colaboradores do escritório
 - Botão "Novo Colaborador" → formulário com nome, categoria (Administrador, Sócio, Advogado, Estagiário, Colaborador), permissões
+- Campos "Número OAB", "UF da OAB" e "Cidade (para documentos)" — disponíveis pra qualquer cargo (inclusive Administrador/Sócio, que também podem ser advogados inscritos), não só pra quem tem cargo "Advogado". Quem tem os 3 campos preenchidos e status ativo entra automaticamente na variável {{advogados}} usada em Modelos de Documentos
 - Cadastro/edição: seção "Comissão por fase do processo" (% administrativo, judicial, ou ambos) e seção "Metas com bônus escalonado" — até 3 faixas (Meta 1/2/3), cada uma com valor de comissão recebida no mês e bônus correspondente; é cumulativo (bater a Meta 2 soma o bônus da Meta 1 + o da Meta 2)
 - Na página do colaborador: card "Meta do mês" mostra a comissão recebida até agora, meta atingida e valor do bônus; botão "Gerar bônus do mês" cria uma "Bonificação" pendente em Remunerações (geração sempre manual)
+- Na página do colaborador também aparece a seção "Arquivos" (documentos do colaborador — ex: contrato de parceria assinado), visível só pro próprio colaborador ou administrador
+
+## MEUS DADOS (menu: Equipe → Meus Dados)
+- Autoatendimento do colaborador logado: dados de contato/endereço (telefone, e-mail, CEP, rua, número, complemento, bairro, cidade, UF) que ele mesmo pode manter atualizados, sem depender do administrador
+- Nome, cargo, OAB e status aparecem só como leitura (quem altera isso é o administrador em Colaboradores)
+- Seção "Meus Arquivos" — mesma área de documentos que aparece na página do colaborador em Colaboradores (ex: contrato de parceria assinado, guardado pra fins de comprovação)
 
 ## TESTE DISC (menu: Equipe → Teste DISC)
 - Testes comportamentais para seleção de colaboradores (metodologia DISC)

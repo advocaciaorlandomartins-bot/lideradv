@@ -115,6 +115,16 @@ interface ProcessoOption {
   valor_causa: number | null;
 }
 
+interface CombinadoMeta {
+  payment_mode?: string;
+  valor_retroativo?: number;
+  percentual_adv?: number;
+  salario_base?: string;
+  percentual_salario?: number;
+  num_salarios?: number;
+  salario_custom?: number | null;
+}
+
 interface Props {
   clients: ClientOption[];
   processos: ProcessoOption[];
@@ -125,6 +135,7 @@ interface Props {
   redirectTo?: string;
   cancelAguardando?: string;
   valorInicial?: string;
+  prefillMeta?: CombinadoMeta | null;
 }
 
 export default function NewLancamentoForm({
@@ -137,6 +148,7 @@ export default function NewLancamentoForm({
   redirectTo,
   cancelAguardando,
   valorInicial,
+  prefillMeta,
 }: Props) {
   const [state, formAction, isPending] = useActionState<
     LancamentoFormState,
@@ -226,11 +238,30 @@ export default function NewLancamentoForm({
   const [valorEntrada, setValorEntrada] = useState("");
   const [totalParcelas, setTotalParcelas] = useState("1");
   const [valorEntradaMensalidade, setValorEntradaMensalidade] = useState("");
-  const [numSalarios, setNumSalarios] = useState("1");
+  const [numSalarios, setNumSalarios] = useState(
+    prefillMeta?.num_salarios ? String(prefillMeta.num_salarios) : "1"
+  );
   const [salarioBase, setSalarioBase] = useState<
     "none" | "minimo" | "custom" | "recorrente"
-  >("none");
-  const [salarioCustomInput, setSalarioCustomInput] = useState("");
+  >(
+    prefillMeta?.salario_base &&
+      ["none", "minimo", "custom", "recorrente"].includes(
+        prefillMeta.salario_base
+      )
+      ? (prefillMeta.salario_base as
+          | "none"
+          | "minimo"
+          | "custom"
+          | "recorrente")
+      : "none"
+  );
+  const [salarioCustomInput, setSalarioCustomInput] = useState(
+    prefillMeta?.salario_custom
+      ? prefillMeta.salario_custom.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        })
+      : ""
+  );
   const [jaRecebida, setJaRecebida] = useState(false);
   const [aguardandoResultado, setAguardandoResultado] = useState(false);
   const [comissaoModoPag, setComissaoModoPag] = useState<"auto" | "avista">(
@@ -239,10 +270,24 @@ export default function NewLancamentoForm({
   const [comissaoValorCustomInput, setComissaoValorCustomInput] = useState("");
 
   // ── Novos modos ────────────────────────────────────────────
-  const [valorRetroativo, setValorRetroativo] = useState("");
-  const [percentualAdv, setPercentualAdv] = useState("30");
+  const [valorRetroativo, setValorRetroativo] = useState(() => {
+    if (!prefillMeta?.valor_retroativo) return "";
+    return prefillMeta.valor_retroativo.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+    });
+  });
+  const [percentualAdv, setPercentualAdv] = useState(() => {
+    if (prefillMeta?.percentual_adv) return String(prefillMeta.percentual_adv);
+    // Sem detalhamento salvo (lançamento antigo, anterior a essa mudança):
+    // não chuta 30% — deixa em branco pra não parecer um valor já calculado.
+    return cancelAguardando ? "" : "30";
+  });
   const [valorMensalidade, setValorMensalidade] = useState("");
-  const [percentualSalario, setPercentualSalario] = useState("");
+  const [percentualSalario, setPercentualSalario] = useState(
+    prefillMeta?.percentual_salario
+      ? String(prefillMeta.percentual_salario)
+      : ""
+  );
 
   // ── Meses a gerar (modo recorrente) ────────────────────────
   const [mesesGerar, setMesesGerar] = useState("12");
@@ -522,6 +567,24 @@ export default function NewLancamentoForm({
       {redirectTo && (
         <input type="hidden" name="redirect_to" value={redirectTo} />
       )}
+      {tipo === "entrada" && aguardandoResultado && (
+        <input
+          type="hidden"
+          name="combinado_meta"
+          value={JSON.stringify({
+            payment_mode: paymentModeSubmit,
+            valor_retroativo: parseFloat(parseMoney(valorRetroativo)) || 0,
+            percentual_adv: parseFloat(percentualAdv) || 0,
+            salario_base: salarioBase,
+            percentual_salario: parseFloat(percentualSalario) || 0,
+            num_salarios: parseFloat(numSalarios.replace(",", ".")) || 0,
+            salario_custom:
+              salarioBase === "custom"
+                ? parseFloat(parseMoney(salarioCustomInput)) || 0
+                : null,
+          })}
+        />
+      )}
 
       {cancelAguardando && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -529,10 +592,17 @@ export default function NewLancamentoForm({
             Registrando resultado do processo
           </p>
           <p className="mt-0.5 font-body text-xs text-emerald-700">
-            Defina o valor final aprovado, a forma de pagamento e as datas. O
-            lançamento &quot;Aguardando resultado&quot; será cancelado
+            {prefillMeta
+              ? "Os campos abaixo já vêm preenchidos com o que foi combinado antes. Ajuste apenas o que mudou com o resultado."
+              : "Defina o valor final aprovado, a forma de pagamento e as datas."}{" "}
+            O lançamento &quot;Aguardando resultado&quot; será cancelado
             automaticamente ao salvar.
           </p>
+          {valorInicial && (
+            <p className="mt-1.5 font-body text-xs font-semibold text-emerald-800">
+              Valor combinado inicialmente: {fmt(parseFloat(valorInicial) || 0)}
+            </p>
+          )}
         </div>
       )}
 

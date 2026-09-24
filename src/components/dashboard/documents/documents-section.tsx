@@ -55,7 +55,7 @@ function formatBytes(bytes: number) {
 // ── Component ──────────────────────────────────────────────
 
 interface Props {
-  entityType: "processo" | "cliente" | "pericia";
+  entityType: "processo" | "cliente" | "pericia" | "colaborador";
   entityId: string;
   documents: Documento[];
 }
@@ -160,8 +160,10 @@ export default function DocumentsSection({
       }
 
       try {
+        const pasta =
+          entityType === "colaborador" ? "colaboradores" : `${entityType}s`;
         const blob = await upload(
-          `documentos/${entityType}s/${entityId}/${file.name}`,
+          `documentos/${pasta}/${entityId}/${file.name}`,
           file,
           {
             access: "private",

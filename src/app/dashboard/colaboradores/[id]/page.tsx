@@ -17,6 +17,9 @@ import {
   filtrarCargaPorPermissao,
 } from "@/lib/controladoria-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
+import { podeAcessarColaborador } from "@/lib/acesso";
+import { getDocumentosByEntityId } from "@/lib/documents-db";
+import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import { getBonusMetaStatus } from "@/lib/metas-bonus";
 import GerarBonusButton from "@/components/dashboard/colaboradores/gerar-bonus-button";
 import {
@@ -80,6 +83,15 @@ export default async function ColaboradorDetailPage({
     podeVerDetalhesDeTodos,
     meuColaboradorId
   )[0];
+
+  // "Arquivos" (ex: contrato de parceria assinado) é área pessoal — quem
+  // tem só colaboradores:ver (a maioria dos cargos, por padrão) enxerga o
+  // perfil básico de qualquer colega, mas os documentos ficam restritos a
+  // quem administra colaboradores ou ao próprio dono do perfil.
+  const podeVerArquivos = await podeAcessarColaborador(session, id);
+  const documentos = podeVerArquivos
+    ? await getDocumentosByEntityId("colaborador", id)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -316,6 +328,16 @@ export default async function ColaboradorDetailPage({
             </p>
           )}
         </div>
+      )}
+
+      {/* Arquivos — ex: contrato de parceria assinado. Só quem administra
+          colaboradores ou o próprio dono do perfil vê esta seção. */}
+      {podeVerArquivos && (
+        <DocumentsSection
+          entityType="colaborador"
+          entityId={colaborador.id}
+          documents={documentos}
+        />
       )}
 
       {/* Remunerações */}

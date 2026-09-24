@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import JSZip from "jszip";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { podeAcessarEntidade } from "@/lib/acesso";
+import { podeAcessarEntidade, podeAcessarColaborador } from "@/lib/acesso";
 import sql from "@/lib/db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 
@@ -11,9 +11,20 @@ export const maxDuration = 60;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const VALID_ENTITY_TYPES = ["processo", "cliente", "pericia"] as const;
+const VALID_ENTITY_TYPES = [
+  "processo",
+  "cliente",
+  "pericia",
+  "colaborador",
+] as const;
 type EntityType = (typeof VALID_ENTITY_TYPES)[number];
-const MODULO_POR_ENTITY_TYPE: Record<EntityType, string> = {
+// "colaborador" fica fora deste mapa — baixar os PRÓPRIOS arquivos em
+// "Meus Dados" não exige colaboradores:ver, só podeAcessarColaborador
+// (admin ou o próprio), checado à parte abaixo.
+const MODULO_POR_ENTITY_TYPE: Record<
+  Exclude<EntityType, "colaborador">,
+  string
+> = {
   processo: "processos",
   cliente: "clientes",
   pericia: "controles",
@@ -31,6 +42,11 @@ async function entidadeAtiva(
   if (entityType === "cliente") {
     const rows =
       await sql`SELECT 1 FROM clients WHERE id = ${entityId}::uuid AND deleted_at IS NULL`;
+    return rows.length > 0;
+  }
+  if (entityType === "colaborador") {
+    const rows =
+      await sql`SELECT 1 FROM colaboradores WHERE id = ${entityId}::uuid`;
     return rows.length > 0;
   }
   const rows = await sql`SELECT 1 FROM pericias WHERE id = ${entityId}::uuid`;
@@ -83,14 +99,28 @@ export async function POST(request: Request) {
     );
   }
 
-  if (
-    !hasPermission(
-      session,
-      MODULO_POR_ENTITY_TYPE[entityType as EntityType],
-      "ver"
+  if (entityType === "colaborador") {
+    if (!(await podeAcessarColaborador(session, entityId)))
+      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  } else {
+    if (
+      !hasPermission(
+        session,
+        MODULO_POR_ENTITY_TYPE[
+          entityType as Exclude<EntityType, "colaborador">
+        ],
+        "ver"
+      )
+    ) {
+      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+    }
+    // hasPermission acima só checa o módulo em geral — sem isto, um usuário
+    // sem "processos_ver_todos" baixava em lote os documentos de QUALQUER
+    // processo do escritório, não só dos que ele é responsável.
+    if (
+      !(await podeAcessarEntidade(session, entityType as EntityType, entityId))
     )
-  ) {
-    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   if (!(await entidadeAtiva(entityType as EntityType, entityId))) {
@@ -99,12 +129,6 @@ export async function POST(request: Request) {
       { status: 404 }
     );
   }
-
-  // hasPermission acima só checa o módulo em geral — sem isto, um usuário
-  // sem "processos_ver_todos" baixava em lote os documentos de QUALQUER
-  // processo do escritório, não só dos que ele é responsável.
-  if (!(await podeAcessarEntidade(session, entityType as EntityType, entityId)))
-    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const todos = await getDocumentosByEntityId(
     entityType as EntityType,

@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { getAllClientsWithOrigin } from "@/lib/clients-db";
 import { getAllProcessos } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
+import { getLancamentoById } from "@/lib/lancamentos-db";
 import NewLancamentoForm from "@/components/dashboard/financeiro/new-lancamento-form";
 import { ChevronRightIcon } from "@/components/icons";
 
@@ -40,11 +41,22 @@ export default async function NovoLancamentoPage({
   const defaultTipo: "entrada" | "saida" =
     tipo === "saida" ? "saida" : "entrada";
 
-  const [clients, processos, escritorioConfig] = await Promise.all([
-    getAllClientsWithOrigin(),
-    getAllProcessos(),
-    getEscritorioConfig(),
-  ]);
+  const [clients, processos, escritorioConfig, lancamentoAguardando] =
+    await Promise.all([
+      getAllClientsWithOrigin(),
+      getAllProcessos(),
+      getEscritorioConfig(),
+      cancel_aguardando
+        ? getLancamentoById(cancel_aguardando).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prefillMeta = (lancamentoAguardando?.combinado_meta ?? null) as any;
+  const valorInicialResolvido =
+    lancamentoAguardando != null
+      ? String(lancamentoAguardando.valor)
+      : valor_inicial;
 
   const clientOptions = clients.map((c) => ({
     id: c.id,
@@ -100,7 +112,8 @@ export default async function NovoLancamentoPage({
           defaultProcessoId={processo_id}
           redirectTo={back}
           cancelAguardando={cancel_aguardando}
-          valorInicial={valor_inicial}
+          valorInicial={valorInicialResolvido}
+          prefillMeta={prefillMeta}
         />
       </div>
     </div>

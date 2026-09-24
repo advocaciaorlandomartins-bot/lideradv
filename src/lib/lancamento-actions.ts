@@ -156,6 +156,18 @@ export async function createLancamentoAction(
   const comissaoValorCustom = comissaoValorCustomStr
     ? parseFloat(comissaoValorCustomStr)
     : null;
+  const combinadoMetaStr = (
+    (formData.get("combinado_meta") as string | null) ?? ""
+  ).trim();
+  let combinadoMeta: string | null = null;
+  if (combinadoMetaStr) {
+    try {
+      JSON.parse(combinadoMetaStr);
+      combinadoMeta = combinadoMetaStr;
+    } catch {
+      combinadoMeta = null;
+    }
+  }
 
   if (!valorStr || isNaN(valor) || valor <= 0)
     return { error: "Informe um valor válido." };
@@ -167,12 +179,13 @@ export async function createLancamentoAction(
       await sql`
         INSERT INTO lancamentos
           (tipo, categoria, descricao, valor, client_id, processo_id,
-           status, data_vencimento, observacoes)
+           status, data_vencimento, observacoes, combinado_meta)
         VALUES
           (${tipo}, ${categoria}, ${descricao}, ${valor},
            ${clientId ? clientId : null}::uuid,
            ${processoId ? processoId : null}::uuid,
-           'aguardando_resultado', '9999-12-31'::date, ${observacoes})
+           'aguardando_resultado', '9999-12-31'::date, ${observacoes},
+           ${combinadoMeta}::jsonb)
       `;
     } catch (err) {
       console.error("createLancamentoAction aguardando error:", err);

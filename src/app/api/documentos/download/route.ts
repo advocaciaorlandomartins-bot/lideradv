@@ -44,6 +44,13 @@ export async function GET(request: Request) {
           SELECT 1 FROM pericias pe
           WHERE pe.id = d.entity_id
         ))
+        OR
+        -- documento de colaborador (sem soft-delete nessa tabela; contrato
+        -- assinado precisa continuar baixável mesmo se a pessoa já saiu)
+        (d.entity_type = 'colaborador' AND EXISTS (
+          SELECT 1 FROM colaboradores col
+          WHERE col.id = d.entity_id
+        ))
       )
     LIMIT 1
   `;
@@ -59,7 +66,7 @@ export async function GET(request: Request) {
     url: string;
     nome: string;
     tipo: string | null;
-    entity_type: "processo" | "cliente" | "pericia";
+    entity_type: "processo" | "cliente" | "pericia" | "colaborador";
     entity_id: string;
   };
 

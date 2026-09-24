@@ -2,7 +2,7 @@ import sql from "./db";
 
 export interface Documento {
   id: string;
-  entity_type: "processo" | "cliente" | "pericia";
+  entity_type: "processo" | "cliente" | "pericia" | "colaborador";
   entity_id: string;
   nome: string;
   tipo: string | null;
@@ -151,7 +151,7 @@ export async function getAllDocumentos(
 }
 
 export async function getDocumentosByEntityId(
-  entityType: "processo" | "cliente" | "pericia",
+  entityType: "processo" | "cliente" | "pericia" | "colaborador",
   entityId: string
 ): Promise<Documento[]> {
   const rows = await sql`
@@ -173,7 +173,11 @@ export async function getDocumentosByEntityId(
 
   return rows.map((r) => ({
     id: r.id,
-    entity_type: r.entity_type as "processo" | "cliente" | "pericia",
+    entity_type: r.entity_type as
+      | "processo"
+      | "cliente"
+      | "pericia"
+      | "colaborador",
     entity_id: r.entity_id,
     nome: r.nome,
     tipo: r.tipo ?? null,

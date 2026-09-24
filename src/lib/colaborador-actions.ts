@@ -1,10 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import sql from "./db";
 import { logAction } from "./audit";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { getColaboradorIdForUser } from "./usuarios-db";
 
 export type ColaboradorFormState = { error: string } | null;
 
@@ -39,6 +41,7 @@ function getFields(formData: FormData) {
         .trim()
         .toUpperCase()
         .slice(0, 2) || null,
+    city: ((formData.get("city") as string | null) ?? "").trim() || null,
     salarioMensal: salarioRaw && Number(salarioRaw) > 0 ? salarioRaw : null,
     dataAdmissao: (formData.get("data_admissao") as string | null) || null,
     dataDemissao:
@@ -93,7 +96,7 @@ export async function createColaboradorAction(
   try {
     const rows = await sql`
       INSERT INTO colaboradores (
-        nome, cargo, email, telefone, oab, oab_uf, salario_mensal, data_admissao,
+        nome, cargo, email, telefone, oab, oab_uf, city, salario_mensal, data_admissao,
         data_demissao, status, observacoes,
         comissao_administrativo_pct, comissao_judicial_pct, comissao_ambos_pct,
         meta1_valor, meta1_bonus, meta2_valor, meta2_bonus, meta3_valor, meta3_bonus
@@ -105,6 +108,7 @@ export async function createColaboradorAction(
         ${f.telefone},
         ${f.oab},
         ${f.oabUf},
+        ${f.city},
         ${f.salarioMensal ? f.salarioMensal : null}::numeric,
         ${f.dataAdmissao ? f.dataAdmissao : null}::date,
         ${f.dataDemissao ? f.dataDemissao : null}::date,
@@ -188,6 +192,7 @@ export async function updateColaboradorAction(
         telefone                     = ${f.telefone},
         oab                          = ${f.oab},
         oab_uf                       = ${f.oabUf},
+        city                         = ${f.city},
         salario_mensal               = ${f.salarioMensal ? f.salarioMensal : null}::numeric,
         data_admissao                = ${f.dataAdmissao ? f.dataAdmissao : null}::date,
         data_demissao                = ${f.dataDemissao ? f.dataDemissao : null}::date,
@@ -244,4 +249,77 @@ export async function deleteColaboradorAction(
     descricao: "Excluiu colaborador",
   });
   redirect("/dashboard/colaboradores");
+}
+
+export type MeusDadosFormState = { error?: string; success?: boolean } | null;
+
+/**
+ * Autoatendimento: qualquer colaborador atualiza os PRÓPRIOS dados de
+ * contato/endereço, sem precisar de colaboradores:editar (que é
+ * administrativo — cargo, salário, comissão, status). O id nunca vem do
+ * formulário: é sempre resolvido a partir da sessão, então não tem como
+ * essa action mexer no cadastro de outra pessoa mesmo que alguém tente
+ * forjar o campo.
+ */
+export async function updateMeusDadosAction(
+  _prev: MeusDadosFormState,
+  formData: FormData
+): Promise<MeusDadosFormState> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+
+  const colaboradorId = await getColaboradorIdForUser(session.id);
+  if (!colaboradorId)
+    return {
+      error: "Seu usuário não está vinculado a um cadastro de colaborador.",
+    };
+
+  const telefone =
+    ((formData.get("telefone") as string | null) ?? "").trim() || null;
+  const email = ((formData.get("email") as string | null) ?? "").trim() || null;
+  const cep = ((formData.get("cep") as string | null) ?? "").trim() || null;
+  const street =
+    ((formData.get("street") as string | null) ?? "").trim() || null;
+  const addrNumber =
+    ((formData.get("addr_number") as string | null) ?? "").trim() || null;
+  const complement =
+    ((formData.get("complement") as string | null) ?? "").trim() || null;
+  const neighborhood =
+    ((formData.get("neighborhood") as string | null) ?? "").trim() || null;
+  const city = ((formData.get("city") as string | null) ?? "").trim() || null;
+  const state =
+    ((formData.get("state") as string | null) ?? "")
+      .trim()
+      .toUpperCase()
+      .slice(0, 2) || null;
+
+  try {
+    await sql`
+      UPDATE colaboradores SET
+        telefone     = ${telefone},
+        email        = ${email},
+        cep          = ${cep},
+        street       = ${street},
+        addr_number  = ${addrNumber},
+        complement   = ${complement},
+        neighborhood = ${neighborhood},
+        city         = ${city},
+        state        = ${state},
+        updated_at   = NOW()
+      WHERE id = ${colaboradorId}::uuid
+    `;
+  } catch (err) {
+    console.error("updateMeusDadosAction DB error:", err);
+    return { error: "Erro ao salvar. Tente novamente." };
+  }
+
+  await logAction({
+    acao: "editar",
+    entidade: "colaborador",
+    entidadeId: colaboradorId,
+    descricao: "Atualizou os próprios dados de contato/endereço",
+  });
+
+  revalidatePath("/dashboard/meus-dados");
+  return { success: true };
 }

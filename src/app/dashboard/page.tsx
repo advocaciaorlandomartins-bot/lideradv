@@ -9,6 +9,10 @@ import {
   getDashboardData,
   getAlertasPrevidenciarios,
 } from "@/lib/dashboard-db";
+import {
+  getMeuFinanceiroInitial,
+  type MeuFinanceiroInitial,
+} from "@/lib/meu-financeiro-db";
 import { countMinhasPendentes } from "@/lib/minhas-tarefas-db";
 import { TIPO_LABELS_COMP, TIPO_ICONS_COMP } from "@/lib/compromissos-db";
 import { getSession } from "@/lib/session";
@@ -160,6 +164,59 @@ function SemAcesso({ modulo }: { modulo: string }) {
   );
 }
 
+// ── Resumo financeiro pessoal — usuário sem acesso ao financeiro do escritório
+// inteiro, mostra só o que é dele (via "Meu Financeiro") ──────────────────────
+
+function MeuResumoFinanceiroCard({
+  meuFinanceiro,
+}: {
+  meuFinanceiro: MeuFinanceiroInitial;
+}) {
+  const { escritorioMes } = meuFinanceiro;
+  return (
+    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+      <h2 className="mb-4 font-heading text-sm font-semibold text-fg">
+        Meu Resumo Financeiro
+      </h2>
+      <div className="space-y-1">
+        {[
+          {
+            label: "Recebido no mês",
+            value: escritorioMes.recebidoMes,
+            cls: "text-emerald-600",
+          },
+          {
+            label: "A receber no mês",
+            value: escritorioMes.aReceberMes,
+            cls: "text-amber-600",
+          },
+          {
+            label: "Total a receber",
+            value: escritorioMes.totalAReceber,
+            cls: "text-amber-600",
+          },
+        ].map(({ label, value, cls }) => (
+          <div
+            key={label}
+            className="flex items-center justify-between rounded-lg px-2 py-1.5"
+          >
+            <span className="font-body text-xs text-muted">{label}</span>
+            <span className={`font-body text-sm font-bold ${cls}`}>
+              {fmt(value)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <Link
+        href="/dashboard/meu-financeiro"
+        className="mt-3 block font-body text-xs font-semibold text-primary hover:underline"
+      >
+        Ver meu financeiro completo →
+      </Link>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
@@ -185,7 +242,12 @@ export default async function DashboardPage() {
   // ── Busca condicional de dados ────────────────────────────────────────────
   const showCrm = perm.crm && perm.dashboard_crm;
   const showControles = perm.controles && perm.dashboard_controles;
+  // "financeiro" dá acesso ao módulo (ex: aba financeira de um cliente), mas
+  // sem "dashboard_financeiro" o usuário não deve ver os números agregados
+  // do escritório inteiro aqui — só os dele, via "Meu Financeiro" abaixo.
   const showFinanceiro = perm.financeiro && perm.dashboard_financeiro;
+  const permMeuFinanceiro = hasPermission(session, "meu_financeiro", "ver");
+  const showFinanceiroPessoal = !showFinanceiro && permMeuFinanceiro;
 
   const needsGerData =
     showFinanceiro || showCrm || perm.clientes || perm.processos;
@@ -198,6 +260,7 @@ export default async function DashboardPage() {
     totalNaoLidos,
     minhasPendentes,
     alertasPrevidenciarios,
+    meuFinanceiro,
   ] = await Promise.all([
     needsGerData ? getGerenciadorData() : Promise.resolve(null),
     needsDashData ? getDashboardData(session.login) : Promise.resolve(null),
@@ -209,6 +272,9 @@ export default async function DashboardPage() {
     perm.processos
       ? getAlertasPrevidenciarios().catch(() => [])
       : Promise.resolve([]),
+    showFinanceiroPessoal
+      ? getMeuFinanceiroInitial(session.id).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   // "totalProcessos" do gerenciador é a contagem do escritório inteiro — sem
@@ -481,7 +547,7 @@ export default async function DashboardPage() {
           </Link>
         )}
 
-        {perm.financeiro && kpis && (
+        {showFinanceiro && kpis && (
           <Link
             href="/dashboard/financeiro"
             className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
@@ -509,6 +575,34 @@ export default async function DashboardPage() {
               className={`mt-2 font-body text-xs font-semibold group-hover:underline ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
             >
               Saldo: {fmt(kpis.saldoMes)} →
+            </p>
+          </Link>
+        )}
+
+        {showFinanceiroPessoal && meuFinanceiro && (
+          <Link
+            href="/dashboard/meu-financeiro"
+            className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between">
+              <div className="rounded-lg bg-emerald-50 p-2.5 transition-colors group-hover:bg-emerald-100">
+                <BanknotesIcon className="h-5 w-5 text-emerald-600" />
+              </div>
+              <span className="font-body text-xs font-semibold text-amber-600">
+                A receber
+              </span>
+            </div>
+            <p
+              className="mt-3 font-heading text-sm font-bold text-fg sm:text-xl whitespace-nowrap overflow-hidden text-ellipsis leading-tight"
+              title={fmt(meuFinanceiro.escritorioMes.recebidoMes)}
+            >
+              {fmt(meuFinanceiro.escritorioMes.recebidoMes)}
+            </p>
+            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+              Recebido no mês (meu)
+            </p>
+            <p className="mt-2 font-body text-xs font-semibold text-amber-600 group-hover:underline">
+              A receber: {fmt(meuFinanceiro.escritorioMes.totalAReceber)} →
             </p>
           </Link>
         )}
@@ -977,6 +1071,8 @@ export default async function DashboardPage() {
                   Ver financeiro completo →
                 </Link>
               </div>
+            ) : showFinanceiroPessoal && meuFinanceiro ? (
+              <MeuResumoFinanceiroCard meuFinanceiro={meuFinanceiro} />
             ) : (
               <SemAcesso modulo="Financeiro" />
             )}
@@ -1025,6 +1121,8 @@ export default async function DashboardPage() {
             ))}
           </div>
         </div>
+      ) : showFinanceiroPessoal && meuFinanceiro ? (
+        <MeuResumoFinanceiroCard meuFinanceiro={meuFinanceiro} />
       ) : null}
 
       {/* ── Gráfico + Clientes em Débito (somente se tiver acesso financeiro) */}

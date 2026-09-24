@@ -18,6 +18,8 @@ export interface Lancamento {
   total_parcelas: number | null;
   grupo_parcelas: string | null;
   observacoes: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  combinado_meta: Record<string, any> | null;
   created_at_formatted: string;
 }
 
@@ -45,6 +47,7 @@ export function mapRow(r: any): Lancamento {
     total_parcelas: r.total_parcelas ?? null,
     grupo_parcelas: r.grupo_parcelas ?? null,
     observacoes: r.observacoes ?? null,
+    combinado_meta: r.combinado_meta ?? null,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
   };
 }
@@ -71,6 +74,7 @@ export async function getLancamentoById(
       l.total_parcelas,
       l.grupo_parcelas::text,
       l.observacoes,
+      l.combinado_meta,
       l.created_at
     FROM lancamentos l
     LEFT JOIN clients   c ON c.id = l.client_id

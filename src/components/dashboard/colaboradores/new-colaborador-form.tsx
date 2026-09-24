@@ -220,6 +220,15 @@ export default function NewColaboradorForm() {
               style={{ textTransform: "uppercase" }}
             />
           </Field>
+          <Field label="Cidade (para documentos)">
+            <input
+              name="city"
+              type="text"
+              placeholder="Ex: Maceió"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
         </div>
       </div>
 

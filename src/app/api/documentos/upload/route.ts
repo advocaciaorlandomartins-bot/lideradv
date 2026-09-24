@@ -2,20 +2,31 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { podeAcessarEntidade } from "@/lib/acesso";
+import { podeAcessarEntidade, podeAcessarColaborador } from "@/lib/acesso";
 
 export const dynamic = "force-dynamic";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const VALID_ENTITY_TYPES = ["processo", "cliente", "pericia"] as const;
+const VALID_ENTITY_TYPES = [
+  "processo",
+  "cliente",
+  "pericia",
+  "colaborador",
+] as const;
 type EntityType = (typeof VALID_ENTITY_TYPES)[number];
 
 // Cada tipo de entidade é dono de um módulo de permissão diferente — usar
 // "processos" fixo pra tudo deixava um Advogado(a) sem "clientes:criar"
 // enviar documento em qualquer cliente, e travava quem só tinha
 // "clientes" (sem "processos") de anexar documento de cliente.
-const MODULO_POR_ENTITY_TYPE: Record<EntityType, string> = {
+// "colaborador" fica de fora deste mapa de propósito: quem sobe um arquivo
+// nos PRÓPRIOS "Meus Dados" não tem (nem precisa ter) colaboradores:criar —
+// esse caso usa só podeAcessarColaborador (admin ou o próprio) abaixo.
+const MODULO_POR_ENTITY_TYPE: Record<
+  Exclude<EntityType, "colaborador">,
+  string
+> = {
   processo: "processos",
   cliente: "clientes",
   pericia: "controles",
@@ -82,25 +93,32 @@ export async function POST(request: Request): Promise<NextResponse> {
           throw new Error("entityType inválido.");
         if (!entityId || !UUID_RE.test(entityId))
           throw new Error("entityId inválido.");
-        if (
-          !hasPermission(
-            session,
-            MODULO_POR_ENTITY_TYPE[entityType as EntityType],
-            "criar"
+        if (entityType === "colaborador") {
+          if (!(await podeAcessarColaborador(session, entityId)))
+            throw new Error("Sem permissão.");
+        } else {
+          if (
+            !hasPermission(
+              session,
+              MODULO_POR_ENTITY_TYPE[
+                entityType as Exclude<EntityType, "colaborador">
+              ],
+              "criar"
+            )
           )
-        )
-          throw new Error("Sem permissão.");
-        // hasPermission acima só checa o módulo em geral — sem isto, um
-        // usuário sem "processos_ver_todos" anexava documento em QUALQUER
-        // processo do escritório, não só nos que ele é responsável.
-        if (
-          !(await podeAcessarEntidade(
-            session,
-            entityType as EntityType,
-            entityId
-          ))
-        )
-          throw new Error("Sem permissão.");
+            throw new Error("Sem permissão.");
+          // hasPermission acima só checa o módulo em geral — sem isto, um
+          // usuário sem "processos_ver_todos" anexava documento em QUALQUER
+          // processo do escritório, não só nos que ele é responsável.
+          if (
+            !(await podeAcessarEntidade(
+              session,
+              entityType as EntityType,
+              entityId
+            ))
+          )
+            throw new Error("Sem permissão.");
+        }
 
         const ext = (pathname.split(".").pop() ?? "").toLowerCase();
         if (!ALLOWED_EXTENSIONS.has(ext))

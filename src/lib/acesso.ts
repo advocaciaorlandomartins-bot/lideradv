@@ -88,14 +88,32 @@ export async function podeAcessarPericia(
 }
 
 /**
+ * Acesso aos arquivos/dados de um colaborador — quem administra colaboradores
+ * (Administrador(a)/Sócio(a), por padrão) vê e mexe em qualquer um; qualquer
+ * outra pessoa só no próprio, nunca no de terceiros. Usado tanto pro upload/
+ * exclusão de documentos ("Arquivos") quanto pro autoatendimento de dados
+ * pessoais (endereço, telefone) na tela "Meus Dados".
+ */
+export async function podeAcessarColaborador(
+  session: SessionUser,
+  colaboradorId: string
+): Promise<boolean> {
+  if (hasPermission(session, "colaboradores", "editar")) return true;
+  const meuColaboradorId = await getColaboradorIdForUser(session.id);
+  return meuColaboradorId === colaboradorId;
+}
+
+/**
  * Acesso a uma entidade genérica de documento.
  */
 export async function podeAcessarEntidade(
   session: SessionUser,
-  entityType: "processo" | "cliente" | "pericia",
+  entityType: "processo" | "cliente" | "pericia" | "colaborador",
   entityId: string
 ): Promise<boolean> {
   if (entityType === "processo") return podeAcessarProcesso(session, entityId);
   if (entityType === "cliente") return podeAcessarCliente(session, entityId);
+  if (entityType === "colaborador")
+    return podeAcessarColaborador(session, entityId);
   return podeAcessarPericia(session, entityId);
 }

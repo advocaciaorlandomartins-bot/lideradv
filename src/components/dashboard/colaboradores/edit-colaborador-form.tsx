@@ -228,6 +228,16 @@ export default function EditColaboradorForm({ colaborador }: Props) {
               style={{ textTransform: "uppercase" }}
             />
           </Field>
+          <Field label="Cidade (para documentos)">
+            <input
+              name="city"
+              type="text"
+              defaultValue={colaborador.city ?? ""}
+              placeholder="Ex: Maceió"
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
         </div>
       </div>
 

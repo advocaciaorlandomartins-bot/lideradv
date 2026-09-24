@@ -3,7 +3,10 @@ import type { EscritorioConfig } from "./escritorio-db";
 import type { AdvogadoParaDocumento } from "./colaboradores-db";
 
 function formatAdvogado(a: AdvogadoParaDocumento): string {
-  return `${a.nome}, inscrito(a) na OAB/${a.oab_uf} sob o nº ${a.oab}`;
+  const base = `${a.nome}, inscrito(a) na OAB/${a.oab_uf} sob o nº ${a.oab}`;
+  return a.city
+    ? `${base}, com endereço profissional em ${a.city}/${a.oab_uf}`
+    : base;
 }
 
 // Junta em texto corrido no padrão jurídico ("Fulano, Ciclano e Beltrano")

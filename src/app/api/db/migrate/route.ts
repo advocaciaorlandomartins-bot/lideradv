@@ -342,6 +342,35 @@ export async function GET() {
       sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS oab_uf VARCHAR(2)`
   );
 
+  // Endereço do colaborador — pra ele mesmo poder manter atualizado na tela
+  // "Meus Dados" (autoatendimento), sem depender de avisar o admin toda vez
+  // que mudar de endereço.
+  await run("colaboradores.endereco", async () => {
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS cep TEXT`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS street TEXT`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS addr_number TEXT`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS complement TEXT`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS neighborhood TEXT`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS city TEXT`;
+    await sql`ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS state TEXT`;
+  });
+
+  // "Arquivos" do colaborador (ex: contrato de parceria assinado) reaproveita
+  // a mesma tabela `documentos` já usada por processo/cliente/perícia — só
+  // precisa entrar na lista de entity_type permitidos.
+  await run("documentos.entity_type_colaborador", async () => {
+    await sql`ALTER TABLE documentos DROP CONSTRAINT IF EXISTS documentos_entity_type_check`;
+    await sql`ALTER TABLE documentos ADD CONSTRAINT documentos_entity_type_check CHECK (entity_type IN ('processo','cliente','pericia','colaborador'))`;
+  });
+
+  // Guarda o detalhamento (percentual, retroativo, salários) usado para
+  // calcular o valor de um lançamento "aguardando resultado" — antes só o
+  // total final era salvo, então "Registrar resultado" não sabia o que
+  // tinha sido combinado originalmente.
+  await run("lancamentos.combinado_meta", async () => {
+    await sql`ALTER TABLE lancamentos ADD COLUMN IF NOT EXISTS combinado_meta JSONB`;
+  });
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

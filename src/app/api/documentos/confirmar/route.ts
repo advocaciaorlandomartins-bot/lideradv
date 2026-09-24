@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { podeAcessarEntidade } from "@/lib/acesso";
+import { podeAcessarEntidade, podeAcessarColaborador } from "@/lib/acesso";
 import { analisarDocumento } from "@/lib/cerebroJuridico";
 import { analisarDocumentoCliente } from "@/lib/cliente-documento-auto";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
@@ -11,9 +11,20 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const VALID_ENTITY_TYPES = ["processo", "cliente", "pericia"] as const;
+const VALID_ENTITY_TYPES = [
+  "processo",
+  "cliente",
+  "pericia",
+  "colaborador",
+] as const;
 type EntityType = (typeof VALID_ENTITY_TYPES)[number];
-const MODULO_POR_ENTITY_TYPE: Record<EntityType, string> = {
+// "colaborador" fica fora deste mapa — autoatendimento de "Meus Dados" não
+// exige colaboradores:criar, só podeAcessarColaborador (admin ou o
+// próprio), checado à parte abaixo.
+const MODULO_POR_ENTITY_TYPE: Record<
+  Exclude<EntityType, "colaborador">,
+  string
+> = {
   processo: "processos",
   cliente: "clientes",
   pericia: "controles",
@@ -67,17 +78,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "URL inválida." }, { status: 400 });
   }
 
-  if (
-    !hasPermission(
-      session,
-      MODULO_POR_ENTITY_TYPE[entityType as EntityType],
-      "criar"
+  if (entityType === "colaborador") {
+    if (!(await podeAcessarColaborador(session, entityId)))
+      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  } else {
+    if (
+      !hasPermission(
+        session,
+        MODULO_POR_ENTITY_TYPE[
+          entityType as Exclude<EntityType, "colaborador">
+        ],
+        "criar"
+      )
+    ) {
+      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+    }
+    if (
+      !(await podeAcessarEntidade(session, entityType as EntityType, entityId))
     )
-  ) {
-    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
-  if (!(await podeAcessarEntidade(session, entityType as EntityType, entityId)))
-    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   try {
     const rows = await sql`

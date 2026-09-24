@@ -11,6 +11,13 @@ export interface Colaborador {
   telefone: string | null;
   oab: string | null;
   oab_uf: string | null;
+  cep: string | null;
+  street: string | null;
+  addr_number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
   salario_mensal: number | null;
   data_admissao: string | null;
   data_demissao: string | null;
@@ -46,6 +53,13 @@ function mapRow(r: any): Colaborador {
     telefone: r.telefone ?? null,
     oab: r.oab ?? null,
     oab_uf: r.oab_uf ?? null,
+    cep: r.cep ?? null,
+    street: r.street ?? null,
+    addr_number: r.addr_number ?? null,
+    complement: r.complement ?? null,
+    neighborhood: r.neighborhood ?? null,
+    city: r.city ?? null,
+    state: r.state ?? null,
     salario_mensal: r.salario_mensal != null ? Number(r.salario_mensal) : null,
     data_admissao: r.data_admissao ?? null,
     data_demissao: r.data_demissao ?? null,
@@ -99,6 +113,7 @@ export interface AdvogadoParaDocumento {
   nome: string;
   oab: string;
   oab_uf: string;
+  city: string | null;
 }
 
 /**
@@ -115,7 +130,7 @@ export async function getAdvogadosParaDocumento(): Promise<
   AdvogadoParaDocumento[]
 > {
   const rows = await sql`
-    SELECT nome, oab, oab_uf
+    SELECT nome, oab, oab_uf, city
     FROM colaboradores
     WHERE status = 'ativo'
       AND oab IS NOT NULL AND oab != ''
@@ -126,6 +141,7 @@ export async function getAdvogadosParaDocumento(): Promise<
     nome: String(r.nome),
     oab: String(r.oab),
     oab_uf: String(r.oab_uf).toUpperCase(),
+    city: r.city ? String(r.city) : null,
   }));
 }
 
@@ -141,6 +157,13 @@ export async function getColaboradorFull(
       telefone,
       oab,
       oab_uf,
+      cep,
+      street,
+      addr_number,
+      complement,
+      neighborhood,
+      city,
+      state,
       salario_mensal,
       to_char(data_admissao, 'DD/MM/YYYY')  AS data_admissao,
       to_char(data_admissao, 'YYYY-MM-DD')  AS data_admissao_iso,

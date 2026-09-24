@@ -50,7 +50,11 @@ export const VARIAVEIS = [
     group: "Geral",
     vars: [
       { tag: "{{data_hoje}}", desc: "Data por extenso" },
-      { tag: "{{advogado}}", desc: "Nome do advogado" },
+      { tag: "{{advogado}}", desc: "Nome do escritório" },
+      {
+        tag: "{{advogados}}",
+        desc: "Todos os advogados ativos, com OAB e cidade",
+      },
     ],
   },
 ] as const;

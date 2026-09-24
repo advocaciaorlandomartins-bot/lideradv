@@ -787,15 +787,17 @@ function AguardandoSection({
       <>
         <Link
           href={`/dashboard/financeiro/novo?tipo=entrada${l.client_id ? `&client_id=${l.client_id}` : ""}${l.processo_id ? `&processo_id=${l.processo_id}` : ""}&cancel_aguardando=${l.id}&valor_inicial=${l.valor}&back=/dashboard/financeiro`}
+          title="O resultado (judicial/administrativo) saiu — defina o valor final e a forma de pagamento"
           className="rounded border border-emerald-500 bg-emerald-50 px-2.5 py-1 font-body text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100"
         >
           Registrar resultado
         </Link>
         <Link
           href={`/dashboard/financeiro/${l.id}/editar`}
+          title="Corrigir o valor/categoria combinados — continua aguardando o resultado"
           className="rounded border border-border bg-white px-2.5 py-1 font-body text-[11px] text-muted hover:text-fg"
         >
-          Editar
+          Corrigir valor combinado
         </Link>
         <button
           type="button"

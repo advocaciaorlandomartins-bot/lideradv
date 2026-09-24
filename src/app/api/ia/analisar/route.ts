@@ -17,6 +17,7 @@ import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import sql from "@/lib/db";
+import { aplicarCamposClienteSeVazios } from "@/lib/cliente-documento-auto";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -220,6 +221,21 @@ export async function POST(req: Request) {
       },
       extrairDados: !!clienteId,
     });
+
+    // Grava automaticamente no cadastro do cliente (só campos vazios, nunca
+    // sobrescreve) em vez de exigir clique manual em "Complementar cadastro"
+    // — mesmo padrão já aplicado no Diagnóstico Estratégico/Cérebro
+    // Jurídico: o dado já foi extraído nesta mesma chamada, sem custo
+    // extra de IA, então não faz sentido deixar isso represado esperando
+    // uma ação manual. O botão "Complementar cadastro" continua existindo
+    // pra reforçar campos que porventura não foram extraídos aqui.
+    if (clienteId && dadosExtraidos) {
+      await aplicarCamposClienteSeVazios(
+        clienteId,
+        dadosExtraidos,
+        "dr_lex_auto"
+      ).catch(() => {});
+    }
 
     // Salva no banco para o Cérebro poder ler depois
     if (processoId) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import IaJuridicaSection from "@/components/dashboard/ia/ia-juridica-section";
@@ -94,7 +94,7 @@ interface Props {
   podeCriarCategoriaNova?: boolean;
 }
 
-type Tab = "dados" | "relato" | "linha_do_tempo";
+type Tab = "resumo_ia" | "dados" | "relato" | "linha_do_tempo";
 
 // ── Style helpers ───────────────────────────────────────────────
 
@@ -1051,6 +1051,175 @@ function RelatoTab({ processo }: { processo: ProcessoExtended }) {
           )}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Resumo do Caso Tab ────────────────────────────────────────
+//
+// Não faz NENHUMA chamada nova de IA — só organiza o que o Dr. Lex
+// (análise de documento) e o Cérebro Jurídico (Diagnóstico Estratégico)
+// já geraram e salvaram em cerebro_analises. O diagnóstico estratégico
+// já é, por natureza, um resumo completo do caso (risco, probabilidade
+// de êxito, pontos fortes/fracos, estratégia) — reaproveitar esse texto
+// aqui custa zero crédito extra de IA.
+
+interface AnaliseCerebroResumo {
+  id: string;
+  tipo: "inicial" | "documento" | "andamento";
+  titulo: string;
+  analise: string;
+  risco: "alto" | "medio" | "baixo" | null;
+  probabilidade_sucesso: number | null;
+  proxima_acao: string | null;
+  created_at: string;
+}
+
+const RESUMO_COR_RISCO: Record<string, string> = {
+  baixo: "text-emerald-700 bg-emerald-50 border-emerald-200",
+  medio: "text-amber-700 bg-amber-50 border-amber-200",
+  alto: "text-red-700 bg-red-50 border-red-200",
+};
+const RESUMO_LABEL_RISCO: Record<string, string> = {
+  baixo: "Risco Baixo",
+  medio: "Risco Médio",
+  alto: "Risco Alto",
+};
+
+function renderTextoAnalise(texto: string) {
+  return texto.split("\n").map((line, i) => {
+    const semMarcadores = line.replace(/\*\*/g, "");
+    if (semMarcadores.startsWith("## "))
+      return (
+        <h4
+          key={i}
+          className="font-body text-sm font-bold text-fg mt-3 mb-1 first:mt-0"
+        >
+          {semMarcadores.replace("## ", "")}
+        </h4>
+      );
+    if (semMarcadores.startsWith("• ") || semMarcadores.startsWith("- "))
+      return (
+        <li key={i} className="font-body text-sm text-fg ml-3 leading-snug">
+          {semMarcadores.slice(2)}
+        </li>
+      );
+    if (semMarcadores.trim())
+      return (
+        <p key={i} className="font-body text-sm text-fg leading-relaxed">
+          {semMarcadores}
+        </p>
+      );
+    return null;
+  });
+}
+
+function ResumoIaTab({ processoId }: { processoId: string }) {
+  const [analises, setAnalises] = useState<AnaliseCerebroResumo[] | null>(null);
+
+  useEffect(() => {
+    let ativo = true;
+    fetch(`/api/cerebro/status/${processoId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (ativo)
+          setAnalises(Array.isArray(data.analises) ? data.analises : []);
+      })
+      .catch(() => {
+        if (ativo) setAnalises([]);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [processoId]);
+
+  if (analises === null) {
+    return (
+      <div className="flex items-center justify-center py-14">
+        <SpinnerIcon className="h-6 w-6 text-muted" />
+      </div>
+    );
+  }
+
+  const diagnostico = analises.find((a) => a.tipo === "inicial") ?? null;
+  const documentos = analises.filter((a) => a.tipo === "documento");
+
+  if (!diagnostico && documentos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-slate-50 py-14 text-center">
+        <ActivityIcon className="mb-3 h-8 w-8 text-muted" />
+        <p className="font-heading text-sm font-semibold text-fg">
+          Ainda não há resumo de IA para este processo
+        </p>
+        <p className="mt-1 max-w-sm font-body text-xs text-muted">
+          Rode &quot;Analisar Documento&quot; (Dr. Lex) ou &quot;Diagnóstico
+          Estratégico&quot; (Cérebro Jurídico) mais acima — o resumo aparece
+          aqui automaticamente, sem gastar crédito extra de IA.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {diagnostico && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-5">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <ActivityIcon className="h-4 w-4 flex-shrink-0 text-violet-600" />
+            <p className="font-body text-xs font-bold uppercase tracking-wide text-violet-700">
+              Diagnóstico Estratégico — Cérebro Jurídico
+            </p>
+            {diagnostico.risco && (
+              <span
+                className={`rounded-full border px-2 py-0.5 font-body text-[10px] font-bold ${RESUMO_COR_RISCO[diagnostico.risco]}`}
+              >
+                {RESUMO_LABEL_RISCO[diagnostico.risco]}
+              </span>
+            )}
+            {diagnostico.probabilidade_sucesso != null && (
+              <span className="rounded-full border border-violet-300 bg-white px-2 py-0.5 font-body text-[10px] font-bold text-violet-700">
+                {diagnostico.probabilidade_sucesso}% de êxito
+              </span>
+            )}
+          </div>
+          <div className="space-y-1">
+            {renderTextoAnalise(diagnostico.analise)}
+          </div>
+          {diagnostico.proxima_acao && (
+            <div className="mt-3 rounded-lg border border-violet-200 bg-white px-3 py-2">
+              <p className="font-body text-[10px] font-bold uppercase tracking-wide text-violet-600">
+                Próxima ação
+              </p>
+              <p className="font-body text-sm text-fg">
+                {diagnostico.proxima_acao}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {documentos.length > 0 && (
+        <div>
+          <p className="mb-2 font-body text-xs font-bold uppercase tracking-wide text-muted">
+            Documentos analisados pelo Dr. Lex ({documentos.length})
+          </p>
+          <div className="space-y-2">
+            {documentos.map((d) => (
+              <details
+                key={d.id}
+                className="rounded-lg border border-border bg-white p-3"
+              >
+                <summary className="cursor-pointer font-body text-sm font-semibold text-fg">
+                  {d.titulo}
+                </summary>
+                <div className="mt-2 space-y-1 border-t border-border pt-2">
+                  {renderTextoAnalise(d.analise)}
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2873,6 +3042,7 @@ export default function ProcessoDetailClient({
   const [novaPendenciaOpen, setNovaPendenciaOpen] = useState(false);
 
   const TABS: { key: Tab; label: string }[] = [
+    { key: "resumo_ia", label: "Resumo do Caso" },
     { key: "dados", label: "Dados" },
     { key: "relato", label: "Relato" },
     { key: "linha_do_tempo", label: "Linha do Tempo" },
@@ -3043,6 +3213,7 @@ export default function ProcessoDetailClient({
 
       {/* Tab Content */}
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+        {tab === "resumo_ia" && <ResumoIaTab processoId={processo.id} />}
         {tab === "dados" && (
           <DadosTab
             processo={processo}

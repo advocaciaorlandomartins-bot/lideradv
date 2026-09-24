@@ -600,18 +600,7 @@ export async function estrategiaProcessual(
   const skill = SKILLS[params.skill];
   const ctxTexto = buildContextoTexto(params.contexto);
 
-  // Streaming em vez de client.messages.create() — mesmo motivo de
-  // analisarDocumento/analisarDocumentoExtendido: diagnóstico estratégico
-  // não-streaming ficava em silêncio até a resposta completa, mais sujeito
-  // a timeout de proxy/gateway no meio do caminho.
-  const stream = client.messages.stream({
-    model: "claude-sonnet-5",
-    max_tokens: 1500,
-    system: skill.systemPrompt,
-    messages: [
-      {
-        role: "user",
-        content: `${ctxTexto}
+  const promptUser = `${ctxTexto}
 
 === TAREFA: DIAGNÓSTICO ESTRATÉGICO ===
 Faça um diagnóstico jurídico completo deste caso e retorne um JSON estruturado com a seguinte estrutura EXATA (nenhum texto fora do JSON):
@@ -628,64 +617,97 @@ Faça um diagnóstico jurídico completo deste caso e retorne um JSON estruturad
   "tempoEstimadoMeses": <número em meses ou null se imprevisível>
 }
 
-Base a análise em TODOS os dados disponíveis acima. Seja realista e específico — não dê probabilidades genéricas.`,
-      },
-    ],
-  });
-  const res = await stream.finalMessage();
+Base a análise em TODOS os dados disponíveis acima. Seja realista e específico — não dê probabilidades genéricas.`;
 
-  const raw = extractText(res) || "{}";
+  // Uma chamada + tentativa de parse. `ok` indica se o JSON veio completo o
+  // suficiente pra usar — um JSON tecnicamente válido mas vazio ({}, porque
+  // a resposta cortou antes de qualquer campo) conta como falha aqui, não
+  // só erro de sintaxe.
+  async function tentar(): Promise<{
+    ok: boolean;
+    resultado: import("./ai-juridico-skills").EstrategiaResult;
+  }> {
+    // Streaming em vez de client.messages.create() — mesmo motivo de
+    // analisarDocumento/analisarDocumentoExtendido: não-streaming ficava em
+    // silêncio até a resposta completa, mais sujeito a timeout de proxy no
+    // meio do caminho.
+    const stream = client.messages.stream({
+      model: "claude-sonnet-5",
+      // 1500 era baixo demais pro JSON completo pedido (resumo + pontos
+      // fortes/frágeis + estratégia + jurisprudência) — a resposta cortava
+      // no meio, JSON.parse falhava e o front mostrava o texto cru do JSON
+      // como se fosse o resumo, com os arrays vazios.
+      max_tokens: 3000,
+      system: skill.systemPrompt,
+      messages: [{ role: "user", content: promptUser }],
+    });
+    const res = await stream.finalMessage();
+    const raw = extractText(res) || "{}";
 
-  try {
-    const match = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(match?.[0] ?? raw);
-    // JSON.parse tem sucesso mesmo se a IA parou de gerar antes de incluir
-    // todos os campos do schema pedido (resposta cortada, mas ainda um JSON
-    // válido até aquele ponto) — sem este fallback por campo, pontosFortes/
-    // pontosFrageis/etc chegavam undefined no front e quebravam o .map()
-    // com "Cannot read properties of undefined", mesmo sem cair no catch.
-    return {
-      probabilidadeExito:
-        typeof parsed.probabilidadeExito === "number"
-          ? parsed.probabilidadeExito
-          : 0,
-      classificacaoRisco: (["alto", "medio", "baixo"] as const).includes(
-        parsed.classificacaoRisco
-      )
-        ? parsed.classificacaoRisco
-        : "alto",
-      resumoEstrategico: parsed.resumoEstrategico ?? raw,
-      pontosFortes: Array.isArray(parsed.pontosFortes)
-        ? parsed.pontosFortes
-        : [],
-      pontosFrageis: Array.isArray(parsed.pontosFrageis)
-        ? parsed.pontosFrageis
-        : [],
-      estrategiaRecomendada: parsed.estrategiaRecomendada ?? raw,
-      proximas_acoes: Array.isArray(parsed.proximas_acoes)
-        ? parsed.proximas_acoes
-        : [],
-      jurisprudenciaRelevante: Array.isArray(parsed.jurisprudenciaRelevante)
-        ? parsed.jurisprudenciaRelevante
-        : [],
-      tempoEstimadoMeses:
-        typeof parsed.tempoEstimadoMeses === "number"
-          ? parsed.tempoEstimadoMeses
-          : null,
-      raw,
-    };
-  } catch {
-    return {
-      probabilidadeExito: 0,
-      classificacaoRisco: "alto" as const,
-      resumoEstrategico: raw,
-      pontosFortes: [],
-      pontosFrageis: [],
-      estrategiaRecomendada: raw,
-      proximas_acoes: [],
-      jurisprudenciaRelevante: [],
-      tempoEstimadoMeses: null,
-      raw,
-    };
+    try {
+      const match = raw.match(/\{[\s\S]*\}/);
+      const parsed = JSON.parse(match?.[0] ?? raw);
+      const ok =
+        typeof parsed.resumoEstrategico === "string" &&
+        parsed.resumoEstrategico.trim().length > 0;
+      return {
+        ok,
+        resultado: {
+          probabilidadeExito:
+            typeof parsed.probabilidadeExito === "number"
+              ? parsed.probabilidadeExito
+              : 0,
+          classificacaoRisco: (["alto", "medio", "baixo"] as const).includes(
+            parsed.classificacaoRisco
+          )
+            ? parsed.classificacaoRisco
+            : "alto",
+          resumoEstrategico: parsed.resumoEstrategico ?? raw,
+          pontosFortes: Array.isArray(parsed.pontosFortes)
+            ? parsed.pontosFortes
+            : [],
+          pontosFrageis: Array.isArray(parsed.pontosFrageis)
+            ? parsed.pontosFrageis
+            : [],
+          estrategiaRecomendada: parsed.estrategiaRecomendada ?? raw,
+          proximas_acoes: Array.isArray(parsed.proximas_acoes)
+            ? parsed.proximas_acoes
+            : [],
+          jurisprudenciaRelevante: Array.isArray(parsed.jurisprudenciaRelevante)
+            ? parsed.jurisprudenciaRelevante
+            : [],
+          tempoEstimadoMeses:
+            typeof parsed.tempoEstimadoMeses === "number"
+              ? parsed.tempoEstimadoMeses
+              : null,
+          raw,
+        },
+      };
+    } catch {
+      return {
+        ok: false,
+        resultado: {
+          probabilidadeExito: 0,
+          classificacaoRisco: "alto" as const,
+          resumoEstrategico: raw,
+          pontosFortes: [],
+          pontosFrageis: [],
+          estrategiaRecomendada: raw,
+          proximas_acoes: [],
+          jurisprudenciaRelevante: [],
+          tempoEstimadoMeses: null,
+          raw,
+        },
+      };
+    }
   }
+
+  const primeira = await tentar();
+  if (primeira.ok) return primeira.resultado;
+
+  // JSON cortado/malformado na 1a tentativa — tenta de novo do zero antes
+  // de desistir e mostrar o texto cru. Resolve o caso mais comum
+  // (instabilidade transitória da geração).
+  const segunda = await tentar();
+  return segunda.ok ? segunda.resultado : primeira.resultado;
 }

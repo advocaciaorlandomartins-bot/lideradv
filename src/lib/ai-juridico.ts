@@ -258,7 +258,12 @@ export async function analisarDocumento(
 
   const ctxTexto = buildContextoTexto(params.contexto);
 
-  const res = await client.messages.create(
+  // Streaming em vez de client.messages.create() — mesmo motivo da versão
+  // "Extendido" logo abaixo: documento anexado (PDF escaneado, principal-
+  // mente) pode levar tempo pra Claude processar, e chamada não-streaming
+  // fica em silêncio até a resposta completa, mais sujeita a timeout de
+  // proxy/gateway no meio do caminho.
+  const stream = client.messages.stream(
     {
       // Sonnet: pede fundamento legal, riscos jurídicos e cláusulas
       // abusivas — raciocínio jurídico de verdade, não extração de dado.
@@ -287,6 +292,7 @@ Responda em português, com formatação markdown clara.`,
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
   );
+  const res = await stream.finalMessage();
 
   const block = res.content[0];
   return block?.type === "text"
@@ -397,7 +403,15 @@ Exemplos de preenchimento:
 
   const ctxTexto = buildContextoTexto(params.contexto);
 
-  const res = await client.messages.create(
+  // Streaming em vez de client.messages.create() — documento anexado (PDF
+  // com imagem escaneada, principalmente) pode levar bastante tempo pra
+  // Claude processar, e uma chamada não-streaming fica em silêncio até
+  // a resposta completa chegar, mais sujeita a timeout de proxy/gateway
+  // no meio do caminho (era o "Erro de conexão" reportado no upload de
+  // laudo médico/atestado). O streaming mantém a conexão SDK↔Anthropic
+  // ativa recebendo chunks continuamente; ainda retorna o texto completo
+  // de uma vez só pro chamador, não expõe streaming pro cliente HTTP.
+  const stream = client.messages.stream(
     {
       // Sonnet: mesmo motivo de analisarDocumento — raciocínio jurídico
       // real (fundamento legal, riscos), não só extração dos dados
@@ -427,6 +441,7 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
   );
+  const res = await stream.finalMessage();
 
   const fullText =
     res.content[0]?.type === "text"

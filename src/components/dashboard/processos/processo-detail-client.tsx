@@ -69,7 +69,9 @@ import {
   ArrowDownTrayIcon,
   KanbanIcon,
   ArchiveBoxIcon,
+  ActivityIcon,
 } from "@/components/icons";
+import { descreverCid } from "@/lib/cid-map";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -108,6 +110,16 @@ const btnOutline =
   "flex items-center gap-1.5 rounded-lg border border-border px-4 h-9 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary cursor-pointer";
 const btnDanger =
   "font-body text-xs font-semibold text-red-500 hover:text-red-700 transition-colors cursor-pointer";
+
+// client.tipo_incapacidade é um enum fixo no formulário de cliente
+// (permanente/temporaria/nao_se_aplica) — mas dado antigo gravado por
+// extração automática de IA às vezes tem texto livre fora desse domínio
+// (ex: "não_atende_critérios"); só traduz os 3 valores válidos pra não
+// exibir lixo cru no badge do processo.
+const TIPO_INCAPACIDADE_LABEL: Record<string, string> = {
+  permanente: "permanente",
+  temporaria: "temporária",
+};
 
 // ── Linha de Produção ──────────────────────────────────────────
 
@@ -2914,6 +2926,34 @@ export default function ProcessoDetailClient({
               <p className="font-mono text-xs text-muted mt-0.5">
                 {processo.numero}
               </p>
+            )}
+            {processo.cid_principal && (
+              <div
+                className="mt-2 inline-flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2"
+                title="Diagnóstico herdado do cadastro do cliente — confira o laudo médico anexado antes de decidir a peça."
+              >
+                <ActivityIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-violet-600" />
+                <p className="font-body text-xs leading-snug text-violet-900">
+                  <span className="font-bold">
+                    CID {processo.cid_principal}
+                  </span>
+                  {descreverCid(processo.cid_principal) && (
+                    <> — {descreverCid(processo.cid_principal)}</>
+                  )}
+                  {TIPO_INCAPACIDADE_LABEL[
+                    processo.tipo_incapacidade ?? ""
+                  ] && (
+                    <span className="block text-violet-700">
+                      Incapacidade{" "}
+                      {
+                        TIPO_INCAPACIDADE_LABEL[
+                          processo.tipo_incapacidade ?? ""
+                        ]
+                      }
+                    </span>
+                  )}
+                </p>
+              </div>
             )}
             <div className="flex gap-3 mt-1.5">
               <Link

@@ -22,6 +22,11 @@ export interface ProcessoExtended extends ProcessoFull {
   resultado_administrativo: string | null;
   resultado_judicial: string | null;
   dias_no_estagio: number;
+  // Diagnóstico do cliente (herdado do cadastro) — mostrado em destaque no
+  // topo do processo pra quem executa a tarefa saber de cara qual condição
+  // está em jogo, sem precisar abrir os documentos anexados.
+  cid_principal: string | null;
+  tipo_incapacidade: string | null;
 }
 
 export interface HistoricoRegistro {
@@ -128,7 +133,8 @@ export async function getProcessoExtended(
       p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
       to_char(p.der, 'YYYY-MM-DD')                         AS der,
       to_char(p.dib, 'YYYY-MM-DD')                         AS dib,
-      to_char(p.dcb, 'YYYY-MM-DD')                         AS dcb
+      to_char(p.dcb, 'YYYY-MM-DD')                         AS dcb,
+      c.cid_principal, c.tipo_incapacidade
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     LEFT JOIN colaboradores col ON col.id = p.responsavel_id
@@ -189,6 +195,8 @@ export async function getProcessoExtended(
     der: r.der ? String(r.der).slice(0, 10) : null,
     dib: r.dib ? String(r.dib).slice(0, 10) : null,
     dcb: r.dcb ? String(r.dcb).slice(0, 10) : null,
+    cid_principal: r.cid_principal ?? null,
+    tipo_incapacidade: r.tipo_incapacidade ?? null,
     // Etiquetas são buscadas à parte (getEtiquetasDeProcesso/getEtiquetasHerdadasDoCliente)
     // e passadas como props próprias pro ProcessoDetailClient — não usado daqui.
     etiquetas: [],

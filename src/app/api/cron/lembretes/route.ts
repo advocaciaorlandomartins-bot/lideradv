@@ -109,12 +109,19 @@ export async function GET(req: Request) {
     const ROTA_RESUMO = "/api/cron/lembretes:resumo-diario";
     let resumoEnviado = false;
     try {
+      // O gate de "já rodou hoje" só olhava a DATA, não a hora — como essa
+      // rota é chamada a cada ~15 min o dia inteiro (pelo pinger do PrevBot),
+      // assim que virava a meia-noite em Brasília a primeira chamada do dia
+      // já disparava o resumo na hora, em vez de às 8h como o texto dizia.
+      const horaBR = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+      ).getHours();
       const [jaEnviadoHoje] = await sql`
         SELECT id FROM cron_execucoes
         WHERE rota = ${ROTA_RESUMO} AND executado_em::date = (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
         LIMIT 1
       `;
-      if (!jaEnviadoHoje) {
+      if (horaBR === 8 && !jaEnviadoHoje) {
         const [cfg] = await sql`SELECT telefone FROM escritorio_config LIMIT 1`;
         const telefone = String(cfg?.telefone ?? "").trim();
         if (telefone) {

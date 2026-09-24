@@ -91,7 +91,13 @@ export async function montarResumoDiario(): Promise<string | null> {
       `,
   ]);
 
-  const hojeISO = new Date().toISOString().slice(0, 10);
+  // toISOString() pega a data em UTC — entre 21h e 23h59 em Brasília o UTC já
+  // virou o dia seguinte, então prazos de HOJE apareciam marcados como
+  // "amanhã/depois" (ou o de amanhã como HOJE) nesse intervalo. Mesmo bug já
+  // corrigido em CURRENT_DATE de outras 13 rotas, só que aqui era do lado JS.
+  const hojeISO = new Date().toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
   const linhas: string[] = [];
 
   if (prazosFatais.length > 0) {

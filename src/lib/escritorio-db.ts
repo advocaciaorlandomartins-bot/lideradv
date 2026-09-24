@@ -4,6 +4,7 @@ export interface EscritorioConfig {
   id: string;
   nome: string;
   oab: string | null;
+  oab_uf: string | null;
   cnpj: string | null;
   telefone: string | null;
   email: string | null;
@@ -38,7 +39,7 @@ export interface EscritorioConfig {
 
 export async function getEscritorioConfig(): Promise<EscritorioConfig> {
   const rows = await sql`
-    SELECT id::text, nome, oab, cnpj, telefone, email, site,
+    SELECT id::text, nome, oab, oab_uf, cnpj, telefone, email, site,
            endereco, cidade, estado, cep, logo_url, logo_ativo,
            identificacao_ativo,
            font_padrao, tamanho_padrao::float AS tamanho_padrao,
@@ -75,6 +76,7 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
       id: "",
       nome: "Advocacia Orlando Martins",
       oab: null,
+      oab_uf: null,
       cnpj: null,
       telefone: null,
       email: null,
@@ -92,6 +94,7 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
     id: r.id,
     nome: r.nome,
     oab: r.oab ?? null,
+    oab_uf: r.oab_uf ?? null,
     cnpj: r.cnpj ?? null,
     telefone: r.telefone ?? null,
     email: r.email ?? null,
@@ -137,6 +140,7 @@ export function configParaDocumento(
     ...config,
     nome: "Advocacia Orlando Martins",
     oab: null,
+    oab_uf: null,
     cnpj: null,
     telefone: null,
     email: null,

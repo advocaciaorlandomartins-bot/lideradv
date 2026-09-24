@@ -17,6 +17,11 @@ export async function saveEscritorioConfigAction(
 
   const nome = ((formData.get("nome") as string) ?? "").trim();
   const oab = ((formData.get("oab") as string) ?? "").trim() || null;
+  const oabUf =
+    ((formData.get("oab_uf") as string) ?? "")
+      .trim()
+      .toUpperCase()
+      .slice(0, 2) || null;
   const cnpj = ((formData.get("cnpj") as string) ?? "").trim() || null;
   const telefone = ((formData.get("telefone") as string) ?? "").trim() || null;
   const email = ((formData.get("email") as string) ?? "").trim() || null;
@@ -66,7 +71,7 @@ export async function saveEscritorioConfigAction(
     if (existing.length > 0) {
       await sql`
         UPDATE escritorio_config SET
-          nome = ${nome}, oab = ${oab}, cnpj = ${cnpj},
+          nome = ${nome}, oab = ${oab}, oab_uf = ${oabUf}, cnpj = ${cnpj},
           telefone = ${telefone}, email = ${email}, site = ${site},
           endereco = ${endereco}, cidade = ${cidade}, estado = ${estado},
           cep = ${cep}, logo_url = ${logoUrl}, logo_ativo = ${logoAtivo},
@@ -85,13 +90,13 @@ export async function saveEscritorioConfigAction(
     } else {
       await sql`
         INSERT INTO escritorio_config
-          (nome, oab, cnpj, telefone, email, site, endereco, cidade, estado, cep,
+          (nome, oab, oab_uf, cnpj, telefone, email, site, endereco, cidade, estado, cep,
            logo_url, logo_ativo, identificacao_ativo, font_padrao, tamanho_padrao, line_height,
            margem_topo, margem_direita, margem_inferior, margem_esquerda,
            modelo_timbrado, modelo_timbrado_ativo,
            fundo_timbrado, fundo_timbrado_ativo, salario_minimo)
         VALUES
-          (${nome}, ${oab}, ${cnpj}, ${telefone}, ${email}, ${site},
+          (${nome}, ${oab}, ${oabUf}, ${cnpj}, ${telefone}, ${email}, ${site},
            ${endereco}, ${cidade}, ${estado}, ${cep}, ${logoUrl}, ${logoAtivo},
            ${identificacaoAtivo},
            ${fontPadrao}, ${tamanhoPadrao}, ${lineHeight},

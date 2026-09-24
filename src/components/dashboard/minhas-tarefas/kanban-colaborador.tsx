@@ -252,14 +252,25 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
       </div>
 
       <div className="border-t border-border px-3 pb-3 pt-3">
-        <Link
-          href={`/dashboard/processos/${item.processo_id}`}
-          style={{ touchAction: "manipulation" }}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
-        >
-          <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />
-          Ver processo
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/dashboard/processos/${item.processo_id}`}
+            style={{ touchAction: "manipulation" }}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
+          >
+            <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />
+            Ver
+          </Link>
+          <Link
+            href={`/dashboard/processos/${item.processo_id}`}
+            style={{ touchAction: "manipulation" }}
+            title="Abra o processo para atualizar seu status e concluir esta ação"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 font-body text-[12px] font-semibold text-white transition-colors hover:bg-emerald-700 active:bg-emerald-800"
+          >
+            <CheckCircleIcon className="h-4 w-4 flex-shrink-0" />
+            Concluir
+          </Link>
+        </div>
       </div>
     </div>
   );

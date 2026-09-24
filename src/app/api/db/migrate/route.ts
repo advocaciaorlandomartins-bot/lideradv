@@ -371,6 +371,14 @@ export async function GET() {
     await sql`ALTER TABLE lancamentos ADD COLUMN IF NOT EXISTS combinado_meta JSONB`;
   });
 
+  // Estado da OAB do escritório — pra aparecer nos documentos junto com o
+  // número da OAB (ex: OAB/SP nº 14381).
+  await run(
+    "escritorio_config.oab_uf",
+    () =>
+      sql`ALTER TABLE escritorio_config ADD COLUMN IF NOT EXISTS oab_uf VARCHAR(2)`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

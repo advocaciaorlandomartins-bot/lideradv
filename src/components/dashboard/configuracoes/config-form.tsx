@@ -349,6 +349,7 @@ export default function ConfigForm({ config }: Props) {
   );
   const [nome, setNome] = useState(config.nome);
   const [oab, setOab] = useState(config.oab ?? "");
+  const [oabUf, setOabUf] = useState(config.oab_uf ?? "");
   const [cnpj, setCnpj] = useState(config.cnpj ?? "");
 
   // Address
@@ -1013,6 +1014,21 @@ export default function ConfigForm({ config }: Props) {
               onChange={(e) => setOab(e.target.value)}
               placeholder="Ex: OAB/SP 123.456"
               className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>OAB Estado</label>
+            <input
+              type="text"
+              name="oab_uf"
+              value={oabUf}
+              onChange={(e) =>
+                setOabUf(e.target.value.toUpperCase().slice(0, 2))
+              }
+              placeholder="SP"
+              maxLength={2}
+              className={`${inputCls} uppercase`}
+              style={{ textTransform: "uppercase" }}
             />
           </div>
           <div>

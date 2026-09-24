@@ -74,7 +74,10 @@ export function buildModeloVars(
     "{{responsavel_email}}": client.responsavel_email ?? "",
     "{{responsavel_parentesco}}": client.responsavel_parentesco ?? "",
     "{{data_hoje}}": date,
-    "{{advogado}}": escritorioConfig.nome,
+    "{{advogado}}":
+      escritorioConfig.oab && escritorioConfig.oab_uf
+        ? `${escritorioConfig.nome}, inscrito(a) na OAB/${escritorioConfig.oab_uf} sob o nº ${escritorioConfig.oab}`
+        : escritorioConfig.nome,
     // Todos os advogados/advogadas ativos com OAB completa (número + UF)
     // cadastrada, prontos pra citar em procuração/contrato — antes só
     // existia {{advogado}}, que é o nome do escritório, sem OAB nenhuma.

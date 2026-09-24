@@ -2929,30 +2929,33 @@ export default function ProcessoDetailClient({
             )}
             {processo.cid_principal && (
               <div
-                className="mt-2 inline-flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2"
+                className="mt-2.5 flex items-start gap-3 rounded-xl bg-violet-700 px-4 py-3 shadow-sm"
                 title="Diagnóstico herdado do cadastro do cliente — confira o laudo médico anexado antes de decidir a peça."
               >
-                <ActivityIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-violet-600" />
-                <p className="font-body text-xs leading-snug text-violet-900">
-                  <span className="font-bold">
+                <ActivityIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-violet-200" />
+                <div>
+                  <p className="font-body text-[10px] font-bold uppercase tracking-wider text-violet-200">
+                    Diagnóstico do cliente
+                  </p>
+                  <p className="font-body text-sm font-semibold leading-snug text-white">
                     CID {processo.cid_principal}
-                  </span>
-                  {descreverCid(processo.cid_principal) && (
-                    <> — {descreverCid(processo.cid_principal)}</>
-                  )}
+                    {descreverCid(processo.cid_principal) && (
+                      <> — {descreverCid(processo.cid_principal)}</>
+                    )}
+                  </p>
                   {TIPO_INCAPACIDADE_LABEL[
                     processo.tipo_incapacidade ?? ""
                   ] && (
-                    <span className="block text-violet-700">
+                    <p className="font-body text-xs text-violet-200">
                       Incapacidade{" "}
                       {
                         TIPO_INCAPACIDADE_LABEL[
                           processo.tipo_incapacidade ?? ""
                         ]
                       }
-                    </span>
+                    </p>
                   )}
-                </p>
+                </div>
               </div>
             )}
             <div className="flex gap-3 mt-1.5">

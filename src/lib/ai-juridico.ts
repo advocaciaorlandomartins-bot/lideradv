@@ -415,7 +415,12 @@ Exemplos de preenchimento:
       // real (fundamento legal, riscos), não só extração dos dados
       // previdenciários que vêm junto no mesmo prompt.
       model: "claude-sonnet-5",
-      max_tokens: 1800,
+      // 1800 era baixo demais quando extrairDados=true: o bloco JSON de
+      // dados previdenciários vem DEPOIS de toda a análise textual (5
+      // seções longas) no mesmo prompt — a resposta cortava antes de
+      // chegar nele, então dadosExtraidos vinha null mesmo com o CID já
+      // mencionado claramente no texto da análise.
+      max_tokens: 3000,
       system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
       messages: [
         {
@@ -481,6 +486,24 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
       if (Object.keys(filtrado).length > 0) dadosExtraidos = filtrado;
     } catch {
       // JSON malformado — ignora silenciosamente
+    }
+  }
+
+  // Fallback: se o bloco JSON estruturado não veio (ou veio sem CID) mas
+  // o texto da análise MENCIONA um CID em prosa (ex: "CID-10 M65.8"), pelo
+  // menos esse campo entra por regex simples — mesmo padrão já usado no
+  // Cérebro Jurídico (augmentProcessFromDocs/salvarAnalise). Evita perder
+  // o dado mais importante quando o bloco estruturado falha por qualquer
+  // motivo, mesmo com max_tokens já aumentado acima.
+  if (!dadosExtraidos?.cid_principal) {
+    const cidMatch = resultado.match(
+      /CID[^:]{0,20}:?\s*([A-Z]\d{2}(?:[.\-]\d+)?)/i
+    );
+    if (cidMatch) {
+      dadosExtraidos = {
+        ...dadosExtraidos,
+        cid_principal: cidMatch[1].toUpperCase(),
+      };
     }
   }
 

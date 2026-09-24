@@ -11,7 +11,7 @@ import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
 import { applyFundoTimbrado } from "@/lib/pdf-fundo";
 import { ModeloPdfDoc } from "@/lib/modelo-pdf";
 import { substituteVariablesInBlocks } from "@/lib/modelo-blocks";
-import { buildModeloVars } from "@/lib/modelo-vars";
+import { buildModeloVars, replaceVars } from "@/lib/modelo-vars";
 
 export const dynamic = "force-dynamic";
 
@@ -76,10 +76,7 @@ export async function GET(request: Request) {
   const vars = buildModeloVars(client, escritorioConfig, date, advogados);
 
   // Replace all variables in content
-  let conteudo = modelo.conteudo;
-  for (const [key, value] of Object.entries(vars)) {
-    conteudo = conteudo.split(key).join(value);
-  }
+  const conteudo = replaceVars(modelo.conteudo, vars);
   const blocks = modelo.conteudo_blocks
     ? substituteVariablesInBlocks(modelo.conteudo_blocks, vars)
     : null;

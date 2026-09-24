@@ -239,13 +239,21 @@ export function substituteVariablesInBlocks(
   blocks: Block[],
   vars: Record<string, string>
 ): Block[] {
-  const replaceInText = (text: string) => {
-    let result = text;
-    for (const [key, value] of Object.entries(vars)) {
-      result = result.split(key).join(value);
-    }
-    return result;
-  };
+  const keys = Object.keys(vars);
+  // Passada única com regex (em vez de split/join encadeado por chave):
+  // se o VALOR de uma variável já substituída contiver, por coincidência,
+  // o texto literal de outro placeholder (ex: nome de cliente "João
+  // {{cpf_cnpj}} Silva"), o loop sequencial substituía essa ocorrência de
+  // novo na iteração seguinte — vazando o valor errado pro documento.
+  const pattern =
+    keys.length > 0
+      ? new RegExp(
+          keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
+          "g"
+        )
+      : null;
+  const replaceInText = (text: string) =>
+    pattern ? text.replace(pattern, (match) => vars[match] ?? match) : text;
 
   const replaceInSpans = (spans: TextSpan[]): TextSpan[] =>
     spans.map((s) => ({ ...s, text: replaceInText(s.text) }));

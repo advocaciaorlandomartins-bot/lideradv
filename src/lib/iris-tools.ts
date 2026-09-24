@@ -4,6 +4,7 @@ import { enviarMensagemDireta } from "./prevbot-outbound";
 import { getLancamentoKpis, getContasAReceber } from "./lancamentos-db";
 import { hasPermission } from "./permissoes";
 import { getColaboradorIdForUser } from "./usuarios-db";
+import { podeAcessarCliente } from "./acesso";
 import { getTipoConfig } from "./controles-types";
 import type { SessionUser } from "./session";
 
@@ -1644,6 +1645,11 @@ async function executarFerramentaIrisInterno(
             erro: `Mais de um cliente encontrado com "${entidadeBusca}" — seja mais específico.`,
             opcoes: clientes.map((c) => c.name),
           });
+        if (!(await podeAcessarCliente(session, String(clientes[0].id))))
+          return JSON.stringify({
+            ok: false,
+            erro: "Este usuário não tem acesso a esse cliente. Explique isso educadamente e não tente de novo.",
+          });
         await aplicarEtiquetaCliente(etiquetaId, String(clientes[0].id));
         return JSON.stringify({
           ok: true,
@@ -1759,6 +1765,13 @@ async function executarFerramentaIrisInterno(
       }
 
       const periciaId = String(filtradas[0].id);
+      const clienteIdRemarcar = String(filtradas[0].cliente_id);
+      if (!(await podeAcessarCliente(session, clienteIdRemarcar))) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem acesso a esse cliente. Explique isso educadamente e não tente de novo.",
+        });
+      }
       await sql`
         UPDATE pericias SET
           data_pericia = ${novaData}::date,
@@ -1855,6 +1868,14 @@ async function executarFerramentaIrisInterno(
           opcoes: candidatosCliente.map((c) => c.name),
         });
       }
+      if (
+        !(await podeAcessarCliente(session, String(candidatosCliente[0].id)))
+      ) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem acesso a esse cliente. Explique isso educadamente e não tente de novo.",
+        });
+      }
 
       const { criarNovoAgendamentoPericia } =
         await import("./pericia-novo-agendamento");
@@ -1938,6 +1959,14 @@ async function executarFerramentaIrisInterno(
           ok: false,
           erro: `Mais de um cliente encontrado com "${clienteBusca}" — pergunte ao usuário qual, ou seja mais específico.`,
           opcoes: candidatosCliente2.map((c) => c.name),
+        });
+      }
+      if (
+        !(await podeAcessarCliente(session, String(candidatosCliente2[0].id)))
+      ) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem acesso a esse cliente. Explique isso educadamente e não tente de novo.",
         });
       }
 
@@ -2263,6 +2292,12 @@ async function executarFerramentaIrisInterno(
           opcoes: candidatos.map((c) => c.name),
         });
       }
+      if (!(await podeAcessarCliente(session, String(candidatos[0].id)))) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem acesso a esse cliente. Explique isso educadamente e não tente de novo.",
+        });
+      }
 
       const CAMPOS_TEXTO = [
         "doc",
@@ -2390,6 +2425,12 @@ async function executarFerramentaIrisInterno(
       }
       const clienteId3 = String(candidatosCliente3[0].id);
       const clienteNome3 = String(candidatosCliente3[0].name);
+      if (!(await podeAcessarCliente(session, clienteId3))) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem acesso a esse cliente. Explique isso educadamente e não tente de novo.",
+        });
+      }
 
       let processoId3: string | null = null;
       const processoBusca = String(input.processo_busca ?? "").trim();

@@ -6,7 +6,7 @@ import { getClientFull } from "@/lib/clients-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { getAdvogadosParaDocumento } from "@/lib/colaboradores-db";
-import { buildModeloVars } from "@/lib/modelo-vars";
+import { buildModeloVars, replaceVars } from "@/lib/modelo-vars";
 import {
   blocksToHtml,
   textToHtml,
@@ -191,13 +191,7 @@ export async function POST(req: NextRequest) {
     const vars = buildModeloVars(client, escritorioConfig, dataHoje, advogados);
     const html = modelo.conteudo_blocks
       ? blocksToHtml(substituteVariablesInBlocks(modelo.conteudo_blocks, vars))
-      : (() => {
-          let conteudo = modelo.conteudo;
-          for (const [key, value] of Object.entries(vars)) {
-            conteudo = conteudo.split(key).join(value);
-          }
-          return textToHtml(conteudo);
-        })();
+      : textToHtml(replaceVars(modelo.conteudo, vars));
 
     // ── 4. Cria o envelope (registro interno) ──
     const criadoPor = await resolverAdminLogin();

@@ -13,7 +13,7 @@ import { getClientFull } from "./clients-db";
 import { getModeloById } from "./modelos-db";
 import { getEscritorioConfig } from "./escritorio-db";
 import { getAdvogadosParaDocumento } from "./colaboradores-db";
-import { buildModeloVars } from "./modelo-vars";
+import { buildModeloVars, replaceVars } from "./modelo-vars";
 import {
   blocksToHtml,
   textToHtml,
@@ -91,11 +91,7 @@ export async function salvarEnvelopeAction(
       const blocks = substituteVariablesInBlocks(modelo.conteudo_blocks, vars);
       html = blocksToHtml(blocks);
     } else {
-      let conteudo = modelo.conteudo;
-      for (const [key, value] of Object.entries(vars)) {
-        conteudo = conteudo.split(key).join(value);
-      }
-      html = textToHtml(conteudo);
+      html = textToHtml(replaceVars(modelo.conteudo, vars));
     }
 
     documentos.push({

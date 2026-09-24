@@ -6,6 +6,7 @@ import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { podeEditarProcesso } from "./processo-ownership";
+import { podeAcessarProcesso } from "./acesso";
 import { interpretarAndamento } from "./cerebroJuridico";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
@@ -212,6 +213,16 @@ export async function marcarAndamentoLidoAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "ver"))
+    return { error: "Sem permissão." };
+  // Sem isso, um usuário restrito aos próprios processos (sem
+  // processos_ver_todos) podia marcar como lido o andamento de QUALQUER
+  // processo do escritório só adivinhando/enumerando o UUID do registro —
+  // hasPermission acima só checa o módulo, nunca o processo_id específico.
+  const [registro] = await sql`
+    SELECT processo_id::text FROM historico_registros WHERE id = ${id}::uuid
+  `;
+  if (!registro) return { error: "Registro não encontrado." };
+  if (!(await podeAcessarProcesso(session, registro.processo_id as string)))
     return { error: "Sem permissão." };
   try {
     await sql`

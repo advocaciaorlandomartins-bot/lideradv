@@ -84,3 +84,24 @@ export function buildModeloVars(
     "{{advogados}}": joinComE(advogados.map(formatAdvogado)),
   };
 }
+
+/**
+ * Substitui {{variavel}} pelo valor correspondente em texto puro (fallback
+ * de modelo sem conteudo_blocks). Passada única com regex — um loop
+ * sequencial de split/join por chave reprocessaria, na chave seguinte, um
+ * placeholder que por coincidência apareça dentro do VALOR já substituído
+ * (ex: nome de cliente contendo literalmente "{{cpf_cnpj}}"), vazando o
+ * valor errado pro documento.
+ */
+export function replaceVars(
+  texto: string,
+  vars: Record<string, string>
+): string {
+  const keys = Object.keys(vars);
+  if (keys.length === 0) return texto;
+  const pattern = new RegExp(
+    keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
+    "g"
+  );
+  return texto.replace(pattern, (match) => vars[match] ?? match);
+}

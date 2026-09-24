@@ -222,6 +222,12 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
                 ? "Aguardando"
                 : "Próxima ação"}
           </span>
+          {item.urgente && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 font-body text-[10px] font-semibold text-red-700">
+              <span className="h-2 w-2 rounded-full bg-red-600" />
+              Requerida
+            </span>
+          )}
         </div>
 
         <p className="font-body text-sm font-semibold leading-snug text-fg">
@@ -252,25 +258,21 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
       </div>
 
       <div className="border-t border-border px-3 pb-3 pt-3">
-        <div className="flex gap-2">
-          <Link
-            href={`/dashboard/processos/${item.processo_id}`}
-            style={{ touchAction: "manipulation" }}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
-          >
-            <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />
-            Ver
-          </Link>
-          <Link
-            href={`/dashboard/processos/${item.processo_id}`}
-            style={{ touchAction: "manipulation" }}
-            title="Abra o processo para atualizar seu status e concluir esta ação"
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 font-body text-[12px] font-semibold text-white transition-colors hover:bg-emerald-700 active:bg-emerald-800"
-          >
-            <CheckCircleIcon className="h-4 w-4 flex-shrink-0" />
-            Concluir
-          </Link>
-        </div>
+        {/* Um único botão — esta ação é derivada automaticamente do estado
+            do processo (não tem um "concluir" próprio como controles/tarefas
+            manuais): ela só some daqui quando o processo for atualizado lá
+            dentro. Um segundo botão verde com CheckCircleIcon ao lado deste
+            passaria a falsa impressão de que a pendência foi resolvida com
+            um clique, sem exigir a atualização real no processo. */}
+        <Link
+          href={`/dashboard/processos/${item.processo_id}`}
+          style={{ touchAction: "manipulation" }}
+          title="Abra o processo para atualizar o andamento e resolver esta pendência"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
+        >
+          <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />
+          Ver processo e resolver
+        </Link>
       </div>
     </div>
   );

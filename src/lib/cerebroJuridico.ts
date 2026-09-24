@@ -1,6 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
+import { aplicarCamposClienteSeVazios } from "./cliente-documento-auto";
 
 function getClaudeClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -2020,6 +2021,25 @@ export async function salvarAnalise(
   ]
     .map((m) => m[0])
     .slice(0, 15);
+
+  // O Diagnóstico Estratégico frequentemente identifica e cita o CID no
+  // texto (ex: "Pessoa com deficiência (CID F84.0 — Autismo Infantil)"),
+  // mas isso nunca era persistido no cadastro do cliente — só alimentava
+  // o contexto em memória de chamadas seguintes (augmentProcessFromDocs).
+  // Sem gravar aqui, o badge de CID no topo do processo ficava vazio
+  // mesmo com o diagnóstico já tendo identificado a condição, obrigando
+  // rodar "Analisar Documento" separadamente só pra preencher esse campo.
+  // Mesmo regex já usado em augmentProcessFromDocs (linha ~962).
+  const cidMatch = analise.match(
+    /CID[^:]{0,15}:?\s*([A-Z]\d{2}(?:[.\-]\d+)?)/i
+  );
+  if (cidMatch) {
+    await aplicarCamposClienteSeVazios(
+      clientId,
+      { cid_principal: cidMatch[1].toUpperCase() },
+      "cerebro_diagnostico"
+    ).catch(() => {});
+  }
 
   let tarefaCriada = false;
   try {

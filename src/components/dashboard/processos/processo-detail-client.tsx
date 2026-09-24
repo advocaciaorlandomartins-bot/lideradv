@@ -3034,7 +3034,7 @@ export default function ProcessoDetailClient({
   podeEditarEtiquetas = false,
   podeCriarCategoriaNova = false,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("dados");
+  const [tab, setTab] = useState<Tab>("resumo_ia");
   const [arquivarOpen, setArquivarOpen] = useState(false);
   const [novoRegistroOpen, setNovoRegistroOpen] = useState(false);
   const [novoEventoOpen, setNovoEventoOpen] = useState(false);

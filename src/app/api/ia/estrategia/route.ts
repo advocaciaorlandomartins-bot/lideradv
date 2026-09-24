@@ -13,6 +13,7 @@ import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { obterContextoCerebro } from "@/lib/cerebroJuridico";
+import { aplicarCamposClienteSeVazios } from "@/lib/cliente-documento-auto";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -95,6 +96,24 @@ export async function POST(req: Request) {
       instrucaoExtra: cerebroCtx || undefined,
     },
   });
+
+  // O diagnóstico frequentemente cita o CID no texto (ex: "CID F84.0 —
+  // Autismo Infantil") mas nunca gravava isso no cadastro do cliente,
+  // deixando o badge de CID no topo do processo vazio mesmo com a IA já
+  // tendo identificado a condição. Mesmo regex usado em cerebroJuridico.ts
+  // (salvarAnalise) — só preenche se o campo já não estiver preenchido.
+  if (clienteId) {
+    const cidMatch = (resultado.resumoEstrategico + " " + resultado.raw).match(
+      /CID[^:]{0,15}:?\s*([A-Z]\d{2}(?:[.\-]\d+)?)/i
+    );
+    if (cidMatch) {
+      await aplicarCamposClienteSeVazios(
+        clienteId,
+        { cid_principal: cidMatch[1].toUpperCase() },
+        "ia_estrategia"
+      ).catch(() => {});
+    }
+  }
 
   return NextResponse.json(resultado);
 }

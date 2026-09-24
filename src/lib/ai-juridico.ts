@@ -609,7 +609,11 @@ export async function estrategiaProcessual(
   const skill = SKILLS[params.skill];
   const ctxTexto = buildContextoTexto(params.contexto);
 
-  const res = await client.messages.create({
+  // Streaming em vez de client.messages.create() — mesmo motivo de
+  // analisarDocumento/analisarDocumentoExtendido: diagnóstico estratégico
+  // não-streaming ficava em silêncio até a resposta completa, mais sujeito
+  // a timeout de proxy/gateway no meio do caminho.
+  const stream = client.messages.stream({
     model: "claude-sonnet-5",
     max_tokens: 1500,
     system: skill.systemPrompt,
@@ -637,6 +641,7 @@ Base a análise em TODOS os dados disponíveis acima. Seja realista e específic
       },
     ],
   });
+  const res = await stream.finalMessage();
 
   const block = res.content[0];
   const raw = block?.type === "text" ? block.text : "{}";
@@ -644,7 +649,41 @@ Base a análise em TODOS os dados disponíveis acima. Seja realista e específic
   try {
     const match = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(match?.[0] ?? raw);
-    return { ...parsed, raw };
+    // JSON.parse tem sucesso mesmo se a IA parou de gerar antes de incluir
+    // todos os campos do schema pedido (resposta cortada, mas ainda um JSON
+    // válido até aquele ponto) — sem este fallback por campo, pontosFortes/
+    // pontosFrageis/etc chegavam undefined no front e quebravam o .map()
+    // com "Cannot read properties of undefined", mesmo sem cair no catch.
+    return {
+      probabilidadeExito:
+        typeof parsed.probabilidadeExito === "number"
+          ? parsed.probabilidadeExito
+          : 0,
+      classificacaoRisco: (["alto", "medio", "baixo"] as const).includes(
+        parsed.classificacaoRisco
+      )
+        ? parsed.classificacaoRisco
+        : "alto",
+      resumoEstrategico: parsed.resumoEstrategico ?? raw,
+      pontosFortes: Array.isArray(parsed.pontosFortes)
+        ? parsed.pontosFortes
+        : [],
+      pontosFrageis: Array.isArray(parsed.pontosFrageis)
+        ? parsed.pontosFrageis
+        : [],
+      estrategiaRecomendada: parsed.estrategiaRecomendada ?? raw,
+      proximas_acoes: Array.isArray(parsed.proximas_acoes)
+        ? parsed.proximas_acoes
+        : [],
+      jurisprudenciaRelevante: Array.isArray(parsed.jurisprudenciaRelevante)
+        ? parsed.jurisprudenciaRelevante
+        : [],
+      tempoEstimadoMeses:
+        typeof parsed.tempoEstimadoMeses === "number"
+          ? parsed.tempoEstimadoMeses
+          : null,
+      raw,
+    };
   } catch {
     return {
       probabilidadeExito: 0,

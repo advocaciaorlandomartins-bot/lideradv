@@ -278,7 +278,7 @@ export default function IaJuridicaSection({
                       ✅ Pontos fortes
                     </h4>
                     <ul className="space-y-1">
-                      {resultado.pontosFortes.map((p, i) => (
+                      {(resultado.pontosFortes ?? []).map((p, i) => (
                         <li
                           key={i}
                           className="font-body text-xs text-emerald-800 flex gap-2"
@@ -294,7 +294,7 @@ export default function IaJuridicaSection({
                       ⚠️ Pontos frágeis
                     </h4>
                     <ul className="space-y-1">
-                      {resultado.pontosFrageis.map((p, i) => (
+                      {(resultado.pontosFrageis ?? []).map((p, i) => (
                         <li
                           key={i}
                           className="font-body text-xs text-red-800 flex gap-2"
@@ -318,13 +318,13 @@ export default function IaJuridicaSection({
                 </div>
 
                 {/* Próximas ações */}
-                {resultado.proximas_acoes.length > 0 && (
+                {(resultado.proximas_acoes ?? []).length > 0 && (
                   <div>
                     <h4 className="font-body text-xs font-bold text-muted uppercase tracking-wide mb-2">
                       📋 Próximas ações
                     </h4>
                     <ol className="space-y-1">
-                      {resultado.proximas_acoes.map((a, i) => (
+                      {(resultado.proximas_acoes ?? []).map((a, i) => (
                         <li
                           key={i}
                           className="flex gap-2 font-body text-sm text-fg"
@@ -340,13 +340,13 @@ export default function IaJuridicaSection({
                 )}
 
                 {/* Jurisprudência */}
-                {resultado.jurisprudenciaRelevante.length > 0 && (
+                {(resultado.jurisprudenciaRelevante ?? []).length > 0 && (
                   <div>
                     <h4 className="font-body text-xs font-bold text-muted uppercase tracking-wide mb-2">
                       📚 Jurisprudência relevante
                     </h4>
                     <ul className="space-y-1">
-                      {resultado.jurisprudenciaRelevante.map((j, i) => (
+                      {(resultado.jurisprudenciaRelevante ?? []).map((j, i) => (
                         <li
                           key={i}
                           className="font-body text-xs text-muted flex gap-2"

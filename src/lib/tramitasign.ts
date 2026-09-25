@@ -20,18 +20,21 @@ import crypto from "crypto";
 const TRAMITA_PLANILHA_BASE = "https://planilha.tramitacaointeligente.com.br";
 
 function baseUrl(): string {
-  // TRAMITASIGN_BASE_URL pode estar salva com ou sem /api/v1, com barra(s)
-  // no fim, ou com espaço/quebra de linha sobrando (bem comum ao colar
-  // valor num campo de variável de ambiente) — qualquer uma dessas coisas
-  // fazia a checagem antiga (endsWith direto) falhar silenciosamente e
-  // duplicar o sufixo (".../api/v1/api/v1/...", 404 puro, confirmado
-  // reproduzindo o erro batido pelo usuário). Normaliza de forma tolerante
-  // a qualquer um desses formatos antes de montar a URL final.
-  const raw = (process.env.TRAMITASIGN_BASE_URL ?? "")
-    .trim()
-    .replace(/\/+$/, "")
-    .replace(/\/api\/v1$/i, "");
-  return `${raw}/api/v1`;
+  // TRAMITASIGN_BASE_URL em produção estava salva terminando em "/api"
+  // (não no domínio puro, nem em "/api/v1") — confirmado ao vivo: o erro
+  // batido pelo usuário mostrou a URL de verdade sendo montada como
+  // ".../api/api/v1/usuarios" (404 puro). Tentativas anteriores de
+  // normalizar só cobriam alguns formatos (com/sem "/api/v1", barra(s) no
+  // fim) e continuavam vulneráveis a qualquer outro caminho salvo na
+  // variável. Em vez de adivinhar mais formatos, ignora completamente
+  // qualquer caminho salvo — usa só o domínio (origin) e monta "/api/v1"
+  // do zero. Blindado contra qualquer lixo de caminho na variável.
+  const raw = (process.env.TRAMITASIGN_BASE_URL ?? "").trim();
+  try {
+    return `${new URL(raw).origin}/api/v1`;
+  } catch {
+    return `${raw.replace(/\/+$/, "")}/api/v1`;
+  }
 }
 
 function apiKey(): string {

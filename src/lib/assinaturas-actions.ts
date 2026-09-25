@@ -36,6 +36,7 @@ import {
   tramitaCriarEnvelopeAssinatura,
   tramitaAtualizarSignatarios,
   tramitaEnviarEnvelopeAssinatura,
+  tramitaObterEnvelopeAssinatura,
   type TramitaSignerInput,
 } from "./tramitasign";
 
@@ -339,12 +340,42 @@ export async function enviarEnvelopeParaTramitaSign(
       link: s.signatureLink,
       erro: s.signatureLink
         ? null
-        : "Envelope enviado, mas o TramitaSign não retornou o link de assinatura deste assinante.",
+        : "Envelope enviado, mas o TramitaSign ainda não gerou o link de assinatura deste assinante.",
     });
   }
 
+  // 7. POST /envio responde 202 (aceito) enquanto o envelope ainda está em
+  //    preparação — o signature_link só fica pronto quando chega em
+  //    aguardando_assinaturas. Espera um pouco e reconsulta uma vez antes
+  //    de desistir (o webhook também atualiza isso depois, mas não faz
+  //    sentido deixar o usuário vendo "sem link" se resolve em segundos).
+  if (algumSemLink) {
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+    const atualizado = await tramitaObterEnvelopeAssinatura(criado.id);
+    if (atualizado) {
+      algumSemLink = false;
+      for (const s of atualizado.signers) {
+        const assinanteId = s.email
+          ? assinanteIdPorEmail.get(s.email.toLowerCase())
+          : undefined;
+        if (!assinanteId || !s.signatureLink) {
+          if (assinanteId) algumSemLink = true;
+          continue;
+        }
+        await atualizarAssinanteTramitaSign(assinanteId, {
+          signerId: s.id,
+          link: s.signatureLink,
+          erro: null,
+        });
+      }
+    }
+  }
+
   return algumSemLink
-    ? { error: "Envio parcial — confira o assinante sem link." }
+    ? {
+        error:
+          "Envelope enviado — o TramitaSign ainda está preparando o link de assinatura. Reenvie em alguns segundos ou aguarde, ele chega automaticamente.",
+      }
     : {};
 }
 

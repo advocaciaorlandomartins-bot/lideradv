@@ -105,15 +105,27 @@ export async function POST(request: Request) {
   }
   const envelopeId = nosso.id as string;
 
-  // Atualiza o status de cada assinante que já terminou de assinar.
+  // Atualiza cada assinante: link de assinatura assim que disponível
+  // (POST /envio responde antes disso ficar pronto — é por isso que esse
+  // webhook existe também pra esse caso, não só pra marcar "assinado") e
+  // status quando ele já terminou de assinar.
   const signers = Array.isArray(envelope.signers) ? envelope.signers : [];
   for (const s of signers) {
-    if (!s.id || !s.all_documents_signed) continue;
-    await sql`
-      UPDATE envelope_assinantes
-      SET status = 'assinado', assinado_em = COALESCE(assinado_em, now())
-      WHERE envelope_id = ${envelopeId}::uuid AND tramitasign_signer_id = ${s.id}
-    `;
+    if (!s.id) continue;
+    if (s.signature_link) {
+      await sql`
+        UPDATE envelope_assinantes
+        SET tramitasign_link = ${s.signature_link}, tramitasign_erro = NULL
+        WHERE envelope_id = ${envelopeId}::uuid AND tramitasign_signer_id = ${s.id}
+      `;
+    }
+    if (s.all_documents_signed) {
+      await sql`
+        UPDATE envelope_assinantes
+        SET status = 'assinado', assinado_em = COALESCE(assinado_em, now())
+        WHERE envelope_id = ${envelopeId}::uuid AND tramitasign_signer_id = ${s.id}
+      `;
+    }
   }
 
   const finalizado =

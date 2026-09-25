@@ -461,6 +461,24 @@ export interface TramitaSignerResultado {
 }
 
 /** Passo 6: envia de verdade — a resposta traz o signature_link de cada assinante. */
+function mapEnvelopeSigners(data: unknown): TramitaSignerResultado[] {
+  const signers = ((data as { envelope?: { signers?: unknown[] } })?.envelope
+    ?.signers ?? []) as Array<{
+    id: string;
+    signer_type: string;
+    email: string | null;
+    full_name: string | null;
+    signature_link: string | null;
+  }>;
+  return signers.map((s) => ({
+    id: s.id,
+    signerType: s.signer_type,
+    email: s.email ?? null,
+    fullName: s.full_name ?? null,
+    signatureLink: s.signature_link ?? null,
+  }));
+}
+
 export async function tramitaEnviarEnvelopeAssinatura(
   envelopeId: number
 ): Promise<{ signers: TramitaSignerResultado[] } | null> {
@@ -477,25 +495,37 @@ export async function tramitaEnviarEnvelopeAssinatura(
       );
       return null;
     }
-    const data = await res.json();
-    const signers = (data?.envelope?.signers ?? []) as Array<{
-      id: string;
-      signer_type: string;
-      email: string | null;
-      full_name: string | null;
-      signature_link: string | null;
-    }>;
-    return {
-      signers: signers.map((s) => ({
-        id: s.id,
-        signerType: s.signer_type,
-        email: s.email ?? null,
-        fullName: s.full_name ?? null,
-        signatureLink: s.signature_link ?? null,
-      })),
-    };
+    return { signers: mapEnvelopeSigners(await res.json()) };
   } catch (e) {
     console.error("[TramitaSign] enviarEnvelopeAssinatura error:", e);
+    return null;
+  }
+}
+
+/**
+ * POST /assinaturas/{id}/envio responde 202 (aceito) enquanto o envelope
+ * ainda está em preparação — o signature_link de cada assinante só vem
+ * preenchido quando o envelope chega em aguardando_assinaturas (ou depois).
+ * Usado logo após o envio pra tentar pegar o link já pronto sem esperar o
+ * webhook, que também recebe esse mesmo dado quando fica disponível.
+ */
+export async function tramitaObterEnvelopeAssinatura(
+  envelopeId: number
+): Promise<{ signers: TramitaSignerResultado[] } | null> {
+  try {
+    const res = await fetch(`${baseUrl()}/assinaturas/${envelopeId}`, {
+      headers: headers(),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.error(
+        `[TramitaSign] obterEnvelope: HTTP ${res.status} — ${txt.slice(0, 300)}`
+      );
+      return null;
+    }
+    return { signers: mapEnvelopeSigners(await res.json()) };
+  } catch (e) {
+    console.error("[TramitaSign] obterEnvelopeAssinatura error:", e);
     return null;
   }
 }

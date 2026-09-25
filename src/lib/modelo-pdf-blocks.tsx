@@ -182,15 +182,20 @@ export function renderBlocks(
         );
 
       case "callout": {
+        // Espaçamento reduzido (era marginBottom 14 + padding 10 + gap 4 —
+        // com muitos callouts em sequência, como uma cláusula de honorários
+        // detalhada em várias situações A-K, isso sozinho somava mais de uma
+        // página inteira só em margens/padding repetidos). Ajuste puramente
+        // visual, não muda o texto nem a estrutura do conteúdo.
         return (
           <View
             key={idx}
             style={{
-              marginBottom: 14,
+              marginBottom: 8,
               backgroundColor: "#f8f8f8",
               borderLeftWidth: 3,
               borderLeftColor: "#1a1a1a",
-              padding: 10,
+              padding: 7,
             }}
           >
             {block.title && (
@@ -200,7 +205,7 @@ export function renderBlocks(
                   fontFamily: pdfCfg.fontBold,
                   fontSize: pdfCfg.fontSize,
                   color: "#1a1a1a",
-                  marginBottom: 4,
+                  marginBottom: 2,
                 }}
               >
                 {block.title}
@@ -210,7 +215,7 @@ export function renderBlocks(
               style={{
                 fontFamily: pdfCfg.fontRegular,
                 fontSize: pdfCfg.fontSize,
-                lineHeight: pdfCfg.lineHeight,
+                lineHeight: Math.min(pdfCfg.lineHeight, 1.35),
                 textAlign: "justify",
               }}
             >

@@ -74,13 +74,8 @@ export function ModeloPdfDoc({
               </Text>
             ))}
 
-        {withLetterhead ? (
+        {withLetterhead && (
           <TimbradoFooter config={configParaDocumento(config!)} date={date} />
-        ) : (
-          <Text style={s.simpleFooter} fixed>
-            {nomeExibido}
-            {oabExibida ? ` — ${oabExibida}` : ""}
-          </Text>
         )}
       </Page>
     </Document>

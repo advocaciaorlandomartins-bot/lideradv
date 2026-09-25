@@ -44,16 +44,11 @@ function PageHeader({
 function PageFooter({
   config,
   date,
-  s,
 }: SharedProps & { date: string; s: ReturnType<typeof buildStyles> }) {
   if (config && config.modelo_timbrado_ativo) {
     return <TimbradoFooter config={configParaDocumento(config)} date={date} />;
   }
-  return (
-    <Text style={s.simpleFooter} fixed>
-      {lawyerName(config)} — {lawyerOab(config)}
-    </Text>
-  );
+  return null;
 }
 
 // Signature block — structure only, font applied inline

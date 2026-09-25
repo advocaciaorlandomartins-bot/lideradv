@@ -32,8 +32,8 @@ export function ModeloPdfDoc({
   const s = buildStyles(pdfCfg);
   const identificacaoAtiva = !config || config.identificacao_ativo;
   const nomeExibido = identificacaoAtiva
-    ? (config?.nome ?? "Advocacia Orlando Martins")
-    : "Advocacia Orlando Martins";
+    ? (config?.nome ?? "Orlando Martins Advocacia")
+    : "Orlando Martins Advocacia";
   const oabExibida = identificacaoAtiva ? (config?.oab ?? null) : null;
 
   const paragraphs = conteudo
@@ -79,7 +79,7 @@ export function ModeloPdfDoc({
         ) : (
           <Text style={s.simpleFooter} fixed>
             {nomeExibido}
-            {oabExibida ? ` — ${oabExibida}` : ""} · {date}
+            {oabExibida ? ` — ${oabExibida}` : ""}
           </Text>
         )}
       </Page>

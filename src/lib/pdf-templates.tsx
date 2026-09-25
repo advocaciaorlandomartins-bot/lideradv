@@ -51,7 +51,7 @@ function PageFooter({
   }
   return (
     <Text style={s.simpleFooter} fixed>
-      {lawyerName(config)} — {lawyerOab(config)} · {date}
+      {lawyerName(config)} — {lawyerOab(config)}
     </Text>
   );
 }
@@ -98,8 +98,8 @@ function formatAddress(c: ClientFull) {
 
 /** Nome pra metadata "Autor" do PDF — respeita identificacao_ativo (não é só o cabeçalho/rodapé visível que precisa disso). */
 function authorName(config?: EscritorioConfig | null) {
-  if (config && !config.identificacao_ativo) return "Advocacia Orlando Martins";
-  return config?.nome ?? "Advocacia Orlando Martins";
+  if (config && !config.identificacao_ativo) return "Orlando Martins Advocacia";
+  return config?.nome ?? "Orlando Martins Advocacia";
 }
 
 function lawyerName(config?: EscritorioConfig | null) {

@@ -203,10 +203,10 @@ export async function enviarEnvelopeParaTramitaSign(
   //    chave de API não é uma pessoa). Confere isso primeiro, antes de
   //    gastar tempo gerando/subindo PDF: se a API key/URL estiverem
   //    erradas, é aqui que dá pra saber mais rápido e mais claro.
-  const userId = await tramitaObterUserId();
+  const userIdResultado = await tramitaObterUserId();
+  const userId = userIdResultado.userId;
   if (!userId) {
-    const erro =
-      "Não foi possível obter o usuário do TramitaSign (API key/URL configuradas mas a resposta não trouxe um id válido).";
+    const erro = `Não foi possível obter o usuário do TramitaSign${userIdResultado.erro ? ` (${userIdResultado.erro})` : ""}.`;
     await gravarErroEmTodos(erro);
     return { error: erro };
   }

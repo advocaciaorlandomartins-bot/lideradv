@@ -239,30 +239,34 @@ export async function tramitaCriarNota(
   }
 }
 
-export async function tramitaObterUserId(): Promise<string> {
+export interface TramitaUserIdResultado {
+  userId: string;
+  erro?: string;
+}
+
+export async function tramitaObterUserId(): Promise<TramitaUserIdResultado> {
   try {
-    const res = await fetch(`${baseUrl()}/usuarios?items=1`, {
+    const res = await fetch(`${baseUrl()}/usuarios?per_page=1`, {
       headers: headers(),
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
-      console.error(
-        `[TramitaSign] obterUserId: HTTP ${res.status} — ${txt.slice(0, 300)}`
-      );
-      return "";
+      const erro = `obterUserId: HTTP ${res.status} — ${txt.slice(0, 200)}`;
+      console.error(`[TramitaSign] ${erro}`);
+      return { userId: "", erro };
     }
     const data = await res.json();
     const id = String(data?.users?.[0]?.id ?? data?.[0]?.id ?? "");
     if (!id) {
-      console.error(
-        "[TramitaSign] obterUserId: resposta OK mas sem id de usuário — formato inesperado:",
-        JSON.stringify(data).slice(0, 300)
-      );
+      const erro = `obterUserId: resposta OK mas sem id de usuário — ${JSON.stringify(data).slice(0, 200)}`;
+      console.error(`[TramitaSign] ${erro}`);
+      return { userId: "", erro };
     }
-    return id;
+    return { userId: id };
   } catch (e) {
+    const erro = e instanceof Error ? e.message : String(e);
     console.error("[TramitaSign] obterUserId error:", e);
-    return "";
+    return { userId: "", erro };
   }
 }
 

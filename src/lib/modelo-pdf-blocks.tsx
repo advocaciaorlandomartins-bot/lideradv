@@ -49,6 +49,30 @@ function renderSpans(spans: TextSpan[], cfg: PdfPageConfig, fontSize: number) {
   ));
 }
 
+// Modelos de honorários no formato pergunta/resposta vinham com "PERGUNTA:"
+// e "RESPOSTA:" (spans em negrito) dentro do mesmo parágrafo justificado —
+// a resposta ficava colada no fim da linha da pergunta, difícil de
+// distinguir visualmente. Quebra o callout em duas linhas sempre que um
+// span em negrito começa com "RESPOSTA" — não altera o texto, só onde a
+// quebra de linha acontece.
+function splitSpansAtResposta(spans: TextSpan[]): TextSpan[][] {
+  const groups: TextSpan[][] = [];
+  let current: TextSpan[] = [];
+  for (const span of spans) {
+    if (
+      span.bold &&
+      /^RESPOSTA\s*:?$/i.test(span.text.trim()) &&
+      current.length > 0
+    ) {
+      groups.push(current);
+      current = [];
+    }
+    current.push(span);
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
 export function renderBlocks(
   blocks: Block[],
   s: Styles,
@@ -211,16 +235,20 @@ export function renderBlocks(
                 {block.title}
               </Text>
             )}
-            <Text
-              style={{
-                fontFamily: pdfCfg.fontRegular,
-                fontSize: pdfCfg.fontSize,
-                lineHeight: Math.min(pdfCfg.lineHeight, 1.35),
-                textAlign: "justify",
-              }}
-            >
-              {renderSpans(block.spans, pdfCfg, pdfCfg.fontSize)}
-            </Text>
+            {splitSpansAtResposta(block.spans).map((grupo, gi) => (
+              <Text
+                key={gi}
+                style={{
+                  fontFamily: pdfCfg.fontRegular,
+                  fontSize: pdfCfg.fontSize,
+                  lineHeight: Math.min(pdfCfg.lineHeight, 1.35),
+                  textAlign: "justify",
+                  marginTop: gi > 0 ? 4 : 0,
+                }}
+              >
+                {renderSpans(grupo, pdfCfg, pdfCfg.fontSize)}
+              </Text>
+            ))}
           </View>
         );
       }

@@ -81,6 +81,7 @@ export interface EnvelopeDetalhe {
     status: string;
     ordem: number;
     tramitasignLink: string | null;
+    tramitasignErro: string | null;
   }[];
 }
 
@@ -104,7 +105,8 @@ export async function getEnvelopeById(
       ORDER BY ordem
     `,
     sql`
-      SELECT id::text, tipo, nome, email, papel, status, ordem, tramitasign_link
+      SELECT id::text, tipo, nome, email, papel, status, ordem,
+             tramitasign_link, tramitasign_erro
       FROM envelope_assinantes
       WHERE envelope_id = ${id}::uuid
       ORDER BY ordem
@@ -134,6 +136,7 @@ export async function getEnvelopeById(
       status: a.status,
       ordem: a.ordem,
       tramitasignLink: a.tramitasign_link ?? null,
+      tramitasignErro: a.tramitasign_erro ?? null,
     })),
   };
 }
@@ -208,13 +211,75 @@ export async function criarEnvelope(data: {
 
 export async function atualizarAssinanteTramitaSign(
   assinanteId: string,
-  data: { documentoId: string | null; link: string | null }
+  data: {
+    documentoId: string | null;
+    link: string | null;
+    erro?: string | null;
+  }
 ): Promise<void> {
   await sql`
     UPDATE envelope_assinantes
-    SET tramitasign_documento_id = ${data.documentoId}, tramitasign_link = ${data.link}
+    SET tramitasign_documento_id = ${data.documentoId},
+        tramitasign_link = ${data.link},
+        tramitasign_erro = ${data.erro ?? null}
     WHERE id = ${assinanteId}::uuid
   `;
+}
+
+export interface AssinanteParaReenvio {
+  id: string;
+  envelopeId: string;
+  envelopeNome: string;
+  nome: string;
+  email: string;
+  tipo: string;
+  valSelfie: boolean;
+  valDocumento: boolean;
+  status: string;
+  notifAssinantes: boolean;
+  documentoHtmlCombinado: string;
+}
+
+/** Reúne o que a chamada ao TramitaSign precisa pra reenviar um único assinante. */
+export async function getAssinanteParaReenvio(
+  assinanteId: string
+): Promise<AssinanteParaReenvio | null> {
+  const [a] = await sql`
+    SELECT a.id::text, a.envelope_id::text, a.nome, a.email, a.tipo,
+           a.val_selfie, a.val_documento, a.status,
+           e.nome AS envelope_nome, e.notif_assinantes
+    FROM envelope_assinantes a
+    JOIN envelopes e ON e.id = a.envelope_id
+    WHERE a.id = ${assinanteId}::uuid
+  `;
+  if (!a) return null;
+
+  const documentos = await sql`
+    SELECT nome, html_content, ordem
+    FROM envelope_documentos
+    WHERE envelope_id = ${a.envelope_id}::uuid
+    ORDER BY ordem
+  `;
+  const documentoHtmlCombinado = documentos
+    .map(
+      (d) =>
+        `<h2>${String(d.nome).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c]!)}</h2>\n${d.html_content}\n<div style="margin:24px 0"><hr></div>`
+    )
+    .join("\n");
+
+  return {
+    id: a.id,
+    envelopeId: a.envelope_id,
+    envelopeNome: a.envelope_nome,
+    nome: a.nome,
+    email: a.email,
+    tipo: a.tipo,
+    valSelfie: a.val_selfie,
+    valDocumento: a.val_documento,
+    status: a.status,
+    notifAssinantes: a.notif_assinantes,
+    documentoHtmlCombinado,
+  };
 }
 
 export async function getEnvelopeCriadoPor(id: string): Promise<string | null> {

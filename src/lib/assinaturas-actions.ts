@@ -9,6 +9,7 @@ import {
   cancelarEnvelope,
   excluirEnvelope,
   atualizarEmailAssinante,
+  getAssinanteParaReenvio,
   type DocumentoInput,
   type AssinanteInput,
   type AssinanteCriado,
@@ -186,6 +187,12 @@ async function processarEnvioEnvelope(params: {
       for (const a of assinantesCriados) {
         if (a.tipo === "eu_mesmo") continue;
 
+        let erro: string | null = null;
+        if (!userId) {
+          erro =
+            "Não foi possível obter o usuário do TramitaSign (API key/URL configuradas mas a resposta não trouxe um id válido).";
+        }
+
         const cliente = userId
           ? await tramitaCriarCliente({
               nome: a.nome,
@@ -194,6 +201,9 @@ async function processarEnvioEnvelope(params: {
               cpf: null,
             })
           : null;
+        if (userId && !cliente?.id) {
+          erro = "Falha ao criar o cliente no TramitaSign.";
+        }
 
         let link: string | null = null;
         let documentoId: string | null = null;
@@ -214,11 +224,16 @@ async function processarEnvioEnvelope(params: {
           });
           link = doc?.link ?? null;
           documentoId = doc?.id ?? null;
+          if (!link)
+            erro =
+              "Falha ao enviar o documento para assinatura no TramitaSign.";
+          else erro = null;
         }
 
         await atualizarAssinanteTramitaSign(a.id, {
           documentoId,
           link,
+          erro,
         });
         resultados.push({ nome: a.nome, email: a.email, link });
       }
@@ -297,6 +312,70 @@ export async function excluirEnvelopeAction(
   await excluirEnvelope(envelopeId);
   revalidatePath("/dashboard/assinaturas");
   return {};
+}
+
+export async function reenviarAssinaturaAction(
+  envelopeId: string,
+  assinanteId: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "assinaturas", "editar"))
+    return { error: "Sem permissão." };
+  if (!UUID_RE.test(envelopeId) || !UUID_RE.test(assinanteId))
+    return { error: "ID inválido." };
+  if (!(await podeEditarEnvelope(session, envelopeId)))
+    return { error: "Sem permissão." };
+
+  const a = await getAssinanteParaReenvio(assinanteId);
+  if (!a || a.envelopeId !== envelopeId)
+    return { error: "Assinante não encontrado." };
+  if (a.status === "assinado")
+    return { error: "Este assinante já assinou o documento." };
+  if (!tramitaSignAtivo())
+    return { error: "Integração com TramitaSign não está ativa." };
+
+  let erro: string | null = null;
+  let link: string | null = null;
+  let documentoId: string | null = null;
+  try {
+    const userId = await tramitaObterUserId();
+    if (!userId) {
+      erro =
+        "Não foi possível obter o usuário do TramitaSign (API key/URL configuradas mas a resposta não trouxe um id válido).";
+    } else {
+      const cliente = await tramitaCriarCliente({
+        nome: a.nome,
+        email: a.email || null,
+        telefone: null,
+        cpf: null,
+      });
+      if (!cliente?.id) {
+        erro = "Falha ao criar o cliente no TramitaSign.";
+      } else {
+        const doc = await tramitaEnviarDocumento({
+          clienteId: cliente.id,
+          userId,
+          titulo: a.envelopeNome,
+          htmlContent: a.documentoHtmlCombinado,
+          email: a.notifAssinantes ? a.email || null : null,
+          telefone: null,
+          requireSelfie: a.valSelfie,
+          requireDocument: a.valDocumento,
+        });
+        link = doc?.link ?? null;
+        documentoId = doc?.id ?? null;
+        if (!link)
+          erro = "Falha ao enviar o documento para assinatura no TramitaSign.";
+      }
+    }
+  } catch (e) {
+    console.error("[TramitaSign] reenviarAssinaturaAction error:", e);
+    erro = e instanceof Error ? e.message : "Erro inesperado ao reenviar.";
+  }
+
+  await atualizarAssinanteTramitaSign(assinanteId, { documentoId, link, erro });
+  revalidatePath(`/dashboard/assinaturas/${envelopeId}`);
+  return erro ? { error: erro } : {};
 }
 
 export async function atualizarEmailAssinanteAction(

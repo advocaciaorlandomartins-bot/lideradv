@@ -217,10 +217,24 @@ export async function tramitaObterUserId(): Promise<string> {
     const res = await fetch(`${baseUrl()}/usuarios?items=1`, {
       headers: headers(),
     });
-    if (!res.ok) return "";
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.error(
+        `[TramitaSign] obterUserId: HTTP ${res.status} — ${txt.slice(0, 300)}`
+      );
+      return "";
+    }
     const data = await res.json();
-    return String(data?.users?.[0]?.id ?? data?.[0]?.id ?? "");
-  } catch {
+    const id = String(data?.users?.[0]?.id ?? data?.[0]?.id ?? "");
+    if (!id) {
+      console.error(
+        "[TramitaSign] obterUserId: resposta OK mas sem id de usuário — formato inesperado:",
+        JSON.stringify(data).slice(0, 300)
+      );
+    }
+    return id;
+  } catch (e) {
+    console.error("[TramitaSign] obterUserId error:", e);
     return "";
   }
 }

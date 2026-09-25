@@ -7,6 +7,7 @@ import { ChevronRightIcon } from "@/components/icons";
 import {
   EnvelopeAcoesTopo,
   EditarEmailAssinante,
+  ReenviarAssinatura,
 } from "@/components/dashboard/assinaturas/envelope-acoes";
 
 export const dynamic = "force-dynamic";
@@ -138,6 +139,16 @@ export default async function EnvelopeDetalhePage({
                       Link de assinatura →
                     </a>
                   )}
+                  {a.status === "pendente" &&
+                    a.tipo !== "eu_mesmo" &&
+                    !a.tramitasignLink &&
+                    hasPermission(session, "assinaturas", "editar") && (
+                      <ReenviarAssinatura
+                        envelopeId={envelope.id}
+                        assinanteId={a.id}
+                        erroAtual={a.tramitasignErro}
+                      />
+                    )}
                   {a.status === "pendente" &&
                     hasPermission(session, "assinaturas", "editar") && (
                       <EditarEmailAssinante

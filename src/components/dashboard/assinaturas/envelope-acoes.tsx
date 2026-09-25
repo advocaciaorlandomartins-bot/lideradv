@@ -6,6 +6,7 @@ import {
   cancelarEnvelopeAction,
   excluirEnvelopeAction,
   atualizarEmailAssinanteAction,
+  reenviarAssinaturaAction,
 } from "@/lib/assinaturas-actions";
 import { TrashIcon, XMarkIcon, SpinnerIcon } from "@/components/icons";
 
@@ -199,6 +200,47 @@ export function EditarEmailAssinante({
         </button>
       </div>
       {erro && <p className="font-body text-[11px] text-red-600">{erro}</p>}
+    </div>
+  );
+}
+
+export function ReenviarAssinatura({
+  envelopeId,
+  assinanteId,
+  erroAtual,
+}: {
+  envelopeId: string;
+  assinanteId: string;
+  erroAtual: string | null;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(erroAtual);
+  const router = useRouter();
+
+  function handleReenviar() {
+    setErro(null);
+    startTransition(async () => {
+      const r = await reenviarAssinaturaAction(envelopeId, assinanteId);
+      if (r.error) {
+        setErro(r.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="mt-1.5 flex flex-col gap-1">
+      {erro && <p className="font-body text-[11px] text-red-600">{erro}</p>}
+      <button
+        type="button"
+        onClick={handleReenviar}
+        disabled={pending}
+        className="flex w-fit items-center gap-1.5 font-body text-[11px] font-semibold text-primary hover:underline disabled:opacity-50"
+      >
+        {pending && <SpinnerIcon className="h-3 w-3" />}
+        {pending ? "Reenviando…" : "Reenviar link de assinatura"}
+      </button>
     </div>
   );
 }

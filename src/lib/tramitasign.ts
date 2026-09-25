@@ -245,13 +245,14 @@ export interface TramitaUserIdResultado {
 }
 
 export async function tramitaObterUserId(): Promise<TramitaUserIdResultado> {
+  const url = `${baseUrl()}/usuarios?per_page=1`;
   try {
-    const res = await fetch(`${baseUrl()}/usuarios?per_page=1`, {
+    const res = await fetch(url, {
       headers: headers(),
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
-      const erro = `obterUserId: HTTP ${res.status} — ${txt.slice(0, 200)}`;
+      const erro = `obterUserId: HTTP ${res.status} em ${url} — ${txt.slice(0, 150)}`;
       console.error(`[TramitaSign] ${erro}`);
       return { userId: "", erro };
     }

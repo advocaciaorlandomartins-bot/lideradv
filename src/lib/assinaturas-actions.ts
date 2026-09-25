@@ -199,7 +199,19 @@ export async function enviarEnvelopeParaTramitaSign(
   const advogados = await getAdvogadosParaDocumento().catch(() => []);
   const vars = buildModeloVars(client, escritorioConfig, date, advogados);
 
-  // 1. Renderiza cada documento do envelope como PDF de verdade e sobe pro
+  // 1. Usuário do escritório dono do envelope (obrigatório na criação — a
+  //    chave de API não é uma pessoa). Confere isso primeiro, antes de
+  //    gastar tempo gerando/subindo PDF: se a API key/URL estiverem
+  //    erradas, é aqui que dá pra saber mais rápido e mais claro.
+  const userId = await tramitaObterUserId();
+  if (!userId) {
+    const erro =
+      "Não foi possível obter o usuário do TramitaSign (API key/URL configuradas mas a resposta não trouxe um id válido).";
+    await gravarErroEmTodos(erro);
+    return { error: erro };
+  }
+
+  // 2. Renderiza cada documento do envelope como PDF de verdade e sobe pro
   //    TramitaSign (a API deles só aceita arquivo, não HTML).
   const uploadIds: number[] = [];
   for (const doc of env.documentos) {
@@ -233,16 +245,6 @@ export async function enviarEnvelopeParaTramitaSign(
   }
   if (uploadIds.length === 0) {
     const erro = "Nenhum documento válido para enviar.";
-    await gravarErroEmTodos(erro);
-    return { error: erro };
-  }
-
-  // 2. Usuário do escritório dono do envelope (obrigatório na criação —
-  //    a chave de API não é uma pessoa).
-  const userId = await tramitaObterUserId();
-  if (!userId) {
-    const erro =
-      "Não foi possível obter o usuário do TramitaSign (API key/URL configuradas mas a resposta não trouxe um id válido).";
     await gravarErroEmTodos(erro);
     return { error: erro };
   }

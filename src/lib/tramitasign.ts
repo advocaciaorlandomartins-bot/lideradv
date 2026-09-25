@@ -20,15 +20,18 @@ import crypto from "crypto";
 const TRAMITA_PLANILHA_BASE = "https://planilha.tramitacaointeligente.com.br";
 
 function baseUrl(): string {
-  // TRAMITASIGN_BASE_URL costuma estar salvo só com o domínio
-  // (https://planilha.tramitacaointeligente.com.br), mas os endpoints REST
-  // reais (usuarios/clientes/documentos/notas/publicacoes) vivem sob
-  // /api/v1 — confirmado testando os caminhos sem autenticação: sem o
-  // prefixo dá 404 (rota não existe), com o prefixo dá 401 (existe, só
-  // falta a chave). Sem isso, toda chamada às funções abaixo recebia 404 —
-  // nenhum envelope de assinatura conseguia gerar link de verdade.
-  const raw = (process.env.TRAMITASIGN_BASE_URL ?? "").replace(/\/$/, "");
-  return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`;
+  // TRAMITASIGN_BASE_URL pode estar salva com ou sem /api/v1, com barra(s)
+  // no fim, ou com espaço/quebra de linha sobrando (bem comum ao colar
+  // valor num campo de variável de ambiente) — qualquer uma dessas coisas
+  // fazia a checagem antiga (endsWith direto) falhar silenciosamente e
+  // duplicar o sufixo (".../api/v1/api/v1/...", 404 puro, confirmado
+  // reproduzindo o erro batido pelo usuário). Normaliza de forma tolerante
+  // a qualquer um desses formatos antes de montar a URL final.
+  const raw = (process.env.TRAMITASIGN_BASE_URL ?? "")
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\/api\/v1$/i, "");
+  return `${raw}/api/v1`;
 }
 
 function apiKey(): string {

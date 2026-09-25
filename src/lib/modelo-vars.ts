@@ -2,11 +2,14 @@ import type { ClientFull } from "./clients-db";
 import type { EscritorioConfig } from "./escritorio-db";
 import type { AdvogadoParaDocumento } from "./colaboradores-db";
 
+// Não inclui a cidade individual de cada advogado aqui — antes causava um
+// texto inconsistente dentro da mesma lista corrida (só aparecia "com
+// endereço profissional em X" pra quem tinha o campo Cidade preenchido no
+// cadastro, ficando faltando pros outros) e virou redundante depois que
+// {{endereco_escritorio}} passou a cobrir o endereço completo (rua + CEP)
+// numa cláusula própria do documento.
 function formatAdvogado(a: AdvogadoParaDocumento): string {
-  const base = `${a.nome}, inscrito(a) na OAB/${a.oab_uf} sob o nº ${a.oab}`;
-  return a.city
-    ? `${base}, com endereço profissional em ${a.city}/${a.oab_uf}`
-    : base;
+  return `${a.nome}, inscrito(a) na OAB/${a.oab_uf} sob o nº ${a.oab}`;
 }
 
 // Junta em texto corrido no padrão jurídico ("Fulano, Ciclano e Beltrano")

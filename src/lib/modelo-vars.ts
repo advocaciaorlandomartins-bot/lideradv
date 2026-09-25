@@ -82,6 +82,20 @@ export function buildModeloVars(
     // cadastrada, prontos pra citar em procuração/contrato — antes só
     // existia {{advogado}}, que é o nome do escritório, sem OAB nenhuma.
     "{{advogados}}": joinComE(advogados.map(formatAdvogado)),
+    // Endereço PROFISSIONAL do escritório (não confundir com {{endereco}}/
+    // {{endereco_completo}}, que são do cliente) — usado na cláusula "Com
+    // endereço profissional localizado em..." de procuração/contrato.
+    // Antes esse endereço vinha digitado fixo no texto do modelo, e não
+    // acompanhava quando o cadastro do escritório em Configurações mudava.
+    "{{endereco_escritorio}}": [
+      escritorioConfig.endereco,
+      escritorioConfig.cidade && escritorioConfig.estado
+        ? `${escritorioConfig.cidade}/${escritorioConfig.estado}`
+        : escritorioConfig.cidade,
+      escritorioConfig.cep ? `CEP ${escritorioConfig.cep}` : null,
+    ]
+      .filter(Boolean)
+      .join(", "),
   };
 }
 

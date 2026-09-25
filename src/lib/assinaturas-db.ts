@@ -216,3 +216,47 @@ export async function atualizarAssinanteTramitaSign(
     WHERE id = ${assinanteId}::uuid
   `;
 }
+
+export async function getEnvelopeCriadoPor(id: string): Promise<string | null> {
+  const [row] =
+    await sql`SELECT criado_por FROM envelopes WHERE id = ${id}::uuid`;
+  return row?.criado_por ?? null;
+}
+
+export async function cancelarEnvelope(id: string): Promise<void> {
+  await sql`
+    UPDATE envelopes SET status = 'cancelado', atualizado_em = NOW()
+    WHERE id = ${id}::uuid
+  `;
+}
+
+// FK envelope_documentos/envelope_assinantes → envelopes é ON DELETE CASCADE,
+// então excluir o envelope já remove documentos e assinantes junto.
+export async function excluirEnvelope(id: string): Promise<void> {
+  await sql`DELETE FROM envelopes WHERE id = ${id}::uuid`;
+}
+
+/**
+ * Corrige e-mail de um assinante ainda pendente — cobre o caso comum de
+ * digitar/colar o e-mail errado (ex: o do próprio criador, por engano) ao
+ * montar o envelope. Só permite alterar enquanto ele ainda não assinou,
+ * pra não reescrever histórico de quem realmente assinou o quê.
+ */
+export async function atualizarEmailAssinante(
+  assinanteId: string,
+  email: string
+): Promise<{ ok: boolean; error?: string }> {
+  const [row] = await sql`
+    SELECT status, envelope_id::text FROM envelope_assinantes WHERE id = ${assinanteId}::uuid
+  `;
+  if (!row) return { ok: false, error: "Assinante não encontrado." };
+  if (row.status === "assinado")
+    return { ok: false, error: "Não é possível editar quem já assinou." };
+
+  await sql`
+    UPDATE envelope_assinantes
+    SET email = ${email}, tramitasign_documento_id = NULL, tramitasign_link = NULL
+    WHERE id = ${assinanteId}::uuid
+  `;
+  return { ok: true };
+}

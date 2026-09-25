@@ -4,6 +4,10 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { getEnvelopeById } from "@/lib/assinaturas-db";
 import { ChevronRightIcon } from "@/components/icons";
+import {
+  EnvelopeAcoesTopo,
+  EditarEmailAssinante,
+} from "@/components/dashboard/assinaturas/envelope-acoes";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +99,12 @@ export default async function EnvelopeDetalhePage({
             {fmtDate(envelope.prazo)} · Criado em {fmtDate(envelope.criado_em)}
           </p>
         </div>
+        {hasPermission(session, "assinaturas", "editar") && (
+          <EnvelopeAcoesTopo
+            envelopeId={envelope.id}
+            status={envelope.status}
+          />
+        )}
       </div>
 
       {/* Assinantes */}
@@ -128,6 +138,14 @@ export default async function EnvelopeDetalhePage({
                       Link de assinatura →
                     </a>
                   )}
+                  {a.status === "pendente" &&
+                    hasPermission(session, "assinaturas", "editar") && (
+                      <EditarEmailAssinante
+                        envelopeId={envelope.id}
+                        assinanteId={a.id}
+                        emailAtual={a.email}
+                      />
+                    )}
                 </div>
                 <span
                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-body text-xs font-semibold ${

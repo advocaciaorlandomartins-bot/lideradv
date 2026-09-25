@@ -50,10 +50,17 @@ export const VARIAVEIS = [
     group: "Geral",
     vars: [
       { tag: "{{data_hoje}}", desc: "Data por extenso" },
-      { tag: "{{advogado}}", desc: "Nome do escritório" },
+      {
+        tag: "{{advogado}}",
+        desc: "Nome do escritório, com OAB se cadastrada",
+      },
       {
         tag: "{{advogados}}",
         desc: "Todos os advogados ativos, com OAB e cidade",
+      },
+      {
+        tag: "{{endereco_escritorio}}",
+        desc: "Endereço profissional do escritório (não confundir com {{endereco}}, que é do cliente)",
       },
     ],
   },

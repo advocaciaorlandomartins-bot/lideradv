@@ -5,6 +5,10 @@ import { hasPermission } from "./permissoes";
 import {
   criarEnvelope,
   atualizarAssinanteTramitaSign,
+  getEnvelopeCriadoPor,
+  cancelarEnvelope,
+  excluirEnvelope,
+  atualizarEmailAssinante,
   type DocumentoInput,
   type AssinanteInput,
   type AssinanteCriado,
@@ -246,4 +250,75 @@ async function processarEnvioEnvelope(params: {
       tramitaSignAtivo: ativo,
     }).catch((e) => console.error("[email] envelope enviado falhou:", e));
   }
+}
+
+// Mesma regra de acesso já usada na página de detalhe: quem não é
+// Administrador(a)/Sócio(a) só mexe em envelope que ele mesmo criou.
+async function podeEditarEnvelope(
+  session: { login: string; categoria: string },
+  envelopeId: string
+): Promise<boolean> {
+  const criadoPor = await getEnvelopeCriadoPor(envelopeId);
+  if (!criadoPor) return false;
+  if (
+    session.categoria === "Administrador(a)" ||
+    session.categoria === "Sócio(a)"
+  )
+    return true;
+  return criadoPor === session.login;
+}
+
+export async function cancelarEnvelopeAction(
+  envelopeId: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "assinaturas", "editar"))
+    return { error: "Sem permissão." };
+  if (!UUID_RE.test(envelopeId)) return { error: "ID inválido." };
+  if (!(await podeEditarEnvelope(session, envelopeId)))
+    return { error: "Sem permissão." };
+
+  await cancelarEnvelope(envelopeId);
+  revalidatePath("/dashboard/assinaturas");
+  revalidatePath(`/dashboard/assinaturas/${envelopeId}`);
+  return {};
+}
+
+export async function excluirEnvelopeAction(
+  envelopeId: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "assinaturas", "excluir"))
+    return { error: "Sem permissão." };
+  if (!UUID_RE.test(envelopeId)) return { error: "ID inválido." };
+  if (!(await podeEditarEnvelope(session, envelopeId)))
+    return { error: "Sem permissão." };
+
+  await excluirEnvelope(envelopeId);
+  revalidatePath("/dashboard/assinaturas");
+  return {};
+}
+
+export async function atualizarEmailAssinanteAction(
+  envelopeId: string,
+  assinanteId: string,
+  email: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "assinaturas", "editar"))
+    return { error: "Sem permissão." };
+  if (!UUID_RE.test(envelopeId) || !UUID_RE.test(assinanteId))
+    return { error: "ID inválido." };
+  if (!(await podeEditarEnvelope(session, envelopeId)))
+    return { error: "Sem permissão." };
+
+  const trimmed = email.trim();
+  if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed))
+    return { error: "E-mail inválido." };
+
+  const result = await atualizarEmailAssinante(assinanteId, trimmed);
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath(`/dashboard/assinaturas/${envelopeId}`);
+  return {};
 }

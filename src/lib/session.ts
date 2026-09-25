@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import sql from "./db";
-import type { Permissoes } from "./permissoes";
+import { resolvePermissoes, type Permissoes } from "./permissoes";
 
 const COOKIE = "adv_session";
 const MAX_AGE = 60 * 60 * 8; // 8 h
@@ -96,7 +96,15 @@ export async function getSession(): Promise<SessionUser | null> {
     login: data.login ?? "",
     nome: row.nome ?? data.login ?? "",
     categoria: row.categoria,
-    permissoes: row.permissoes ?? {},
+    // resolvePermissoes garante TODOS os módulos presentes (customizado
+    // salvo + default da categoria pro que faltar) — sem isso, contas com
+    // permissões customizadas salvas antes de um módulo novo existir
+    // (ex: dashboard_financeiro, gerenciador) ficavam sem acesso a ele pra
+    // sempre, mesmo com hasPermission() tendo lógica de fallback própria
+    // (bug real: faltava só "dashboard" no objeto customizado de uma conta
+    // Administrador(a), e isso bastava pra bloquear a página inteira do
+    // Gerenciador, que exige dashboard_financeiro:ver).
+    permissoes: resolvePermissoes(row.categoria, row.permissoes ?? null),
   };
 }
 

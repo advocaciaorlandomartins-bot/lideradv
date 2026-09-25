@@ -261,12 +261,29 @@ export function hasPermission(
   const perms = user.permissoes[modulo];
   if (perms != null) return (Array.isArray(perms) ? perms : []).includes(acao);
 
-  // Sub-módulo não presente na sessão: herda do pai
-  const parent = MODULOS.find((m) => m.key === modulo)?.parent;
-  if (parent) return (user.permissoes[parent] ?? []).includes(acao);
-
-  // Módulo de nível superior ausente (sessão criada antes do módulo existir):
-  // faz fallback nos defaults da categoria para não exigir novo login.
+  // Módulo ausente na sessão (permissões customizadas salvas antes desse
+  // módulo existir no sistema — ex: dashboard_financeiro, gerenciador,
+  // controladoria foram adicionados depois de várias contas já terem um
+  // objeto `permissoes` customizado salvo). Cai direto no default da
+  // categoria PRO PRÓPRIO MÓDULO quando existe — bug real encontrado: pra
+  // sub-módulos (com parent), o código antigo só olhava o campo do pai
+  // dentro da MESMA sessão (`user.permissoes[parent] ?? []`), e se o pai
+  // também estivesse ausente do objeto customizado (ex: "dashboard"),
+  // caía sempre em `[]` sem nunca considerar os defaults — um
+  // Administrador(a) com permissões customizadas antigas ficava
+  // permanentemente sem acesso a "Gerenciador" mesmo tendo dashboard_financeiro
+  // como VER nos defaults da categoria, só porque a chave "dashboard"
+  // nunca tinha sido salva no objeto dele.
   const defaults = DEFAULTS_POR_CATEGORIA[user.categoria] ?? {};
-  return (defaults[modulo] ?? NONE).includes(acao);
+  if (modulo in defaults) return (defaults[modulo] ?? NONE).includes(acao);
+
+  // Sub-módulo sem default próprio (não está na lista de DEFAULTS_POR_CATEGORIA
+  // por chave própria): herda do pai — sessão primeiro, senão default do pai.
+  const parent = MODULOS.find((m) => m.key === modulo)?.parent;
+  if (parent) {
+    const parentPerms = user.permissoes[parent] ?? defaults[parent] ?? NONE;
+    return parentPerms.includes(acao);
+  }
+
+  return NONE.includes(acao);
 }

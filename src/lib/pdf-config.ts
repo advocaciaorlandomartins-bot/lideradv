@@ -1,4 +1,17 @@
+import { Font } from "@react-pdf/renderer";
 import type { EscritorioConfig } from "./escritorio-db";
+
+// @react-pdf/renderer hifeniza palavras longas por padrão usando um
+// algoritmo genérico que não conhece as regras do português — resultado
+// real visto num documento gerado: "constitui" quebrado como "con-" no
+// fim de uma linha e "stitui" no início da próxima, no meio da palavra
+// (não numa sílaba real). Erro tipográfico grosseiro num documento
+// jurídico. Desabilita a hifenização por completo: o callback devolve a
+// palavra inteira como único "fragmento" possível, então o texto só
+// quebra de linha nos espaços entre palavras, nunca no meio de uma —
+// registrado uma vez aqui porque todo gerador de PDF do sistema importa
+// este arquivo antes de renderizar.
+Font.registerHyphenationCallback((word) => [word]);
 
 /** 1 mm in PDF points */
 const MM = 2.835;

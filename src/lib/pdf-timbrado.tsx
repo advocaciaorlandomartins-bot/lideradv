@@ -420,6 +420,10 @@ interface TimbradoFooterProps {
   date: string;
 }
 
+// mantido na assinatura pra não quebrar os 3 chamadores existentes
+// (modelo-pdf.tsx, pdf-peticao.tsx, pdf-templates.tsx), mas não é mais
+// impresso no rodapé — pedido explícito: rodapé repetindo a data em toda
+// página era redundante/desnecessário.
 export function TimbradoFooter({ config, date }: TimbradoFooterProps) {
   const { regular } = getFonts(config);
   const base = config.tamanho_padrao ?? 12;
@@ -465,7 +469,7 @@ export function TimbradoFooter({ config, date }: TimbradoFooterProps) {
             color: "#9CA3AF",
           }}
           render={({ pageNumber, totalPages }) =>
-            `Página ${pageNumber} de ${totalPages} · ${date}`
+            `Página ${pageNumber} de ${totalPages}`
           }
         />
       </View>

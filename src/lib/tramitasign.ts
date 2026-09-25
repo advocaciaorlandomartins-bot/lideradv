@@ -4,7 +4,16 @@
 const TRAMITA_PLANILHA_BASE = "https://planilha.tramitacaointeligente.com.br";
 
 function baseUrl(): string {
-  return (process.env.TRAMITASIGN_BASE_URL ?? "").replace(/\/$/, "");
+  // TRAMITASIGN_BASE_URL costuma estar salvo só com o domínio
+  // (https://planilha.tramitacaointeligente.com.br), mas os endpoints REST
+  // reais (usuarios/clientes/documentos/notas/publicacoes) vivem sob
+  // /api/v1 — confirmado testando os caminhos sem autenticação: sem o
+  // prefixo dá 404 (rota não existe), com o prefixo dá 401 (existe, só
+  // falta a chave). Sem isso, tramitaObterUserId()/tramitaCriarCliente()/
+  // tramitaEnviarDocumento() sempre recebiam 404 e falhavam em silêncio —
+  // nenhum envelope de assinatura conseguia gerar link de verdade.
+  const raw = (process.env.TRAMITASIGN_BASE_URL ?? "").replace(/\/$/, "");
+  return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`;
 }
 
 function apiKey(): string {

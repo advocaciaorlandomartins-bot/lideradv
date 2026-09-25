@@ -5,14 +5,15 @@ import { hasPermission } from "./permissoes";
 import {
   criarEnvelope,
   atualizarAssinanteTramitaSign,
+  atualizarEnvelopeTramitaSign,
   getEnvelopeCriadoPor,
+  getEnvelopeById,
+  getEnvelopeParaEnvio,
   cancelarEnvelope,
   excluirEnvelope,
   atualizarEmailAssinante,
-  getAssinanteParaReenvio,
   type DocumentoInput,
   type AssinanteInput,
-  type AssinanteCriado,
 } from "./assinaturas-db";
 import { getClientFull } from "./clients-db";
 import { getModeloById } from "./modelos-db";
@@ -23,15 +24,19 @@ import {
   blocksToHtml,
   textToHtml,
   substituteVariablesInBlocks,
-  escapeHtml,
 } from "./modelo-blocks";
+import { renderModeloParaPdf } from "./modelo-pdf-render";
 import { enviarEmailEnvelopeEnviado } from "./email";
 import { revalidatePath } from "next/cache";
 import {
   tramitaSignAtivo,
   tramitaCriarCliente,
-  tramitaEnviarDocumento,
   tramitaObterUserId,
+  tramitaUploadArquivo,
+  tramitaCriarEnvelopeAssinatura,
+  tramitaAtualizarSignatarios,
+  tramitaEnviarEnvelopeAssinatura,
+  type TramitaSignerInput,
 } from "./tramitasign";
 
 const UUID_RE =
@@ -85,7 +90,10 @@ export async function salvarEnvelopeAction(
   const vars = buildModeloVars(client, escritorioConfig, date, advogados);
 
   // A ordem de seleção no wizard já é a ordem de envio — só respeitamos o
-  // "ordem" enviado por cada item, sem reordenar aqui.
+  // "ordem" enviado por cada item, sem reordenar aqui. O HTML aqui é só pra
+  // pré-visualização na nossa própria tela (aba "Documentos" do envelope) —
+  // o que vai pro TramitaSign é um PDF de verdade, gerado à parte em
+  // enviarEnvelopeParaTramitaSign.
   const documentos: DocumentoInput[] = [];
   for (const m of modelosSelecionados) {
     const modelo = await getModeloById(m.modeloId);
@@ -124,21 +132,10 @@ export async function salvarEnvelopeAction(
   });
 
   if (enviar && assinantesCriados.length > 0) {
-    const documentoHtmlCombinado = documentos
-      .sort((a, b) => a.ordem - b.ordem)
-      .map(
-        (d) =>
-          `<h2>${escapeHtml(d.nome)}</h2>\n${d.htmlContent}\n<div style="margin:24px 0"><hr></div>`
-      )
-      .join("\n");
-
     processarEnvioEnvelope({
       envelopeId: id,
       envelopeNome: nome,
       clienteNome: client.name,
-      assinantesCriados,
-      documentoHtml: documentoHtmlCombinado,
-      notifAssinantes,
       notifCriador,
       notifEscritorio,
       criadorEmail: session.login,
@@ -152,13 +149,207 @@ export async function salvarEnvelopeAction(
   return { id };
 }
 
+/**
+ * Faz o envio (ou reenvio) de um envelope inteiro ao TramitaSign, do zero:
+ * renderiza cada modelo em PDF de verdade, sobe pro TramitaSign, cria o
+ * envelope remoto, cadastra os assinantes e manda pra assinatura.
+ *
+ * A API real do TramitaSign modela isso como UM envelope remoto com vários
+ * assinantes/documentos dentro — não um "documento" isolado por pessoa,
+ * como a implementação anterior (removida) assumia. Por isso essa função
+ * trabalha no envelope inteiro, não num assinante isolado: um reenvio
+ * refaz o processo completo e atualiza o link de todo mundo que ainda não
+ * assinou.
+ */
+export async function enviarEnvelopeParaTramitaSign(
+  envelopeId: string
+): Promise<{ error?: string }> {
+  const env = await getEnvelopeParaEnvio(envelopeId);
+  if (!env) return { error: "Envelope não encontrado." };
+
+  const assinantesParaEnviar = env.assinantes.filter(
+    (a) => a.tipo !== "eu_mesmo" && a.status !== "assinado"
+  );
+  if (assinantesParaEnviar.length === 0) return {};
+
+  const gravarErroEmTodos = async (erro: string) => {
+    for (const a of assinantesParaEnviar) {
+      await atualizarAssinanteTramitaSign(a.id, {
+        signerId: null,
+        link: null,
+        erro,
+      });
+    }
+  };
+
+  const client = await getClientFull(env.clienteId);
+  if (!client) {
+    const erro = "Cliente do envelope não encontrado.";
+    await gravarErroEmTodos(erro);
+    return { error: erro };
+  }
+
+  const escritorioConfig = await getEscritorioConfig();
+  const date = new Date().toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Sao_Paulo",
+  });
+  const advogados = await getAdvogadosParaDocumento().catch(() => []);
+  const vars = buildModeloVars(client, escritorioConfig, date, advogados);
+
+  // 1. Renderiza cada documento do envelope como PDF de verdade e sobe pro
+  //    TramitaSign (a API deles só aceita arquivo, não HTML).
+  const uploadIds: number[] = [];
+  for (const doc of env.documentos) {
+    if (!doc.modeloId) continue;
+    const modelo = await getModeloById(doc.modeloId);
+    if (!modelo) continue;
+
+    let pdfBuffer: Buffer;
+    try {
+      pdfBuffer = await renderModeloParaPdf({
+        modelo,
+        client,
+        escritorioConfig,
+        vars,
+        date,
+      });
+    } catch (e) {
+      console.error("[assinaturas] renderModeloParaPdf falhou:", e);
+      const erro = `Falha ao gerar o PDF de "${doc.nome}".`;
+      await gravarErroEmTodos(erro);
+      return { error: erro };
+    }
+
+    const upload = await tramitaUploadArquivo(pdfBuffer, `${doc.nome}.pdf`);
+    if (!upload?.id) {
+      const erro = `Falha ao enviar o PDF de "${doc.nome}" para o TramitaSign.`;
+      await gravarErroEmTodos(erro);
+      return { error: erro };
+    }
+    uploadIds.push(upload.id);
+  }
+  if (uploadIds.length === 0) {
+    const erro = "Nenhum documento válido para enviar.";
+    await gravarErroEmTodos(erro);
+    return { error: erro };
+  }
+
+  // 2. Usuário do escritório dono do envelope (obrigatório na criação —
+  //    a chave de API não é uma pessoa).
+  const userId = await tramitaObterUserId();
+  if (!userId) {
+    const erro =
+      "Não foi possível obter o usuário do TramitaSign (API key/URL configuradas mas a resposta não trouxe um id válido).";
+    await gravarErroEmTodos(erro);
+    return { error: erro };
+  }
+
+  // 3. Cria o envelope remoto (nasce em rascunho) já com os documentos.
+  const criado = await tramitaCriarEnvelopeAssinatura({
+    userId,
+    nome: env.nome,
+    uploadIds,
+  });
+  if (!criado?.id) {
+    const erro = "Falha ao criar o envelope no TramitaSign.";
+    await gravarErroEmTodos(erro);
+    return { error: erro };
+  }
+  await atualizarEnvelopeTramitaSign(envelopeId, criado.id);
+
+  // 4. Cria um cliente (customer) no TramitaSign pra cada assinante e monta
+  //    a lista de signers do envelope.
+  const signers: TramitaSignerInput[] = [];
+  const assinanteIdPorEmail = new Map<string, string>();
+  for (const a of assinantesParaEnviar) {
+    const cliente = await tramitaCriarCliente({
+      nome: a.nome,
+      email: a.email || null,
+      telefone: null,
+      cpf: null,
+    });
+    if (!cliente?.id) {
+      await atualizarAssinanteTramitaSign(a.id, {
+        signerId: null,
+        link: null,
+        erro: "Falha ao criar o cliente no TramitaSign.",
+      });
+      continue;
+    }
+    signers.push({
+      signerType: "customer",
+      customerId: Number(cliente.id),
+      signatureType:
+        a.papel === "testemunha" || a.papel === "avalista"
+          ? a.papel
+          : "assinante",
+      selfieRequired: a.valSelfie,
+      documentPhotoRequired: a.valDocumento,
+    });
+    if (a.email) assinanteIdPorEmail.set(a.email.toLowerCase(), a.id);
+  }
+  if (signers.length === 0) {
+    return { error: "Nenhum assinante pôde ser cadastrado no TramitaSign." };
+  }
+
+  const okSigners = await tramitaAtualizarSignatarios(criado.id, signers);
+  if (!okSigners) {
+    const erro = "Falha ao definir os assinantes no TramitaSign.";
+    for (const assinanteId of assinanteIdPorEmail.values()) {
+      await atualizarAssinanteTramitaSign(assinanteId, {
+        signerId: null,
+        link: null,
+        erro,
+      });
+    }
+    return { error: erro };
+  }
+
+  // 5. Envia de verdade — a resposta traz o link de assinatura de cada
+  //    assinante.
+  const enviado = await tramitaEnviarEnvelopeAssinatura(criado.id);
+  if (!enviado) {
+    const erro = "Falha ao enviar o envelope para assinatura no TramitaSign.";
+    for (const assinanteId of assinanteIdPorEmail.values()) {
+      await atualizarAssinanteTramitaSign(assinanteId, {
+        signerId: null,
+        link: null,
+        erro,
+      });
+    }
+    return { error: erro };
+  }
+
+  // 6. Casa cada signer devolvido com o assinante nosso (por e-mail) e
+  //    grava o link de assinatura.
+  let algumSemLink = false;
+  for (const s of enviado.signers) {
+    const assinanteId = s.email
+      ? assinanteIdPorEmail.get(s.email.toLowerCase())
+      : undefined;
+    if (!assinanteId) continue;
+    if (!s.signatureLink) algumSemLink = true;
+    await atualizarAssinanteTramitaSign(assinanteId, {
+      signerId: s.id,
+      link: s.signatureLink,
+      erro: s.signatureLink
+        ? null
+        : "Envelope enviado, mas o TramitaSign não retornou o link de assinatura deste assinante.",
+    });
+  }
+
+  return algumSemLink
+    ? { error: "Envio parcial — confira o assinante sem link." }
+    : {};
+}
+
 async function processarEnvioEnvelope(params: {
   envelopeId: string;
   envelopeNome: string;
   clienteNome: string;
-  assinantesCriados: AssinanteCriado[];
-  documentoHtml: string;
-  notifAssinantes: boolean;
   notifCriador: boolean;
   notifEscritorio: boolean;
   criadorEmail: string;
@@ -168,9 +359,6 @@ async function processarEnvioEnvelope(params: {
     envelopeId,
     envelopeNome,
     clienteNome,
-    assinantesCriados,
-    documentoHtml,
-    notifAssinantes,
     notifCriador,
     notifEscritorio,
     criadorEmail,
@@ -178,76 +366,18 @@ async function processarEnvioEnvelope(params: {
   } = params;
 
   const ativo = tramitaSignAtivo();
-  const resultados: { nome: string; email: string; link: string | null }[] = [];
-
   if (ativo) {
-    try {
-      const userId = await tramitaObterUserId();
-
-      for (const a of assinantesCriados) {
-        if (a.tipo === "eu_mesmo") continue;
-
-        let erro: string | null = null;
-        if (!userId) {
-          erro =
-            "Não foi possível obter o usuário do TramitaSign (API key/URL configuradas mas a resposta não trouxe um id válido).";
-        }
-
-        const cliente = userId
-          ? await tramitaCriarCliente({
-              nome: a.nome,
-              email: a.email || null,
-              telefone: null,
-              cpf: null,
-            })
-          : null;
-        if (userId && !cliente?.id) {
-          erro = "Falha ao criar o cliente no TramitaSign.";
-        }
-
-        let link: string | null = null;
-        let documentoId: string | null = null;
-        if (cliente?.id && userId) {
-          const doc = await tramitaEnviarDocumento({
-            clienteId: cliente.id,
-            userId,
-            titulo: envelopeNome,
-            htmlContent: documentoHtml,
-            // Só pede ao TramitaSign pra notificar automaticamente
-            // (email/WhatsApp) se "Notificar assinantes" estiver marcado —
-            // o link continua sendo gerado e salvo de qualquer forma, pra
-            // poder ser copiado manualmente na tela do envelope.
-            email: notifAssinantes ? a.email || null : null,
-            telefone: null,
-            requireSelfie: a.valSelfie,
-            requireDocument: a.valDocumento,
-          });
-          link = doc?.link ?? null;
-          documentoId = doc?.id ?? null;
-          if (!link)
-            erro =
-              "Falha ao enviar o documento para assinatura no TramitaSign.";
-          else erro = null;
-        }
-
-        await atualizarAssinanteTramitaSign(a.id, {
-          documentoId,
-          link,
-          erro,
-        });
-        resultados.push({ nome: a.nome, email: a.email, link });
-      }
-    } catch (e) {
-      console.error("[TramitaSign] processarEnvioEnvelope error:", e);
-    }
-  } else {
-    for (const a of assinantesCriados) {
-      if (a.tipo === "eu_mesmo") continue;
-      resultados.push({ nome: a.nome, email: a.email, link: null });
-    }
+    const r = await enviarEnvelopeParaTramitaSign(envelopeId);
+    if (r.error)
+      console.error("[assinaturas] envio ao TramitaSign falhou:", r.error);
   }
 
   if (!notifCriador && !notifEscritorio) return;
+
+  const envelope = await getEnvelopeById(envelopeId);
+  const resultados = (envelope?.assinantes ?? [])
+    .filter((a) => a.tipo !== "eu_mesmo")
+    .map((a) => ({ nome: a.nome, email: a.email, link: a.tramitasignLink }));
 
   const envelopeUrl = `https://lideradv.vercel.app/dashboard/assinaturas/${envelopeId}`;
   const destinatarios = [
@@ -314,6 +444,11 @@ export async function excluirEnvelopeAction(
   return {};
 }
 
+/**
+ * Reenvia o envelope inteiro ao TramitaSign (não só o assinante clicado —
+ * a API real deles trabalha no envelope como um todo). Disparado a partir
+ * de qualquer assinante pendente sem link na tela de detalhe.
+ */
 export async function reenviarAssinaturaAction(
   envelopeId: string,
   assinanteId: string
@@ -325,57 +460,12 @@ export async function reenviarAssinaturaAction(
     return { error: "ID inválido." };
   if (!(await podeEditarEnvelope(session, envelopeId)))
     return { error: "Sem permissão." };
-
-  const a = await getAssinanteParaReenvio(assinanteId);
-  if (!a || a.envelopeId !== envelopeId)
-    return { error: "Assinante não encontrado." };
-  if (a.status === "assinado")
-    return { error: "Este assinante já assinou o documento." };
   if (!tramitaSignAtivo())
     return { error: "Integração com TramitaSign não está ativa." };
 
-  let erro: string | null = null;
-  let link: string | null = null;
-  let documentoId: string | null = null;
-  try {
-    const userId = await tramitaObterUserId();
-    if (!userId) {
-      erro =
-        "Não foi possível obter o usuário do TramitaSign (API key/URL configuradas mas a resposta não trouxe um id válido).";
-    } else {
-      const cliente = await tramitaCriarCliente({
-        nome: a.nome,
-        email: a.email || null,
-        telefone: null,
-        cpf: null,
-      });
-      if (!cliente?.id) {
-        erro = "Falha ao criar o cliente no TramitaSign.";
-      } else {
-        const doc = await tramitaEnviarDocumento({
-          clienteId: cliente.id,
-          userId,
-          titulo: a.envelopeNome,
-          htmlContent: a.documentoHtmlCombinado,
-          email: a.notifAssinantes ? a.email || null : null,
-          telefone: null,
-          requireSelfie: a.valSelfie,
-          requireDocument: a.valDocumento,
-        });
-        link = doc?.link ?? null;
-        documentoId = doc?.id ?? null;
-        if (!link)
-          erro = "Falha ao enviar o documento para assinatura no TramitaSign.";
-      }
-    }
-  } catch (e) {
-    console.error("[TramitaSign] reenviarAssinaturaAction error:", e);
-    erro = e instanceof Error ? e.message : "Erro inesperado ao reenviar.";
-  }
-
-  await atualizarAssinanteTramitaSign(assinanteId, { documentoId, link, erro });
+  const r = await enviarEnvelopeParaTramitaSign(envelopeId);
   revalidatePath(`/dashboard/assinaturas/${envelopeId}`);
-  return erro ? { error: erro } : {};
+  return r;
 }
 
 export async function atualizarEmailAssinanteAction(

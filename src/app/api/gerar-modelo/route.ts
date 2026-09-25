@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
-import { createElement, type ReactElement } from "react";
 import { getModeloById } from "@/lib/modelos-db";
 import { getClientFull } from "@/lib/clients-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { getAdvogadosParaDocumento } from "@/lib/colaboradores-db";
-import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
-import { applyFundoTimbrado } from "@/lib/pdf-fundo";
-import { ModeloPdfDoc } from "@/lib/modelo-pdf";
-import { substituteVariablesInBlocks } from "@/lib/modelo-blocks";
-import { buildModeloVars, replaceVars } from "@/lib/modelo-vars";
+import { buildModeloVars } from "@/lib/modelo-vars";
+import { renderModeloParaPdf } from "@/lib/modelo-pdf-render";
 
 export const dynamic = "force-dynamic";
 
@@ -57,11 +52,6 @@ export async function GET(request: Request) {
       { status: 404 }
     );
 
-  const logoData =
-    escritorioConfig.logo_ativo && escritorioConfig.logo_url
-      ? await fetchLogoAsDataUri(escritorioConfig.logo_url)
-      : null;
-
   // Sem timeZone explícito, o servidor (UTC) data o documento um dia à
   // frente para gerações após as 21h no horário de Brasília.
   const date = new Date().toLocaleDateString("pt-BR", {
@@ -75,36 +65,15 @@ export async function GET(request: Request) {
   const advogados = await getAdvogadosParaDocumento().catch(() => []);
   const vars = buildModeloVars(client, escritorioConfig, date, advogados);
 
-  // Replace all variables in content
-  const conteudo = replaceVars(modelo.conteudo, vars);
-  const blocks = modelo.conteudo_blocks
-    ? substituteVariablesInBlocks(modelo.conteudo_blocks, vars)
-    : null;
-
-  const doc = createElement(ModeloPdfDoc, {
-    titulo: modelo.titulo,
-    conteudo,
-    blocks,
-    date,
-    clientName: client.name,
-    config: escritorioConfig,
-    logoData,
-    usarTimbrado: modelo.usar_timbrado,
-  }) as ReactElement<DocumentProps>;
-
   let buffer: Buffer;
   try {
-    buffer = await renderToBuffer(doc);
-    if (
-      escritorioConfig.fundo_timbrado_ativo &&
-      escritorioConfig.fundo_timbrado
-    ) {
-      const withBg = await applyFundoTimbrado(
-        new Uint8Array(buffer),
-        escritorioConfig.fundo_timbrado
-      );
-      buffer = Buffer.from(withBg);
-    }
+    buffer = await renderModeloParaPdf({
+      modelo,
+      client,
+      escritorioConfig,
+      vars,
+      date,
+    });
   } catch (err) {
     console.error("gerar-modelo render error:", err);
     return NextResponse.json(

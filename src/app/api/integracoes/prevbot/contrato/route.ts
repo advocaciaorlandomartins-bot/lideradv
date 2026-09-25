@@ -12,16 +12,9 @@ import {
   textToHtml,
   substituteVariablesInBlocks,
 } from "@/lib/modelo-blocks";
-import {
-  criarEnvelope,
-  atualizarAssinanteTramitaSign,
-} from "@/lib/assinaturas-db";
-import {
-  tramitaSignAtivo,
-  tramitaCriarCliente,
-  tramitaEnviarDocumento,
-  tramitaObterUserId,
-} from "@/lib/tramitasign";
+import { criarEnvelope, getEnvelopeById } from "@/lib/assinaturas-db";
+import { tramitaSignAtivo } from "@/lib/tramitasign";
+import { enviarEnvelopeParaTramitaSign } from "@/lib/assinaturas-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -195,7 +188,7 @@ export async function POST(req: NextRequest) {
 
     // ── 4. Cria o envelope (registro interno) ──
     const criadoPor = await resolverAdminLogin();
-    const { assinantes } = await criarEnvelope({
+    const { id: envelopeId } = await criarEnvelope({
       nome: `${modelo.titulo} — ${nome}`,
       prazo: null,
       status: "aguardando",
@@ -225,62 +218,34 @@ export async function POST(req: NextRequest) {
         },
       ],
     });
-    const assinante = assinantes[0];
 
-    // ── 5. Cria o documento de assinatura no TramitaSign ──
-    const userId = await tramitaObterUserId();
-    if (!userId) {
+    // ── 5. Envia pro TramitaSign de verdade (gera o PDF, sobe, cria o
+    // envelope remoto, cadastra o assinante e manda pra assinatura) ──
+    const envio = await enviarEnvelopeParaTramitaSign(envelopeId);
+    const envelopeAtualizado = await getEnvelopeById(envelopeId);
+    const assinanteAtualizado = envelopeAtualizado?.assinantes[0];
+    if (envio.error || !assinanteAtualizado?.tramitasignLink) {
       return NextResponse.json(
-        { ok: false, error: "Não foi possível autenticar no TramitaSign." },
+        {
+          ok: false,
+          error: envio.error ?? "TramitaSign não retornou link de assinatura.",
+        },
         { status: 502 }
       );
     }
-    const tsCliente = await tramitaCriarCliente({
-      nome,
-      email,
-      telefone,
-      cpf: cpfRaw,
-    });
-    if (!tsCliente?.id) {
-      return NextResponse.json(
-        { ok: false, error: "Falha ao criar cliente no TramitaSign." },
-        { status: 502 }
-      );
-    }
-    const doc = await tramitaEnviarDocumento({
-      clienteId: tsCliente.id,
-      userId,
-      titulo: modelo.titulo,
-      htmlContent: html,
-      // O PrevBot manda o link pelo próprio WhatsApp — não pede notificação
-      // duplicada do TramitaSign por e-mail/WhatsApp aqui.
-      email: null,
-      telefone: null,
-      requireSelfie: true,
-      requireDocument: true,
-    });
-    if (!doc?.link || !doc?.id) {
-      return NextResponse.json(
-        { ok: false, error: "TramitaSign não retornou link de assinatura." },
-        { status: 502 }
-      );
-    }
-
-    await atualizarAssinanteTramitaSign(assinante.id, {
-      documentoId: doc.id,
-      link: doc.link,
-    });
+    const link = assinanteAtualizado.tramitasignLink;
 
     // ── 6. Sincroniza com crm_leads — é isso que faz o webhook do TramitaSign
     // (quando o cliente assinar) reconhecer que é um lead do PrevBot e avisar
-    // de volta via PREVBOT_CALLBACK_URL.
+    // de volta via PREVBOT_CALLBACK_URL. contrato_id usa o UUID do nosso
+    // próprio envelope — é isso que o webhook casa de volta.
     const existenteLead = telefone
       ? await sql`SELECT id::text FROM crm_leads WHERE telefone = ${telefone} AND origem = 'prevbot' LIMIT 1`
       : [];
     if (existenteLead.length > 0) {
       await sql`
         UPDATE crm_leads SET
-          contrato_id = ${doc.id},
+          contrato_id = ${envelopeId},
           contrato_status = 'aguardando_assinatura',
           prevbot_lead_id = COALESCE(${prevbotLeadId}, prevbot_lead_id),
           client_id = COALESCE(client_id, ${clienteId}::uuid),
@@ -292,14 +257,14 @@ export async function POST(req: NextRequest) {
         INSERT INTO crm_leads
           (nome, email, telefone, tipo, estagio, origem, prevbot_lead_id, contrato_id, contrato_status, client_id)
         VALUES
-          (${nome}, ${email}, ${telefone}, 'PF', 'novo_contato', 'prevbot', ${prevbotLeadId}, ${doc.id}, 'aguardando_assinatura', ${clienteId}::uuid)
+          (${nome}, ${email}, ${telefone}, 'PF', 'novo_contato', 'prevbot', ${prevbotLeadId}, ${envelopeId}, 'aguardando_assinatura', ${clienteId}::uuid)
       `;
     }
 
     return NextResponse.json({
       ok: true,
-      link: doc.link,
-      documento_id: doc.id,
+      link,
+      documento_id: envelopeId,
       client_id: clienteId,
       modelo: modelo.titulo,
     });

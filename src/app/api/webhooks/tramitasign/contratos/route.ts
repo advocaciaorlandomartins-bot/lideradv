@@ -21,6 +21,33 @@ function verificarAssinatura(
   }
 }
 
+interface WebhookSigner {
+  id?: string;
+  email?: string | null;
+  all_documents_signed?: boolean;
+  signature_link?: string | null;
+}
+
+interface WebhookDocument {
+  signed_file_url?: string | null;
+}
+
+interface WebhookEnvelope {
+  id?: number;
+  status?: string;
+  signers?: WebhookSigner[];
+  documents?: WebhookDocument[];
+}
+
+// A API real do TramitaSign modela isso como envelope (POST /assinaturas),
+// não "documento" isolado — eventos confirmados na doc oficial deles
+// (schema SignatureSigner): `envelope.sent`, `envelope.signed` e
+// `envelope.completed`, com o corpo de todo evento de envelope sendo o
+// mesmo SignatureEnvelope de qualquer resposta do grupo /assinaturas
+// (id, status, signers[], documents[]). O wrapper exato do payload
+// (event_type solto vs dentro de "data" etc.) não está 100% documentado
+// publicamente, então a extração abaixo tenta os formatos mais prováveis
+// em vez de assumir só um.
 export async function POST(request: Request) {
   const secret = process.env.TRAMITASIGN_WEBHOOK_SECRET;
   if (!secret) {
@@ -43,89 +70,93 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const eventType = (payload.event_type ?? payload.event ?? "") as string;
+  const eventType = String(payload.event_type ?? payload.event ?? "");
 
-  const isAssinado =
-    eventType === "document.signed" ||
-    eventType === "contract.signed" ||
-    eventType === "signing.completed" ||
-    (payload.status as string | undefined) === "signed" ||
-    (payload.status as string | undefined) === "completed";
+  const envelope: WebhookEnvelope =
+    (payload.envelope as WebhookEnvelope | undefined) ??
+    ((payload.data as { envelope?: WebhookEnvelope } | undefined)?.envelope as
+      | WebhookEnvelope
+      | undefined) ??
+    // Formato achatado: o próprio payload já é o envelope (tem id + signers).
+    (typeof payload.id === "number" && Array.isArray(payload.signers)
+      ? (payload as unknown as WebhookEnvelope)
+      : undefined) ??
+    {};
 
-  if (!isAssinado) {
-    return NextResponse.json({ ok: true, skipped: true, event: eventType });
+  const envelopeTramitaId = envelope.id;
+  if (typeof envelopeTramitaId !== "number") {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      event: eventType,
+      motivo: "payload sem envelope.id",
+    });
   }
 
-  const data = (payload.data ?? payload) as Record<string, unknown>;
-  const contratoId = (data.document_id ??
-    data.contract_id ??
-    data.contrato_id ??
-    data.id ??
-    "") as string;
-  const contratoUrlAssinado =
-    ((data.signed_url ?? data.document_url ?? data.url ?? "") as string) ||
-    null;
-
-  if (!contratoId) {
-    return NextResponse.json(
-      { error: "document_id não encontrado no payload" },
-      { status: 422 }
-    );
+  const [nosso] = await sql`
+    SELECT id::text, status FROM envelopes
+    WHERE tramitasign_envelope_id = ${envelopeTramitaId}
+  `;
+  if (!nosso) {
+    return NextResponse.json({
+      ok: false,
+      message: `Nenhum envelope com tramitasign_envelope_id '${envelopeTramitaId}'`,
+    });
   }
+  const envelopeId = nosso.id as string;
+
+  // Atualiza o status de cada assinante que já terminou de assinar.
+  const signers = Array.isArray(envelope.signers) ? envelope.signers : [];
+  for (const s of signers) {
+    if (!s.id || !s.all_documents_signed) continue;
+    await sql`
+      UPDATE envelope_assinantes
+      SET status = 'assinado', assinado_em = COALESCE(assinado_em, now())
+      WHERE envelope_id = ${envelopeId}::uuid AND tramitasign_signer_id = ${s.id}
+    `;
+  }
+
+  const finalizado =
+    eventType === "envelope.completed" || envelope.status === "finalizado";
+
+  if (finalizado && nosso.status !== "concluido") {
+    await sql`
+      UPDATE envelopes SET status = 'concluido', atualizado_em = now()
+      WHERE id = ${envelopeId}::uuid
+    `;
+  }
+
+  if (!finalizado) {
+    return NextResponse.json({
+      ok: true,
+      envelope_id: envelopeId,
+      event: eventType,
+      finalizado: false,
+    });
+  }
+
+  // Envelope concluído — se for um lead do PrevBot (contrato_id = nosso
+  // envelope_id), converte e avisa o PrevBot de volta.
+  const signedUrl =
+    (envelope.documents ?? []).find((d) => d.signed_file_url)
+      ?.signed_file_url ?? null;
 
   const updated = await sql`
     UPDATE crm_leads SET
       contrato_status      = 'assinado',
-      contrato_url         = COALESCE(${contratoUrlAssinado}, contrato_url),
+      contrato_url         = COALESCE(${signedUrl}, contrato_url),
       contrato_assinado_em = COALESCE(contrato_assinado_em, now()),
       updated_at           = now()
-    WHERE contrato_id = ${String(contratoId)}
+    WHERE contrato_id = ${envelopeId}
     RETURNING id::text, nome, telefone, contrato_url, prevbot_lead_id
   `;
 
   if (updated.length === 0) {
-    // Mesmo evento "documento assinado" do TramitaSign também é usado pelo
-    // fluxo de Assinaturas (envelopes) — os dois recursos criam documento
-    // via tramitaEnviarDocumento e recebem o callback aqui. Sem este
-    // branch, nenhum envelope_assinantes/envelopes jamais saía do status
-    // inicial ('pendente'/'aguardando'): não havia UPDATE de status em
-    // lugar nenhum do código pra esse caso, e o painel de Assinaturas
-    // ficava mostrando "aguardando" pra sempre, mesmo já assinado.
-    const assinanteAtualizado = await sql`
-      UPDATE envelope_assinantes
-      SET status = 'assinado', assinado_em = COALESCE(assinado_em, now())
-      WHERE tramitasign_documento_id = ${String(contratoId)}
-      RETURNING id::text, envelope_id::text
-    `;
-
-    if (assinanteAtualizado.length === 0) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: `Nenhum lead ou assinante com contrato_id '${contratoId}'`,
-        },
-        { status: 404 }
-      );
-    }
-
-    const envelopeId = assinanteAtualizado[0].envelope_id as string;
-    const pendentes = await sql`
-      SELECT COUNT(*)::int AS c FROM envelope_assinantes
-      WHERE envelope_id = ${envelopeId}::uuid AND status != 'assinado'
-    `;
-
-    if (Number(pendentes[0]?.c ?? 1) === 0) {
-      await sql`
-        UPDATE envelopes SET status = 'concluido', atualizado_em = now()
-        WHERE id = ${envelopeId}::uuid AND status != 'concluido'
-      `;
-    }
-
     return NextResponse.json({
       ok: true,
       envelope_id: envelopeId,
-      assinante_id: assinanteAtualizado[0].id,
-      pendentes: Number(pendentes[0]?.c ?? 0),
+      event: eventType,
+      finalizado: true,
     });
   }
 
@@ -139,7 +170,7 @@ export async function POST(request: Request) {
 
   const { clientId, processoId, documentoId } = await converterLeadAssinado(
     lead.id,
-    contratoUrlAssinado || lead.contrato_url
+    signedUrl || lead.contrato_url
   );
 
   // Notifica PrevBot
@@ -155,8 +186,8 @@ export async function POST(request: Request) {
           }),
         },
         body: JSON.stringify({
-          contrato_id: contratoId,
-          document_id: contratoId,
+          contrato_id: envelopeId,
+          document_id: envelopeId,
           prevbot_lead_id: lead.prevbot_lead_id,
         }),
         signal: AbortSignal.timeout(8000),
@@ -170,7 +201,7 @@ export async function POST(request: Request) {
     ok: true,
     lead_id: lead.id,
     nome: lead.nome,
-    contrato_id: contratoId,
+    contrato_id: envelopeId,
     contrato_status: "assinado",
     client_id: clientId,
     processo_id: processoId,

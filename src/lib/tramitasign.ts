@@ -1,5 +1,21 @@
 // Wraps the TramitaSign (tramitacaointeligente.com.br) API for use within LiderAdv.
 // Set TRAMITASIGN_API_KEY and TRAMITASIGN_BASE_URL in .env.local and Vercel.
+//
+// Endpoints de assinatura de envelope confirmados contra a documentação
+// oficial (Swagger real, servido pelo próprio TramitaSign em
+// https://planilha.tramitacaointeligente.com.br/api/docs.json e
+// /api/docs/endpoints/<grupo>.json — não é doc de terceiro). A
+// implementação anterior (função tramitaEnviarDocumento, removida) mandava
+// um POST /documentos com content_html + require_signature — esse endpoint
+// não existe na API real. O fluxo correto de assinatura eletrônica é:
+//   1. POST /arquivos/envios-diretos  → signed_id + upload_url (S3)
+//   2. PUT no upload_url              → sobe os bytes do PDF
+//   3. POST /arquivos                 → registra o upload, devolve id
+//   4. POST /assinaturas              → cria o envelope (rascunho) com os upload_ids
+//   5. PATCH /assinaturas/{id}        → define os assinantes (signers)
+//   6. POST /assinaturas/{id}/envio   → envia de verdade; a resposta traz
+//      signature_link por assinante.
+import crypto from "crypto";
 
 const TRAMITA_PLANILHA_BASE = "https://planilha.tramitacaointeligente.com.br";
 
@@ -9,8 +25,7 @@ function baseUrl(): string {
   // reais (usuarios/clientes/documentos/notas/publicacoes) vivem sob
   // /api/v1 — confirmado testando os caminhos sem autenticação: sem o
   // prefixo dá 404 (rota não existe), com o prefixo dá 401 (existe, só
-  // falta a chave). Sem isso, tramitaObterUserId()/tramitaCriarCliente()/
-  // tramitaEnviarDocumento() sempre recebiam 404 e falhavam em silêncio —
+  // falta a chave). Sem isso, toda chamada às funções abaixo recebia 404 —
   // nenhum envelope de assinatura conseguia gerar link de verdade.
   const raw = (process.env.TRAMITASIGN_BASE_URL ?? "").replace(/\/$/, "");
   return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`;
@@ -248,54 +263,228 @@ export async function tramitaObterUserId(): Promise<string> {
   }
 }
 
-export async function tramitaEnviarDocumento(params: {
-  clienteId: string | number;
-  userId: string;
-  titulo: string;
-  htmlContent: string;
-  email?: string | null;
-  telefone?: string | null;
-  requireSelfie?: boolean;
-  requireDocument?: boolean;
-}): Promise<{ id: string; link?: string } | null> {
+/**
+ * Passo 1+2+3 do fluxo de assinatura: sobe um PDF pro TramitaSign (upload
+ * direto estilo Rails ActiveStorage — pede uma URL assinada, manda os bytes
+ * pra ela, depois registra o upload) e devolve o id numérico usável em
+ * upload_ids na criação/edição de um envelope.
+ */
+export async function tramitaUploadArquivo(
+  buffer: Buffer,
+  filename: string,
+  contentType = "application/pdf"
+): Promise<{ id: number } | null> {
   try {
-    const res = await fetch(`${baseUrl()}/documentos`, {
+    const checksum = crypto.createHash("md5").update(buffer).digest("base64");
+
+    const directRes = await fetch(`${baseUrl()}/arquivos/envios-diretos`, {
       method: "POST",
       headers: headers(),
       body: JSON.stringify({
-        document: {
-          title: params.titulo,
-          content_html: params.htmlContent,
-          customer_id: params.clienteId,
-          user_id: params.userId,
-          send_via_whatsapp: !!params.telefone,
-          send_via_email: !!params.email,
-          phone_mobile: params.telefone?.replace(/\D/g, "") ?? null,
-          email: params.email ?? null,
-          require_signature: true,
-          // Nomes inferidos pelo padrão já usado nos campos acima
-          // (require_signature) — a API do TramitaSign não tem
-          // documentação pública acessível pra confirmar. Enviar só
-          // quando marcado (omite quando false) é o comportamento mais
-          // seguro caso o nome do campo esteja errado: na pior hipótese a
-          // API ignora um campo desconhecido, igual ao comportamento
-          // anterior (nunca era enviado). Se a validação de
-          // selfie/documento não estiver realmente sendo exigida no link
-          // de assinatura, confirmar o nome certo com o suporte do
-          // TramitaSign e ajustar aqui.
-          ...(params.requireSelfie ? { require_selfie: true } : {}),
-          ...(params.requireDocument ? { require_document: true } : {}),
+        direct_upload: {
+          filename,
+          byte_size: buffer.byteLength,
+          checksum,
+          content_type: contentType,
         },
       }),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!directRes.ok) {
+      const txt = await directRes.text().catch(() => "");
+      console.error(
+        `[TramitaSign] envios-diretos: HTTP ${directRes.status} — ${txt.slice(0, 300)}`
+      );
+      return null;
+    }
+    const directData = await directRes.json();
+    const du = directData?.direct_upload;
+    if (!du?.upload_url || !du?.signed_id) {
+      console.error(
+        "[TramitaSign] envios-diretos: resposta sem upload_url/signed_id:",
+        JSON.stringify(directData).slice(0, 300)
+      );
+      return null;
+    }
+
+    // PUT direto no armazenamento assinado (S3 ou equivalente) — não é a
+    // API do TramitaSign: não manda o Bearer token, só os headers
+    // exatamente como vieram em upload_headers.
+    const putRes = await fetch(du.upload_url, {
+      method: "PUT",
+      headers: du.upload_headers ?? {},
+      body: new Uint8Array(buffer),
+    });
+    if (!putRes.ok) {
+      console.error(
+        `[TramitaSign] PUT upload_url: HTTP ${putRes.status} ao subir ${filename}`
+      );
+      return null;
+    }
+
+    const registerRes = await fetch(`${baseUrl()}/arquivos`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ upload: { signed_id: du.signed_id } }),
+    });
+    if (!registerRes.ok) {
+      const txt = await registerRes.text().catch(() => "");
+      console.error(
+        `[TramitaSign] registrar arquivo: HTTP ${registerRes.status} — ${txt.slice(0, 300)}`
+      );
+      return null;
+    }
+    const registerData = await registerRes.json();
+    const id = registerData?.upload?.id;
+    if (typeof id !== "number") {
+      console.error(
+        "[TramitaSign] registrar arquivo: resposta sem id numérico:",
+        JSON.stringify(registerData).slice(0, 300)
+      );
+      return null;
+    }
+    return { id };
+  } catch (e) {
+    console.error("[TramitaSign] uploadArquivo error:", e);
+    return null;
+  }
+}
+
+/** Passo 4: cria o envelope (nasce em rascunho) já com os documentos (upload_ids). */
+export async function tramitaCriarEnvelopeAssinatura(params: {
+  userId: string;
+  nome: string;
+  uploadIds: number[];
+}): Promise<{ id: number } | null> {
+  try {
+    const res = await fetch(`${baseUrl()}/assinaturas`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        envelope: {
+          user_id: params.userId,
+          name: params.nome,
+          upload_ids: params.uploadIds,
+        },
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.error(
+        `[TramitaSign] criarEnvelope: HTTP ${res.status} — ${txt.slice(0, 300)}`
+      );
+      return null;
+    }
     const data = await res.json();
+    const id = data?.envelope?.id;
+    if (typeof id !== "number") {
+      console.error(
+        "[TramitaSign] criarEnvelope: resposta sem id numérico:",
+        JSON.stringify(data).slice(0, 300)
+      );
+      return null;
+    }
+    return { id };
+  } catch (e) {
+    console.error("[TramitaSign] criarEnvelopeAssinatura error:", e);
+    return null;
+  }
+}
+
+export interface TramitaSignerInput {
+  signerType: "user" | "customer" | "third_party";
+  customerId?: number;
+  userId?: string;
+  fullName?: string;
+  email?: string;
+  signatureType?: "assinante" | "testemunha" | "avalista";
+  selfieRequired?: boolean;
+  documentPhotoRequired?: boolean;
+}
+
+/** Passo 5: define os assinantes do envelope (só aceito enquanto está em rascunho). */
+export async function tramitaAtualizarSignatarios(
+  envelopeId: number,
+  signers: TramitaSignerInput[]
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${baseUrl()}/assinaturas/${envelopeId}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({
+        envelope: {
+          signers: signers.map((s) => ({
+            signer_type: s.signerType,
+            ...(s.customerId != null ? { customer_id: s.customerId } : {}),
+            ...(s.userId ? { user_id: s.userId } : {}),
+            ...(s.fullName ? { full_name: s.fullName } : {}),
+            ...(s.email ? { email: s.email } : {}),
+            ...(s.signatureType ? { signature_type: s.signatureType } : {}),
+            ...(s.selfieRequired ? { selfie_required: true } : {}),
+            ...(s.documentPhotoRequired
+              ? { document_photo_required: true }
+              : {}),
+          })),
+        },
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.error(
+        `[TramitaSign] atualizarSignatarios: HTTP ${res.status} — ${txt.slice(0, 300)}`
+      );
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[TramitaSign] atualizarSignatarios error:", e);
+    return false;
+  }
+}
+
+export interface TramitaSignerResultado {
+  id: string;
+  signerType: string;
+  email: string | null;
+  fullName: string | null;
+  signatureLink: string | null;
+}
+
+/** Passo 6: envia de verdade — a resposta traz o signature_link de cada assinante. */
+export async function tramitaEnviarEnvelopeAssinatura(
+  envelopeId: number
+): Promise<{ signers: TramitaSignerResultado[] } | null> {
+  try {
+    const res = await fetch(`${baseUrl()}/assinaturas/${envelopeId}/envio`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      console.error(
+        `[TramitaSign] enviarEnvelope: HTTP ${res.status} — ${txt.slice(0, 300)}`
+      );
+      return null;
+    }
+    const data = await res.json();
+    const signers = (data?.envelope?.signers ?? []) as Array<{
+      id: string;
+      signer_type: string;
+      email: string | null;
+      full_name: string | null;
+      signature_link: string | null;
+    }>;
     return {
-      id: String(data?.document?.id ?? data?.id ?? ""),
-      link: data?.document?.sign_link ?? data?.sign_link ?? undefined,
+      signers: signers.map((s) => ({
+        id: s.id,
+        signerType: s.signer_type,
+        email: s.email ?? null,
+        fullName: s.full_name ?? null,
+        signatureLink: s.signature_link ?? null,
+      })),
     };
   } catch (e) {
-    console.error("[TramitaSign] enviarDocumento error:", e);
+    console.error("[TramitaSign] enviarEnvelopeAssinatura error:", e);
     return null;
   }
 }

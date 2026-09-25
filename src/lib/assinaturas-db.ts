@@ -209,76 +209,112 @@ export async function criarEnvelope(data: {
   return { id: envId, assinantes: assinantesCriados };
 }
 
+/**
+ * A API real de assinatura do TramitaSign modela isso como UM envelope
+ * remoto por envelope nosso, com os "signers" dele apontando pro id do
+ * assinante lá (não um "documento" por assinante — a implementação
+ * anterior assumia errado). `signerId` é o `signers[].id` devolvido por
+ * `POST /assinaturas/{id}/envio`.
+ */
 export async function atualizarAssinanteTramitaSign(
   assinanteId: string,
   data: {
-    documentoId: string | null;
+    signerId: string | null;
     link: string | null;
     erro?: string | null;
   }
 ): Promise<void> {
   await sql`
     UPDATE envelope_assinantes
-    SET tramitasign_documento_id = ${data.documentoId},
+    SET tramitasign_signer_id = ${data.signerId},
         tramitasign_link = ${data.link},
         tramitasign_erro = ${data.erro ?? null}
     WHERE id = ${assinanteId}::uuid
   `;
 }
 
-export interface AssinanteParaReenvio {
+export async function atualizarEnvelopeTramitaSign(
+  envelopeId: string,
+  tramitasignEnvelopeId: number | null
+): Promise<void> {
+  await sql`
+    UPDATE envelopes SET tramitasign_envelope_id = ${tramitasignEnvelopeId}
+    WHERE id = ${envelopeId}::uuid
+  `;
+}
+
+export interface DocumentoParaEnvio {
+  modeloId: string | null;
+  nome: string;
+  ordem: number;
+}
+
+export interface AssinanteParaEnvio {
   id: string;
-  envelopeId: string;
-  envelopeNome: string;
+  tipo: string;
   nome: string;
   email: string;
-  tipo: string;
+  papel: string;
   valSelfie: boolean;
   valDocumento: boolean;
   status: string;
-  notifAssinantes: boolean;
-  documentoHtmlCombinado: string;
 }
 
-/** Reúne o que a chamada ao TramitaSign precisa pra reenviar um único assinante. */
-export async function getAssinanteParaReenvio(
-  assinanteId: string
-): Promise<AssinanteParaReenvio | null> {
-  const [a] = await sql`
-    SELECT a.id::text, a.envelope_id::text, a.nome, a.email, a.tipo,
-           a.val_selfie, a.val_documento, a.status,
-           e.nome AS envelope_nome, e.notif_assinantes
-    FROM envelope_assinantes a
-    JOIN envelopes e ON e.id = a.envelope_id
-    WHERE a.id = ${assinanteId}::uuid
-  `;
-  if (!a) return null;
+export interface EnvelopeParaEnvio {
+  id: string;
+  nome: string;
+  clienteId: string;
+  notifAssinantes: boolean;
+  documentos: DocumentoParaEnvio[];
+  assinantes: AssinanteParaEnvio[];
+}
 
-  const documentos = await sql`
-    SELECT nome, html_content, ordem
-    FROM envelope_documentos
-    WHERE envelope_id = ${a.envelope_id}::uuid
-    ORDER BY ordem
+/** Reúne o que o envio (ou reenvio) ao TramitaSign precisa: o envelope inteiro. */
+export async function getEnvelopeParaEnvio(
+  envelopeId: string
+): Promise<EnvelopeParaEnvio | null> {
+  const [env] = await sql`
+    SELECT id::text, nome, client_id::text, notif_assinantes
+    FROM envelopes
+    WHERE id = ${envelopeId}::uuid
   `;
-  const documentoHtmlCombinado = documentos
-    .map(
-      (d) =>
-        `<h2>${String(d.nome).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c]!)}</h2>\n${d.html_content}\n<div style="margin:24px 0"><hr></div>`
-    )
-    .join("\n");
+  if (!env) return null;
+
+  const [documentos, assinantes] = await Promise.all([
+    sql`
+      SELECT modelo_id::text, nome, ordem
+      FROM envelope_documentos
+      WHERE envelope_id = ${envelopeId}::uuid
+      ORDER BY ordem
+    `,
+    sql`
+      SELECT id::text, tipo, nome, email, papel, val_selfie, val_documento, status
+      FROM envelope_assinantes
+      WHERE envelope_id = ${envelopeId}::uuid
+      ORDER BY ordem
+    `,
+  ]);
 
   return {
-    id: a.id,
-    envelopeId: a.envelope_id,
-    envelopeNome: a.envelope_nome,
-    nome: a.nome,
-    email: a.email,
-    tipo: a.tipo,
-    valSelfie: a.val_selfie,
-    valDocumento: a.val_documento,
-    status: a.status,
-    notifAssinantes: a.notif_assinantes,
-    documentoHtmlCombinado,
+    id: env.id,
+    nome: env.nome,
+    clienteId: env.client_id,
+    notifAssinantes: env.notif_assinantes,
+    documentos: documentos.map((d) => ({
+      modeloId: d.modelo_id ?? null,
+      nome: d.nome,
+      ordem: d.ordem,
+    })),
+    assinantes: assinantes.map((a) => ({
+      id: a.id,
+      tipo: a.tipo,
+      nome: a.nome,
+      email: a.email,
+      papel: a.papel,
+      valSelfie: a.val_selfie,
+      valDocumento: a.val_documento,
+      status: a.status,
+    })),
   };
 }
 

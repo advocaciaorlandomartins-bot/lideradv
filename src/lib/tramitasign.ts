@@ -269,11 +269,16 @@ export async function tramitaObterUserId(): Promise<string> {
  * pra ela, depois registra o upload) e devolve o id numérico usável em
  * upload_ids na criação/edição de um envelope.
  */
+export interface TramitaUploadResultado {
+  id: number | null;
+  erro?: string;
+}
+
 export async function tramitaUploadArquivo(
   buffer: Buffer,
   filename: string,
   contentType = "application/pdf"
-): Promise<{ id: number } | null> {
+): Promise<TramitaUploadResultado> {
   try {
     const checksum = crypto.createHash("md5").update(buffer).digest("base64");
 
@@ -291,19 +296,16 @@ export async function tramitaUploadArquivo(
     });
     if (!directRes.ok) {
       const txt = await directRes.text().catch(() => "");
-      console.error(
-        `[TramitaSign] envios-diretos: HTTP ${directRes.status} — ${txt.slice(0, 300)}`
-      );
-      return null;
+      const erro = `envios-diretos: HTTP ${directRes.status} — ${txt.slice(0, 200)}`;
+      console.error(`[TramitaSign] ${erro}`);
+      return { id: null, erro };
     }
     const directData = await directRes.json();
     const du = directData?.direct_upload;
     if (!du?.upload_url || !du?.signed_id) {
-      console.error(
-        "[TramitaSign] envios-diretos: resposta sem upload_url/signed_id:",
-        JSON.stringify(directData).slice(0, 300)
-      );
-      return null;
+      const erro = `envios-diretos: resposta sem upload_url/signed_id — ${JSON.stringify(directData).slice(0, 200)}`;
+      console.error(`[TramitaSign] ${erro}`);
+      return { id: null, erro };
     }
 
     // PUT direto no armazenamento assinado (S3 ou equivalente) — não é a
@@ -315,10 +317,10 @@ export async function tramitaUploadArquivo(
       body: new Uint8Array(buffer),
     });
     if (!putRes.ok) {
-      console.error(
-        `[TramitaSign] PUT upload_url: HTTP ${putRes.status} ao subir ${filename}`
-      );
-      return null;
+      const putTxt = await putRes.text().catch(() => "");
+      const erro = `PUT upload_url: HTTP ${putRes.status} ao subir ${filename} — ${putTxt.slice(0, 200)}`;
+      console.error(`[TramitaSign] ${erro}`);
+      return { id: null, erro };
     }
 
     const registerRes = await fetch(`${baseUrl()}/arquivos`, {
@@ -328,24 +330,22 @@ export async function tramitaUploadArquivo(
     });
     if (!registerRes.ok) {
       const txt = await registerRes.text().catch(() => "");
-      console.error(
-        `[TramitaSign] registrar arquivo: HTTP ${registerRes.status} — ${txt.slice(0, 300)}`
-      );
-      return null;
+      const erro = `registrar arquivo: HTTP ${registerRes.status} — ${txt.slice(0, 200)}`;
+      console.error(`[TramitaSign] ${erro}`);
+      return { id: null, erro };
     }
     const registerData = await registerRes.json();
     const id = registerData?.upload?.id;
     if (typeof id !== "number") {
-      console.error(
-        "[TramitaSign] registrar arquivo: resposta sem id numérico:",
-        JSON.stringify(registerData).slice(0, 300)
-      );
-      return null;
+      const erro = `registrar arquivo: resposta sem id numérico — ${JSON.stringify(registerData).slice(0, 200)}`;
+      console.error(`[TramitaSign] ${erro}`);
+      return { id: null, erro };
     }
     return { id };
   } catch (e) {
+    const erro = e instanceof Error ? e.message : String(e);
     console.error("[TramitaSign] uploadArquivo error:", e);
-    return null;
+    return { id: null, erro };
   }
 }
 

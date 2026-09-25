@@ -224,8 +224,8 @@ export async function enviarEnvelopeParaTramitaSign(
     }
 
     const upload = await tramitaUploadArquivo(pdfBuffer, `${doc.nome}.pdf`);
-    if (!upload?.id) {
-      const erro = `Falha ao enviar o PDF de "${doc.nome}" para o TramitaSign.`;
+    if (!upload.id) {
+      const erro = `Falha ao enviar o PDF de "${doc.nome}" para o TramitaSign${upload.erro ? ` (${upload.erro})` : ""}.`;
       await gravarErroEmTodos(erro);
       return { error: erro };
     }

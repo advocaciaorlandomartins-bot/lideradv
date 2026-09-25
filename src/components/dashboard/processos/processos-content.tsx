@@ -297,9 +297,10 @@ export default function ProcessosContent({
     null
   );
 
-  // Sort
-  const [sortKey, setSortKey] = useState<SortKey>("updated_at");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // Sort — alfabético por cliente por padrão, mais fácil de achar na tela
+  // do que ordenado por data de atualização.
+  const [sortKey, setSortKey] = useState<SortKey>("client_name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   // Pagination
   const [page, setPage] = useState(1);

@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import sql from "./db";
 import { logAction } from "./audit";
 import { extractText } from "./anthropic-text";
+import type { MembroFamilia } from "./clients-db";
 
 /**
  * Preenchimento automático do cadastro do cliente a partir de dado
@@ -56,6 +57,7 @@ export interface DadosClienteExtraidos {
   responsavel_rg?: string | null;
   responsavel_rg_orgao?: string | null;
   responsavel_email?: string | null;
+  renda_familiar_per_capita?: string | null;
 }
 
 const CAMPOS_DATA = new Set([
@@ -113,6 +115,7 @@ const CAMPOS_PERMITIDOS = new Set<keyof DadosClienteExtraidos>([
   "responsavel_rg",
   "responsavel_rg_orgao",
   "responsavel_email",
+  "renda_familiar_per_capita",
 ]);
 
 /**
@@ -198,7 +201,9 @@ export async function aplicarCamposClienteSeVazios(
   return preenchidos;
 }
 
-const EXTRACTION_PROMPT = `Extraia todos os dados deste documento brasileiro e retorne SOMENTE o JSON abaixo. Pode ser um documento de identificação, um comprovante de residência (conta de água/luz/telefone, contrato de aluguel) ou um documento médico/previdenciário (carta de concessão/indeferimento do INSS, extrato do CNIS, laudo médico, atestado). Preencha só os campos que existirem nesse tipo de documento — campos ausentes, ilegíveis ou que não se aplicam ao documento devem ter valor null. Nunca invente dado que não esteja explícito no documento.
+const EXTRACTION_PROMPT = `Extraia todos os dados deste documento brasileiro e retorne SOMENTE o JSON abaixo. Pode ser um documento de identificação, um comprovante de residência (conta de água/luz/telefone, contrato de aluguel), um documento médico/previdenciário (carta de concessão/indeferimento do INSS, extrato do CNIS, laudo médico, atestado) ou o Comprovante de Cadastro do CadÚnico (Ministério do Desenvolvimento e Assistência Social). Preencha só os campos que existirem nesse tipo de documento — campos ausentes, ilegíveis ou que não se aplicam ao documento devem ter valor null. Nunca invente dado que não esteja explícito no documento.
+
+Se o documento for o Comprovante de Cadastro do CadÚnico: "renda_familiar_per_capita" é o texto da faixa em "Faixa de renda familiar por pessoa (per capita)" (ex: "Entre R$ 210,01 até meio salário mínimo") — NUNCA use a "Faixa de renda familiar total" para esse campo, são faixas diferentes. "membros_familia" é a lista completa da tabela "Integrantes da família", um item por linha, incluindo a Pessoa Responsável pela Unidade Familiar.
 
 {
   "cpf": "000.000.000-00",
@@ -229,7 +234,16 @@ const EXTRACTION_PROMPT = `Extraia todos os dados deste documento brasileiro e r
   "data_diagnostico": "YYYY-MM-DD",
   "data_afastamento": "YYYY-MM-DD",
   "atividade_anterior": "última profissão antes do afastamento",
-  "num_contribuicoes": "número inteiro de contribuições, se constar"
+  "num_contribuicoes": "número inteiro de contribuições, se constar",
+  "renda_familiar_per_capita": "faixa de renda per capita (CadÚnico)",
+  "membros_familia": [
+    {
+      "nome": "Nome completo",
+      "parentesco": "Parentesco com o RF (ou 'Pessoa Responsável pela Unidade Familiar')",
+      "data_nascimento": "YYYY-MM-DD",
+      "cpf": "000.000.000-00"
+    }
+  ]
 }`;
 
 function strOrNull(v: unknown): string | null {
@@ -242,6 +256,25 @@ function numOrNull(v: unknown): number | null {
   const n = Number(v);
   return !isNaN(n) ? n : null;
 }
+function parseMembrosFamilia(v: unknown): MembroFamilia[] | null {
+  if (!Array.isArray(v)) return null;
+  const membros = v
+    .map((item): MembroFamilia | null => {
+      if (!item || typeof item !== "object") return null;
+      const o = item as Record<string, unknown>;
+      const nome = strOrNull(o.nome);
+      if (!nome) return null;
+      return {
+        nome,
+        parentesco: strOrNull(o.parentesco),
+        data_nascimento: normDate(o.data_nascimento),
+        cpf: strOrNull(o.cpf),
+      };
+    })
+    .filter((m): m is MembroFamilia => m !== null);
+  return membros.length > 0 ? membros : null;
+}
+
 function normDate(v: unknown): string | null {
   const s = strOrNull(v);
   if (!s) return null;
@@ -305,7 +338,7 @@ export async function analisarDocumentoCliente(
   const aiResp = await client.messages.create(
     {
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
+      max_tokens: 1536,
       messages: [{ role: "user", content }],
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
@@ -351,6 +384,7 @@ export async function analisarDocumentoCliente(
     data_afastamento: normDate(extracted.data_afastamento),
     atividade_anterior: strOrNull(extracted.atividade_anterior),
     num_contribuicoes: numOrNull(extracted.num_contribuicoes),
+    renda_familiar_per_capita: strOrNull(extracted.renda_familiar_per_capita),
   };
   // Remove chaves null pra aplicarCamposClienteSeVazios só considerar o que
   // o documento realmente trouxe.
@@ -363,5 +397,43 @@ export async function analisarDocumentoCliente(
     dados,
     `documento "${doc.nome}"`
   );
+
+  // membros_familia é JSONB (lista), fora do mecanismo genérico de colunas
+  // escalares acima — mesma regra de não sobrescrever: só grava se o
+  // cliente ainda não tem nenhum membro cadastrado.
+  const membrosFamilia = parseMembrosFamilia(extracted.membros_familia);
+  if (membrosFamilia) {
+    const [atual] = await sql`
+      SELECT membros_familia FROM clients
+      WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
+    `.catch(() => [null]);
+    const jaTemMembros =
+      Array.isArray(atual?.membros_familia) && atual.membros_familia.length > 0;
+    if (atual && !jaTemMembros) {
+      const ok = await sql`
+        UPDATE clients SET membros_familia = ${JSON.stringify(membrosFamilia)}::jsonb
+        WHERE id = ${clienteId}::uuid
+      `
+        .then(() => true)
+        .catch((e) => {
+          console.error(
+            "[cliente-documento-auto] falha ao gravar membros_familia:",
+            e
+          );
+          return false;
+        });
+      if (ok) {
+        preenchidos.push("membros_familia");
+        await logAction({
+          acao: "editar",
+          entidade: "cliente",
+          entidadeId: clienteId,
+          descricao: `Preenchimento automático (documento "${doc.nome}"): membros_familia`,
+          _login: "sistema (IA)",
+        }).catch(() => null);
+      }
+    }
+  }
+
   return { camposPreenchidos: preenchidos };
 }

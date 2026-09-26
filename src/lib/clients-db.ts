@@ -190,6 +190,16 @@ export interface ClientFull {
   atividade_anterior: string | null;
   num_contribuicoes: number | null;
   bloquear_mensagens: boolean;
+  // Grupo familiar (Formulário LOAS/BPC) — extraído do CadÚnico
+  membros_familia: MembroFamilia[] | null;
+  renda_familiar_per_capita: string | null;
+}
+
+export interface MembroFamilia {
+  nome: string;
+  parentesco: string | null;
+  data_nascimento: string | null;
+  cpf: string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -272,6 +282,10 @@ function mapClientFull(r: any, hasOrigemCols: boolean): ClientFull {
     num_contribuicoes:
       r.num_contribuicoes != null ? Number(r.num_contribuicoes) : null,
     bloquear_mensagens: r.bloquear_mensagens ?? false,
+    membros_familia: Array.isArray(r.membros_familia)
+      ? r.membros_familia
+      : null,
+    renda_familiar_per_capita: r.renda_familiar_per_capita ?? null,
   };
 }
 
@@ -310,6 +324,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         c.atividade_anterior,
         c.num_contribuicoes,
         c.bloquear_mensagens,
+        c.membros_familia, c.renda_familiar_per_capita,
         (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
@@ -348,6 +363,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       c.atividade_anterior,
       c.num_contribuicoes,
       c.bloquear_mensagens,
+      c.membros_familia, c.renda_familiar_per_capita,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
     WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL

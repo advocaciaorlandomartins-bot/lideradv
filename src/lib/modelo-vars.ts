@@ -21,6 +21,13 @@ function joinComE(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}`;
 }
 
+// Cobre a tabela "RENDA FAMILIAR" do Formulário LOAS — número fixo de
+// linhas (variáveis {{membro1_nome}}..{{membro6_cpf}}) pra caber no
+// mecanismo de substituição por regex já existente, sem precisar de um
+// tipo de bloco de tabela dinâmica no editor. Linha sem membro cadastrado
+// nessa posição fica em branco no documento.
+const MAX_MEMBROS_FAMILIA = 6;
+
 /**
  * Mapa {{variavel}} → valor, usado tanto na geração de PDF (gerar-modelo)
  * quanto na geração de HTML pra assinatura (Assinaturas) — mesma fonte de
@@ -39,6 +46,20 @@ export function buildModeloVars(
     client.complement,
   ].filter(Boolean);
   const enderecoCompleto = `${addrParts.join(", ")}, ${client.neighborhood}, ${client.city}/${client.state}, CEP ${client.cep}`;
+
+  const membrosVars: Record<string, string> = {};
+  for (let i = 0; i < MAX_MEMBROS_FAMILIA; i++) {
+    const m = client.membros_familia?.[i];
+    const n = i + 1;
+    membrosVars[`{{membro${n}_nome}}`] = m?.nome ?? "";
+    membrosVars[`{{membro${n}_parentesco}}`] = m?.parentesco ?? "";
+    membrosVars[`{{membro${n}_nascimento}}`] = m?.data_nascimento
+      ? new Date(m.data_nascimento).toLocaleDateString("pt-BR", {
+          timeZone: "UTC",
+        })
+      : "";
+    membrosVars[`{{membro${n}_cpf}}`] = m?.cpf ?? "";
+  }
 
   return {
     "{{nome}}": client.name,
@@ -76,6 +97,8 @@ export function buildModeloVars(
     "{{responsavel_telefone}}": client.responsavel_telefone ?? "",
     "{{responsavel_email}}": client.responsavel_email ?? "",
     "{{responsavel_parentesco}}": client.responsavel_parentesco ?? "",
+    "{{renda_familiar_per_capita}}": client.renda_familiar_per_capita ?? "",
+    ...membrosVars,
     "{{data_hoje}}": date,
     "{{advogado}}":
       escritorioConfig.oab && escritorioConfig.oab_uf

@@ -6,6 +6,7 @@ import type { ClientFull } from "@/lib/clients-db";
 import type { Processo } from "@/lib/processos-db";
 import type { ClientDebito } from "@/lib/lancamentos-db";
 import type { Documento } from "@/lib/documents-db";
+import type { ModeloDocumento } from "@/lib/modelos-db";
 import type {
   InboundEmailAddress,
   InboundEmail,
@@ -242,6 +243,7 @@ interface Props {
   inboundEmails: InboundEmail[];
   initialTab?: Tab;
   podeVerFinanceiro?: boolean;
+  modelos: ModeloDocumento[];
 }
 
 export default function ClienteDetailTabs({
@@ -253,6 +255,7 @@ export default function ClienteDetailTabs({
   inboundEmails,
   initialTab,
   podeVerFinanceiro = true,
+  modelos,
 }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "geral");
   const tabsVisiveis = podeVerFinanceiro
@@ -985,6 +988,7 @@ export default function ClienteDetailTabs({
               <GerarDocumentoButton
                 clientId={client.id}
                 clientName={client.name}
+                modelos={modelos}
               />
             </div>
           </div>

@@ -7,6 +7,7 @@ import {
   XMarkIcon,
   SpinnerIcon,
 } from "@/components/icons";
+import type { ModeloDocumento } from "@/lib/modelos-db";
 
 type TemplateKey =
   | "procuracao"
@@ -61,16 +62,25 @@ const TEMPLATES: Template[] = [
 interface Props {
   clientId: string;
   clientName: string;
+  modelos: ModeloDocumento[];
 }
 
-export default function GerarDocumentoButton({ clientId, clientName }: Props) {
+// Seleção mistura os 5 modelos padrão (TemplateKey) com os modelos
+// próprios do escritório (id UUID) — os dois cabem no mesmo Set<string>
+// porque as chaves fixas nunca colidem com um UUID.
+export default function GerarDocumentoButton({
+  clientId,
+  clientName,
+  modelos,
+}: Props) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<TemplateKey>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const allChecked = selected.size === TEMPLATES.length;
+  const totalItens = TEMPLATES.length + modelos.length;
+  const allChecked = selected.size === totalItens;
   const someChecked = selected.size > 0 && !allChecked;
 
   useEffect(() => {
@@ -90,7 +100,7 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
     setOpen(false);
   }
 
-  function toggleTemplate(key: TemplateKey) {
+  function toggleTemplate(key: string) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -103,7 +113,12 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
     if (allChecked) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(TEMPLATES.map((t) => t.key)));
+      setSelected(
+        new Set([
+          ...TEMPLATES.map((t): string => t.key),
+          ...modelos.map((m) => m.id),
+        ])
+      );
     }
   }
 
@@ -119,9 +134,12 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
 
     try {
       for (const key of selected) {
-        const res = await fetch(
-          `/api/clientes/${clientId}/gerar-documento?template=${key}`
-        );
+        const modelo = modelos.find((m) => m.id === key);
+        const url = modelo
+          ? `/api/gerar-modelo?modeloId=${modelo.id}&clienteId=${clientId}`
+          : `/api/clientes/${clientId}/gerar-documento?template=${key}`;
+
+        const res = await fetch(url);
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -129,16 +147,18 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
         }
 
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
+        const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        const templateLabel =
-          TEMPLATES.find((t) => t.key === key)?.label ?? "Documento";
-        a.href = url;
-        a.download = `${templateLabel.replace(/\s+/g, "_")}_${safeName}.pdf`;
+        const label =
+          modelo?.titulo ??
+          TEMPLATES.find((t) => t.key === key)?.label ??
+          "Documento";
+        a.href = objectUrl;
+        a.download = `${label.replace(/\s+/g, "_")}_${safeName}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(objectUrl);
       }
       setOpen(false);
     } catch (err) {
@@ -214,10 +234,16 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
                 </span>
                 {selected.size > 0 && (
                   <span className="ml-auto font-body text-xs text-muted">
-                    {selected.size} de {TEMPLATES.length} selecionados
+                    {selected.size} de {totalItens} selecionados
                   </span>
                 )}
               </label>
+
+              {modelos.length > 0 && (
+                <p className="mb-2 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                  Modelos do sistema
+                </p>
+              )}
 
               {/* Template cards */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -276,6 +302,70 @@ export default function GerarDocumentoButton({ clientId, clientName }: Props) {
                   );
                 })}
               </div>
+
+              {modelos.length > 0 && (
+                <>
+                  <p className="mb-2 mt-5 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                    Meus Modelos
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {modelos.map((m) => {
+                      const isSelected = selected.has(m.id);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => toggleTemplate(m.id)}
+                          disabled={loading}
+                          className={`flex flex-col items-start gap-1.5 rounded-xl border-2 p-4 text-left transition-all duration-150 cursor-pointer disabled:opacity-50 ${
+                            isSelected
+                              ? "border-primary bg-blue-50 shadow-sm"
+                              : "border-border hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex w-full items-start justify-between gap-2">
+                            <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-body text-xs font-bold text-slate-600">
+                              <DocumentTextIcon className="h-3.5 w-3.5" />
+                              PDF
+                            </div>
+                            <span
+                              className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
+                                isSelected
+                                  ? "border-primary bg-primary text-white"
+                                  : "border-border bg-white"
+                              }`}
+                            >
+                              {isSelected && (
+                                <svg
+                                  className="h-3 w-3"
+                                  viewBox="0 0 12 12"
+                                  fill="none"
+                                >
+                                  <path
+                                    d="M2 6l3 3 5-5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
+                            </span>
+                          </div>
+                          <span className="font-body text-sm font-semibold text-fg leading-snug">
+                            {m.titulo}
+                          </span>
+                          {m.descricao && (
+                            <span className="font-body text-xs text-muted leading-relaxed">
+                              {m.descricao}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
               {error && (
                 <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">

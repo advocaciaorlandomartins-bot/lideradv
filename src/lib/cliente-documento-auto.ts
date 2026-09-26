@@ -161,10 +161,16 @@ export async function aplicarCamposClienteSeVazios(
   if (elegiveis.length === 0) return [];
 
   // Só entra na lista devolvida (e no que é anunciado como "preenchido")
-  // se o UPDATE realmente confirmou — antes o campo era considerado
-  // preenchido só por ELEGIBILIDADE, mesmo quando o UPDATE falhava e o
-  // erro era engolido: a Íris/o cadastro diziam "atualizado" pro usuário
-  // sem o dado ter sido gravado de verdade.
+  // se o UPDATE realmente confirmou uma linha — antes isso era decidido só
+  // pela leitura de `atual` no início da função (checa-então-age): duas
+  // chamadas concorrentes pro mesmo cliente (dois documentos analisados
+  // quase ao mesmo tempo, ou upload + edição manual do formulário) podiam
+  // ambas ler o campo como vazio antes de qualquer UPDATE confirmar, e a
+  // que rodasse por último vencia mesmo sendo o dado errado/mais antigo —
+  // contradizendo a regra de nunca sobrescrever um valor real. O guard
+  // (AND campo ainda vazio) no próprio WHERE torna a checagem e a escrita
+  // atômicas: só conta como "preenchido" quem realmente mudou uma linha
+  // que ainda estava vazia NO MOMENTO do UPDATE, não no início da função.
   const preenchidos: (keyof DadosClienteExtraidos)[] = [];
   for (const campo of elegiveis) {
     const valor = dados[campo];
@@ -173,20 +179,28 @@ export async function aplicarCamposClienteSeVazios(
       : CAMPOS_NUMERICOS.has(campo)
         ? "::numeric"
         : "";
-    const ok = await sql
-      .query(`UPDATE clients SET ${campo} = $1${cast} WHERE id = $2::uuid`, [
-        valor,
-        clienteId,
-      ])
-      .then(() => true)
+    const guardVazio =
+      CAMPOS_DATA.has(campo) || CAMPOS_NUMERICOS.has(campo)
+        ? `${campo} IS NULL`
+        : `(${campo} IS NULL OR ${campo} = '' OR ${campo} = ANY($3::text[]))`;
+    const params = [
+      valor,
+      clienteId,
+      ...(guardVazio.includes("$3") ? [[...PLACEHOLDERS]] : []),
+    ];
+    const rows = await sql
+      .query(
+        `UPDATE clients SET ${campo} = $1${cast} WHERE id = $2::uuid AND ${guardVazio} RETURNING id`,
+        params
+      )
       .catch((e) => {
         console.error(
           `[cliente-documento-auto] falha ao gravar campo "${campo}":`,
           e
         );
-        return false;
+        return [];
       });
-    if (ok) preenchidos.push(campo);
+    if (Array.isArray(rows) && rows.length > 0) preenchidos.push(campo);
   }
   if (preenchidos.length === 0) return [];
 
@@ -425,26 +439,27 @@ export async function aplicarMembrosFamiliaSeVazio(
   const membrosFamilia = parseMembrosFamilia(rawMembrosFamilia);
   if (!membrosFamilia) return false;
 
-  const [atual] = await sql`
-    SELECT membros_familia FROM clients
-    WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
-  `.catch(() => [null]);
-  const jaTemMembros =
-    Array.isArray(atual?.membros_familia) && atual.membros_familia.length > 0;
-  if (!atual || jaTemMembros) return false;
-
-  const ok = await sql`
-    UPDATE clients SET membros_familia = ${JSON.stringify(membrosFamilia)}::jsonb
+  // UPDATE condicional e atômico (guard no próprio WHERE, não uma leitura
+  // prévia) — CadÚnico pode ser analisado pelo pipeline de cliente e pelo
+  // de processo quase ao mesmo tempo pro mesmo cliente; sem o guard aqui,
+  // as duas passagens podiam ler "ainda sem membros" antes de qualquer
+  // UPDATE confirmar, e a segunda sobrescrevia silenciosamente a lista já
+  // salva pela primeira em vez de ser ignorada.
+  const rows = await sql`
+    UPDATE clients
+    SET membros_familia = ${JSON.stringify(membrosFamilia)}::jsonb
     WHERE id = ${clienteId}::uuid
-  `
-    .then(() => true)
-    .catch((e) => {
-      console.error(
-        "[cliente-documento-auto] falha ao gravar membros_familia:",
-        e
-      );
-      return false;
-    });
+      AND deleted_at IS NULL
+      AND (membros_familia IS NULL OR jsonb_array_length(membros_familia) = 0)
+    RETURNING id
+  `.catch((e) => {
+    console.error(
+      "[cliente-documento-auto] falha ao gravar membros_familia:",
+      e
+    );
+    return [];
+  });
+  const ok = rows.length > 0;
   if (ok) {
     await logAction({
       acao: "editar",

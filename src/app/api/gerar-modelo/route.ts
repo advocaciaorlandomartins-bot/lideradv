@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { getSession, type SessionUser } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarCliente } from "@/lib/acesso";
 import { getModeloById } from "@/lib/modelos-db";
 import { getClientFull } from "@/lib/clients-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
@@ -15,6 +16,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function gerarPdf(
+  session: SessionUser,
   modeloId: string,
   clienteId: string,
   respostasExtras: Record<string, string>
@@ -25,6 +27,15 @@ async function gerarPdf(
       { status: 400 }
     );
   }
+
+  // Sem isto, qualquer usuário com clientes:ver (mas sem
+  // clientes_ver_todos, ex: Advogado(a)/Estagiário(a) não responsável por
+  // esse cliente) conseguia passar o clienteId de OUTRO colaborador e
+  // receber de volta CPF, endereço, membros da família e dados do
+  // responsável legal num PDF — mesma checagem que documentos/*, ia/* e
+  // assinaturas-actions.ts já fazem.
+  if (!(await podeAcessarCliente(session, clienteId)))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const [modelo, client, escritorioConfig] = await Promise.all([
     getModeloById(modeloId),
@@ -133,7 +144,7 @@ export async function GET(request: Request) {
     );
   }
 
-  return gerarPdf(modeloId, clienteId, {});
+  return gerarPdf(session, modeloId, clienteId, {});
 }
 
 // Usado quando o modelo tem perguntas_extras (respostas digitadas na hora
@@ -164,5 +175,5 @@ export async function POST(request: Request) {
     if (typeof v === "string") respostasStr[k] = v;
   }
 
-  return gerarPdf(modeloId, clienteId, respostasStr);
+  return gerarPdf(session, modeloId, clienteId, respostasStr);
 }

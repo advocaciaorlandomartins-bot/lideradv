@@ -7,6 +7,7 @@ import { fetchLogoAsDataUri } from "@/lib/pdf-timbrado";
 import { applyFundoTimbrado } from "@/lib/pdf-fundo";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarCliente } from "@/lib/acesso";
 import { getClientPendingEntradas } from "@/lib/lancamentos-db";
 import {
   ProcuracaoDoc,
@@ -54,6 +55,13 @@ export async function GET(
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   }
+
+  // Sem isto, qualquer usuário com clientes:ver (mas sem
+  // clientes_ver_todos) conseguia passar o id de OUTRO colaborador e
+  // receber de volta CPF, endereço e demais dados num PDF de Procuração/
+  // Contrato/Declaração — mesma checagem que gerar-modelo/route.ts.
+  if (!(await podeAcessarCliente(session, id)))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
   const template = searchParams.get("template") as TemplateKey | null;

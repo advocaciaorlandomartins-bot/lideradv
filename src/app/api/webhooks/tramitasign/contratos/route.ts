@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import sql from "@/lib/db";
-import { converterLeadAssinado } from "@/lib/crm-contrato";
+import { processarAtualizacaoEnvelope } from "@/lib/assinaturas-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
   }
 
   const [nosso] = await sql`
-    SELECT id::text, status FROM envelopes
+    SELECT id::text FROM envelopes
     WHERE tramitasign_envelope_id = ${envelopeTramitaId}
   `;
   if (!nosso) {
@@ -105,118 +105,29 @@ export async function POST(request: Request) {
   }
   const envelopeId = nosso.id as string;
 
-  // Atualiza cada assinante: link de assinatura assim que disponível
-  // (POST /envio responde antes disso ficar pronto — é por isso que esse
-  // webhook existe também pra esse caso, não só pra marcar "assinado") e
-  // status quando ele já terminou de assinar.
-  const signers = Array.isArray(envelope.signers) ? envelope.signers : [];
-  for (const s of signers) {
-    if (!s.id) continue;
-    if (s.signature_link) {
-      await sql`
-        UPDATE envelope_assinantes
-        SET tramitasign_link = ${s.signature_link}, tramitasign_erro = NULL
-        WHERE envelope_id = ${envelopeId}::uuid AND tramitasign_signer_id = ${s.id}
-      `;
-    }
-    if (s.all_documents_signed) {
-      await sql`
-        UPDATE envelope_assinantes
-        SET status = 'assinado', assinado_em = COALESCE(assinado_em, now())
-        WHERE envelope_id = ${envelopeId}::uuid AND tramitasign_signer_id = ${s.id}
-      `;
-    }
-  }
-
-  const finalizado =
-    eventType === "envelope.completed" || envelope.status === "finalizado";
-
-  if (finalizado && nosso.status !== "concluido") {
-    await sql`
-      UPDATE envelopes SET status = 'concluido', atualizado_em = now()
-      WHERE id = ${envelopeId}::uuid
-    `;
-  }
-
-  if (!finalizado) {
-    return NextResponse.json({
-      ok: true,
-      envelope_id: envelopeId,
-      event: eventType,
-      finalizado: false,
-    });
-  }
-
-  // Envelope concluído — se for um lead do PrevBot (contrato_id = nosso
-  // envelope_id), converte e avisa o PrevBot de volta.
   const signedUrl =
     (envelope.documents ?? []).find((d) => d.signed_file_url)
       ?.signed_file_url ?? null;
+  const remoteStatus =
+    eventType === "envelope.completed" ? "finalizado" : (envelope.status ?? "");
 
-  const updated = await sql`
-    UPDATE crm_leads SET
-      contrato_status      = 'assinado',
-      contrato_url         = COALESCE(${signedUrl}, contrato_url),
-      contrato_assinado_em = COALESCE(contrato_assinado_em, now()),
-      updated_at           = now()
-    WHERE contrato_id = ${envelopeId}
-    RETURNING id::text, nome, telefone, contrato_url, prevbot_lead_id
-  `;
-
-  if (updated.length === 0) {
-    return NextResponse.json({
-      ok: true,
-      envelope_id: envelopeId,
-      event: eventType,
-      finalizado: true,
-    });
-  }
-
-  const lead = updated[0] as {
-    id: string;
-    nome: string;
-    telefone: string;
-    contrato_url: string | null;
-    prevbot_lead_id: string | null;
-  };
-
-  const { clientId, processoId, documentoId } = await converterLeadAssinado(
-    lead.id,
-    signedUrl || lead.contrato_url
-  );
-
-  // Notifica PrevBot
-  const prevbotCallbackUrl = process.env.PREVBOT_CALLBACK_URL;
-  if (prevbotCallbackUrl) {
-    try {
-      await fetch(prevbotCallbackUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(process.env.CONTRATO_WEBHOOK_SECRET && {
-            Authorization: `Bearer ${process.env.CONTRATO_WEBHOOK_SECRET}`,
-          }),
-        },
-        body: JSON.stringify({
-          contrato_id: envelopeId,
-          document_id: envelopeId,
-          prevbot_lead_id: lead.prevbot_lead_id,
-        }),
-        signal: AbortSignal.timeout(8000),
-      });
-    } catch (err) {
-      console.error("[TramitaSign/contratos] Falha ao notificar PrevBot:", err);
-    }
-  }
+  const { finalizado } = await processarAtualizacaoEnvelope({
+    envelopeId,
+    remoteStatus,
+    signers: (envelope.signers ?? [])
+      .filter((s): s is WebhookSigner & { id: string } => !!s.id)
+      .map((s) => ({
+        id: s.id,
+        signatureLink: s.signature_link ?? null,
+        allDocumentsSigned: !!s.all_documents_signed,
+      })),
+    signedUrl,
+  });
 
   return NextResponse.json({
     ok: true,
-    lead_id: lead.id,
-    nome: lead.nome,
-    contrato_id: envelopeId,
-    contrato_status: "assinado",
-    client_id: clientId,
-    processo_id: processoId,
-    documento_id: documentoId,
+    envelope_id: envelopeId,
+    event: eventType,
+    finalizado,
   });
 }

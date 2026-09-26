@@ -118,6 +118,23 @@ export default function DocumentsSection({
 
   async function handleDownloadZip(ids: string[] | null) {
     setOpenError(null);
+
+    // Um arquivo só não precisa virar zip — baixa ele direto, mais rápido
+    // e sem o nome genérico "documentos.zip" pra um único arquivo.
+    if (ids && ids.length === 1) {
+      const aberta = window.open(
+        `/api/documentos/download?id=${ids[0]}&download=1`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+      if (!aberta) {
+        setOpenError(
+          "Não consegui baixar o arquivo — o navegador bloqueou a aba. Tente permitir pop-ups para este site."
+        );
+      }
+      return;
+    }
+
     setDownloadingZip(true);
     try {
       const res = await fetch("/api/documentos/download-zip", {

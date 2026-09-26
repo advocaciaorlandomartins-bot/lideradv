@@ -16,6 +16,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
+  const forcarDownload = searchParams.get("download") === "1";
 
   if (!id || !UUID_RE.test(id)) {
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
@@ -76,7 +77,8 @@ export async function GET(request: Request) {
 
   const contentDisposition = (nomeArquivo: string) => {
     const ascii = nomeArquivo.replace(/[^\x20-\x7E]/g, "_");
-    return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nomeArquivo)}`;
+    const tipo = forcarDownload ? "attachment" : "inline";
+    return `${tipo}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nomeArquivo)}`;
   };
 
   try {

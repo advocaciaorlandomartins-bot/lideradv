@@ -7,6 +7,7 @@ import {
   excluirEnvelopeAction,
   atualizarEmailAssinanteAction,
   reenviarAssinaturaAction,
+  sincronizarEnvelopeAction,
 } from "@/lib/assinaturas-actions";
 import { TrashIcon, XMarkIcon, SpinnerIcon } from "@/components/icons";
 
@@ -51,9 +52,32 @@ export function EnvelopeAcoesTopo({
     });
   }
 
+  function handleVerificarStatus() {
+    setErro(null);
+    startTransition(async () => {
+      const r = await sincronizarEnvelopeAction(envelopeId);
+      if (r.error) {
+        setErro(r.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex gap-2">
+        {!jaFinalizado && (
+          <button
+            type="button"
+            onClick={handleVerificarStatus}
+            disabled={pending}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-body text-xs font-semibold text-fg transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+          >
+            {pending && <SpinnerIcon className="h-3.5 w-3.5" />}
+            Verificar status
+          </button>
+        )}
         {!jaFinalizado && (
           <button
             type="button"

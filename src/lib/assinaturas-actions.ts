@@ -27,6 +27,8 @@ import {
 } from "./modelo-blocks";
 import { renderModeloParaPdf } from "./modelo-pdf-render";
 import { enviarEmailEnvelopeEnviado } from "./email";
+import { processarAtualizacaoEnvelope } from "./assinaturas-sync";
+import sql from "./db";
 import { revalidatePath } from "next/cache";
 import {
   tramitaSignAtivo,
@@ -500,6 +502,48 @@ export async function reenviarAssinaturaAction(
   const r = await enviarEnvelopeParaTramitaSign(envelopeId);
   revalidatePath(`/dashboard/assinaturas/${envelopeId}`);
   return r;
+}
+
+/**
+ * Consulta o status do envelope direto na API do TramitaSign e grava o
+ * que mudou por aqui — não depende do webhook deles ter chegado (útil
+ * enquanto não está confirmado se o webhook está configurado do lado
+ * deles apontando pra cá, ou pra conferir na hora sem esperar).
+ */
+export async function sincronizarEnvelopeAction(
+  envelopeId: string
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "assinaturas", "editar"))
+    return { error: "Sem permissão." };
+  if (!UUID_RE.test(envelopeId)) return { error: "ID inválido." };
+  if (!(await podeEditarEnvelope(session, envelopeId)))
+    return { error: "Sem permissão." };
+  if (!tramitaSignAtivo())
+    return { error: "Integração com TramitaSign não está ativa." };
+
+  const [row] = await sql`
+    SELECT tramitasign_envelope_id FROM envelopes WHERE id = ${envelopeId}::uuid
+  `;
+  const tramitaId = row?.tramitasign_envelope_id as number | null | undefined;
+  if (!tramitaId) {
+    return { error: "Este envelope ainda não foi enviado ao TramitaSign." };
+  }
+
+  const atual = await tramitaObterEnvelopeAssinatura(tramitaId);
+  if (!atual) {
+    return { error: "Não foi possível consultar o status no TramitaSign." };
+  }
+
+  await processarAtualizacaoEnvelope({
+    envelopeId,
+    remoteStatus: atual.status,
+    signers: atual.signers,
+    signedUrl: atual.signedUrl,
+  });
+
+  revalidatePath(`/dashboard/assinaturas/${envelopeId}`);
+  return {};
 }
 
 export async function atualizarEmailAssinanteAction(

@@ -14,17 +14,33 @@ const sql = neon(process.env.DATABASE_URL!);
 const TITULO = "Formulário LOAS";
 const CATEGORIA = "Previdenciário";
 const DESCRICAO =
-  "Declaração de composição familiar e situação socioeconômica exigida nos Juizados Especiais Federais de Maceió/AL para processos de LOAS/BPC. A parte autora é identificada pelo nome e CPF do responsável legal cadastrado no cliente. Puxa automaticamente os dados do grupo familiar (extraídos do CadÚnico) — as seções b.1 a b.5 ficam em branco para preenchimento manual, conforme o formulário oficial.";
+  "Declaração de composição familiar e situação socioeconômica exigida nos Juizados Especiais Federais de Maceió/AL para processos de LOAS/BPC. A parte autora é identificada pelo nome e CPF do responsável legal cadastrado no cliente. Puxa automaticamente os dados do grupo familiar (extraídos do CadÚnico) — as perguntas b.1 a b.5 sobre o imóvel são digitadas na hora de gerar o documento.";
+
+const PERGUNTAS_EXTRAS = [
+  {
+    tag: "pergunta_b1",
+    label:
+      "b.1. Principais bens que guarnecem o imóvel (eletrodomésticos; móveis de grande porte, tais como armários, mesas e camas)",
+  },
+  {
+    tag: "pergunta_b2",
+    label: "b.2. Quantidade de cômodos (quartos, salas e banheiros)",
+  },
+  {
+    tag: "pergunta_b3",
+    label:
+      "b.3. Serviços básicos disponíveis na residência (luz elétrica, água e outros)",
+  },
+  { tag: "pergunta_b4", label: "b.4. Área aproximada do imóvel" },
+  {
+    tag: "pergunta_b5",
+    label:
+      "b.5. Imóvel próprio ou alugado — valores pagos de aluguel ou financiamento, se houver",
+  },
+];
 
 function t(text: string, opts: Partial<TextSpan> = {}): TextSpan {
   return { text, ...opts };
-}
-
-const BLANK_LINE =
-  "____________________ ____________________ ____________________";
-
-function blankParagraph(): Block {
-  return { type: "paragraph", spans: [t(BLANK_LINE)] };
 }
 
 function membroRow(n: number): TextSpan[][] {
@@ -122,40 +138,40 @@ const blocks: Block[] = [
     type: "paragraph",
     spans: [
       t(
-        "b.1. os principais bens que o guarnecem (eletrodomésticos; móveis de grande porte, tais como armários, mesas e camas):"
+        "b.1. os principais bens que o guarnecem (eletrodomésticos; móveis de grande porte, tais como armários, mesas e camas): "
       ),
+      t("{{pergunta_b1}}"),
     ],
   },
-  blankParagraph(),
-  blankParagraph(),
   {
     type: "paragraph",
-    spans: [t("b.2. quantidade de cômodos (quartos, salas e banheiros):")],
+    spans: [
+      t("b.2. quantidade de cômodos (quartos, salas e banheiros): "),
+      t("{{pergunta_b2}}"),
+    ],
   },
-  blankParagraph(),
   {
     type: "paragraph",
     spans: [
       t(
-        "b.3. serviços básicos disponíveis na residência (existência de luz elétrica, serviço de água e outros):"
+        "b.3. serviços básicos disponíveis na residência (existência de luz elétrica, serviço de água e outros): "
       ),
+      t("{{pergunta_b3}}"),
     ],
   },
-  blankParagraph(),
   {
     type: "paragraph",
-    spans: [t("b.4. área aproximada do imóvel:")],
+    spans: [t("b.4. área aproximada do imóvel: "), t("{{pergunta_b4}}")],
   },
-  blankParagraph(),
   {
     type: "paragraph",
     spans: [
       t(
-        "b.5. se o imóvel é próprio ou alugado, indicando, quando existirem, os valores pagos a título de aluguéis ou prestação de financiamento:"
+        "b.5. se o imóvel é próprio ou alugado, indicando, quando existirem, os valores pagos a título de aluguéis ou prestação de financiamento: "
       ),
+      t("{{pergunta_b5}}"),
     ],
   },
-  blankParagraph(),
   {
     type: "paragraph",
     spans: [
@@ -194,6 +210,7 @@ async function main() {
           usar_timbrado = false,
           usar_fundo_timbrado = false,
           requer_responsavel_legal = true,
+          perguntas_extras = ${JSON.stringify(PERGUNTAS_EXTRAS)},
           ativo = true,
           updated_at = now()
       WHERE id = ${existente.id}::uuid
@@ -202,9 +219,9 @@ async function main() {
   } else {
     await sql`
       INSERT INTO modelos_documento
-        (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal)
+        (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, perguntas_extras)
       VALUES
-        (${TITULO}, ${CATEGORIA}, ${DESCRICAO}, ${conteudo}, ${JSON.stringify(blocks)}, false, false, true)
+        (${TITULO}, ${CATEGORIA}, ${DESCRICAO}, ${conteudo}, ${JSON.stringify(blocks)}, false, false, true, ${JSON.stringify(PERGUNTAS_EXTRAS)})
     `;
     console.log(`✓ Modelo "${TITULO}" criado.`);
   }

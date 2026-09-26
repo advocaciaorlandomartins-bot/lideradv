@@ -10,24 +10,14 @@ import { renderModeloParaPdf } from "@/lib/modelo-pdf-render";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  const session = await getSession();
-  if (!session || !hasPermission(session, "clientes", "ver"))
-    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const { searchParams } = new URL(request.url);
-  const modeloId = searchParams.get("modeloId");
-  const clienteId = searchParams.get("clienteId");
-
-  if (!modeloId || !clienteId) {
-    return NextResponse.json(
-      { error: "Parâmetros inválidos." },
-      { status: 400 }
-    );
-  }
-
-  const UUID_RE =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function gerarPdf(
+  modeloId: string,
+  clienteId: string,
+  respostasExtras: Record<string, string>
+): Promise<NextResponse | Response> {
   if (!UUID_RE.test(modeloId) || !UUID_RE.test(clienteId)) {
     return NextResponse.json(
       { error: "Parâmetros inválidos." },
@@ -61,9 +51,20 @@ export async function GET(request: Request) {
     year: "numeric",
   });
 
-  // Build variable map
   const advogados = await getAdvogadosParaDocumento().catch(() => []);
   const vars = buildModeloVars(client, escritorioConfig, date, advogados);
+
+  // Só aceita resposta pra tag que o modelo realmente declarou em
+  // perguntas_extras — impede que o body do POST injete uma variável
+  // arbitrária no documento.
+  const tagsPermitidas = new Set(
+    (modelo.perguntas_extras ?? []).map((p) => p.tag)
+  );
+  for (const [tag, valor] of Object.entries(respostasExtras)) {
+    if (tagsPermitidas.has(tag) && valor.trim()) {
+      vars[`{{${tag}}}`] = valor.trim();
+    }
+  }
 
   let buffer: Buffer;
   try {
@@ -97,4 +98,54 @@ export async function GET(request: Request) {
       "Content-Disposition": `attachment; filename="${safeTitle}_${safeName}.pdf"`,
     },
   });
+}
+
+export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "ver"))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+
+  const { searchParams } = new URL(request.url);
+  const modeloId = searchParams.get("modeloId");
+  const clienteId = searchParams.get("clienteId");
+
+  if (!modeloId || !clienteId) {
+    return NextResponse.json(
+      { error: "Parâmetros inválidos." },
+      { status: 400 }
+    );
+  }
+
+  return gerarPdf(modeloId, clienteId, {});
+}
+
+// Usado quando o modelo tem perguntas_extras (respostas digitadas na hora
+// de gerar) — texto livre pode passar do limite prático de uma query
+// string, então vai no corpo em vez de GET.
+export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "clientes", "ver"))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+
+  const body = await request.json().catch(() => null);
+  const modeloId = body?.modeloId;
+  const clienteId = body?.clienteId;
+  const respostas =
+    body?.respostas && typeof body.respostas === "object"
+      ? (body.respostas as Record<string, unknown>)
+      : {};
+
+  if (typeof modeloId !== "string" || typeof clienteId !== "string") {
+    return NextResponse.json(
+      { error: "Parâmetros inválidos." },
+      { status: 400 }
+    );
+  }
+
+  const respostasStr: Record<string, string> = {};
+  for (const [k, v] of Object.entries(respostas)) {
+    if (typeof v === "string") respostasStr[k] = v;
+  }
+
+  return gerarPdf(modeloId, clienteId, respostasStr);
 }

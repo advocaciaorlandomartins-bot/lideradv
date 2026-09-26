@@ -7,7 +7,7 @@ import {
   XMarkIcon,
   SpinnerIcon,
 } from "@/components/icons";
-import type { ModeloDocumento } from "@/lib/modelos-db";
+import type { ModeloDocumento, PerguntaExtra } from "@/lib/modelos-db";
 
 type TemplateKey =
   | "procuracao"
@@ -77,6 +77,10 @@ export default function GerarDocumentoButton({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<"select" | "responder">("select");
+  const [respostas, setRespostas] = useState<
+    Record<string, Record<string, string>>
+  >({});
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const totalItens = TEMPLATES.length + modelos.length;
@@ -92,6 +96,8 @@ export default function GerarDocumentoButton({
   function handleOpen() {
     setSelected(new Set());
     setError(null);
+    setStep("select");
+    setRespostas({});
     setOpen(true);
   }
 
@@ -122,6 +128,31 @@ export default function GerarDocumentoButton({
     }
   }
 
+  // Modelos selecionados que têm perguntas de texto livre (ex: Formulário
+  // LOAS) — precisam de uma etapa de resposta antes de gerar, já que esse
+  // valor não vem do cadastro do cliente nem de documento nenhum.
+  function modelosComPerguntas(): ModeloDocumento[] {
+    return modelos.filter(
+      (m) => selected.has(m.id) && (m.perguntas_extras?.length ?? 0) > 0
+    );
+  }
+
+  function handleAvancar() {
+    if (selected.size === 0) return;
+    if (modelosComPerguntas().length > 0) {
+      setStep("responder");
+      return;
+    }
+    handleGenerate();
+  }
+
+  function setResposta(modeloId: string, tag: string, valor: string) {
+    setRespostas((prev) => ({
+      ...prev,
+      [modeloId]: { ...prev[modeloId], [tag]: valor },
+    }));
+  }
+
   async function handleGenerate() {
     if (selected.size === 0) return;
     setLoading(true);
@@ -135,11 +166,24 @@ export default function GerarDocumentoButton({
     try {
       for (const key of selected) {
         const modelo = modelos.find((m) => m.id === key);
-        const url = modelo
-          ? `/api/gerar-modelo?modeloId=${modelo.id}&clienteId=${clientId}`
-          : `/api/clientes/${clientId}/gerar-documento?template=${key}`;
+        const temPerguntas = (modelo?.perguntas_extras?.length ?? 0) > 0;
 
-        const res = await fetch(url);
+        const res =
+          modelo && temPerguntas
+            ? await fetch("/api/gerar-modelo", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  modeloId: modelo.id,
+                  clienteId: clientId,
+                  respostas: respostas[modelo.id] ?? {},
+                }),
+              })
+            : await fetch(
+                modelo
+                  ? `/api/gerar-modelo?modeloId=${modelo.id}&clienteId=${clientId}`
+                  : `/api/clientes/${clientId}/gerar-documento?template=${key}`
+              );
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -169,11 +213,15 @@ export default function GerarDocumentoButton({
   }
 
   const btnLabel =
-    selected.size === 0
-      ? "Baixar PDF"
-      : selected.size === 1
-        ? "Baixar PDF"
-        : `Baixar ${selected.size} PDFs`;
+    step === "responder"
+      ? selected.size === 1
+        ? "Gerar PDF"
+        : `Gerar ${selected.size} PDFs`
+      : modelosComPerguntas().length > 0
+        ? "Continuar"
+        : selected.size === 0 || selected.size === 1
+          ? "Baixar PDF"
+          : `Baixar ${selected.size} PDFs`;
 
   return (
     <>
@@ -213,109 +261,81 @@ export default function GerarDocumentoButton({
 
             {/* Body */}
             <div className="overflow-y-auto px-6 py-5">
-              <p className="mb-4 font-body text-sm text-muted">
-                Selecione os modelos. Os dados de{" "}
-                <span className="font-semibold text-fg">{clientName}</span>{" "}
-                serão preenchidos automaticamente.
-              </p>
-
-              {/* Marcar todos */}
-              <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-4 py-2.5 transition-colors hover:bg-slate-50">
-                <input
-                  ref={selectAllRef}
-                  type="checkbox"
-                  checked={allChecked}
-                  onChange={toggleAll}
-                  disabled={loading}
-                  className="h-4 w-4 cursor-pointer rounded border-border accent-primary disabled:opacity-50"
-                />
-                <span className="font-body text-sm font-semibold text-fg">
-                  {allChecked ? "Desmarcar todos" : "Marcar todos"}
-                </span>
-                {selected.size > 0 && (
-                  <span className="ml-auto font-body text-xs text-muted">
-                    {selected.size} de {totalItens} selecionados
-                  </span>
-                )}
-              </label>
-
-              {modelos.length > 0 && (
-                <p className="mb-2 font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                  Modelos do sistema
-                </p>
-              )}
-
-              {/* Template cards */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {TEMPLATES.map((t) => {
-                  const isSelected = selected.has(t.key);
-                  return (
-                    <button
-                      key={t.key}
-                      type="button"
-                      onClick={() => toggleTemplate(t.key)}
-                      disabled={loading}
-                      className={`flex flex-col items-start gap-1.5 rounded-xl border-2 p-4 text-left transition-all duration-150 cursor-pointer disabled:opacity-50 ${
-                        isSelected
-                          ? "border-primary bg-blue-50 shadow-sm"
-                          : "border-border hover:border-slate-300 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex w-full items-start justify-between gap-2">
-                        <div
-                          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-body text-xs font-bold ${t.color}`}
-                        >
-                          <DocumentTextIcon className="h-3.5 w-3.5" />
-                          PDF
-                        </div>
-                        <span
-                          className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
-                            isSelected
-                              ? "border-primary bg-primary text-white"
-                              : "border-border bg-white"
-                          }`}
-                        >
-                          {isSelected && (
-                            <svg
-                              className="h-3 w-3"
-                              viewBox="0 0 12 12"
-                              fill="none"
-                            >
-                              <path
-                                d="M2 6l3 3 5-5"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          )}
-                        </span>
-                      </div>
-                      <span className="font-body text-sm font-semibold text-fg leading-snug">
-                        {t.label}
-                      </span>
-                      <span className="font-body text-xs text-muted leading-relaxed">
-                        {t.description}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {modelos.length > 0 && (
-                <>
-                  <p className="mb-2 mt-5 font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                    Meus Modelos
+              {step === "responder" ? (
+                <div className="space-y-5">
+                  <p className="font-body text-sm text-muted">
+                    Essas respostas entram direto no documento — não vêm do
+                    cadastro do cliente.
                   </p>
+                  {modelosComPerguntas().map((m) => (
+                    <div key={m.id}>
+                      <p className="mb-2 font-body text-sm font-semibold text-fg">
+                        {m.titulo}
+                      </p>
+                      <div className="space-y-3">
+                        {(m.perguntas_extras ?? []).map((p: PerguntaExtra) => (
+                          <div key={p.tag}>
+                            <label className="mb-1 block font-body text-xs font-semibold text-fg">
+                              {p.label}
+                            </label>
+                            <textarea
+                              value={respostas[m.id]?.[p.tag] ?? ""}
+                              onChange={(e) =>
+                                setResposta(m.id, p.tag, e.target.value)
+                              }
+                              disabled={loading}
+                              rows={2}
+                              className="w-full rounded-lg border border-border px-3 py-2 font-body text-sm text-fg outline-none transition-colors focus:border-primary disabled:opacity-50"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <p className="mb-4 font-body text-sm text-muted">
+                    Selecione os modelos. Os dados de{" "}
+                    <span className="font-semibold text-fg">{clientName}</span>{" "}
+                    serão preenchidos automaticamente.
+                  </p>
+
+                  {/* Marcar todos */}
+                  <label className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-4 py-2.5 transition-colors hover:bg-slate-50">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      checked={allChecked}
+                      onChange={toggleAll}
+                      disabled={loading}
+                      className="h-4 w-4 cursor-pointer rounded border-border accent-primary disabled:opacity-50"
+                    />
+                    <span className="font-body text-sm font-semibold text-fg">
+                      {allChecked ? "Desmarcar todos" : "Marcar todos"}
+                    </span>
+                    {selected.size > 0 && (
+                      <span className="ml-auto font-body text-xs text-muted">
+                        {selected.size} de {totalItens} selecionados
+                      </span>
+                    )}
+                  </label>
+
+                  {modelos.length > 0 && (
+                    <p className="mb-2 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Modelos do sistema
+                    </p>
+                  )}
+
+                  {/* Template cards */}
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {modelos.map((m) => {
-                      const isSelected = selected.has(m.id);
+                    {TEMPLATES.map((t) => {
+                      const isSelected = selected.has(t.key);
                       return (
                         <button
-                          key={m.id}
+                          key={t.key}
                           type="button"
-                          onClick={() => toggleTemplate(m.id)}
+                          onClick={() => toggleTemplate(t.key)}
                           disabled={loading}
                           className={`flex flex-col items-start gap-1.5 rounded-xl border-2 p-4 text-left transition-all duration-150 cursor-pointer disabled:opacity-50 ${
                             isSelected
@@ -324,7 +344,9 @@ export default function GerarDocumentoButton({
                           }`}
                         >
                           <div className="flex w-full items-start justify-between gap-2">
-                            <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-body text-xs font-bold text-slate-600">
+                            <div
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-body text-xs font-bold ${t.color}`}
+                            >
                               <DocumentTextIcon className="h-3.5 w-3.5" />
                               PDF
                             </div>
@@ -353,17 +375,79 @@ export default function GerarDocumentoButton({
                             </span>
                           </div>
                           <span className="font-body text-sm font-semibold text-fg leading-snug">
-                            {m.titulo}
+                            {t.label}
                           </span>
-                          {m.descricao && (
-                            <span className="font-body text-xs text-muted leading-relaxed">
-                              {m.descricao}
-                            </span>
-                          )}
+                          <span className="font-body text-xs text-muted leading-relaxed">
+                            {t.description}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
+
+                  {modelos.length > 0 && (
+                    <>
+                      <p className="mb-2 mt-5 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                        Meus Modelos
+                      </p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {modelos.map((m) => {
+                          const isSelected = selected.has(m.id);
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => toggleTemplate(m.id)}
+                              disabled={loading}
+                              className={`flex flex-col items-start gap-1.5 rounded-xl border-2 p-4 text-left transition-all duration-150 cursor-pointer disabled:opacity-50 ${
+                                isSelected
+                                  ? "border-primary bg-blue-50 shadow-sm"
+                                  : "border-border hover:border-slate-300 hover:bg-slate-50"
+                              }`}
+                            >
+                              <div className="flex w-full items-start justify-between gap-2">
+                                <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-body text-xs font-bold text-slate-600">
+                                  <DocumentTextIcon className="h-3.5 w-3.5" />
+                                  PDF
+                                </div>
+                                <span
+                                  className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
+                                    isSelected
+                                      ? "border-primary bg-primary text-white"
+                                      : "border-border bg-white"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <svg
+                                      className="h-3 w-3"
+                                      viewBox="0 0 12 12"
+                                      fill="none"
+                                    >
+                                      <path
+                                        d="M2 6l3 3 5-5"
+                                        stroke="currentColor"
+                                        strokeWidth="1.8"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                  )}
+                                </span>
+                              </div>
+                              <span className="font-body text-sm font-semibold text-fg leading-snug">
+                                {m.titulo}
+                              </span>
+                              {m.descricao && (
+                                <span className="font-body text-xs text-muted leading-relaxed">
+                                  {m.descricao}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -376,15 +460,25 @@ export default function GerarDocumentoButton({
 
             {/* Footer */}
             <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-4">
+              {step === "responder" ? (
+                <button
+                  onClick={() => setStep("select")}
+                  disabled={loading}
+                  className="flex h-9 items-center rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors duration-150 hover:border-slate-400 disabled:opacity-40 cursor-pointer"
+                >
+                  Voltar
+                </button>
+              ) : (
+                <button
+                  onClick={handleClose}
+                  disabled={loading}
+                  className="flex h-9 items-center rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors duration-150 hover:border-slate-400 disabled:opacity-40 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              )}
               <button
-                onClick={handleClose}
-                disabled={loading}
-                className="flex h-9 items-center rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors duration-150 hover:border-slate-400 disabled:opacity-40 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleGenerate}
+                onClick={step === "responder" ? handleGenerate : handleAvancar}
                 disabled={selected.size === 0 || loading}
                 className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >

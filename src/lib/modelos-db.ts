@@ -1,6 +1,11 @@
 import sql from "./db";
 import { isValidBlocks, type Block } from "./modelo-blocks";
 
+export interface PerguntaExtra {
+  tag: string;
+  label: string;
+}
+
 export interface ModeloDocumento {
   id: string;
   titulo: string;
@@ -12,8 +17,15 @@ export interface ModeloDocumento {
   usar_timbrado: boolean;
   usar_fundo_timbrado: boolean;
   requer_responsavel_legal: boolean;
+  perguntas_extras: PerguntaExtra[] | null;
   created_at_formatted: string;
   updated_at_formatted: string;
+}
+
+function isPerguntaExtra(v: unknown): v is PerguntaExtra {
+  if (!v || typeof v !== "object") return false;
+  const p = v as Record<string, unknown>;
+  return typeof p.tag === "string" && typeof p.label === "string";
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +42,9 @@ function mapRow(r: any): ModeloDocumento {
     usar_timbrado: r.usar_timbrado ?? true,
     usar_fundo_timbrado: r.usar_fundo_timbrado ?? true,
     requer_responsavel_legal: r.requer_responsavel_legal ?? false,
+    perguntas_extras: Array.isArray(r.perguntas_extras)
+      ? r.perguntas_extras.filter(isPerguntaExtra)
+      : null,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
     updated_at_formatted: new Date(r.updated_at).toLocaleDateString("pt-BR"),
   };
@@ -38,7 +53,7 @@ function mapRow(r: any): ModeloDocumento {
 export async function getAllModelos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, perguntas_extras, created_at, updated_at
     FROM modelos_documento
     ORDER BY categoria NULLS LAST, titulo
   `;
@@ -48,7 +63,7 @@ export async function getAllModelos(): Promise<ModeloDocumento[]> {
 export async function getModelosAtivos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, perguntas_extras, created_at, updated_at
     FROM modelos_documento
     WHERE ativo = TRUE
     ORDER BY categoria NULLS LAST, titulo
@@ -61,7 +76,7 @@ export async function getModeloById(
 ): Promise<ModeloDocumento | null> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, perguntas_extras, created_at, updated_at
     FROM modelos_documento
     WHERE id = ${id}::uuid
   `;

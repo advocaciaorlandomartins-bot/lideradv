@@ -193,6 +193,9 @@ export interface ClientFull {
   // Grupo familiar (Formulário LOAS/BPC) — extraído do CadÚnico
   membros_familia: MembroFamilia[] | null;
   renda_familiar_per_capita: string | null;
+  // Respostas de perguntas_extras de modelos (tag -> resposta), guardadas
+  // pra pré-preencher da próxima vez que o mesmo modelo for gerado.
+  respostas_extras: Record<string, string> | null;
 }
 
 export interface MembroFamilia {
@@ -286,6 +289,10 @@ function mapClientFull(r: any, hasOrigemCols: boolean): ClientFull {
       ? r.membros_familia
       : null,
     renda_familiar_per_capita: r.renda_familiar_per_capita ?? null,
+    respostas_extras:
+      r.respostas_extras && typeof r.respostas_extras === "object"
+        ? r.respostas_extras
+        : null,
   };
 }
 
@@ -324,7 +331,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         c.atividade_anterior,
         c.num_contribuicoes,
         c.bloquear_mensagens,
-        c.membros_familia, c.renda_familiar_per_capita,
+        c.membros_familia, c.renda_familiar_per_capita, c.respostas_extras,
         (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
@@ -363,7 +370,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       c.atividade_anterior,
       c.num_contribuicoes,
       c.bloquear_mensagens,
-      c.membros_familia, c.renda_familiar_per_capita,
+      c.membros_familia, c.renda_familiar_per_capita, c.respostas_extras,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
     WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL

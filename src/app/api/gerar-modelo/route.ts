@@ -7,6 +7,7 @@ import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { getAdvogadosParaDocumento } from "@/lib/colaboradores-db";
 import { buildModeloVars } from "@/lib/modelo-vars";
 import { renderModeloParaPdf } from "@/lib/modelo-pdf-render";
+import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -60,10 +61,26 @@ async function gerarPdf(
   const tagsPermitidas = new Set(
     (modelo.perguntas_extras ?? []).map((p) => p.tag)
   );
+  const respostasValidas: Record<string, string> = {};
   for (const [tag, valor] of Object.entries(respostasExtras)) {
     if (tagsPermitidas.has(tag) && valor.trim()) {
       vars[`{{${tag}}}`] = valor.trim();
+      respostasValidas[tag] = valor.trim();
     }
+  }
+
+  // Guarda a resposta no próprio cliente pra pré-preencher da próxima vez
+  // — sem isso, cada geração pedia as mesmas perguntas do zero de novo.
+  // Merge (||) em vez de substituir: editar uma pergunta não apaga as
+  // outras já salvas, inclusive de outro modelo com perguntas_extras.
+  if (Object.keys(respostasValidas).length > 0) {
+    await sql`
+      UPDATE clients
+      SET respostas_extras = COALESCE(respostas_extras, '{}'::jsonb) || ${JSON.stringify(respostasValidas)}::jsonb
+      WHERE id = ${clienteId}::uuid
+    `.catch((e) =>
+      console.error("[gerar-modelo] falha ao salvar respostas_extras:", e)
+    );
   }
 
   let buffer: Buffer;

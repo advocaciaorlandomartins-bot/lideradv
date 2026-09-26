@@ -989,6 +989,7 @@ export default function ClienteDetailTabs({
                 clientId={client.id}
                 clientName={client.name}
                 modelos={modelos}
+                respostasSalvas={client.respostas_extras}
               />
             </div>
           </div>

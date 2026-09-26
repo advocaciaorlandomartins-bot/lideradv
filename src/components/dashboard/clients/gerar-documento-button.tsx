@@ -63,6 +63,7 @@ interface Props {
   clientId: string;
   clientName: string;
   modelos: ModeloDocumento[];
+  respostasSalvas: Record<string, string> | null;
 }
 
 // Seleção mistura os 5 modelos padrão (TemplateKey) com os modelos
@@ -72,15 +73,19 @@ export default function GerarDocumentoButton({
   clientId,
   clientName,
   modelos,
+  respostasSalvas,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"select" | "responder">("select");
-  const [respostas, setRespostas] = useState<
-    Record<string, Record<string, string>>
-  >({});
+  // Chave = tag da pergunta (ex: "pergunta_b1") — pré-preenchida com o que
+  // já foi respondido antes (guardado no cliente), editável a qualquer
+  // momento; o que for digitado aqui sobrescreve ao gerar.
+  const [respostas, setRespostas] = useState<Record<string, string>>(
+    respostasSalvas ?? {}
+  );
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const totalItens = TEMPLATES.length + modelos.length;
@@ -97,7 +102,7 @@ export default function GerarDocumentoButton({
     setSelected(new Set());
     setError(null);
     setStep("select");
-    setRespostas({});
+    setRespostas(respostasSalvas ?? {});
     setOpen(true);
   }
 
@@ -146,11 +151,8 @@ export default function GerarDocumentoButton({
     handleGenerate();
   }
 
-  function setResposta(modeloId: string, tag: string, valor: string) {
-    setRespostas((prev) => ({
-      ...prev,
-      [modeloId]: { ...prev[modeloId], [tag]: valor },
-    }));
+  function setResposta(tag: string, valor: string) {
+    setRespostas((prev) => ({ ...prev, [tag]: valor }));
   }
 
   async function handleGenerate() {
@@ -176,7 +178,7 @@ export default function GerarDocumentoButton({
                 body: JSON.stringify({
                   modeloId: modelo.id,
                   clienteId: clientId,
-                  respostas: respostas[modelo.id] ?? {},
+                  respostas,
                 }),
               })
             : await fetch(
@@ -264,8 +266,8 @@ export default function GerarDocumentoButton({
               {step === "responder" ? (
                 <div className="space-y-5">
                   <p className="font-body text-sm text-muted">
-                    Essas respostas entram direto no documento — não vêm do
-                    cadastro do cliente.
+                    Essas respostas entram direto no documento e ficam salvas —
+                    da próxima vez já vêm preenchidas, só edite o que mudou.
                   </p>
                   {modelosComPerguntas().map((m) => (
                     <div key={m.id}>
@@ -279,9 +281,9 @@ export default function GerarDocumentoButton({
                               {p.label}
                             </label>
                             <textarea
-                              value={respostas[m.id]?.[p.tag] ?? ""}
+                              value={respostas[p.tag] ?? ""}
                               onChange={(e) =>
-                                setResposta(m.id, p.tag, e.target.value)
+                                setResposta(p.tag, e.target.value)
                               }
                               disabled={loading}
                               rows={2}

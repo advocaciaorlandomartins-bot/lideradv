@@ -186,7 +186,7 @@ const blocks: Block[] = [
   },
   {
     type: "signatureLine",
-    label: "ASSINATURA DA PARTE AUTORA",
+    label: "ASSINATURA DA PARTE AUTORA\n{{responsavel_nome}}",
   },
 ];
 

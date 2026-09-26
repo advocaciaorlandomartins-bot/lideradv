@@ -108,8 +108,16 @@ export async function POST(request: Request) {
   const signedUrl =
     (envelope.documents ?? []).find((d) => d.signed_file_url)
       ?.signed_file_url ?? null;
+  // event_type é a fonte mais confiável pra desfechos — envelope.status
+  // (quando vem no payload) serve de reforço/fallback.
   const remoteStatus =
-    eventType === "envelope.completed" ? "finalizado" : (envelope.status ?? "");
+    eventType === "envelope.completed"
+      ? "finalizado"
+      : eventType === "envelope.canceled"
+        ? "cancelado"
+        : eventType === "envelope.failed"
+          ? "falhou"
+          : (envelope.status ?? "");
 
   const { finalizado } = await processarAtualizacaoEnvelope({
     envelopeId,

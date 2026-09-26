@@ -102,6 +102,18 @@ export async function processarAtualizacaoEnvelope(params: {
       UPDATE envelopes SET status = 'concluido', atualizado_em = now()
       WHERE id = ${envelopeId}::uuid
     `;
+  } else if (
+    (remoteStatus === "cancelado" || remoteStatus === "falhou") &&
+    nosso?.status !== remoteStatus
+  ) {
+    // Sem isso, um envelope cancelado ou que falhou do lado do TramitaSign
+    // (PDF não pôde ser preparado etc.) ficava marcado "aguardando" pra
+    // sempre no nosso sistema, sem nada avisando que não vai mesmo sair
+    // do lugar.
+    await sql`
+      UPDATE envelopes SET status = ${remoteStatus}, atualizado_em = now()
+      WHERE id = ${envelopeId}::uuid
+    `;
   }
 
   if (!finalizado) return { finalizado: false };

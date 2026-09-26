@@ -14,6 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
   concluido: "Concluído",
   expirado: "Expirado",
   cancelado: "Cancelado",
+  falhou: "Falhou",
 };
 
 const STATUS_CLASS: Record<string, string> = {
@@ -22,6 +23,7 @@ const STATUS_CLASS: Record<string, string> = {
   concluido: "bg-emerald-50 text-emerald-700",
   expirado: "bg-red-50 text-red-600",
   cancelado: "bg-slate-100 text-slate-500",
+  falhou: "bg-red-50 text-red-600",
 };
 
 function fmtDate(s: string | null) {

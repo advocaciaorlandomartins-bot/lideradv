@@ -105,9 +105,11 @@ export async function POST(request: Request) {
   }
   const envelopeId = nosso.id as string;
 
-  const signedUrl =
-    (envelope.documents ?? []).find((d) => d.signed_file_url)
-      ?.signed_file_url ?? null;
+  // Envelope pode ter mais de um documento (wizard permite selecionar
+  // vários modelos) — pega TODOS os signed_file_url, não só o primeiro.
+  const signedUrls = (envelope.documents ?? [])
+    .map((d) => d.signed_file_url)
+    .filter((u): u is string => !!u);
   // event_type é a fonte mais confiável pra desfechos — envelope.status
   // (quando vem no payload) serve de reforço/fallback.
   const remoteStatus =
@@ -129,7 +131,7 @@ export async function POST(request: Request) {
         signatureLink: s.signature_link ?? null,
         allDocumentsSigned: !!s.all_documents_signed,
       })),
-    signedUrl,
+    signedUrls,
   });
 
   return NextResponse.json({

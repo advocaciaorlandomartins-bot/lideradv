@@ -19,7 +19,7 @@ export interface SignerAtualizado {
  */
 async function salvarPdfAssinadoNoCliente(
   clientId: string,
-  nomeEnvelope: string,
+  nomeDocumento: string,
   signedUrl: string
 ): Promise<void> {
   try {
@@ -34,7 +34,7 @@ async function salvarPdfAssinadoNoCliente(
       return;
     }
     const bytes = Buffer.from(await res.arrayBuffer());
-    const nomeArquivo = `${nomeEnvelope.replace(/[/\\]/g, "-")} (assinado).pdf`;
+    const nomeArquivo = `${nomeDocumento.replace(/[/\\]/g, "-")} (assinado).pdf`;
 
     const blob = await put(
       `documentos/clientes/${clientId}/${nomeArquivo}`,
@@ -69,9 +69,9 @@ export async function processarAtualizacaoEnvelope(params: {
   envelopeId: string; // nosso uuid
   remoteStatus: string;
   signers: SignerAtualizado[];
-  signedUrl: string | null;
+  signedUrls: string[];
 }): Promise<{ finalizado: boolean }> {
-  const { envelopeId, remoteStatus, signers, signedUrl } = params;
+  const { envelopeId, remoteStatus, signers, signedUrls } = params;
 
   for (const s of signers) {
     if (!s.id) continue;
@@ -95,7 +95,7 @@ export async function processarAtualizacaoEnvelope(params: {
     SELECT status, nome, client_id::text FROM envelopes WHERE id = ${envelopeId}::uuid
   `;
   const finalizado = remoteStatus === "finalizado";
-  const eraConcluidoAntes = nosso?.status === "concluido";
+  const jaConcluido = nosso?.status === "concluido";
 
   // Grava o status bruto em toda sincronização (webhook ou manual), mesmo
   // quando não muda nosso status local — sem isso não tem como diagnosticar
@@ -109,19 +109,33 @@ export async function processarAtualizacaoEnvelope(params: {
     WHERE id = ${envelopeId}::uuid
   `.catch(() => null);
 
-  if (finalizado && !eraConcluidoAntes) {
-    await sql`
+  // UPDATE condicional e atômico (WHERE status <> 'concluido' RETURNING
+  // id) em vez de checar `jaConcluido` em memória e depois fazer um
+  // UPDATE incondicional — webhooks reenviam o mesmo evento em timeout, e
+  // duas entregas quase simultâneas podiam ler "ainda não concluído" antes
+  // de qualquer uma commitar, passando as duas pelo salvamento do PDF e
+  // pelo aviso ao PrevBot (documento duplicado nos Documentos do cliente,
+  // callback duplicado). Só a entrega que realmente muda a linha segue.
+  let transicaoParaConcluido = false;
+  if (finalizado && !jaConcluido) {
+    const [transicao] = await sql`
       UPDATE envelopes SET status = 'concluido', atualizado_em = now()
-      WHERE id = ${envelopeId}::uuid
+      WHERE id = ${envelopeId}::uuid AND status <> 'concluido'
+      RETURNING id
     `;
+    transicaoParaConcluido = !!transicao;
   } else if (
     (remoteStatus === "cancelado" || remoteStatus === "falhou") &&
-    nosso?.status !== remoteStatus
+    nosso?.status !== remoteStatus &&
+    !jaConcluido
   ) {
     // Sem isso, um envelope cancelado ou que falhou do lado do TramitaSign
     // (PDF não pôde ser preparado etc.) ficava marcado "aguardando" pra
     // sempre no nosso sistema, sem nada avisando que não vai mesmo sair
-    // do lugar.
+    // do lugar. `!jaConcluido` evita o cenário oposto: um evento
+    // cancelado/falhou chegando atrasado ou fora de ordem DEPOIS do
+    // envelope já ter sido legitimamente assinado e concluído não pode
+    // reverter esse status — o PDF assinado já está na área do cliente.
     await sql`
       UPDATE envelopes SET status = ${remoteStatus}, atualizado_em = now()
       WHERE id = ${envelopeId}::uuid
@@ -129,20 +143,33 @@ export async function processarAtualizacaoEnvelope(params: {
   }
 
   if (!finalizado) return { finalizado: false };
+  if (!transicaoParaConcluido) return { finalizado: true };
 
-  // Só salva o PDF assinado na primeira vez que o envelope é reconhecido
-  // como concluído — evita duplicar o documento se o webhook reenviar o
-  // mesmo evento (providers de webhook costumam reenviar em timeout).
-  if (!eraConcluidoAntes && signedUrl && nosso?.client_id) {
-    await salvarPdfAssinadoNoCliente(nosso.client_id, nosso.nome, signedUrl);
+  // Salva TODOS os documentos assinados do envelope na área do cliente —
+  // um envelope pode ter mais de um documento (wizard permite selecionar
+  // vários modelos), correlacionados pela mesma ordem em que foram
+  // enviados ao TramitaSign (envelope_documentos.ordem).
+  if (signedUrls.length > 0 && nosso?.client_id) {
+    const documentos = await sql`
+      SELECT nome FROM envelope_documentos
+      WHERE envelope_id = ${envelopeId}::uuid
+      ORDER BY ordem
+    `;
+    for (let i = 0; i < signedUrls.length; i++) {
+      const nomeDoc =
+        (documentos[i]?.nome as string | undefined) ??
+        `${nosso.nome} (${i + 1})`;
+      await salvarPdfAssinadoNoCliente(nosso.client_id, nomeDoc, signedUrls[i]);
+    }
   }
 
   // Envelope concluído — se for um lead do PrevBot (contrato_id = nosso
   // envelope_id), converte e avisa o PrevBot de volta.
+  const primeiroUrl = signedUrls[0] ?? null;
   const updated = await sql`
     UPDATE crm_leads SET
       contrato_status      = 'assinado',
-      contrato_url         = COALESCE(${signedUrl}, contrato_url),
+      contrato_url         = COALESCE(${primeiroUrl}, contrato_url),
       contrato_assinado_em = COALESCE(contrato_assinado_em, now()),
       updated_at           = now()
     WHERE contrato_id = ${envelopeId}
@@ -159,7 +186,7 @@ export async function processarAtualizacaoEnvelope(params: {
     prevbot_lead_id: string | null;
   };
 
-  await converterLeadAssinado(lead.id, signedUrl || lead.contrato_url);
+  await converterLeadAssinado(lead.id, primeiroUrl || lead.contrato_url);
 
   const prevbotCallbackUrl = process.env.PREVBOT_CALLBACK_URL;
   if (prevbotCallbackUrl) {

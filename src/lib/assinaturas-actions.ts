@@ -539,7 +539,7 @@ export async function sincronizarEnvelopeAction(
     envelopeId,
     remoteStatus: atual.status,
     signers: atual.signers,
-    signedUrl: atual.signedUrl,
+    signedUrls: atual.signedUrls,
   });
 
   revalidatePath(`/dashboard/assinaturas/${envelopeId}`);

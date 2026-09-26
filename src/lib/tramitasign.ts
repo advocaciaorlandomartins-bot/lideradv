@@ -469,7 +469,7 @@ export interface TramitaSignerResultado {
 function mapEnvelopeResposta(data: unknown): {
   status: string;
   signers: TramitaSignerResultado[];
-  signedUrl: string | null;
+  signedUrls: string[];
 } {
   const env = (
     data as {
@@ -501,8 +501,13 @@ function mapEnvelopeResposta(data: unknown): {
       signatureLink: s.signature_link ?? null,
       allDocumentsSigned: s.all_documents_signed ?? false,
     })),
-    signedUrl:
-      documents.find((d) => d.signed_file_url)?.signed_file_url ?? null,
+    // Envelope pode ter vários documentos (Passo 2 do wizard permite
+    // selecionar vários modelos) — pega TODOS os signed_file_url, não só
+    // o primeiro, senão os demais documentos assinados somem sem nunca
+    // aparecer nos Documentos do cliente.
+    signedUrls: documents
+      .map((d) => d.signed_file_url)
+      .filter((u): u is string => !!u),
   };
 }
 
@@ -511,7 +516,7 @@ export async function tramitaEnviarEnvelopeAssinatura(
 ): Promise<{
   status: string;
   signers: TramitaSignerResultado[];
-  signedUrl: string | null;
+  signedUrls: string[];
 } | null> {
   try {
     const res = await fetch(`${baseUrl()}/assinaturas/${envelopeId}/envio`, {
@@ -545,7 +550,7 @@ export async function tramitaObterEnvelopeAssinatura(
 ): Promise<{
   status: string;
   signers: TramitaSignerResultado[];
-  signedUrl: string | null;
+  signedUrls: string[];
 } | null> {
   try {
     const res = await fetch(`${baseUrl()}/assinaturas/${envelopeId}`, {

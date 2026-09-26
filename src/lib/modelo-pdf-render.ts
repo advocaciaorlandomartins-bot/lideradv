@@ -49,6 +49,7 @@ export async function renderModeloParaPdf(params: {
   let buffer = await renderToBuffer(doc);
 
   if (
+    modelo.usar_fundo_timbrado &&
     escritorioConfig.fundo_timbrado_ativo &&
     escritorioConfig.fundo_timbrado
   ) {

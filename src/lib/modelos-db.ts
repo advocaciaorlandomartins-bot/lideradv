@@ -10,6 +10,7 @@ export interface ModeloDocumento {
   conteudo_blocks: Block[] | null;
   ativo: boolean;
   usar_timbrado: boolean;
+  usar_fundo_timbrado: boolean;
   requer_responsavel_legal: boolean;
   created_at_formatted: string;
   updated_at_formatted: string;
@@ -27,6 +28,7 @@ function mapRow(r: any): ModeloDocumento {
     conteudo_blocks: blocks,
     ativo: r.ativo,
     usar_timbrado: r.usar_timbrado ?? true,
+    usar_fundo_timbrado: r.usar_fundo_timbrado ?? true,
     requer_responsavel_legal: r.requer_responsavel_legal ?? false,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
     updated_at_formatted: new Date(r.updated_at).toLocaleDateString("pt-BR"),
@@ -36,7 +38,7 @@ function mapRow(r: any): ModeloDocumento {
 export async function getAllModelos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, requer_responsavel_legal, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, created_at, updated_at
     FROM modelos_documento
     ORDER BY categoria NULLS LAST, titulo
   `;
@@ -46,7 +48,7 @@ export async function getAllModelos(): Promise<ModeloDocumento[]> {
 export async function getModelosAtivos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, requer_responsavel_legal, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, created_at, updated_at
     FROM modelos_documento
     WHERE ativo = TRUE
     ORDER BY categoria NULLS LAST, titulo
@@ -59,7 +61,7 @@ export async function getModeloById(
 ): Promise<ModeloDocumento | null> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, requer_responsavel_legal, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, created_at, updated_at
     FROM modelos_documento
     WHERE id = ${id}::uuid
   `;

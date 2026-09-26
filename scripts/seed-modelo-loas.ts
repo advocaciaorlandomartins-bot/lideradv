@@ -192,6 +192,7 @@ async function main() {
           conteudo = ${conteudo},
           conteudo_blocks = ${JSON.stringify(blocks)},
           usar_timbrado = false,
+          usar_fundo_timbrado = false,
           requer_responsavel_legal = true,
           ativo = true,
           updated_at = now()
@@ -201,9 +202,9 @@ async function main() {
   } else {
     await sql`
       INSERT INTO modelos_documento
-        (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado, requer_responsavel_legal)
+        (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal)
       VALUES
-        (${TITULO}, ${CATEGORIA}, ${DESCRICAO}, ${conteudo}, ${JSON.stringify(blocks)}, false, true)
+        (${TITULO}, ${CATEGORIA}, ${DESCRICAO}, ${conteudo}, ${JSON.stringify(blocks)}, false, false, true)
     `;
     console.log(`✓ Modelo "${TITULO}" criado.`);
   }

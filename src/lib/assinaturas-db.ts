@@ -67,6 +67,8 @@ export interface EnvelopeDetalhe {
   criado_por: string;
   criado_em: string;
   cliente_nome: string | null;
+  tramitasignUltimoStatus: string | null;
+  tramitasignUltimaSync: string | null;
   documentos: {
     id: string;
     nome: string;
@@ -91,7 +93,8 @@ export async function getEnvelopeById(
 ): Promise<EnvelopeDetalhe | null> {
   const [env] = await sql`
     SELECT e.id::text, e.nome, e.prazo, e.status, e.criado_por, e.criado_em,
-           c.name AS cliente_nome
+           c.name AS cliente_nome,
+           e.tramitasign_ultimo_status, e.tramitasign_ultima_sync
     FROM envelopes e
     LEFT JOIN clients c ON c.id = e.client_id
     WHERE e.id = ${id}::uuid
@@ -122,6 +125,10 @@ export async function getEnvelopeById(
     criado_por: env.criado_por,
     criado_em: String(env.criado_em),
     cliente_nome: env.cliente_nome ?? null,
+    tramitasignUltimoStatus: env.tramitasign_ultimo_status ?? null,
+    tramitasignUltimaSync: env.tramitasign_ultima_sync
+      ? String(env.tramitasign_ultima_sync)
+      : null,
     documentos: documentos.map((d) => ({
       id: d.id,
       nome: d.nome,

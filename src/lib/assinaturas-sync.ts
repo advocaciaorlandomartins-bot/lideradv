@@ -97,6 +97,18 @@ export async function processarAtualizacaoEnvelope(params: {
   const finalizado = remoteStatus === "finalizado";
   const eraConcluidoAntes = nosso?.status === "concluido";
 
+  // Grava o status bruto em toda sincronização (webhook ou manual), mesmo
+  // quando não muda nosso status local — sem isso não tem como diagnosticar
+  // um envelope que fica preso "aguardando" enquanto o assinante já
+  // aparece "assinado" (o remoto pode estar num estado intermediário, ex:
+  // "finalizando", que não é nem sucesso nem erro).
+  await sql`
+    UPDATE envelopes
+    SET tramitasign_ultimo_status = ${remoteStatus},
+        tramitasign_ultima_sync = now()
+    WHERE id = ${envelopeId}::uuid
+  `.catch(() => null);
+
   if (finalizado && !eraConcluidoAntes) {
     await sql`
       UPDATE envelopes SET status = 'concluido', atualizado_em = now()

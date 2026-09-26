@@ -101,6 +101,17 @@ export default async function EnvelopeDetalhePage({
             Cliente: {envelope.cliente_nome ?? "—"} · Prazo:{" "}
             {fmtDate(envelope.prazo)} · Criado em {fmtDate(envelope.criado_em)}
           </p>
+          {envelope.status !== "concluido" &&
+            envelope.tramitasignUltimoStatus && (
+              <p className="mt-1 font-body text-xs text-muted">
+                Último status recebido do TramitaSign:{" "}
+                <span className="font-semibold">
+                  {envelope.tramitasignUltimoStatus}
+                </span>
+                {envelope.tramitasignUltimaSync &&
+                  ` · sincronizado em ${new Date(envelope.tramitasignUltimaSync).toLocaleString("pt-BR")}`}
+              </p>
+            )}
         </div>
         {hasPermission(session, "assinaturas", "editar") && (
           <EnvelopeAcoesTopo

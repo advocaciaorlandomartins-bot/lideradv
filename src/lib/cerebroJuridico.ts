@@ -1,7 +1,10 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
-import { aplicarCamposClienteSeVazios } from "./cliente-documento-auto";
+import {
+  aplicarCamposClienteSeVazios,
+  aplicarMembrosFamiliaSeVazio,
+} from "./cliente-documento-auto";
 import { extractText } from "./anthropic-text";
 
 function getClaudeClient(): Anthropic {
@@ -2219,7 +2222,7 @@ Arquivo: ${doc.nome}
 TAREFA: Analise este documento e extraia todos os dados jurídicos relevantes.
 
 ## TIPO DO DOCUMENTO
-Identifique (CNIS, laudo médico, carta INSS, PPP, CTPS, sentença, etc.)
+Identifique (CNIS, laudo médico, carta INSS, PPP, CTPS, sentença, Comprovante de Cadastro do CadÚnico, etc.)
 
 ## DADOS EXTRAÍDOS
 Todos os dados relevantes: datas, números, CIDs, períodos contributivos, vínculos, valores, resultados de perícia.
@@ -2238,7 +2241,7 @@ Ação concreta com base neste documento.
 
 ## CAMPOS_JSON
 Preencha o JSON abaixo com dados EXPLÍCITOS do documento. Use null para campos ausentes.
-Atenção: "contribuicoes" deve ser um número inteiro (ex: 120) ou null; "resultado" aceita apenas DEFERIDO, INDEFERIDO ou CESSADO; datas no formato YYYY-MM-DD; "tipo_incapacidade" aceita Mental, Físico, Intelectual, Sensorial (ou combinação) — extraia APENAS se for laudo/relatório médico, null nos demais documentos.
+Atenção: "contribuicoes" deve ser um número inteiro (ex: 120) ou null; "resultado" aceita apenas DEFERIDO, INDEFERIDO ou CESSADO; datas no formato YYYY-MM-DD; "tipo_incapacidade" aceita Mental, Físico, Intelectual, Sensorial (ou combinação) — extraia APENAS se for laudo/relatório médico, null nos demais documentos. Se for o Comprovante de Cadastro do CadÚnico: "renda_familiar_per_capita" é o texto da faixa em "Faixa de renda familiar por pessoa (per capita)" (NUNCA a "Faixa de renda familiar total", são faixas diferentes); "membros_familia" é a lista completa da tabela "Integrantes da família" (um item por linha, incluindo a Pessoa Responsável pela Unidade Familiar), cada item com nome, parentesco, data_nascimento (YYYY-MM-DD) e cpf.
 Retorne SOMENTE o JSON abaixo, sem texto extra antes ou depois:
 {
   "cid": null,
@@ -2251,7 +2254,9 @@ Retorne SOMENTE o JSON abaixo, sem texto extra antes ou depois:
   "resultado": null,
   "afastamento": null,
   "contribuicoes": null,
-  "motivo": null
+  "motivo": null,
+  "renda_familiar_per_capita": null,
+  "membros_familia": null
 }
 
 Nunca invente dados que não estejam no documento. Se não conseguir ler alguma parte, informe.`;
@@ -2367,6 +2372,16 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
       await sql`UPDATE clients SET num_contribuicoes = ${contribuicoesVal} WHERE id = ${clientId}::uuid AND num_contribuicoes IS NULL`.catch(
         () => null
       );
+    const rendaPerCapitaVal = strOrNull(extracted.renda_familiar_per_capita);
+    if (rendaPerCapitaVal)
+      await sql`UPDATE clients SET renda_familiar_per_capita = ${rendaPerCapitaVal} WHERE id = ${clientId}::uuid AND (renda_familiar_per_capita IS NULL OR renda_familiar_per_capita = '')`.catch(
+        () => null
+      );
+    await aplicarMembrosFamiliaSeVazio(
+      clientId,
+      extracted.membros_familia,
+      `documento "${doc.nome}" (processo)`
+    ).catch(() => null);
 
     // processos: datas e textos
     const derVal = normDate(extracted.der);

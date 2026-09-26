@@ -256,7 +256,7 @@ function numOrNull(v: unknown): number | null {
   const n = Number(v);
   return !isNaN(n) ? n : null;
 }
-function parseMembrosFamilia(v: unknown): MembroFamilia[] | null {
+export function parseMembrosFamilia(v: unknown): MembroFamilia[] | null {
   if (!Array.isArray(v)) return null;
   const membros = v
     .map((item): MembroFamilia | null => {
@@ -398,42 +398,61 @@ export async function analisarDocumentoCliente(
     `documento "${doc.nome}"`
   );
 
-  // membros_familia é JSONB (lista), fora do mecanismo genérico de colunas
-  // escalares acima — mesma regra de não sobrescrever: só grava se o
-  // cliente ainda não tem nenhum membro cadastrado.
-  const membrosFamilia = parseMembrosFamilia(extracted.membros_familia);
-  if (membrosFamilia) {
-    const [atual] = await sql`
-      SELECT membros_familia FROM clients
-      WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
-    `.catch(() => [null]);
-    const jaTemMembros =
-      Array.isArray(atual?.membros_familia) && atual.membros_familia.length > 0;
-    if (atual && !jaTemMembros) {
-      const ok = await sql`
-        UPDATE clients SET membros_familia = ${JSON.stringify(membrosFamilia)}::jsonb
-        WHERE id = ${clienteId}::uuid
-      `
-        .then(() => true)
-        .catch((e) => {
-          console.error(
-            "[cliente-documento-auto] falha ao gravar membros_familia:",
-            e
-          );
-          return false;
-        });
-      if (ok) {
-        preenchidos.push("membros_familia");
-        await logAction({
-          acao: "editar",
-          entidade: "cliente",
-          entidadeId: clienteId,
-          descricao: `Preenchimento automático (documento "${doc.nome}"): membros_familia`,
-          _login: "sistema (IA)",
-        }).catch(() => null);
-      }
-    }
-  }
+  const gravouMembros = await aplicarMembrosFamiliaSeVazio(
+    clienteId,
+    extracted.membros_familia,
+    `documento "${doc.nome}"`
+  );
+  if (gravouMembros) preenchidos.push("membros_familia");
 
   return { camposPreenchidos: preenchidos };
+}
+
+/**
+ * membros_familia é JSONB (lista de {nome, parentesco, data_nascimento,
+ * cpf}) — fora do mecanismo genérico de colunas escalares de
+ * aplicarCamposClienteSeVazios. Mesma regra de não sobrescrever: só grava
+ * se o cliente ainda não tem nenhum membro cadastrado. Reaproveitada tanto
+ * pela extração em documento de cliente (acima) quanto pela extração em
+ * documento de processo (cerebroJuridico.ts:analisarDocumento) — CadÚnico
+ * pode ser anexado em qualquer um dos dois lugares.
+ */
+export async function aplicarMembrosFamiliaSeVazio(
+  clienteId: string,
+  rawMembrosFamilia: unknown,
+  origem: string
+): Promise<boolean> {
+  const membrosFamilia = parseMembrosFamilia(rawMembrosFamilia);
+  if (!membrosFamilia) return false;
+
+  const [atual] = await sql`
+    SELECT membros_familia FROM clients
+    WHERE id = ${clienteId}::uuid AND deleted_at IS NULL
+  `.catch(() => [null]);
+  const jaTemMembros =
+    Array.isArray(atual?.membros_familia) && atual.membros_familia.length > 0;
+  if (!atual || jaTemMembros) return false;
+
+  const ok = await sql`
+    UPDATE clients SET membros_familia = ${JSON.stringify(membrosFamilia)}::jsonb
+    WHERE id = ${clienteId}::uuid
+  `
+    .then(() => true)
+    .catch((e) => {
+      console.error(
+        "[cliente-documento-auto] falha ao gravar membros_familia:",
+        e
+      );
+      return false;
+    });
+  if (ok) {
+    await logAction({
+      acao: "editar",
+      entidade: "cliente",
+      entidadeId: clienteId,
+      descricao: `Preenchimento automático (${origem}): membros_familia`,
+      _login: "sistema (IA)",
+    }).catch(() => null);
+  }
+  return ok;
 }

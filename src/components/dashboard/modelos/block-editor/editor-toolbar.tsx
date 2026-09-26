@@ -29,6 +29,7 @@ const btnBase =
   "flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-slate-100 hover:text-fg cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed";
 const btnActive = "bg-blue-50 text-primary hover:bg-blue-50 hover:text-primary";
 const FONTS: FontFamily[] = ["Times", "Arial", "Courier"];
+const FONT_SIZES = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
 
 export default function EditorToolbar({ editor }: Props) {
   if (!editor) return null;
@@ -38,6 +39,26 @@ export default function EditorToolbar({ editor }: Props) {
   const isTable = editor.isActive("table");
   const currentFont = (editor.getAttributes("textStyle").fontFamily ??
     "") as string;
+  const currentSizeRaw = editor.getAttributes("textStyle").fontSize as
+    | string
+    | undefined;
+  const currentSize = currentSizeRaw ? parseInt(currentSizeRaw, 10) : null;
+
+  function applySize(size: number | null) {
+    if (size == null) editor!.chain().focus().unsetFontSize().run();
+    else editor!.chain().focus().setFontSize(`${size}px`).run();
+  }
+
+  function stepSize(delta: 1 | -1) {
+    const base = currentSize ?? 12;
+    const idx = FONT_SIZES.reduce(
+      (best, sz, i) =>
+        Math.abs(sz - base) < Math.abs(FONT_SIZES[best] - base) ? i : best,
+      0
+    );
+    const nextIdx = Math.min(Math.max(idx + delta, 0), FONT_SIZES.length - 1);
+    applySize(FONT_SIZES[nextIdx]);
+  }
   const currentBlockValue = editor.isActive("heading", { level: 1 })
     ? "h1"
     : editor.isActive("heading", { level: 2 })
@@ -91,6 +112,40 @@ export default function EditorToolbar({ editor }: Props) {
           <option value="Arial">Arial</option>
           <option value="Courier">Courier</option>
         </select>
+
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            title="Diminuir fonte"
+            onClick={() => stepSize(-1)}
+            className={btnBase}
+          >
+            <MinusIcon className="h-3.5 w-3.5" />
+          </button>
+          <select
+            title="Tamanho do trecho selecionado"
+            value={currentSize ?? ""}
+            onChange={(e) =>
+              applySize(e.target.value ? Number(e.target.value) : null)
+            }
+            className="h-8 cursor-pointer rounded-md border border-border bg-white px-2 font-body text-xs font-semibold text-fg outline-none focus:border-primary"
+          >
+            <option value="">Padrão</option>
+            {FONT_SIZES.map((sz) => (
+              <option key={sz} value={sz}>
+                {sz}pt
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            title="Aumentar fonte"
+            onClick={() => stepSize(1)}
+            className={btnBase}
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
         <div className="mx-1 h-5 w-px bg-border" />
 

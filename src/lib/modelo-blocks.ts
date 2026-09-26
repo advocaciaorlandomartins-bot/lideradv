@@ -20,7 +20,12 @@ export interface TextSpan {
   highlight?: string;
   /** Família tipográfica do trecho — se ausente, usa a fonte padrão do escritório. */
   font?: FontFamily;
+  /** Tamanho do trecho em pt — se ausente, usa o tamanho padrão do escritório/bloco. */
+  fontSize?: number;
 }
+
+const MIN_FONT_SIZE = 6;
+const MAX_FONT_SIZE = 72;
 
 export type Align = "left" | "center" | "right" | "justify";
 
@@ -56,6 +61,13 @@ function isTextSpan(v: unknown): v is TextSpan {
   if (s.color !== undefined && !isValidHexColor(s.color)) return false;
   if (s.highlight !== undefined && !isValidHexColor(s.highlight)) return false;
   if (s.font !== undefined && !FONT_FAMILIES.includes(s.font as FontFamily))
+    return false;
+  if (
+    s.fontSize !== undefined &&
+    (typeof s.fontSize !== "number" ||
+      s.fontSize < MIN_FONT_SIZE ||
+      s.fontSize > MAX_FONT_SIZE)
+  )
     return false;
   return true;
 }
@@ -151,6 +163,7 @@ function spanToHtml(s: TextSpan): string {
   if (s.color) styles.push(`color:${s.color}`);
   if (s.highlight) styles.push(`background-color:${s.highlight}`);
   if (s.font) styles.push(`font-family:${s.font}`);
+  if (s.fontSize) styles.push(`font-size:${s.fontSize}px`);
   if (styles.length > 0)
     inner = `<span style="${styles.join(";")}">${inner}</span>`;
   if (s.underline) inner = `<u>${inner}</u>`;

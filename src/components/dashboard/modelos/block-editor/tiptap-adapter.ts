@@ -9,6 +9,8 @@ import { isValidHexColor } from "@/lib/modelo-blocks";
 
 const ALIGNS: Align[] = ["left", "center", "right", "justify"];
 const FONT_FAMILIES: FontFamily[] = ["Times", "Arial", "Courier"];
+const MIN_FONT_SIZE = 6;
+const MAX_FONT_SIZE = 72;
 
 function alignFromAttrs(attrs?: Record<string, unknown>): Align | undefined {
   const a = attrs?.textAlign;
@@ -40,6 +42,11 @@ function inlineContentToSpans(content?: JSONContent[]): TextSpan[] {
             FONT_FAMILIES.includes(family as FontFamily)
           )
             span.font = family as FontFamily;
+          const sizeRaw = mark.attrs?.fontSize;
+          const size =
+            typeof sizeRaw === "string" ? parseInt(sizeRaw, 10) : NaN;
+          if (!isNaN(size) && size >= MIN_FONT_SIZE && size <= MAX_FONT_SIZE)
+            span.fontSize = size;
         } else if (
           mark.type === "highlight" &&
           isValidHexColor(mark.attrs?.color)
@@ -63,12 +70,13 @@ function spansToInlineContent(spans: TextSpan[]): JSONContent[] {
       if (s.bold) marks.push({ type: "bold" });
       if (s.italic) marks.push({ type: "italic" });
       if (s.underline) marks.push({ type: "underline" });
-      if (s.color || s.font) {
+      if (s.color || s.font || s.fontSize) {
         marks.push({
           type: "textStyle",
           attrs: {
             ...(s.color ? { color: s.color } : {}),
             ...(s.font ? { fontFamily: s.font } : {}),
+            ...(s.fontSize ? { fontSize: `${s.fontSize}px` } : {}),
           },
         });
       }

@@ -39,7 +39,7 @@ function renderSpans(spans: TextSpan[], cfg: PdfPageConfig, fontSize: number) {
       key={i}
       style={{
         fontFamily: spanFontFamily(cfg, span),
-        fontSize,
+        fontSize: span.fontSize ?? fontSize,
         textDecoration: span.underline ? ("underline" as const) : undefined,
         color: "#1a1a1a",
       }}

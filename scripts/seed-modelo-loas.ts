@@ -14,7 +14,7 @@ const sql = neon(process.env.DATABASE_URL!);
 const TITULO = "Formulário LOAS";
 const CATEGORIA = "Previdenciário";
 const DESCRICAO =
-  "Declaração de composição familiar e situação socioeconômica exigida nos Juizados Especiais Federais de Maceió/AL para processos de LOAS/BPC. Puxa automaticamente os dados do cliente e do grupo familiar (extraídos do CadÚnico) — as seções b.1 a b.5 ficam em branco para preenchimento manual, conforme o formulário oficial.";
+  "Declaração de composição familiar e situação socioeconômica exigida nos Juizados Especiais Federais de Maceió/AL para processos de LOAS/BPC. A parte autora é identificada pelo nome e CPF do responsável legal cadastrado no cliente. Puxa automaticamente os dados do grupo familiar (extraídos do CadÚnico) — as seções b.1 a b.5 ficam em branco para preenchimento manual, conforme o formulário oficial.";
 
 function t(text: string, opts: Partial<TextSpan> = {}): TextSpan {
   return { text, ...opts };
@@ -63,9 +63,9 @@ const blocks: Block[] = [
     type: "paragraph",
     spans: [
       t("A parte autora, "),
-      t("{{nome}}", { bold: true }),
+      t("{{responsavel_nome}}", { bold: true }),
       t(", portador(a) do CPF nº "),
-      t("{{cpf_cnpj}}", { bold: true }),
+      t("{{responsavel_cpf}}", { bold: true }),
       t(", declara:"),
     ],
   },
@@ -192,7 +192,7 @@ async function main() {
           conteudo = ${conteudo},
           conteudo_blocks = ${JSON.stringify(blocks)},
           usar_timbrado = false,
-          requer_responsavel_legal = false,
+          requer_responsavel_legal = true,
           ativo = true,
           updated_at = now()
       WHERE id = ${existente.id}::uuid
@@ -203,7 +203,7 @@ async function main() {
       INSERT INTO modelos_documento
         (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado, requer_responsavel_legal)
       VALUES
-        (${TITULO}, ${CATEGORIA}, ${DESCRICAO}, ${conteudo}, ${JSON.stringify(blocks)}, false, false)
+        (${TITULO}, ${CATEGORIA}, ${DESCRICAO}, ${conteudo}, ${JSON.stringify(blocks)}, false, true)
     `;
     console.log(`✓ Modelo "${TITULO}" criado.`);
   }

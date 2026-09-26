@@ -86,56 +86,105 @@ export async function POST(request: Request) {
 
   const entityType = body?.entityType;
   const entityId = body?.entityId;
+  const idsRaw = Array.isArray(body?.ids) ? body.ids : null;
+  const ids =
+    idsRaw?.filter(
+      (x): x is string => typeof x === "string" && UUID_RE.test(x)
+    ) ?? null;
 
-  if (
-    !entityType ||
-    !VALID_ENTITY_TYPES.includes(entityType as EntityType) ||
-    !entityId ||
-    !UUID_RE.test(entityId)
-  ) {
-    return NextResponse.json(
-      { error: "Parâmetros inválidos." },
-      { status: 400 }
-    );
-  }
+  let selecionados: { id: string; nome: string; url: string }[];
 
-  if (entityType === "colaborador") {
-    if (!(await podeAcessarColaborador(session, entityId)))
-      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
-  } else {
-    if (
-      !hasPermission(
-        session,
-        MODULO_POR_ENTITY_TYPE[
-          entityType as Exclude<EntityType, "colaborador">
-        ],
-        "ver"
-      )
-    ) {
-      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  if (ids && ids.length > 0) {
+    // "Baixar selecionados" pode misturar documentos de entidades
+    // diferentes — a tela de processo, por exemplo, mostra numa lista só
+    // os documentos do processo E os do cliente vinculado. Em vez de
+    // assumir que todo id selecionado pertence à entidade da página
+    // (entityType/entityId), busca cada documento pelo id e valida o
+    // acesso pela entidade REAL dele — mesmo padrão já usado em
+    // /api/documentos/download (documento único). Sem isso, selecionar um
+    // documento cuja entidade real é diferente da página sempre batia em
+    // "Nenhum documento para baixar" (nenhum id selecionado nunca aparecia
+    // no resultado filtrado por entityType/entityId da página).
+    const rows = await sql`
+      SELECT id::text, nome, url, entity_type, entity_id::text
+      FROM documentos
+      WHERE id = ANY(${ids}::uuid[])
+    `;
+    selecionados = [];
+    for (const r of rows as {
+      id: string;
+      nome: string;
+      url: string;
+      entity_type: string;
+      entity_id: string;
+    }[]) {
+      const et = r.entity_type as EntityType;
+      if (!VALID_ENTITY_TYPES.includes(et)) continue;
+      const permitido =
+        et === "colaborador"
+          ? await podeAcessarColaborador(session, r.entity_id)
+          : hasPermission(
+              session,
+              MODULO_POR_ENTITY_TYPE[et as Exclude<EntityType, "colaborador">],
+              "ver"
+            ) && (await podeAcessarEntidade(session, et, r.entity_id));
+      if (permitido) selecionados.push({ id: r.id, nome: r.nome, url: r.url });
     }
-    // hasPermission acima só checa o módulo em geral — sem isto, um usuário
-    // sem "processos_ver_todos" baixava em lote os documentos de QUALQUER
-    // processo do escritório, não só dos que ele é responsável.
+  } else {
+    // "Baixar todos" (sem seleção) — mantém o comportamento por entidade
+    // única já existente.
     if (
-      !(await podeAcessarEntidade(session, entityType as EntityType, entityId))
-    )
-      return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
-  }
+      !entityType ||
+      !VALID_ENTITY_TYPES.includes(entityType as EntityType) ||
+      !entityId ||
+      !UUID_RE.test(entityId)
+    ) {
+      return NextResponse.json(
+        { error: "Parâmetros inválidos." },
+        { status: 400 }
+      );
+    }
 
-  if (!(await entidadeAtiva(entityType as EntityType, entityId))) {
-    return NextResponse.json(
-      { error: "Registro não encontrado." },
-      { status: 404 }
+    if (entityType === "colaborador") {
+      if (!(await podeAcessarColaborador(session, entityId)))
+        return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+    } else {
+      if (
+        !hasPermission(
+          session,
+          MODULO_POR_ENTITY_TYPE[
+            entityType as Exclude<EntityType, "colaborador">
+          ],
+          "ver"
+        )
+      ) {
+        return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+      }
+      // hasPermission acima só checa o módulo em geral — sem isto, um
+      // usuário sem "processos_ver_todos" baixava em lote os documentos de
+      // QUALQUER processo do escritório, não só dos que ele é responsável.
+      if (
+        !(await podeAcessarEntidade(
+          session,
+          entityType as EntityType,
+          entityId
+        ))
+      )
+        return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+    }
+
+    if (!(await entidadeAtiva(entityType as EntityType, entityId))) {
+      return NextResponse.json(
+        { error: "Registro não encontrado." },
+        { status: 404 }
+      );
+    }
+
+    selecionados = await getDocumentosByEntityId(
+      entityType as EntityType,
+      entityId
     );
   }
-
-  const todos = await getDocumentosByEntityId(
-    entityType as EntityType,
-    entityId
-  );
-  const ids = Array.isArray(body?.ids) ? body.ids : null;
-  const selecionados = ids ? todos.filter((d) => ids.includes(d.id)) : todos;
 
   if (selecionados.length === 0) {
     return NextResponse.json(

@@ -263,7 +263,7 @@ export default function DocumentsSection({
         <div className="flex items-center gap-2">
           {documents.length > 0 && (
             <button
-              onClick={() => handleDownloadZip(null)}
+              onClick={() => handleDownloadZip(documents.map((d) => d.id))}
               disabled={downloadingZip}
               className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-sm font-semibold text-fg transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
             >

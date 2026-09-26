@@ -157,16 +157,21 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 2. Escolhe o modelo certo (com/sem responsável legal) ──
+    // usar_prevbot_contrato é obrigatório aqui — sem ele, qualquer outro
+    // modelo marcado requer_responsavel_legal=true (ex: Formulário LOAS)
+    // colidiria e poderia ser escolhido no lugar do contrato de verdade.
     const modelos = await getModelosAtivos();
     const requerResponsavel = client.menor_incapaz;
     const modelo = modelos.find(
-      (m) => m.requer_responsavel_legal === requerResponsavel
+      (m) =>
+        m.usar_prevbot_contrato &&
+        m.requer_responsavel_legal === requerResponsavel
     );
     if (!modelo) {
       return NextResponse.json(
         {
           ok: false,
-          error: `Nenhum modelo de contrato ativo configurado (requer_responsavel_legal=${requerResponsavel}). Cadastre em Documentos → Modelos.`,
+          error: `Nenhum modelo de contrato ativo configurado (usar_prevbot_contrato=true, requer_responsavel_legal=${requerResponsavel}). Cadastre em Documentos → Modelos.`,
         },
         { status: 422 }
       );

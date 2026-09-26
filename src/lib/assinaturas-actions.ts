@@ -291,6 +291,7 @@ export async function enviarEnvelopeParaTramitaSign(
           : "assinante",
       selfieRequired: a.valSelfie,
       documentPhotoRequired: a.valDocumento,
+      handwrittenSignatureRequired: a.valAssinaturaDesenhada,
     });
     if (a.email) assinanteIdPorEmail.set(a.email.toLowerCase(), a.id);
   }

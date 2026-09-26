@@ -25,6 +25,7 @@ interface Assinante {
   valEmail: boolean;
   valSelfie: boolean;
   valDocumento: boolean;
+  valAssinaturaDesenhada: boolean;
   // used only for select lookup
   refId?: string;
 }
@@ -207,6 +208,8 @@ export default function NovoEnvelope({
   const [newValEmail, setNewValEmail] = useState(true);
   const [newValSelfie, setNewValSelfie] = useState(false);
   const [newValDoc, setNewValDoc] = useState(false);
+  const [newValAssinaturaDesenhada, setNewValAssinaturaDesenhada] =
+    useState(false);
   const [newRefId, setNewRefId] = useState("");
 
   // Step 4
@@ -293,6 +296,7 @@ export default function NovoEnvelope({
         valEmail: newValEmail,
         valSelfie: newValSelfie,
         valDocumento: newValDoc,
+        valAssinaturaDesenhada: newValAssinaturaDesenhada,
         refId: newRefId,
       },
     ]);
@@ -325,6 +329,7 @@ export default function NovoEnvelope({
             valEmail: a.valEmail,
             valSelfie: a.valSelfie,
             valDocumento: a.valDocumento,
+            valAssinaturaDesenhada: a.valAssinaturaDesenhada,
             ordem: i + 1,
           }))
         )
@@ -613,6 +618,11 @@ export default function NovoEnvelope({
                         Doc
                       </span>
                     )}
+                    {a.valAssinaturaDesenhada && (
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5">
+                        Ass. desenhada
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -767,6 +777,12 @@ export default function NovoEnvelope({
                     label: "Documento",
                     val: newValDoc,
                     set: setNewValDoc,
+                  },
+                  {
+                    key: "assinaturaDesenhada",
+                    label: "Assinatura desenhada",
+                    val: newValAssinaturaDesenhada,
+                    set: setNewValAssinaturaDesenhada,
                   },
                 ].map(({ key, label, val, set }) => (
                   <label

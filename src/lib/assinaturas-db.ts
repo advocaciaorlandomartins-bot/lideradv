@@ -18,6 +18,7 @@ export interface AssinanteInput {
   valEmail: boolean;
   valSelfie: boolean;
   valDocumento: boolean;
+  valAssinaturaDesenhada: boolean;
   ordem: number;
 }
 
@@ -188,10 +189,10 @@ export async function criarEnvelope(data: {
     for (const a of data.assinantes) {
       const [row] = await sql`
         INSERT INTO envelope_assinantes
-          (envelope_id, tipo, nome, email, papel, val_email, val_selfie, val_documento, ordem)
+          (envelope_id, tipo, nome, email, papel, val_email, val_selfie, val_documento, val_assinatura_desenhada, ordem)
         VALUES
           (${envId}::uuid, ${a.tipo}, ${a.nome}, ${a.email}, ${a.papel},
-           ${a.valEmail}, ${a.valSelfie}, ${a.valDocumento}, ${a.ordem})
+           ${a.valEmail}, ${a.valSelfie}, ${a.valDocumento}, ${a.valAssinaturaDesenhada}, ${a.ordem})
         RETURNING id::text
       `;
       assinantesCriados.push({
@@ -257,6 +258,7 @@ export interface AssinanteParaEnvio {
   papel: string;
   valSelfie: boolean;
   valDocumento: boolean;
+  valAssinaturaDesenhada: boolean;
   status: string;
 }
 
@@ -288,7 +290,8 @@ export async function getEnvelopeParaEnvio(
       ORDER BY ordem
     `,
     sql`
-      SELECT id::text, tipo, nome, email, papel, val_selfie, val_documento, status
+      SELECT id::text, tipo, nome, email, papel, val_selfie, val_documento,
+             val_assinatura_desenhada, status
       FROM envelope_assinantes
       WHERE envelope_id = ${envelopeId}::uuid
       ORDER BY ordem
@@ -313,6 +316,7 @@ export async function getEnvelopeParaEnvio(
       papel: a.papel,
       valSelfie: a.val_selfie,
       valDocumento: a.val_documento,
+      valAssinaturaDesenhada: a.val_assinatura_desenhada,
       status: a.status,
     })),
   };

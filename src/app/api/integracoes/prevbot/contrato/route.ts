@@ -206,6 +206,7 @@ export async function POST(req: NextRequest) {
           valEmail: false,
           valSelfie: true,
           valDocumento: true,
+          valAssinaturaDesenhada: false,
           ordem: 1,
         },
       ],

@@ -410,6 +410,7 @@ export interface TramitaSignerInput {
   signatureType?: "assinante" | "testemunha" | "avalista";
   selfieRequired?: boolean;
   documentPhotoRequired?: boolean;
+  handwrittenSignatureRequired?: boolean;
 }
 
 /** Passo 5: define os assinantes do envelope (só aceito enquanto está em rascunho). */
@@ -433,6 +434,9 @@ export async function tramitaAtualizarSignatarios(
             ...(s.selfieRequired ? { selfie_required: true } : {}),
             ...(s.documentPhotoRequired
               ? { document_photo_required: true }
+              : {}),
+            ...(s.handwrittenSignatureRequired
+              ? { handwritten_signature_required: true }
               : {}),
           })),
         },

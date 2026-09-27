@@ -30,6 +30,7 @@ import { enviarEmailEnvelopeEnviado } from "./email";
 import { processarAtualizacaoEnvelope } from "./assinaturas-sync";
 import sql from "./db";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import {
   tramitaSignAtivo,
   tramitaCriarCliente,
@@ -135,16 +136,28 @@ export async function salvarEnvelopeAction(
   });
 
   if (enviar && assinantesCriados.length > 0) {
-    processarEnvioEnvelope({
-      envelopeId: id,
-      envelopeNome: nome,
-      clienteNome: client.name,
-      notifCriador,
-      notifEscritorio,
-      criadorEmail: session.login,
-      escritorioEmail: escritorioConfig.email,
-    }).catch((e) =>
-      console.error("[assinaturas] processarEnvioEnvelope falhou:", e)
+    // Precisa de after() — não dá pra só disparar a promise sem esperar
+    // (`.catch(...)` sem await): a Vercel pode encerrar a função assim que
+    // a Server Action devolve `{ id }" logo abaixo, matando a promise
+    // solta no meio (com sorte variável de rodar completa ou não). Era
+    // exatamente isso que fazia o envio ao TramitaSign falhar em silêncio
+    // às vezes — o envelope ficava salvo como "aguardando" no nosso banco
+    // sem nunca ter sido enviado de verdade (tramitasign_envelope_id nulo,
+    // nenhum erro gravado porque o código que gravaria o erro nem chegava
+    // a rodar). after() garante que o callback roda até o fim mesmo depois
+    // da resposta já ter sido enviada ao navegador.
+    after(() =>
+      processarEnvioEnvelope({
+        envelopeId: id,
+        envelopeNome: nome,
+        clienteNome: client.name,
+        notifCriador,
+        notifEscritorio,
+        criadorEmail: session.login,
+        escritorioEmail: escritorioConfig.email,
+      }).catch((e) =>
+        console.error("[assinaturas] processarEnvioEnvelope falhou:", e)
+      )
     );
   }
 

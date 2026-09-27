@@ -131,11 +131,13 @@ const blocks: Block[] = [
     type: "paragraph",
     spans: [
       t(
-        "Faixa de renda familiar por pessoa (per capita), conforme Cadastro Único (CadÚnico): "
+        "Faixa de renda familiar por pessoa (per capita), conforme Cadastro Único (CadÚnico):"
       ),
-      t("{{renda_familiar_per_capita}}", { bold: true }),
-      t("."),
     ],
+  },
+  {
+    type: "paragraph",
+    spans: [t("{{renda_familiar_per_capita}}", { bold: true })],
   },
   {
     type: "paragraph",

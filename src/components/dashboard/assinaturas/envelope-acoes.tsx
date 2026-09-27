@@ -228,6 +228,58 @@ export function EditarEmailAssinante({
   );
 }
 
+export function CompartilharLinkAssinatura({
+  link,
+  nomeAssinante,
+}: {
+  link: string;
+  nomeAssinante: string;
+}) {
+  const [copiado, setCopiado] = useState(false);
+
+  async function handleCopiar() {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // navigator.clipboard pode falhar (contexto não-seguro, permissão
+      // negada) — sem tratar, o clique parecia não fazer nada.
+    }
+  }
+
+  const mensagem = `Olá, ${nomeAssinante}! Segue o link para assinatura do seu documento: ${link}`;
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <a
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-body text-xs font-semibold text-primary hover:underline"
+      >
+        Link de assinatura →
+      </a>
+      <button
+        type="button"
+        onClick={handleCopiar}
+        className="font-body text-xs font-semibold text-muted hover:text-fg"
+      >
+        {copiado ? "Copiado!" : "Copiar link"}
+      </button>
+      <a
+        href={whatsappUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-body text-xs font-semibold text-emerald-600 hover:underline"
+      >
+        Enviar por WhatsApp
+      </a>
+    </div>
+  );
+}
+
 export function ReenviarAssinatura({
   envelopeId,
   assinanteId,

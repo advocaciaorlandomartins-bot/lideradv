@@ -8,6 +8,7 @@ import {
   EnvelopeAcoesTopo,
   EditarEmailAssinante,
   ReenviarAssinatura,
+  CompartilharLinkAssinatura,
 } from "@/components/dashboard/assinaturas/envelope-acoes";
 
 export const dynamic = "force-dynamic";
@@ -143,14 +144,10 @@ export default async function EnvelopeDetalhePage({
                     {a.email} · {a.papel}
                   </p>
                   {a.tramitasignLink && (
-                    <a
-                      href={a.tramitasignLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1 inline-block font-body text-xs font-semibold text-primary hover:underline"
-                    >
-                      Link de assinatura →
-                    </a>
+                    <CompartilharLinkAssinatura
+                      link={a.tramitasignLink}
+                      nomeAssinante={a.nome}
+                    />
                   )}
                   {a.status === "pendente" &&
                     a.tipo !== "eu_mesmo" &&

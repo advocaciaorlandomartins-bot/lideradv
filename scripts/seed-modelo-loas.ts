@@ -48,7 +48,7 @@ function membroRow(n: number): TextSpan[][] {
     [t(`{{membro${n}_nome}}`)],
     [t(`{{membro${n}_parentesco}}`)],
     [t(`{{membro${n}_nascimento}}`)],
-    [t("")],
+    [t(`{{membro${n}_remuneracao}}`)],
     [t(`{{membro${n}_cpf}}`)],
   ];
 }
@@ -104,6 +104,13 @@ const blocks: Block[] = [
   },
   {
     type: "table",
+    // Larguras relativas (%) — "Nome completo" e "Grau de parentesco"
+    // (que pode conter "Pessoa Responsável pela Unidade Familiar", o
+    // valor mais longo da tabela) precisam de mais espaço do que CPF/
+    // Data/Remuneração, que têm formato curto e fixo. Sem isso, cada
+    // coluna dividia o espaço igual e nomes/parentesco quebravam em
+    // várias linhas enquanto CPF/Data sobravam com espaço vazio.
+    colWidths: [26, 24, 12, 14, 24],
     rows: [
       [
         [t("Nome completo", { bold: true })],

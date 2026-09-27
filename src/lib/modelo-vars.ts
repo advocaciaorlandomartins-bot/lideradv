@@ -28,6 +28,18 @@ function joinComE(items: string[]): string {
 // nessa posição fica em branco no documento.
 const MAX_MEMBROS_FAMILIA = 6;
 
+// O CadÚnico não traz renda mensal individual por pessoa — só a faixa per
+// capita da família inteira (ex: "Entre R$ 210,01 até meio salário
+// mínimo"). A pedido do Orlando, a coluna "Remuneração mensal em R$" da
+// tabela usa o valor inicial dessa faixa (ex: "R$ 210,01"), repetido pra
+// cada membro cadastrado — não é o valor real de cada um, só o piso da
+// faixa em que a família se enquadra.
+function extrairValorPerCapita(texto: string | null): string {
+  if (!texto) return "";
+  const m = texto.match(/R\$\s*[\d.,]+/);
+  return m ? m[0] : "";
+}
+
 /**
  * Mapa {{variavel}} → valor, usado tanto na geração de PDF (gerar-modelo)
  * quanto na geração de HTML pra assinatura (Assinaturas) — mesma fonte de
@@ -47,6 +59,9 @@ export function buildModeloVars(
   ].filter(Boolean);
   const enderecoCompleto = `${addrParts.join(", ")}, ${client.neighborhood}, ${client.city}/${client.state}, CEP ${client.cep}`;
 
+  const valorPerCapita = extrairValorPerCapita(
+    client.renda_familiar_per_capita
+  );
   const membrosVars: Record<string, string> = {};
   for (let i = 0; i < MAX_MEMBROS_FAMILIA; i++) {
     const m = client.membros_familia?.[i];
@@ -59,6 +74,7 @@ export function buildModeloVars(
         })
       : "";
     membrosVars[`{{membro${n}_cpf}}`] = m?.cpf ?? "";
+    membrosVars[`{{membro${n}_remuneracao}}`] = m ? valorPerCapita : "";
   }
 
   return {

@@ -40,7 +40,15 @@ export type Block =
     }
   | { type: "list"; ordered?: boolean; items: TextSpan[][] }
   | { type: "divider" }
-  | { type: "table"; rows: TextSpan[][][] }
+  | {
+      type: "table";
+      rows: TextSpan[][][];
+      // Largura relativa de cada coluna em %, soma ~100 — opcional, sem
+      // isso toda coluna divide o espaço igualmente (flex:1), o que fica
+      // ruim quando uma coluna precisa de bem mais espaço que outra (ex:
+      // "Nome completo" vs "CPF" na tabela de família do Formulário LOAS).
+      colWidths?: number[];
+    }
   | { type: "callout"; title?: string; color?: string; spans: TextSpan[] }
   | { type: "signatureLine"; label: string };
 
@@ -100,6 +108,14 @@ function isBlock(v: unknown): v is Block {
     case "divider":
       return true;
     case "table":
+      if (
+        b.colWidths !== undefined &&
+        !(
+          Array.isArray(b.colWidths) &&
+          b.colWidths.every((w) => typeof w === "number" && w > 0)
+        )
+      )
+        return false;
       return (
         Array.isArray(b.rows) &&
         b.rows.every(

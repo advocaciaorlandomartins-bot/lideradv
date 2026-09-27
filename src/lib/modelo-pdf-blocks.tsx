@@ -179,7 +179,9 @@ export function renderBlocks(
                   <View
                     key={ci}
                     style={{
-                      flex: 1,
+                      ...(block.colWidths?.[ci]
+                        ? { width: `${block.colWidths[ci]}%` }
+                        : { flex: 1 }),
                       padding: 6,
                       borderRightWidth: ci < row.length - 1 ? 1 : 0,
                       borderRightColor: "#D1D5DB",

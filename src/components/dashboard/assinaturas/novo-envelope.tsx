@@ -30,11 +30,17 @@ interface Assinante {
   refId?: string;
 }
 
+interface PerguntaExtra {
+  tag: string;
+  label: string;
+}
+
 interface ModeloOpt {
   id: string;
   titulo: string;
   categoria: string | null;
   requerResponsavelLegal: boolean;
+  perguntasExtras: PerguntaExtra[];
 }
 
 interface Props {
@@ -198,6 +204,12 @@ export default function NovoEnvelope({
   // Step 2
   const [modelosSelecionados, setModelosSelecionados] = useState<string[]>([]);
   const [buscaModelo, setBuscaModelo] = useState("");
+  // Respostas de perguntas_extras (ex: b.1 a b.5 do Formulário LOAS) —
+  // chave é a tag, valor a resposta digitada. Sem isso o documento enviado
+  // pro TramitaSign saía com {{pergunta_b1}} cru, sem substituir — o
+  // envelope aqui monta o PDF real direto, não passa pelo modal "Gerar
+  // Documento" (única tela que já pedia essas respostas antes).
+  const [respostas, setRespostas] = useState<Record<string, string>>({});
 
   // Step 3
   const [assinantes, setAssinantes] = useState<Assinante[]>([]);
@@ -237,6 +249,14 @@ export default function NovoEnvelope({
   const modelosFiltrados = modelos.filter((m) =>
     m.titulo.toLowerCase().includes(buscaModelo.trim().toLowerCase())
   );
+
+  const modelosComPerguntas = modelos.filter(
+    (m) => modelosSelecionados.includes(m.id) && m.perguntasExtras.length > 0
+  );
+
+  function setResposta(tag: string, valor: string) {
+    setRespostas((prev) => ({ ...prev, [tag]: valor }));
+  }
 
   const clienteSelecionado = clientes.find((c) => c.id === clienteId);
   const clienteMenorIncapaz = clienteSelecionado?.menorIncapaz ?? false;
@@ -343,6 +363,7 @@ export default function NovoEnvelope({
           }))
         )
       );
+      fd.set("respostas_extras", JSON.stringify(respostas));
       await salvarEnvelopeAction(fd);
       router.push("/dashboard/assinaturas");
     } catch (e) {
@@ -553,6 +574,38 @@ export default function NovoEnvelope({
                   );
                 })}
               </ul>
+            </div>
+          )}
+
+          {modelosComPerguntas.length > 0 && (
+            <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="font-body text-xs text-amber-800">
+                Esses modelos têm perguntas de texto livre — não vêm do cadastro
+                do cliente. Responda antes de enviar, senão o documento sai com
+                a tag em branco.
+              </p>
+              {modelosComPerguntas.map((m) => (
+                <div key={m.id}>
+                  <p className="mb-2 font-body text-sm font-semibold text-fg">
+                    {m.titulo}
+                  </p>
+                  <div className="space-y-3">
+                    {m.perguntasExtras.map((p) => (
+                      <div key={p.tag}>
+                        <label className="mb-1 block font-body text-xs font-semibold text-fg">
+                          {p.label}
+                        </label>
+                        <textarea
+                          value={respostas[p.tag] ?? ""}
+                          onChange={(e) => setResposta(p.tag, e.target.value)}
+                          rows={2}
+                          className="w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg outline-none transition-colors focus:border-primary"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

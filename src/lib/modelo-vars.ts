@@ -99,6 +99,19 @@ export function buildModeloVars(
     "{{responsavel_parentesco}}": client.responsavel_parentesco ?? "",
     "{{renda_familiar_per_capita}}": client.renda_familiar_per_capita ?? "",
     ...membrosVars,
+    // Respostas de perguntas_extras já salvas antes pra esse cliente (ex:
+    // b.1 a b.5 do Formulário LOAS) — sem isso, qualquer geração fora do
+    // modal "Gerar Documento" (Assinaturas → Novo envelope, PrevBot) não
+    // via essas respostas e mandava a tag {{pergunta_bN}} crua e sem
+    // substituir pro documento final. Uma resposta nova digitada na hora
+    // (gerar-modelo/route.ts, novo-envelope.tsx) ainda sobrescreve isso,
+    // já que é aplicada DEPOIS de chamar buildModeloVars.
+    ...Object.fromEntries(
+      Object.entries(client.respostas_extras ?? {}).map(([tag, valor]) => [
+        `{{${tag}}}`,
+        valor,
+      ])
+    ),
     "{{data_hoje}}": date,
     "{{advogado}}":
       escritorioConfig.oab && escritorioConfig.oab_uf

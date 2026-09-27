@@ -67,12 +67,16 @@ export async function salvarEnvelopeAction(
 
   const assinantesJson = formData.get("assinantes") as string;
   const modelosJson = formData.get("modelos") as string;
+  const respostasExtrasJson = formData.get("respostas_extras") as string;
 
   const assinantes = JSON.parse(assinantesJson || "[]") as AssinanteInput[];
   const modelosSelecionados = JSON.parse(modelosJson || "[]") as Array<{
     modeloId: string;
     ordem: number;
   }>;
+  const respostasExtrasBrutas = JSON.parse(
+    respostasExtrasJson || "{}"
+  ) as Record<string, unknown>;
 
   if (modelosSelecionados.length === 0)
     throw new Error("Selecione ao menos um modelo de documento.");
@@ -93,6 +97,42 @@ export async function salvarEnvelopeAction(
   const advogados = await getAdvogadosParaDocumento().catch(() => []);
   const vars = buildModeloVars(client, escritorioConfig, date, advogados);
 
+  // Busca todos os modelos primeiro (uma vez só) — precisa disso pra saber
+  // o conjunto de tags de perguntas_extras válidas ANTES de montar `vars`,
+  // já que os documentos são renderizados a partir do mesmo `vars`
+  // compartilhado logo abaixo.
+  const modelosCarregados = (
+    await Promise.all(modelosSelecionados.map((m) => getModeloById(m.modeloId)))
+  ).filter((m): m is NonNullable<typeof m> => m !== null);
+
+  // Só aceita resposta pra tag que algum modelo selecionado realmente
+  // declarou em perguntas_extras — mesma regra de gerar-modelo/route.ts,
+  // impede que o formulário injete uma variável arbitrária no documento.
+  const tagsPermitidas = new Set(
+    modelosCarregados.flatMap((m) =>
+      (m.perguntas_extras ?? []).map((p) => p.tag)
+    )
+  );
+  const respostasValidas: Record<string, string> = {};
+  for (const [tag, valor] of Object.entries(respostasExtrasBrutas)) {
+    if (tagsPermitidas.has(tag) && typeof valor === "string" && valor.trim()) {
+      vars[`{{${tag}}}`] = valor.trim();
+      respostasValidas[tag] = valor.trim();
+    }
+  }
+  // Guarda pra pré-preencher da próxima vez (mesma regra de gerar-modelo/
+  // route.ts) — merge, não substitui, senão apagaria respostas salvas de
+  // outro modelo já respondido antes pra esse mesmo cliente.
+  if (Object.keys(respostasValidas).length > 0) {
+    await sql`
+      UPDATE clients
+      SET respostas_extras = COALESCE(respostas_extras, '{}'::jsonb) || ${JSON.stringify(respostasValidas)}::jsonb
+      WHERE id = ${clienteId}::uuid
+    `.catch((e) =>
+      console.error("[assinaturas] falha ao salvar respostas_extras:", e)
+    );
+  }
+
   // A ordem de seleção no wizard já é a ordem de envio — só respeitamos o
   // "ordem" enviado por cada item, sem reordenar aqui. O HTML aqui é só pra
   // pré-visualização na nossa própria tela (aba "Documentos" do envelope) —
@@ -100,7 +140,7 @@ export async function salvarEnvelopeAction(
   // enviarEnvelopeParaTramitaSign.
   const documentos: DocumentoInput[] = [];
   for (const m of modelosSelecionados) {
-    const modelo = await getModeloById(m.modeloId);
+    const modelo = modelosCarregados.find((x) => x.id === m.modeloId);
     if (!modelo) continue;
 
     let html: string;

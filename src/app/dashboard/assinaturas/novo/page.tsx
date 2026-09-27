@@ -27,6 +27,7 @@ export default async function NovoEnvelopePage() {
     titulo: m.titulo,
     categoria: m.categoria,
     requerResponsavelLegal: m.requer_responsavel_legal,
+    perguntasExtras: m.perguntas_extras ?? [],
   }));
 
   const colaboradoresOpts = colaboradores

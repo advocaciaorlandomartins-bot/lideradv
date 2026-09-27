@@ -315,6 +315,8 @@ export default function ProcessosContent({
   const [showCadastroSimples, setShowCadastroSimples] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showQuick, setShowQuick] = useState(false);
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
+  const [erroRelatorio, setErroRelatorio] = useState<string | null>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -559,6 +561,36 @@ export default function ProcessosContent({
     setShowExport(false);
   }
 
+  async function handleExportRelatorioSimplificado() {
+    setErroRelatorio(null);
+    setGerandoRelatorio(true);
+    try {
+      const res = await fetch("/api/processos/relatorio-simplificado", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ processoIds: filtered.map((p) => p.id) }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Erro ao gerar relatório.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `relatorio_processos_${new Date().toISOString().split("T")[0]}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setShowExport(false);
+    } catch (err) {
+      setErroRelatorio(
+        err instanceof Error ? err.message : "Erro ao gerar relatório."
+      );
+    } finally {
+      setGerandoRelatorio(false);
+    }
+  }
+
   function handleSaveQuickFilter(nome: string, f: FiltroAvancado) {
     const existing = quickFilters.filter((q) => q.nome !== nome);
     const next = [...existing, { nome, filtros: f }].slice(0, 10);
@@ -763,12 +795,19 @@ export default function ProcessosContent({
                 <DropdownItem
                   icon={DocumentTextIcon}
                   label="Relatório simplificado"
-                  description="Em desenvolvimento"
-                  onClick={() => {
-                    setShowExport(false);
-                  }}
-                  disabled
+                  description={
+                    gerandoRelatorio
+                      ? "Gerando…"
+                      : `PDF · ${filtered.length} processos`
+                  }
+                  onClick={handleExportRelatorioSimplificado}
+                  disabled={gerandoRelatorio || filtered.length === 0}
                 />
+                {erroRelatorio && (
+                  <p className="px-3 py-1.5 font-body text-xs text-red-600">
+                    {erroRelatorio}
+                  </p>
+                )}
               </DropdownMenu>
             </div>
 

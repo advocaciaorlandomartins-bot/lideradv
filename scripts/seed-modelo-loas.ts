@@ -104,19 +104,22 @@ const blocks: Block[] = [
   },
   {
     type: "table",
-    // Larguras relativas (%) — "Nome completo" e "Grau de parentesco"
-    // (que pode conter "Pessoa Responsável pela Unidade Familiar", o
-    // valor mais longo da tabela) precisam de mais espaço do que CPF/
-    // Data/Remuneração, que têm formato curto e fixo. Sem isso, cada
-    // coluna dividia o espaço igual e nomes/parentesco quebravam em
-    // várias linhas enquanto CPF/Data sobravam com espaço vazio.
-    colWidths: [26, 24, 12, 14, 24],
+    // Larguras relativas (%). "Data de nascimento" e "CPF" são um único
+    // token sem espaço nenhum (ex: "10/02/1991", "418.910.998-33") — sem
+    // hifenização (desligada globalmente, ver pdf-config.ts), esse token
+    // NUNCA quebra linha: se a coluna for mais estreita que o texto, ele
+    // estoura pra cima da coluna vizinha em vez de quebrar. "Nome
+    // completo"/"Grau de parentesco" têm várias palavras (quebram normal
+    // em qualquer largura razoável) e "Renda mensal (R$)" só precisa
+    // caber "R$ 210,01" — por isso Data/CPF ganham mais folga aqui do
+    // que o "tamanho do texto" sozinho sugeriria.
+    colWidths: [24, 20, 15, 17, 24],
     rows: [
       [
         [t("Nome completo", { bold: true })],
         [t("Grau de parentesco", { bold: true })],
         [t("Data de nascimento", { bold: true })],
-        [t("Remuneração mensal em R$", { bold: true })],
+        [t("Renda mensal (R$)", { bold: true })],
         [t("CPF", { bold: true })],
       ],
       membroRow(1),

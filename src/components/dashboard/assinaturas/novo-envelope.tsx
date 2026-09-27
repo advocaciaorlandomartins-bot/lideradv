@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { salvarEnvelopeAction } from "@/lib/assinaturas-actions";
 import {
@@ -210,6 +210,28 @@ export default function NovoEnvelope({
   // envelope aqui monta o PDF real direto, não passa pelo modal "Gerar
   // Documento" (única tela que já pedia essas respostas antes).
   const [respostas, setRespostas] = useState<Record<string, string>>({});
+
+  // Pré-preenche com o que já foi respondido antes pra esse cliente (em
+  // "Gerar Documento" ou num envelope anterior) — sem isso, o usuário
+  // tinha que digitar tudo de novo mesmo já tendo respondido uma vez.
+  // Troca de cliente troca as respostas exibidas (as de antes não valem
+  // mais pra esse cliente novo); a resposta salva só é sobrescrita quando
+  // o envelope é de fato enviado.
+  useEffect(() => {
+    if (!clienteId) return;
+    let cancelado = false;
+    fetch(`/api/clientes/${clienteId}/respostas-extras`)
+      .then((res) => (res.ok ? res.json() : { respostas: {} }))
+      .then((data) => {
+        if (!cancelado) setRespostas(data.respostas ?? {});
+      })
+      .catch(() => {
+        if (!cancelado) setRespostas({});
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [clienteId]);
 
   // Step 3
   const [assinantes, setAssinantes] = useState<Assinante[]>([]);

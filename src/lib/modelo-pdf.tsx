@@ -14,6 +14,7 @@ interface Props {
   config?: EscritorioConfig | null;
   logoData?: string | null;
   usarTimbrado?: boolean;
+  ocultarIdentificacao?: boolean;
 }
 
 export function ModeloPdfDoc({
@@ -25,12 +26,17 @@ export function ModeloPdfDoc({
   config,
   logoData,
   usarTimbrado,
+  ocultarIdentificacao,
 }: Props) {
   const withLetterhead =
-    (usarTimbrado ?? false) && !!config && config.modelo_timbrado_ativo;
+    !ocultarIdentificacao &&
+    (usarTimbrado ?? false) &&
+    !!config &&
+    config.modelo_timbrado_ativo;
   const pdfCfg = getPdfConfig(config, withLetterhead);
   const s = buildStyles(pdfCfg);
-  const identificacaoAtiva = !config || config.identificacao_ativo;
+  const identificacaoAtiva =
+    !ocultarIdentificacao && (!config || config.identificacao_ativo);
   const nomeExibido = identificacaoAtiva
     ? (config?.nome ?? "Orlando Martins Advocacia")
     : "Orlando Martins Advocacia";
@@ -53,15 +59,17 @@ export function ModeloPdfDoc({
             logoData={logoData ?? null}
           />
         ) : (
-          <View fixed>
-            <Text style={s.simpleHeader.firmName}>
-              {nomeExibido.toUpperCase()}
-            </Text>
-            {oabExibida && (
-              <Text style={s.simpleHeader.firmSub}>{oabExibida}</Text>
-            )}
-            <View style={s.simpleHeader.divider} />
-          </View>
+          !ocultarIdentificacao && (
+            <View fixed>
+              <Text style={s.simpleHeader.firmName}>
+                {nomeExibido.toUpperCase()}
+              </Text>
+              {oabExibida && (
+                <Text style={s.simpleHeader.firmSub}>{oabExibida}</Text>
+              )}
+              <View style={s.simpleHeader.divider} />
+            </View>
+          )
         )}
 
         <Text style={s.docTitle}>{titulo.toUpperCase()}</Text>

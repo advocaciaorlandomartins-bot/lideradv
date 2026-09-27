@@ -208,6 +208,7 @@ async function main() {
           conteudo_blocks = ${JSON.stringify(blocks)},
           usar_timbrado = false,
           usar_fundo_timbrado = false,
+          ocultar_identificacao_escritorio = true,
           requer_responsavel_legal = true,
           perguntas_extras = ${JSON.stringify(PERGUNTAS_EXTRAS)},
           ativo = true,
@@ -218,9 +219,9 @@ async function main() {
   } else {
     await sql`
       INSERT INTO modelos_documento
-        (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, perguntas_extras)
+        (titulo, categoria, descricao, conteudo, conteudo_blocks, usar_timbrado, usar_fundo_timbrado, ocultar_identificacao_escritorio, requer_responsavel_legal, perguntas_extras)
       VALUES
-        (${TITULO}, ${CATEGORIA}, ${DESCRICAO}, ${conteudo}, ${JSON.stringify(blocks)}, false, false, true, ${JSON.stringify(PERGUNTAS_EXTRAS)})
+        (${TITULO}, ${CATEGORIA}, ${DESCRICAO}, ${conteudo}, ${JSON.stringify(blocks)}, false, false, true, true, ${JSON.stringify(PERGUNTAS_EXTRAS)})
     `;
     console.log(`✓ Modelo "${TITULO}" criado.`);
   }

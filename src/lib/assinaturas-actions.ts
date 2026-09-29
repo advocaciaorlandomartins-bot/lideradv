@@ -41,6 +41,7 @@ import {
   tramitaEnviarEnvelopeAssinatura,
   tramitaObterEnvelopeAssinatura,
   type TramitaSignerInput,
+  type TramitaSignerResultado,
 } from "./tramitasign";
 
 const UUID_RE =
@@ -205,6 +206,77 @@ export async function salvarEnvelopeAction(
   return { id };
 }
 
+function normalizarNome(nome: string): string {
+  return nome.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+}
+
+/**
+ * Casa cada signer devolvido pelo TramitaSign com o assinante nosso e já
+ * grava signerId/link/erro. Tenta e-mail, depois nome normalizado; se ainda
+ * sobrar exatamente um de cada lado sem casar, casa por posição (só nesse
+ * caso — mais de um sobrando de cada lado é ambíguo, melhor reportar erro
+ * do que arriscar gravar o link de assinatura na pessoa errada).
+ *
+ * Sem isso, um assinante sem e-mail cadastrado (comum em lead do PrevBot,
+ * que às vezes só tem telefone) nunca casava com nada — o `continue` mudo
+ * da versão anterior deixava signerId/link/erro todos null pra sempre, sem
+ * nenhum erro registrado (achado real em produção: envelopes "Juliana
+ * Teste", tramitasign_envelope_id 15/16, email="").
+ */
+async function casarEGravarSigners(
+  signersResposta: TramitaSignerResultado[],
+  assinantesEnviados: string[],
+  assinanteIdPorEmail: Map<string, string>,
+  assinanteIdPorNome: Map<string, string>
+): Promise<{ assinantesSemMatch: string[]; semLink: string[] }> {
+  const pares: Array<{ assinanteId: string; signer: TramitaSignerResultado }> =
+    [];
+  const signersSemMatch: TramitaSignerResultado[] = [];
+
+  for (const s of signersResposta) {
+    const assinanteId =
+      (s.email ? assinanteIdPorEmail.get(s.email.toLowerCase()) : undefined) ??
+      (s.fullName
+        ? assinanteIdPorNome.get(normalizarNome(s.fullName))
+        : undefined);
+    if (assinanteId) {
+      pares.push({ assinanteId, signer: s });
+    } else {
+      signersSemMatch.push(s);
+    }
+  }
+
+  const assinantesCasados = new Set(pares.map((p) => p.assinanteId));
+  let assinantesRestantes = assinantesEnviados.filter(
+    (id) => !assinantesCasados.has(id)
+  );
+
+  if (assinantesRestantes.length === 1 && signersSemMatch.length === 1) {
+    pares.push({
+      assinanteId: assinantesRestantes[0],
+      signer: signersSemMatch[0],
+    });
+    assinantesRestantes = [];
+  }
+
+  for (const { assinanteId, signer } of pares) {
+    await atualizarAssinanteTramitaSign(assinanteId, {
+      signerId: signer.id,
+      link: signer.signatureLink,
+      erro: signer.signatureLink
+        ? null
+        : "Envelope enviado, mas o TramitaSign ainda não gerou o link de assinatura deste assinante.",
+    });
+  }
+
+  return {
+    assinantesSemMatch: assinantesRestantes,
+    semLink: pares
+      .filter((p) => !p.signer.signatureLink)
+      .map((p) => p.assinanteId),
+  };
+}
+
 /**
  * Faz o envio (ou reenvio) de um envelope inteiro ao TramitaSign, do zero:
  * renderiza cada modelo em PDF de verdade, sobe pro TramitaSign, cria o
@@ -322,6 +394,14 @@ export async function enviarEnvelopeParaTramitaSign(
   //    a lista de signers do envelope.
   const signers: TramitaSignerInput[] = [];
   const assinanteIdPorEmail = new Map<string, string>();
+  // Casamento por nome/posição é fallback pro caso (comum em lead do
+  // PrevBot, que às vezes só tem telefone) de assinante sem e-mail
+  // cadastrado — sem isso, o signer devolvido pela API nunca casava com
+  // ninguém aqui e o link ficava pra sempre null, sem erro nenhum
+  // registrado (achado real em produção: envelopes 15/16, "Juliana
+  // Teste", email="", tramitasign_signer_id/link/erro todos null).
+  const assinanteIdPorNome = new Map<string, string>();
+  const assinantesEnviados: string[] = [];
   for (const a of assinantesParaEnviar) {
     const cliente = await tramitaCriarCliente({
       nome: a.nome,
@@ -349,6 +429,8 @@ export async function enviarEnvelopeParaTramitaSign(
       handwrittenSignatureRequired: a.valAssinaturaDesenhada,
     });
     if (a.email) assinanteIdPorEmail.set(a.email.toLowerCase(), a.id);
+    assinanteIdPorNome.set(normalizarNome(a.nome), a.id);
+    assinantesEnviados.push(a.id);
   }
   if (signers.length === 0) {
     return { error: "Nenhum assinante pôde ser cadastrado no TramitaSign." };
@@ -357,7 +439,7 @@ export async function enviarEnvelopeParaTramitaSign(
   const okSigners = await tramitaAtualizarSignatarios(criado.id, signers);
   if (!okSigners) {
     const erro = "Falha ao definir os assinantes no TramitaSign.";
-    for (const assinanteId of assinanteIdPorEmail.values()) {
+    for (const assinanteId of assinantesEnviados) {
       await atualizarAssinanteTramitaSign(assinanteId, {
         signerId: null,
         link: null,
@@ -372,7 +454,7 @@ export async function enviarEnvelopeParaTramitaSign(
   const enviado = await tramitaEnviarEnvelopeAssinatura(criado.id);
   if (!enviado) {
     const erro = "Falha ao enviar o envelope para assinatura no TramitaSign.";
-    for (const assinanteId of assinanteIdPorEmail.values()) {
+    for (const assinanteId of assinantesEnviados) {
       await atualizarAssinanteTramitaSign(assinanteId, {
         signerId: null,
         link: null,
@@ -382,55 +464,71 @@ export async function enviarEnvelopeParaTramitaSign(
     return { error: erro };
   }
 
-  // 6. Casa cada signer devolvido com o assinante nosso (por e-mail) e
-  //    grava o link de assinatura.
+  // 6. Casa cada signer devolvido com o assinante nosso e grava o link de
+  //    assinatura. Tenta e-mail primeiro, depois nome normalizado; se um
+  //    signer não casa com ninguém (ou sobra exatamente um de cada lado),
+  //    NUNCA descarta em silêncio — melhor sobrar um erro visível do que
+  //    voltar {} de sucesso sem ter gravado nada (era exatamente isso que
+  //    acontecia antes com assinante sem e-mail: `continue` mudo).
   let algumSemLink = false;
-  for (const s of enviado.signers) {
-    const assinanteId = s.email
-      ? assinanteIdPorEmail.get(s.email.toLowerCase())
-      : undefined;
-    if (!assinanteId) continue;
-    if (!s.signatureLink) algumSemLink = true;
-    await atualizarAssinanteTramitaSign(assinanteId, {
-      signerId: s.id,
-      link: s.signatureLink,
-      erro: s.signatureLink
-        ? null
-        : "Envelope enviado, mas o TramitaSign ainda não gerou o link de assinatura deste assinante.",
-    });
-  }
+  const naoCasados = await casarEGravarSigners(
+    enviado.signers,
+    assinantesEnviados,
+    assinanteIdPorEmail,
+    assinanteIdPorNome
+  );
+  if (naoCasados.assinantesSemMatch.length > 0) algumSemLink = true;
+  if (naoCasados.semLink.length > 0) algumSemLink = true;
 
   // 7. POST /envio responde 202 (aceito) enquanto o envelope ainda está em
   //    preparação — o signature_link só fica pronto quando chega em
   //    aguardando_assinaturas. Espera um pouco e reconsulta uma vez antes
   //    de desistir (o webhook também atualiza isso depois, mas não faz
   //    sentido deixar o usuário vendo "sem link" se resolve em segundos).
+  let assinantesSemMatchFinal = naoCasados.assinantesSemMatch;
   if (algumSemLink) {
     await new Promise((resolve) => setTimeout(resolve, 4000));
     const atualizado = await tramitaObterEnvelopeAssinatura(criado.id);
     if (atualizado) {
-      algumSemLink = false;
-      for (const s of atualizado.signers) {
-        const assinanteId = s.email
-          ? assinanteIdPorEmail.get(s.email.toLowerCase())
-          : undefined;
-        if (!assinanteId || !s.signatureLink) {
-          if (assinanteId) algumSemLink = true;
-          continue;
-        }
-        await atualizarAssinanteTramitaSign(assinanteId, {
-          signerId: s.id,
-          link: s.signatureLink,
-          erro: null,
-        });
-      }
+      const naoCasados2 = await casarEGravarSigners(
+        atualizado.signers,
+        assinantesEnviados,
+        assinanteIdPorEmail,
+        assinanteIdPorNome
+      );
+      assinantesSemMatchFinal = naoCasados2.assinantesSemMatch;
+      algumSemLink =
+        naoCasados2.assinantesSemMatch.length > 0 ||
+        naoCasados2.semLink.length > 0;
+    }
+  }
+
+  // Assinante que nunca casou com nenhum signer devolvido (mesmo depois do
+  // retry) fica com erro gravado na hora — sem isso, a linha em
+  // envelope_assinantes fica com signerId/link/erro todos null pra sempre,
+  // indistinguível de "envio nem começou" (foi exatamente essa ambiguidade
+  // que escondeu esse bug em produção antes).
+  if (assinantesSemMatchFinal.length > 0) {
+    console.error(
+      "[TramitaSign] signer(s) da resposta não casaram com nenhum assinante local (envelope %s): %o",
+      criado.id,
+      assinantesSemMatchFinal
+    );
+    for (const assinanteId of assinantesSemMatchFinal) {
+      await atualizarAssinanteTramitaSign(assinanteId, {
+        signerId: null,
+        link: null,
+        erro: 'Envelope enviado ao TramitaSign, mas não foi possível identificar o link de assinatura deste assinante na resposta (verifique e-mail/nome cadastrados). Use "Verificar status" ou reenvie.',
+      });
     }
   }
 
   return algumSemLink
     ? {
         error:
-          "Envelope enviado — o TramitaSign ainda está preparando o link de assinatura. Reenvie em alguns segundos ou aguarde, ele chega automaticamente.",
+          assinantesSemMatchFinal.length > 0
+            ? "Envelope enviado, mas não foi possível confirmar o link de assinatura de um ou mais assinantes. Verifique o status do envelope."
+            : "Envelope enviado — o TramitaSign ainda está preparando o link de assinatura. Reenvie em alguns segundos ou aguarde, ele chega automaticamente.",
       }
     : {};
 }

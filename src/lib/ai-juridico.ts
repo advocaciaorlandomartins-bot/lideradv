@@ -417,11 +417,7 @@ Exemplos de preenchimento:
   // laudo médico/atestado). O streaming mantém a conexão SDK↔Anthropic
   // ativa recebendo chunks continuamente; ainda retorna o texto completo
   // de uma vez só pro chamador, não expõe streaming pro cliente HTTP.
-  async function chamarIa(): Promise<{
-    fullText: string;
-    truncado: boolean;
-    stopReason: string | null;
-  }> {
+  const res = await (async () => {
     const stream = client.messages.stream(
       {
         // Sonnet: mesmo motivo de analisarDocumento — raciocínio jurídico
@@ -433,9 +429,11 @@ Exemplos de preenchimento:
         // seções longas) no mesmo prompt — a resposta cortava antes de
         // chegar nele. 3000 ainda não bastava pra caso com vários
         // documentos (confirmado em produção: cortou aos 6794 caracteres,
-        // no meio de uma frase). O número sozinho não é confiável — por
-        // isso agora confere stop_reason e tenta de novo uma vez (abaixo)
-        // em vez de só confiar que o número é grande o bastante.
+        // no meio de uma frase). Repetir a chamada inteira quando corta
+        // (tentado antes) estourava os 60s de limite da rota (plano atual
+        // não permite aumentar) — por isso, se mesmo assim cortar, o
+        // fallback abaixo faz uma chamada SEPARADA e enxuta só pra extrair
+        // os dados, em vez de repetir a análise inteira.
         max_tokens: 4096,
         system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
         messages: [
@@ -460,42 +458,9 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
       },
       isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
     );
-    const res = await stream.finalMessage();
-    const text = extractText(res) || "Não foi possível analisar o documento.";
-    return {
-      fullText: text,
-      stopReason: res.stop_reason,
-      // stop_reason nem sempre é "max_tokens" num corte real (visto em
-      // produção: resposta de ~900 tokens, bem abaixo do teto de 4096,
-      // terminando no meio de uma frase sem nunca chegar no bloco
-      // obrigatório de dados) — por isso confia também no resultado em si,
-      // não só no motivo que a API reportou.
-      truncado:
-        res.stop_reason === "max_tokens" ||
-        (!!params.extrairDados && !text.includes("json_dados_previd")),
-    };
-  }
-
-  let { fullText, truncado, stopReason } = await chamarIa();
-  // Resposta incompleta (cortada pelo teto de tokens, ou terminou sem
-  // nunca chegar no bloco obrigatório de dados estruturados mesmo tendo
-  // sido pedido) — tenta de novo uma vez antes de entregar uma análise
-  // cortada no meio de uma frase pro advogado. Cobre tanto instabilidade
-  // pontual quanto o caso real de produção (ver comentário acima).
-  if (truncado) {
-    console.error(
-      `[ai-juridico] analisarDocumentoExtendido incompleto (arquivo "${params.nomeArquivo}", stop_reason=${stopReason}) — tentando de novo`
-    );
-    const retry = await chamarIa();
-    fullText = retry.fullText;
-    truncado = retry.truncado;
-    stopReason = retry.stopReason;
-    if (truncado) {
-      console.error(
-        `[ai-juridico] analisarDocumentoExtendido incompleto de novo na segunda tentativa (arquivo "${params.nomeArquivo}", stop_reason=${stopReason})`
-      );
-    }
-  }
+    return stream.finalMessage();
+  })();
+  const fullText = extractText(res) || "Não foi possível analisar o documento.";
 
   // Extrai o bloco JSON de dados previdenciários
   // Tenta múltiplos padrões para robustez contra variações de formatação do AI
@@ -535,6 +500,65 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
       if (Object.keys(filtrado).length > 0) dadosExtraidos = filtrado;
     } catch {
       // JSON malformado — ignora silenciosamente
+    }
+  }
+
+  // A análise completa cortou antes de chegar no bloco de dados (visto em
+  // produção: documento com várias páginas/CIDs consumiu os 4096 tokens só
+  // na análise textual). Em vez de repetir a chamada inteira (dobra o
+  // tempo e já estourou os 60s da rota numa tentativa real), faz uma
+  // chamada separada e enxuta SÓ pra extração — pede direto o JSON, sem
+  // pedir a análise jurídica de novo, então sai rápido mesmo com o mesmo
+  // documento anexado. Haiku (mesmo modelo já usado pra extração pura em
+  // cliente-documento-auto.ts) é suficiente aqui: não tem raciocínio
+  // jurídico nenhum, só leitura do documento.
+  if (params.extrairDados && !jsonMatch) {
+    console.error(
+      `[ai-juridico] analisarDocumentoExtendido sem bloco de dados (arquivo "${params.nomeArquivo}") — extração rápida separada`
+    );
+    try {
+      const extraRes = await client.messages.create(
+        {
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1536,
+          messages: [
+            {
+              role: "user",
+              content: [
+                contentBlock,
+                {
+                  type: "text",
+                  text: `Extraia os dados deste documento (${params.nomeArquivo}). Responda SOMENTE com o JSON abaixo, sem texto antes ou depois, sem bloco de código markdown.${extrairInstrucao}`,
+                },
+              ],
+            },
+          ],
+        },
+        isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
+      );
+      const extraText = extractText(extraRes);
+      const objMatch = extraText.match(/\{[\s\S]*\}/);
+      if (objMatch) {
+        const parsed = JSON.parse(objMatch[0]) as DadosPrevidenciarios;
+        const filtrado: DadosPrevidenciarios = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          if (
+            v !== null &&
+            v !== undefined &&
+            v !== "null" &&
+            v !== "" &&
+            String(v).toLowerCase() !== "null"
+          ) {
+            (filtrado as Record<string, unknown>)[k] = v;
+          }
+        }
+        if (Object.keys(filtrado).length > 0) dadosExtraidos = filtrado;
+      }
+    } catch (e) {
+      console.error(
+        `[ai-juridico] extração rápida separada falhou (arquivo "${params.nomeArquivo}"):`,
+        e
+      );
     }
   }
 

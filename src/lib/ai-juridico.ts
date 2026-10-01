@@ -417,32 +417,35 @@ Exemplos de preenchimento:
   // laudo médico/atestado). O streaming mantém a conexão SDK↔Anthropic
   // ativa recebendo chunks continuamente; ainda retorna o texto completo
   // de uma vez só pro chamador, não expõe streaming pro cliente HTTP.
-  const stream = client.messages.stream(
-    {
-      // Sonnet: mesmo motivo de analisarDocumento — raciocínio jurídico
-      // real (fundamento legal, riscos), não só extração dos dados
-      // previdenciários que vêm junto no mesmo prompt.
-      model: "claude-sonnet-5",
-      // 1800 era baixo demais quando extrairDados=true: o bloco JSON de
-      // dados previdenciários vem DEPOIS de toda a análise textual (5
-      // seções longas) no mesmo prompt — a resposta cortava antes de
-      // chegar nele, então dadosExtraidos vinha null mesmo com o CID já
-      // mencionado claramente no texto da análise. 3000 ainda não bastava
-      // pra caso com vários documentos (confirmado em produção: análise de
-      // 4 atestados do mesmo cliente cortou aos 6794 caracteres, no meio
-      // de uma frase da seção 5, nunca chegando no bloco JSON nem com o
-      // cid_principal sozinho — só sobreviveu por causa do fallback de
-      // regex em prosa).
-      max_tokens: 4096,
-      system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
-      messages: [
-        {
-          role: "user",
-          content: [
-            contentBlock,
-            {
-              type: "text",
-              text: `Arquivo: ${params.nomeArquivo}
+  async function chamarIa(): Promise<{
+    fullText: string;
+    truncado: boolean;
+    stopReason: string | null;
+  }> {
+    const stream = client.messages.stream(
+      {
+        // Sonnet: mesmo motivo de analisarDocumento — raciocínio jurídico
+        // real (fundamento legal, riscos), não só extração dos dados
+        // previdenciários que vêm junto no mesmo prompt.
+        model: "claude-sonnet-5",
+        // 1800 era baixo demais quando extrairDados=true: o bloco JSON de
+        // dados previdenciários vem DEPOIS de toda a análise textual (5
+        // seções longas) no mesmo prompt — a resposta cortava antes de
+        // chegar nele. 3000 ainda não bastava pra caso com vários
+        // documentos (confirmado em produção: cortou aos 6794 caracteres,
+        // no meio de uma frase). O número sozinho não é confiável — por
+        // isso agora confere stop_reason e tenta de novo uma vez (abaixo)
+        // em vez de só confiar que o número é grande o bastante.
+        max_tokens: 4096,
+        system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
+        messages: [
+          {
+            role: "user",
+            content: [
+              contentBlock,
+              {
+                type: "text",
+                text: `Arquivo: ${params.nomeArquivo}
 
 CONTEXTO DO CASO:
 ${ctxTexto}
@@ -450,16 +453,49 @@ ${ctxTexto}
 ${promptAnalise[params.tipoAnalise ?? "completa"]}
 
 Responda em português, com formatação markdown clara.${extrairInstrucao}`,
-            },
-          ],
-        },
-      ],
-    },
-    isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
-  );
-  const res = await stream.finalMessage();
+              },
+            ],
+          },
+        ],
+      },
+      isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
+    );
+    const res = await stream.finalMessage();
+    const text = extractText(res) || "Não foi possível analisar o documento.";
+    return {
+      fullText: text,
+      stopReason: res.stop_reason,
+      // stop_reason nem sempre é "max_tokens" num corte real (visto em
+      // produção: resposta de ~900 tokens, bem abaixo do teto de 4096,
+      // terminando no meio de uma frase sem nunca chegar no bloco
+      // obrigatório de dados) — por isso confia também no resultado em si,
+      // não só no motivo que a API reportou.
+      truncado:
+        res.stop_reason === "max_tokens" ||
+        (!!params.extrairDados && !text.includes("json_dados_previd")),
+    };
+  }
 
-  const fullText = extractText(res) || "Não foi possível analisar o documento.";
+  let { fullText, truncado, stopReason } = await chamarIa();
+  // Resposta incompleta (cortada pelo teto de tokens, ou terminou sem
+  // nunca chegar no bloco obrigatório de dados estruturados mesmo tendo
+  // sido pedido) — tenta de novo uma vez antes de entregar uma análise
+  // cortada no meio de uma frase pro advogado. Cobre tanto instabilidade
+  // pontual quanto o caso real de produção (ver comentário acima).
+  if (truncado) {
+    console.error(
+      `[ai-juridico] analisarDocumentoExtendido incompleto (arquivo "${params.nomeArquivo}", stop_reason=${stopReason}) — tentando de novo`
+    );
+    const retry = await chamarIa();
+    fullText = retry.fullText;
+    truncado = retry.truncado;
+    stopReason = retry.stopReason;
+    if (truncado) {
+      console.error(
+        `[ai-juridico] analisarDocumentoExtendido incompleto de novo na segunda tentativa (arquivo "${params.nomeArquivo}", stop_reason=${stopReason})`
+      );
+    }
+  }
 
   // Extrai o bloco JSON de dados previdenciários
   // Tenta múltiplos padrões para robustez contra variações de formatação do AI

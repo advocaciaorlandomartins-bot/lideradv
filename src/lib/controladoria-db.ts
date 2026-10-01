@@ -1,4 +1,5 @@
 import sql from "./db";
+import { fotoColaboradorUrl } from "./colaboradores-db";
 
 export interface ItemAberto {
   id: string;
@@ -373,7 +374,7 @@ export async function getCargaColaboradores(
         colaboradorId: String(col.id),
         nome: String(col.nome),
         cargo: String(col.cargo),
-        fotoUrl: col.foto_url ? String(col.foto_url) : null,
+        fotoUrl: fotoColaboradorUrl(String(col.id), col.foto_url ?? null),
         totalAbertas: itens.length,
         totalVencidas: itens.filter((i) => i.statusPrazo === "vencido").length,
         proximoPrazo: proximosPrazos[0] ?? null,

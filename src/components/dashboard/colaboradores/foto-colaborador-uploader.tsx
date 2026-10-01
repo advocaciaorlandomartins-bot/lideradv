@@ -63,7 +63,12 @@ export function FotoColaboradorUploader({
       if ("error" in resultado) {
         setErro(resultado.error);
       } else {
-        setFotoUrl(resultado.url);
+        // resultado.url é a URL crua (privada) do Blob, só pra confirmar
+        // que salvou — quem exibe é sempre a rota proxy (nunca a URL
+        // crua, que exige token e nenhum <img> consegue buscar sozinho).
+        // ?t= evita mostrar a foto antiga cacheada (Cache-Control de 5min
+        // na rota) logo depois de trocar.
+        setFotoUrl(`/api/colaboradores/${colaboradorId}/foto?t=${Date.now()}`);
       }
     } catch {
       setErro("Erro ao enviar a foto. Tente novamente.");

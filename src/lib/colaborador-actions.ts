@@ -359,11 +359,16 @@ export async function atualizarFotoColaboradorAction(
 
   let url: string;
   try {
+    // O store de Blob desta conta só aceita access "private" (confirmado
+    // em produção: "Cannot use public access on a private store") — mesmo
+    // padrão já usado pra documento de cliente. A foto é servida depois
+    // por /api/colaboradores/[id]/foto, que busca com o token server-side
+    // e devolve os bytes — nenhum <img src> aponta pra URL do Blob direto.
     const blob = await put(
       `colaboradores/${colaboradorId}/foto.${ext}`,
       bytes,
       {
-        access: "public",
+        access: "private",
         contentType: mime,
         token: process.env.BLOB_READ_WRITE_TOKEN,
         addRandomSuffix: true,

@@ -1,4 +1,5 @@
 import sql from "./db";
+import { fotoColaboradorUrl } from "./colaboradores-db";
 
 export type OrigemPontuacao = "controle" | "tarefa_processo" | "crm_tarefa";
 
@@ -131,7 +132,7 @@ export async function getRanking(dias = 30): Promise<RankingItem[]> {
     colaboradorId: String(r.colaborador_id),
     nome: String(r.nome),
     cargo: String(r.cargo),
-    fotoUrl: r.foto_url ? String(r.foto_url) : null,
+    fotoUrl: fotoColaboradorUrl(String(r.colaborador_id), r.foto_url ?? null),
     totalPontos: Number(r.total_pontos),
     entregas: Number(r.entregas),
   }));
@@ -335,7 +336,7 @@ export async function getRankingDetalhado(
         colaboradorId,
         nome: String(col.nome),
         cargo: String(col.cargo),
-        fotoUrl: col.foto_url ? String(col.foto_url) : null,
+        fotoUrl: fotoColaboradorUrl(colaboradorId, col.foto_url ?? null),
         totalPontos: agg.pontos,
         entregas: agg.entregas,
         noPrazoPct:

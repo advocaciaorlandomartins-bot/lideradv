@@ -3,6 +3,20 @@ import type { CargoColaborador } from "./colaboradores-types";
 export type { CargoColaborador } from "./colaboradores-types";
 export { CARGO_LABELS, CARGO_COLORS } from "./colaboradores-types";
 
+/**
+ * A URL crua do Blob fica salva em colaboradores.foto_url, mas é privada
+ * (store da conta não aceita "public") — nenhum <img src> consegue
+ * buscá-la direto, só /api/colaboradores/[id]/foto (que tem o token).
+ * Todo lugar que expõe foto pro front usa esta função, nunca o valor cru
+ * da coluna.
+ */
+export function fotoColaboradorUrl(
+  colaboradorId: string,
+  fotoUrlBruta: string | null
+): string | null {
+  return fotoUrlBruta ? `/api/colaboradores/${colaboradorId}/foto` : null;
+}
+
 export interface Colaborador {
   id: string;
   nome: string;
@@ -81,7 +95,7 @@ function mapRow(r: any): Colaborador {
     meta2_bonus: r.meta2_bonus != null ? Number(r.meta2_bonus) : null,
     meta3_valor: r.meta3_valor != null ? Number(r.meta3_valor) : null,
     meta3_bonus: r.meta3_bonus != null ? Number(r.meta3_bonus) : null,
-    foto_url: r.foto_url ?? null,
+    foto_url: fotoColaboradorUrl(r.id, r.foto_url ?? null),
   };
 }
 

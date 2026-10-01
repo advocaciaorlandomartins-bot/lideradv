@@ -269,7 +269,9 @@ export async function POST(req: Request) {
             documentoId,
             origem: "ia" as const,
           }))
-        ).catch(() => {});
+        ).catch((e) =>
+          console.error("[/api/ia/analisar] falha ao gravar cliente_cids:", e)
+        );
       }
     }
 

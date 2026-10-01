@@ -427,8 +427,13 @@ Exemplos de preenchimento:
       // dados previdenciários vem DEPOIS de toda a análise textual (5
       // seções longas) no mesmo prompt — a resposta cortava antes de
       // chegar nele, então dadosExtraidos vinha null mesmo com o CID já
-      // mencionado claramente no texto da análise.
-      max_tokens: 3000,
+      // mencionado claramente no texto da análise. 3000 ainda não bastava
+      // pra caso com vários documentos (confirmado em produção: análise de
+      // 4 atestados do mesmo cliente cortou aos 6794 caracteres, no meio
+      // de uma frase da seção 5, nunca chegando no bloco JSON nem com o
+      // cid_principal sozinho — só sobreviveu por causa do fallback de
+      // regex em prosa).
+      max_tokens: 4096,
       system: `Você é o Dr. Lex, especialista jurídico brasileiro. Analise documentos com precisão técnica, usando terminologia jurídica brasileira, referenciando legislação nacional e identificando aspectos práticos relevantes para o advogado.`,
       messages: [
         {

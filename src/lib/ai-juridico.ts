@@ -314,6 +314,12 @@ export interface DadosPrevidenciarios {
   valor_beneficio?: number | null;
   filiacao_mae?: string | null;
   filiacao_pai?: string | null;
+  // Lista de todos os CIDs do documento (ver cliente-documento-auto.ts:
+  // CidEncontrado) — cid_principal continua existindo pra compat, mas um
+  // documento real costuma trazer mais de um código (ex: atestado com
+  // "I61 + I11.9 + E10.4 + I42.2"); esse campo é o que alimenta a tabela
+  // cliente_cids, não só o primeiro.
+  cids_encontrados?: unknown;
 }
 
 export interface AnalisarDocumentoExtendidoParams extends AnalisarDocumentoParams {
@@ -361,7 +367,8 @@ NÃO copie os exemplos — use os valores reais do documento.
   "data_inicio_beneficio": null,
   "valor_beneficio": null,
   "filiacao_mae": null,
-  "filiacao_pai": null
+  "filiacao_pai": null,
+  "cids_encontrados": null
 }
 \`\`\`
 
@@ -369,7 +376,8 @@ Exemplos de preenchimento:
 - CID encontrado "M54.5" → "cid_principal": "M54.5"
 - Data "15/03/2023" → "data_diagnostico": "2023-03-15"
 - Valor "R$ 1.412,00" → "valor_beneficio": 1412.00
-- Campo não mencionado no documento → null`
+- Campo não mencionado no documento → null
+- "cids_encontrados": se o documento citar mais de um código CID-10 (ex: "CID 10: I61 + I11.9 + E10.4"), preencha um array com um item por código: [{"cid": "I61", "descricao": "nome da doença associada", "medico_nome": "...", "medico_crm": "...", "data_documento": "YYYY-MM-DD"}]. null se não houver CID nenhum.`
     : "";
 
   const isImage = params.mimeType.startsWith("image/");

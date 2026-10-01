@@ -17,7 +17,11 @@ import { getClientFull } from "@/lib/clients-db";
 import { getProcessoById } from "@/lib/processos-db";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import sql from "@/lib/db";
-import { aplicarCamposClienteSeVazios } from "@/lib/cliente-documento-auto";
+import {
+  aplicarCamposClienteSeVazios,
+  parseCidsEncontrados,
+} from "@/lib/cliente-documento-auto";
+import { adicionarCidsCliente } from "@/lib/clients-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -92,6 +96,7 @@ export async function POST(req: Request) {
   let clienteId: string | null = null;
   let processoId: string | null = null;
   let tipoAnalise = "completa";
+  let documentoUrl: string | null = null;
 
   if (contentType.includes("application/json")) {
     // Modo URL: busca o arquivo do Supabase Storage
@@ -142,6 +147,7 @@ export async function POST(req: Request) {
     clienteId = sanitizeUuid(body.clienteId);
     processoId = sanitizeUuid(body.processoId);
     tipoAnalise = body.tipoAnalise ?? "completa";
+    documentoUrl = body.documentoUrl;
   } else {
     // Modo FormData: arquivo enviado diretamente
     let form: FormData;
@@ -235,6 +241,36 @@ export async function POST(req: Request) {
         dadosExtraidos,
         "dr_lex_auto"
       ).catch(() => {});
+
+      // Mesmo problema já corrigido nos outros dois pipelines de análise
+      // (cliente-documento-auto.ts, cerebroJuridico.ts): cid_principal só
+      // guarda um valor, documento real costuma trazer vários. Resolve o
+      // documento_id pela URL quando a análise partiu de um documento já
+      // salvo (modo "existente" do modal) — liga o CID ao laudo que
+      // comprova; fica sem link (null) quando é upload avulso só pra
+      // análise, sem ter sido salvo como documento do cliente ainda.
+      const cidsEncontrados = parseCidsEncontrados(
+        (dadosExtraidos as { cids_encontrados?: unknown }).cids_encontrados
+      );
+      if (cidsEncontrados.length > 0) {
+        const documentoId = documentoUrl
+          ? await sql`SELECT id::text FROM documentos WHERE url = ${documentoUrl} LIMIT 1`
+              .then((r) => (r.length > 0 ? String(r[0].id) : null))
+              .catch(() => null)
+          : null;
+        await adicionarCidsCliente(
+          clienteId,
+          cidsEncontrados.map((c) => ({
+            cid: c.cid,
+            descricao: c.descricao,
+            medicoNome: c.medicoNome,
+            medicoCrm: c.medicoCrm,
+            dataDocumento: c.dataDocumento,
+            documentoId,
+            origem: "ia" as const,
+          }))
+        ).catch(() => {});
+      }
     }
 
     // Salva no banco para o Cérebro poder ler depois

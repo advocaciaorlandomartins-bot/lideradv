@@ -11,6 +11,7 @@ import type { CargoColaborador } from "@/lib/colaboradores-types";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import type { Documento } from "@/lib/documents-db";
 import { SpinnerIcon, CheckCircleIcon } from "@/components/icons";
+import { FotoColaboradorUploader } from "./foto-colaborador-uploader";
 
 const inputClass =
   "h-11 w-full rounded-lg border border-border bg-white px-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
@@ -66,6 +67,14 @@ export default function MeusDadosContent({
 
   return (
     <div className="space-y-6">
+      <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+        <FotoColaboradorUploader
+          colaboradorId={colaborador.id}
+          nome={colaborador.nome}
+          fotoUrlInicial={colaborador.foto_url}
+        />
+      </div>
+
       {/* Dados administrativos — só leitura, quem muda é o admin */}
       <div className="rounded-xl border border-border bg-white p-5 shadow-sm space-y-2">
         <h2 className="font-heading text-base font-semibold text-fg mb-2">

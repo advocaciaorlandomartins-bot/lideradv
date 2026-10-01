@@ -12,6 +12,7 @@ import { CARGO_LABELS } from "@/lib/colaboradores-types";
 import type { CargoColaborador } from "@/lib/colaboradores-types";
 import { PlusIcon } from "@/components/icons";
 import { SpinnerIcon } from "@/components/icons";
+import { FotoColaboradorUploader } from "./foto-colaborador-uploader";
 
 const inputClass =
   "h-11 w-full rounded-lg border border-border bg-white px-4 font-body text-sm text-fg placeholder:text-slate-400 outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-blue-100 disabled:opacity-60";
@@ -175,6 +176,11 @@ export default function EditColaboradorForm({ colaborador }: Props) {
       {/* ── Dados pessoais ── */}
       <div className="space-y-4">
         <SectionTitle>Dados pessoais</SectionTitle>
+        <FotoColaboradorUploader
+          colaboradorId={colaborador.id}
+          nome={colaborador.nome}
+          fotoUrlInicial={colaborador.foto_url}
+        />
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Field label="Nome completo" required>

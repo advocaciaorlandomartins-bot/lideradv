@@ -36,6 +36,7 @@ export interface Colaborador {
   meta2_bonus: number | null;
   meta3_valor: number | null;
   meta3_bonus: number | null;
+  foto_url: string | null;
 }
 
 export interface ColaboradorFull extends Colaborador {
@@ -80,6 +81,7 @@ function mapRow(r: any): Colaborador {
     meta2_bonus: r.meta2_bonus != null ? Number(r.meta2_bonus) : null,
     meta3_valor: r.meta3_valor != null ? Number(r.meta3_valor) : null,
     meta3_bonus: r.meta3_bonus != null ? Number(r.meta3_bonus) : null,
+    foto_url: r.foto_url ?? null,
   };
 }
 
@@ -102,6 +104,7 @@ export async function getAllColaboradores(): Promise<Colaborador[]> {
       comissao_judicial_pct,
       comissao_ambos_pct,
       meta1_valor, meta1_bonus, meta2_valor, meta2_bonus, meta3_valor, meta3_bonus,
+      foto_url,
       created_at
     FROM colaboradores
     ORDER BY nome ASC
@@ -175,6 +178,7 @@ export async function getColaboradorFull(
       comissao_judicial_pct,
       comissao_ambos_pct,
       meta1_valor, meta1_bonus, meta2_valor, meta2_bonus, meta3_valor, meta3_bonus,
+      foto_url,
       created_at
     FROM colaboradores
     WHERE id = ${id}::uuid
@@ -186,4 +190,13 @@ export async function getColaboradorFull(
     data_admissao_iso: r.data_admissao_iso ?? null,
     data_demissao_iso: r.data_demissao_iso ?? null,
   };
+}
+
+export async function salvarFotoColaborador(
+  colaboradorId: string,
+  url: string | null
+): Promise<void> {
+  await sql`
+    UPDATE colaboradores SET foto_url = ${url} WHERE id = ${colaboradorId}::uuid
+  `;
 }

@@ -24,13 +24,27 @@ function corAvatar(nome: string): string {
 
 export function Avatar({
   nome,
+  fotoUrl,
   size = "h-8 w-8",
   className = "",
 }: {
   nome: string;
+  /** URL da foto real do colaborador — quando ausente, cai nas iniciais coloridas. */
+  fotoUrl?: string | null;
   size?: string;
   className?: string;
 }) {
+  if (fotoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- foto vem de URL externa (Vercel Blob), tamanho de avatar não justifica config de domínio no next/image
+      <img
+        src={fotoUrl}
+        alt={nome}
+        title={nome}
+        className={`${size} flex-shrink-0 rounded-full object-cover ${className}`}
+      />
+    );
+  }
   return (
     <span
       title={nome}

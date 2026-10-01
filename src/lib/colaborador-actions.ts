@@ -2,11 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { put } from "@vercel/blob";
 import sql from "./db";
 import { logAction } from "./audit";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { getColaboradorIdForUser } from "./usuarios-db";
+import { podeAcessarColaborador } from "./acesso";
+import { salvarFotoColaborador } from "./colaboradores-db";
 
 export type ColaboradorFormState = { error: string } | null;
 
@@ -322,4 +325,66 @@ export async function updateMeusDadosAction(
 
   revalidatePath("/dashboard/meus-dados");
   return { success: true };
+}
+
+const FOTO_MIME_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+// Avatar renderizado pequeno em vários lugares (cards, pódio, kanban) — não
+// precisa de foto grande; teto baixo evita gastar o storage do Blob com
+// arquivo de câmera em resolução total.
+const FOTO_MAX_BYTES = 3 * 1024 * 1024;
+
+export async function atualizarFotoColaboradorAction(
+  colaboradorId: string,
+  dataUrl: string
+): Promise<{ error: string } | { success: true; url: string }> {
+  const session = await getSession();
+  if (!session || !(await podeAcessarColaborador(session, colaboradorId))) {
+    return { error: "Sem permissão." };
+  }
+
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  const mime = match?.[1] ?? "";
+  const ext = FOTO_MIME_EXT[mime];
+  if (!match || !ext) {
+    return { error: "Formato de imagem inválido. Use JPG, PNG ou WEBP." };
+  }
+  const bytes = Buffer.from(match[2], "base64");
+  if (bytes.byteLength > FOTO_MAX_BYTES) {
+    return { error: "Imagem muito grande (máximo 3MB)." };
+  }
+
+  let url: string;
+  try {
+    const blob = await put(
+      `colaboradores/${colaboradorId}/foto.${ext}`,
+      bytes,
+      {
+        access: "public",
+        contentType: mime,
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+        addRandomSuffix: true,
+      }
+    );
+    url = blob.url;
+    await salvarFotoColaborador(colaboradorId, url);
+  } catch (err) {
+    console.error("atualizarFotoColaboradorAction error:", err);
+    return { error: "Erro ao salvar a foto. Tente novamente." };
+  }
+
+  await logAction({
+    acao: "editar",
+    entidade: "colaborador",
+    entidadeId: colaboradorId,
+    descricao: "Atualizou a foto do perfil",
+  });
+
+  revalidatePath("/dashboard/usuarios");
+  revalidatePath("/dashboard/meus-dados");
+  revalidatePath("/dashboard/controladoria");
+  return { success: true, url };
 }

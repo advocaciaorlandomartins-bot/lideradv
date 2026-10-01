@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/permissoes";
 export const metadata = { title: "Colaborador — LiderAdv" };
 
 import { getColaboradorFull } from "@/lib/colaboradores-db";
+import { Avatar } from "@/components/dashboard/avatar";
 import { getColaboradorContaPagar } from "@/lib/remuneracoes-db";
 import { cargoColor, cargoLabel } from "@/lib/colaboradores-types";
 import DeleteColaboradorButton from "@/components/dashboard/colaboradores/delete-colaborador-button";
@@ -113,9 +114,12 @@ export default async function ColaboradorDetailPage({
       <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-heading text-xl font-semibold text-primary">
-              {colaborador.nome.charAt(0).toUpperCase()}
-            </div>
+            <Avatar
+              nome={colaborador.nome}
+              fotoUrl={colaborador.foto_url}
+              size="h-14 w-14"
+              className="text-xl"
+            />
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="font-heading text-2xl font-semibold text-fg">

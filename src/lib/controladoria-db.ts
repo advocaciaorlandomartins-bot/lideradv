@@ -23,6 +23,7 @@ export interface CargaColaborador {
   colaboradorId: string;
   nome: string;
   cargo: string;
+  fotoUrl: string | null;
   totalAbertas: number;
   totalVencidas: number;
   proximoPrazo: string | null;
@@ -300,12 +301,12 @@ export async function getCargaColaboradores(
 
   const colaboradores = colaboradorId
     ? await sql`
-        SELECT id::text, nome, cargo FROM colaboradores
+        SELECT id::text, nome, cargo, foto_url FROM colaboradores
         WHERE status = 'ativo' AND id = ${colaboradorId}::uuid
         ORDER BY nome
       `
     : await sql`
-        SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo' ORDER BY nome
+        SELECT id::text, nome, cargo, foto_url FROM colaboradores WHERE status = 'ativo' ORDER BY nome
       `;
 
   const itensPorColaborador = new Map<string, ItemAberto[]>();
@@ -372,6 +373,7 @@ export async function getCargaColaboradores(
         colaboradorId: String(col.id),
         nome: String(col.nome),
         cargo: String(col.cargo),
+        fotoUrl: col.foto_url ? String(col.foto_url) : null,
         totalAbertas: itens.length,
         totalVencidas: itens.filter((i) => i.statusPrazo === "vencido").length,
         proximoPrazo: proximosPrazos[0] ?? null,

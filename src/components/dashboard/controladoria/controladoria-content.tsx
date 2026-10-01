@@ -189,6 +189,7 @@ export default function ControladoriaContent({
                       </span>
                       <Avatar
                         nome={r.nome}
+                        fotoUrl={r.fotoUrl}
                         size={isPrimeiro ? "h-14 w-14" : "h-11 w-11"}
                         className={
                           isPrimeiro
@@ -248,7 +249,7 @@ export default function ControladoriaContent({
                         >
                           {idx + 1}
                         </span>
-                        <Avatar nome={r.nome} />
+                        <Avatar nome={r.nome} fotoUrl={r.fotoUrl} />
                         <div className="min-w-0 flex-1">
                           <p className="font-body text-sm font-semibold text-fg">
                             {r.nome}

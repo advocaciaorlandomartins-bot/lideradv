@@ -9,6 +9,7 @@ import {
   cargoColor,
   cargoLabel,
 } from "@/lib/colaboradores-types";
+import { Avatar } from "@/components/dashboard/avatar";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -329,9 +330,11 @@ export default function ColaboradoresContent({ colaboradores }: Props) {
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-body text-sm font-semibold text-primary">
-                            {c.nome.charAt(0).toUpperCase()}
-                          </div>
+                          <Avatar
+                            nome={c.nome}
+                            fotoUrl={c.foto_url}
+                            size="h-9 w-9"
+                          />
                           <p className="font-body text-sm font-semibold text-fg">
                             {c.nome}
                           </p>
@@ -404,9 +407,11 @@ export default function ColaboradoresContent({ colaboradores }: Props) {
                     href={`/dashboard/colaboradores/${c.id}`}
                     className="flex items-center gap-3 px-4 py-4 transition-colors duration-150 hover:bg-primary/5"
                   >
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 font-body text-sm font-semibold text-primary">
-                      {c.nome.charAt(0).toUpperCase()}
-                    </div>
+                    <Avatar
+                      nome={c.nome}
+                      fotoUrl={c.foto_url}
+                      size="h-10 w-10"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-body text-sm font-semibold text-fg">

@@ -108,8 +108,13 @@ export function CargaColaboradorCard({
         }`}
       >
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Avatar nome={c.nome} />
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar
+              nome={c.nome}
+              fotoUrl={c.fotoUrl}
+              size="h-11 w-11"
+              className="text-sm ring-2 ring-white shadow-sm"
+            />
             <div className="min-w-0">
               <p className="truncate font-body text-sm font-semibold text-fg">
                 {c.nome}

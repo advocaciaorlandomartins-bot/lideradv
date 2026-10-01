@@ -105,6 +105,7 @@ export interface RankingItem {
   colaboradorId: string;
   nome: string;
   cargo: string;
+  fotoUrl: string | null;
   totalPontos: number;
   entregas: number;
 }
@@ -115,6 +116,7 @@ export async function getRanking(dias = 30): Promise<RankingItem[]> {
       col.id::text AS colaborador_id,
       col.nome,
       col.cargo,
+      col.foto_url,
       COALESCE(SUM(pe.pontos), 0)::int AS total_pontos,
       COUNT(pe.id)::int AS entregas
     FROM colaboradores col
@@ -122,13 +124,14 @@ export async function getRanking(dias = 30): Promise<RankingItem[]> {
       ON pe.colaborador_id = col.id
       AND pe.criado_em >= NOW() - (${dias} || ' days')::interval
     WHERE col.status = 'ativo'
-    GROUP BY col.id, col.nome, col.cargo
+    GROUP BY col.id, col.nome, col.cargo, col.foto_url
     ORDER BY total_pontos DESC, entregas DESC
   `;
   return rows.map((r) => ({
     colaboradorId: String(r.colaborador_id),
     nome: String(r.nome),
     cargo: String(r.cargo),
+    fotoUrl: r.foto_url ? String(r.foto_url) : null,
     totalPontos: Number(r.total_pontos),
     entregas: Number(r.entregas),
   }));
@@ -264,8 +267,8 @@ export async function getRankingDetalhado(
           GROUP BY u.colaborador_id
         `,
     colaboradorId
-      ? sql`SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo' AND id = ${colaboradorId}::uuid`
-      : sql`SELECT id::text, nome, cargo FROM colaboradores WHERE status = 'ativo'`,
+      ? sql`SELECT id::text, nome, cargo, foto_url FROM colaboradores WHERE status = 'ativo' AND id = ${colaboradorId}::uuid`
+      : sql`SELECT id::text, nome, cargo, foto_url FROM colaboradores WHERE status = 'ativo'`,
   ]);
 
   const fataisPorColaborador = new Map(
@@ -332,6 +335,7 @@ export async function getRankingDetalhado(
         colaboradorId,
         nome: String(col.nome),
         cargo: String(col.cargo),
+        fotoUrl: col.foto_url ? String(col.foto_url) : null,
         totalPontos: agg.pontos,
         entregas: agg.entregas,
         noPrazoPct:

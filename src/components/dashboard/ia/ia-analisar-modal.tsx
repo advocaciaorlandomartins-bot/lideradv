@@ -306,6 +306,11 @@ export default function IaAnalisarModal({
     for (const r of resultados) {
       if (!r.dadosExtraidos) continue;
       for (const [k, v] of Object.entries(r.dadosExtraidos)) {
+        // cids_encontrados é a lista completa de CIDs (array de objeto),
+        // não um campo escalar do cadastro — já é gravado direto em
+        // cliente_cids pela rota, sem depender deste painel. Incluído
+        // aqui só rendia "[object Object],[object Object]..." no card.
+        if (k === "cids_encontrados") continue;
         const key = k as keyof DadosPrevidenciarios;
         if (v !== null && v !== undefined && !(key in combined)) {
           (combined as Record<string, unknown>)[key] = v;

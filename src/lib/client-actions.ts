@@ -680,9 +680,26 @@ export async function complementarClienteAction(
     "filiacao_pai",
   ];
 
+  // Colunas curtas (varchar(10/20)) que guardam valor fixo, não texto
+  // livre — a IA às vezes escreve uma frase descritiva nesses campos em
+  // vez do valor curto (visto em produção: "tipo_incapacidade" chegou
+  // como "Incapacidade clínica e física para o trabalho por tempo
+  // indeterminado" e estourou o varchar(20), derrubando o UPDATE inteiro
+  // — inclusive os outros campos válidos junto, já que é uma query só).
+  // Descarta aqui, campo a campo, em vez de confiar que o prompt sempre
+  // vai respeitar o enum.
+  const ENUMS: Partial<
+    Record<keyof DadosPrevidenciariosComplemento, string[]>
+  > = {
+    tipo_incapacidade: ["permanente", "temporaria", "nao_se_aplica"],
+    status_beneficio: ["ativo", "suspenso", "cessado", "nao_recebe"],
+  };
+
   for (const campo of candidatos) {
     const novoValor = dados[campo];
     if (novoValor !== null && novoValor !== undefined && novoValor !== "") {
+      const enumValido = ENUMS[campo];
+      if (enumValido && !enumValido.includes(String(novoValor))) continue;
       if (
         atual[campo] === null ||
         atual[campo] === undefined ||

@@ -372,6 +372,8 @@ NÃO copie os exemplos — use os valores reais do documento.
 }
 \`\`\`
 
+Atenção — estes três campos são colunas curtas no banco (estouram e derrubam a gravação de TODOS os campos se vier texto livre): "tipo_incapacidade" aceita SOMENTE um destes valores, nunca uma frase: "permanente", "temporaria", "nao_se_aplica" ou null. "status_beneficio" aceita SOMENTE: "ativo", "suspenso", "cessado", "nao_recebe" ou null. "categoria_contribuinte" (se usado) aceita SOMENTE: "empregado", "individual", "especial", "avulso", "facultativo" ou null. Se o documento trouxer uma descrição mais detalhada desses pontos, resuma no texto da análise acima — não force a descrição dentro do JSON.
+
 Exemplos de preenchimento:
 - CID encontrado "M54.5" → "cid_principal": "M54.5"
 - Data "15/03/2023" → "data_diagnostico": "2023-03-15"

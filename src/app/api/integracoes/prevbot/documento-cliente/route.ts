@@ -106,18 +106,24 @@ async function resolverCliente(
     if (rows.length > 0) return { clienteId: String(rows[0].id) };
   }
 
+  // cep/street/addr_number/neighborhood/city/state são NOT NULL em clients
+  // sem default — cliente criado aqui ainda não tem endereço nenhum
+  // coletado (é um lead em conversa inicial do PrevBot, diferente do fluxo
+  // de contrato em /prevbot/contrato, que só roda depois de endereço
+  // completo já ter sido coletado) — '' preenche o obrigatório sem inventar
+  // dado, mesmo padrão já usado pra email/doc/phone vazios aqui.
   if (cpfDigits && body.nome) {
     const rows = await sql`
-      INSERT INTO clients (type, name, doc, email, phone, status)
-      VALUES ('PF', ${body.nome}, ${cpfDigits}, '', ${telefone || ""}, 'ativo')
+      INSERT INTO clients (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+      VALUES ('PF', ${body.nome}, ${cpfDigits}, '', ${telefone || ""}, '', '', '', '', '', '', 'ativo')
       RETURNING id::text
     `;
     return { clienteId: String(rows[0].id) };
   }
   if (telefone && body.nome) {
     const rows = await sql`
-      INSERT INTO clients (type, name, doc, email, phone, status)
-      VALUES ('PF', ${body.nome}, '', '', ${telefone}, 'ativo')
+      INSERT INTO clients (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+      VALUES ('PF', ${body.nome}, '', '', ${telefone}, '', '', '', '', '', '', 'ativo')
       RETURNING id::text
     `;
     return { clienteId: String(rows[0].id) };

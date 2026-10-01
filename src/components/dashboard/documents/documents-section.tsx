@@ -74,7 +74,34 @@ export default function DocumentsSection({
   const [openError, setOpenError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloadingZip, setDownloadingZip] = useState(false);
+  const [reanalisandoId, setReanalisandoId] = useState<string | null>(null);
+  const [reanaliseErro, setReanaliseErro] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  async function handleReanalisar(doc: Documento) {
+    setReanaliseErro(null);
+    setReanalisandoId(doc.id);
+    try {
+      const res = await fetch("/api/cerebro/documento-cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documento_id: doc.id,
+          cliente_id: entityId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setReanaliseErro(data.error ?? "Erro ao reanalisar documento.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setReanaliseErro("Erro ao reanalisar documento.");
+    } finally {
+      setReanalisandoId(null);
+    }
+  }
 
   function toggleSelected(id: string) {
     setSelected((prev) => {
@@ -358,9 +385,9 @@ export default function DocumentsSection({
       )}
 
       {/* Error */}
-      {(uploadError || openError) && (
+      {(uploadError || openError || reanaliseErro) && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">
-          {uploadError || openError}
+          {uploadError || openError || reanaliseErro}
         </div>
       )}
 
@@ -440,6 +467,23 @@ export default function DocumentsSection({
                   >
                     Abrir
                   </button>
+                  {entityType === "cliente" &&
+                    (doc.tipo?.includes("pdf") ||
+                      doc.tipo?.startsWith("image/")) && (
+                      <>
+                        <span className="text-slate-300">·</span>
+                        <button
+                          onClick={() => handleReanalisar(doc)}
+                          disabled={reanalisandoId === doc.id}
+                          title="Reprocessa o documento com a IA (ex: depois de uma extração ter sido melhorada)"
+                          className="font-body text-xs font-semibold text-muted transition-colors duration-150 hover:text-primary disabled:opacity-40 cursor-pointer"
+                        >
+                          {reanalisandoId === doc.id
+                            ? "Analisando…"
+                            : "Reanalisar"}
+                        </button>
+                      </>
+                    )}
                   <span className="text-slate-300">·</span>
                   <button
                     onClick={() => handleDelete(doc)}

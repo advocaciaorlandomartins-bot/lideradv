@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getClientFull } from "@/lib/clients-db";
+import { getClientFull, getCidsByCliente } from "@/lib/clients-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
 
 export const metadata = { title: "Cliente — LiderAdv" };
@@ -90,6 +90,7 @@ export default async function ClienteDetailPage({
     etiquetas,
     catalogoEtiquetas,
     modelos,
+    cids,
   ] = await Promise.all([
     getClientFull(id),
     getProcessosByClientId(id),
@@ -103,6 +104,7 @@ export default async function ClienteDetailPage({
     getEtiquetasDeCliente(id),
     getCatalogoEtiquetas(),
     getModelosAtivos(),
+    getCidsByCliente(id),
   ]);
   if (!client) notFound();
 
@@ -217,6 +219,7 @@ export default async function ClienteDetailPage({
         initialTab={initialTab}
         podeVerFinanceiro={podeVerFinanceiro}
         modelos={modelos}
+        cids={cids}
       />
 
       {/* LGPD — only for Administrador */}

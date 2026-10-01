@@ -196,6 +196,9 @@ export interface ClientFull {
   // Respostas de perguntas_extras de modelos (tag -> resposta), guardadas
   // pra pré-preencher da próxima vez que o mesmo modelo for gerado.
   respostas_extras: Record<string, string> | null;
+  // Histórico de triagens do PrevBot (WhatsApp) — documento médico
+  // analisado + resumo da conversa, antes do cliente chegar ao escritório.
+  prevbot_triagens: PrevbotTriagem[] | null;
 }
 
 export interface MembroFamilia {
@@ -203,6 +206,29 @@ export interface MembroFamilia {
   parentesco: string | null;
   data_nascimento: string | null;
   cpf: string | null;
+}
+
+export interface PrevbotTriagem {
+  data: string;
+  tipoDocumento: string | null;
+  cid: string | null;
+  doencaResumo: string | null;
+  resumoConversa: string | null;
+  documentoId: string | null;
+}
+
+/** Um CID identificado num documento do cliente — ver scripts/migrate-cliente-cids.ts. */
+export interface ClienteCid {
+  id: string;
+  clientId: string;
+  cid: string;
+  descricao: string | null;
+  medicoNome: string | null;
+  medicoCrm: string | null;
+  dataDocumento: string | null;
+  documentoId: string | null;
+  origem: "manual" | "ia" | "prevbot";
+  createdAt: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -293,6 +319,9 @@ function mapClientFull(r: any, hasOrigemCols: boolean): ClientFull {
       r.respostas_extras && typeof r.respostas_extras === "object"
         ? r.respostas_extras
         : null,
+    prevbot_triagens: Array.isArray(r.prevbot_triagens)
+      ? r.prevbot_triagens
+      : null,
   };
 }
 
@@ -332,6 +361,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         c.num_contribuicoes,
         c.bloquear_mensagens,
         c.membros_familia, c.renda_familiar_per_capita, c.respostas_extras,
+        c.prevbot_triagens,
         (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
@@ -371,6 +401,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       c.num_contribuicoes,
       c.bloquear_mensagens,
       c.membros_familia, c.renda_familiar_per_capita, c.respostas_extras,
+      c.prevbot_triagens,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
     WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
@@ -516,4 +547,101 @@ export async function getClientById(id: string): Promise<Client | null> {
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
     menor_incapaz: r.menor_incapaz ?? false,
   };
+}
+
+export async function getCidsByCliente(
+  clientId: string
+): Promise<ClienteCid[]> {
+  const rows = await sql`
+    SELECT
+      id::text, client_id::text, cid, descricao, medico_nome, medico_crm,
+      to_char(data_documento, 'YYYY-MM-DD') AS data_documento,
+      documento_id::text, origem, created_at::text
+    FROM cliente_cids
+    WHERE client_id = ${clientId}::uuid
+    ORDER BY data_documento DESC NULLS LAST, created_at DESC
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    clientId: r.client_id,
+    cid: r.cid,
+    descricao: r.descricao ?? null,
+    medicoNome: r.medico_nome ?? null,
+    medicoCrm: r.medico_crm ?? null,
+    dataDocumento: r.data_documento ?? null,
+    documentoId: r.documento_id ?? null,
+    origem: r.origem as "manual" | "ia" | "prevbot",
+    createdAt: r.created_at,
+  }));
+}
+
+/**
+ * Registra os CIDs encontrados num documento (um documento real costuma
+ * trazer vários — ex: atestado com "CID 10: I61 + I11.9 + E10.4 + I42.2").
+ * Dedup simples: não insere de novo o mesmo CID já ligado ao mesmo
+ * documento (reprocessar o mesmo arquivo não duplica a lista) — CIDs
+ * iguais vindos de documentos DIFERENTES são mantidos, pois confirmam o
+ * diagnóstico em momentos diferentes.
+ */
+export async function adicionarCidsCliente(
+  clientId: string,
+  cids: {
+    cid: string;
+    descricao?: string | null;
+    medicoNome?: string | null;
+    medicoCrm?: string | null;
+    dataDocumento?: string | null;
+    documentoId?: string | null;
+    origem: "manual" | "ia" | "prevbot";
+  }[]
+): Promise<number> {
+  let inseridos = 0;
+  for (const c of cids) {
+    const cidLimpo = c.cid.trim().toUpperCase();
+    if (!cidLimpo) continue;
+    const existente = c.documentoId
+      ? await sql`
+          SELECT id FROM cliente_cids
+          WHERE client_id = ${clientId}::uuid AND cid = ${cidLimpo}
+            AND documento_id = ${c.documentoId}::uuid
+        `
+      : [];
+    if (existente.length > 0) continue;
+    await sql`
+      INSERT INTO cliente_cids
+        (client_id, cid, descricao, medico_nome, medico_crm, data_documento, documento_id, origem)
+      VALUES (
+        ${clientId}::uuid, ${cidLimpo}, ${c.descricao ?? null},
+        ${c.medicoNome ?? null}, ${c.medicoCrm ?? null},
+        ${c.dataDocumento ?? null}, ${c.documentoId ?? null}::uuid, ${c.origem}
+      )
+    `;
+    inseridos++;
+  }
+  return inseridos;
+}
+
+export async function adicionarPrevbotTriagem(
+  clientId: string,
+  triagem: {
+    tipoDocumento: string | null;
+    cid: string | null;
+    doencaResumo: string | null;
+    resumoConversa: string | null;
+    documentoId: string | null;
+  }
+): Promise<void> {
+  const entrada: PrevbotTriagem = {
+    data: new Date().toISOString(),
+    tipoDocumento: triagem.tipoDocumento,
+    cid: triagem.cid,
+    doencaResumo: triagem.doencaResumo,
+    resumoConversa: triagem.resumoConversa,
+    documentoId: triagem.documentoId,
+  };
+  await sql`
+    UPDATE clients
+    SET prevbot_triagens = COALESCE(prevbot_triagens, '[]'::jsonb) || ${JSON.stringify([entrada])}::jsonb
+    WHERE id = ${clientId}::uuid
+  `;
 }

@@ -4,6 +4,7 @@ import sql from "./db";
 import { logAction } from "./audit";
 import { extractText } from "./anthropic-text";
 import type { MembroFamilia } from "./clients-db";
+import { adicionarCidsCliente } from "./clients-db";
 
 /**
  * Preenchimento automático do cadastro do cliente a partir de dado
@@ -250,6 +251,15 @@ Se o documento for o Comprovante de Cadastro do CadÚnico: "renda_familiar_per_c
   "atividade_anterior": "última profissão antes do afastamento",
   "num_contribuicoes": "número inteiro de contribuições, se constar",
   "renda_familiar_per_capita": "faixa de renda per capita (CadÚnico)",
+  "cids_encontrados": [
+    {
+      "cid": "Código CID-10, ex: I61 (um item por código — se o documento citar vários juntos, ex: 'CID 10: I61 + I11.9 + E10.4', separe em um item por código)",
+      "descricao": "nome da doença/condição associada a esse CID, como escrito no documento",
+      "medico_nome": "nome do médico que assina o documento",
+      "medico_crm": "CRM do médico, com UF se constar",
+      "data_documento": "YYYY-MM-DD, data do documento/assinatura"
+    }
+  ],
   "membros_familia": [
     {
       "nome": "Nome completo",
@@ -287,6 +297,33 @@ export function parseMembrosFamilia(v: unknown): MembroFamilia[] | null {
     })
     .filter((m): m is MembroFamilia => m !== null);
   return membros.length > 0 ? membros : null;
+}
+
+export interface CidEncontrado {
+  cid: string;
+  descricao: string | null;
+  medicoNome: string | null;
+  medicoCrm: string | null;
+  dataDocumento: string | null;
+}
+
+export function parseCidsEncontrados(v: unknown): CidEncontrado[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((item): CidEncontrado | null => {
+      if (!item || typeof item !== "object") return null;
+      const o = item as Record<string, unknown>;
+      const cid = strOrNull(o.cid);
+      if (!cid) return null;
+      return {
+        cid,
+        descricao: strOrNull(o.descricao),
+        medicoNome: strOrNull(o.medico_nome),
+        medicoCrm: strOrNull(o.medico_crm),
+        dataDocumento: normDate(o.data_documento),
+      };
+    })
+    .filter((c): c is CidEncontrado => c !== null);
 }
 
 function normDate(v: unknown): string | null {
@@ -418,6 +455,23 @@ export async function analisarDocumentoCliente(
     `documento "${doc.nome}"`
   );
   if (gravouMembros) preenchidos.push("membros_familia");
+
+  const cidsEncontrados = parseCidsEncontrados(extracted.cids_encontrados);
+  if (cidsEncontrados.length > 0) {
+    const qtd = await adicionarCidsCliente(
+      clienteId,
+      cidsEncontrados.map((c) => ({
+        cid: c.cid,
+        descricao: c.descricao,
+        medicoNome: c.medicoNome,
+        medicoCrm: c.medicoCrm,
+        dataDocumento: c.dataDocumento,
+        documentoId,
+        origem: "ia" as const,
+      }))
+    );
+    if (qtd > 0) preenchidos.push("cids");
+  }
 
   return { camposPreenchidos: preenchidos };
 }

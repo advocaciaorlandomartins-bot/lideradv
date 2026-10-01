@@ -4,7 +4,9 @@ import sql from "@/lib/db";
 import {
   aplicarCamposClienteSeVazios,
   aplicarMembrosFamiliaSeVazio,
+  parseCidsEncontrados,
 } from "./cliente-documento-auto";
+import { adicionarCidsCliente } from "./clients-db";
 import { extractText } from "./anthropic-text";
 
 function getClaudeClient(): Anthropic {
@@ -2256,8 +2258,10 @@ Retorne SOMENTE o JSON abaixo, sem texto extra antes ou depois:
   "contribuicoes": null,
   "motivo": null,
   "renda_familiar_per_capita": null,
-  "membros_familia": null
+  "membros_familia": null,
+  "cids_encontrados": null
 }
+Em "cids_encontrados": se o documento citar mais de um código CID-10 (ex: "CID 10: I61 + I11.9 + E10.4"), retorne um array com um item por código — cada item: {"cid": "I61", "descricao": "nome da doença associada", "medico_nome": "...", "medico_crm": "...", "data_documento": "YYYY-MM-DD"}. null se não houver nenhum CID no documento.
 
 Nunca invente dados que não estejam no documento. Se não conseguir ler alguma parte, informe.`;
 
@@ -2382,6 +2386,22 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
       extracted.membros_familia,
       `documento "${doc.nome}" (processo)`
     ).catch(() => null);
+
+    const cidsEncontrados = parseCidsEncontrados(extracted.cids_encontrados);
+    if (cidsEncontrados.length > 0) {
+      await adicionarCidsCliente(
+        clientId,
+        cidsEncontrados.map((c) => ({
+          cid: c.cid,
+          descricao: c.descricao,
+          medicoNome: c.medicoNome,
+          medicoCrm: c.medicoCrm,
+          dataDocumento: c.dataDocumento,
+          documentoId,
+          origem: "ia" as const,
+        }))
+      ).catch(() => null);
+    }
 
     // processos: datas e textos
     const derVal = normDate(extracted.der);

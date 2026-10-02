@@ -163,8 +163,13 @@ export async function POST(request: Request) {
     if (isSupportedImage(fileType)) {
       const base64 = buffer.toString("base64");
       const res = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        // Sonnet, não Haiku: confirmado em produção que Haiku falhava em
+        // ler atestado médico real (várias páginas, parte manuscrita) —
+        // o mesmo documento, analisado depois pelo Dr. Lex (Sonnet),
+        // extraiu os dados certinho. Documento de identificação/endereço
+        // continua simples o bastante pra não perder nada trocando.
+        model: "claude-sonnet-5",
+        max_tokens: 1536,
         messages: [
           {
             role: "user",
@@ -196,8 +201,8 @@ export async function POST(request: Request) {
       }
 
       const res = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        model: "claude-sonnet-5",
+        max_tokens: 1536,
         messages: [{ role: "user", content: pdfContent }],
       });
       const block = res.content[0];

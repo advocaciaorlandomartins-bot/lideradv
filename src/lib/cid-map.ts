@@ -2,8 +2,9 @@
  * Tradução CID-10 → descrição em português, pra quem abre o processo
  * entender de cara qual é a condição do cliente sem precisar abrir os
  * documentos anexados. Cobre as categorias (3 primeiros caracteres) mais
- * comuns em processos previdenciários (BPC, aposentadoria por invalidez,
- * auxílio-doença) — não é o CID-10 completo (são +14 mil códigos), é uma
+ * comuns em processos previdenciários (BPC, auxílio por incapacidade
+ * permanente, auxílio por incapacidade temporária) — não é o CID-10
+ * completo (são +14 mil códigos), é uma
  * tabela pragmática que cresce conforme aparecem casos novos.
  *
  * cid_principal no banco vem como categoria (ex: "F84") ou subcategoria

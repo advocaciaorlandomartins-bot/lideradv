@@ -410,7 +410,7 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         beneficio_tipo: {
           type: "string",
           description:
-            "Tipo do benefício, ex: Auxílio-doença. Só pra prorrogação. Opcional.",
+            "Tipo do benefício, ex: Auxílio por Incapacidade Temporária. Só pra prorrogação. Opcional.",
         },
         data_fim_beneficio: {
           type: "string",
@@ -489,7 +489,7 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         tipo_beneficio: {
           type: "string",
           description:
-            "Tipo de benefício, ex: Auxílio-doença, BPC/LOAS. Opcional.",
+            "Tipo de benefício, ex: Auxílio por Incapacidade Temporária, BPC/LOAS. Opcional.",
         },
         status_beneficio: {
           type: "string",
@@ -621,7 +621,7 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         tipo_beneficio: {
           type: "string",
           description:
-            "Tipo de benefício, ex: Auxílio-doença, BPC/LOAS. Opcional.",
+            "Tipo de benefício, ex: Auxílio por Incapacidade Temporária, BPC/LOAS. Opcional.",
         },
         cid_principal: {
           type: "string",

@@ -280,7 +280,7 @@ export default function NewPericiaForm({
               <input
                 name="beneficio_tipo"
                 type="text"
-                placeholder="Ex: Auxílio-doença, Aposentadoria por invalidez…"
+                placeholder="Ex: Auxílio por Incapacidade Temporária, Auxílio por Incapacidade Permanente…"
                 disabled={isPending}
                 className={inputClass}
               />

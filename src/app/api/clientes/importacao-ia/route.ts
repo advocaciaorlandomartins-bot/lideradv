@@ -38,7 +38,7 @@ const EXTRACTION_PROMPT = `Extraia todos os dados deste documento brasileiro e r
   "nis": "NIS/PIS/PASEP, só dígitos",
   "num_beneficio": "Número do benefício (NB) do INSS",
   "status_beneficio": "ativo|suspenso|cessado|nao_recebe|null — status atual do benefício, se identificável",
-  "tipo_beneficio": "descrição do benefício, ex: Auxílio-doença, Aposentadoria por invalidez, BPC/LOAS, Pensão por morte",
+  "tipo_beneficio": "descrição do benefício, ex: Auxílio por Incapacidade Temporária, Auxílio por Incapacidade Permanente, BPC/LOAS, Pensão por morte",
   "data_inicio_beneficio": "YYYY-MM-DD (DIB — data de início do benefício)",
   "valor_beneficio": "valor numérico sem formatação, ex: 1518.00",
   "categoria_contribuinte": "empregado|individual|especial|avulso|facultativo|null",

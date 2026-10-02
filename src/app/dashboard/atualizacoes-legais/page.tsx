@@ -20,8 +20,8 @@ const TIPO_LABEL: Record<string, string> = {
 };
 
 const TIPO_AFETADO_LABEL: Record<string, string> = {
-  aposentadoria_invalidez: "Aposentadoria por Invalidez",
-  auxilio_doenca: "Auxílio-Doença",
+  aposentadoria_invalidez: "Auxílio por Incapacidade Permanente",
+  auxilio_doenca: "Auxílio por Incapacidade Temporária",
   bpc_loas: "BPC/LOAS",
   rural: "Trabalhador Rural",
   revisao_beneficio: "Revisão de Benefício",

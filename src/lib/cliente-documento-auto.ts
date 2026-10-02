@@ -240,7 +240,7 @@ Se o documento for o Comprovante de Cadastro do CadÚnico: "renda_familiar_per_c
   "nis": "NIS/PIS/PASEP, só dígitos",
   "num_beneficio": "Número do benefício (NB) do INSS",
   "status_beneficio": "ativo|suspenso|cessado|nao_recebe|null",
-  "tipo_beneficio": "descrição do benefício, ex: Auxílio-doença, BPC/LOAS",
+  "tipo_beneficio": "descrição do benefício, ex: Auxílio por Incapacidade Temporária, BPC/LOAS",
   "data_inicio_beneficio": "YYYY-MM-DD",
   "valor_beneficio": "valor numérico sem formatação, ex: 1518.00",
   "categoria_contribuinte": "empregado|individual|especial|avulso|facultativo|null",

@@ -635,8 +635,8 @@ export default function NewClientForm({
                 className={selectClass}
               >
                 <option value="">— Selecione —</option>
-                <option value="B32 - Aposentadoria por invalidez">
-                  B32 - Aposentadoria por invalidez
+                <option value="B32 - Auxílio por Incapacidade Permanente">
+                  B32 - Auxílio por Incapacidade Permanente
                 </option>
                 <option value="B41 - Aposentadoria por idade">
                   B41 - Aposentadoria por idade
@@ -650,8 +650,8 @@ export default function NewClientForm({
                 <option value="B21 - Pensão por morte">
                   B21 - Pensão por morte
                 </option>
-                <option value="B31 - Auxílio-doença">
-                  B31 - Auxílio-doença
+                <option value="B31 - Auxílio por Incapacidade Temporária">
+                  B31 - Auxílio por Incapacidade Temporária
                 </option>
                 <option value="B94 - Auxílio-acidente">
                   B94 - Auxílio-acidente

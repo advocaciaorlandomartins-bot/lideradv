@@ -34,7 +34,8 @@ const TERMOS_DOU = [
   "instrução normativa INSS",
   "portaria previdência social",
   "salário mínimo decreto",
-  "auxílio-doença aposentadoria",
+  "auxílio-doença aposentadoria por invalidez",
+  "auxílio por incapacidade temporária permanente",
   "BPC LOAS deficiência",
 ];
 

@@ -278,7 +278,7 @@ export default function EditPericiaForm({
                 name="beneficio_tipo"
                 type="text"
                 defaultValue={pericia.beneficio_tipo ?? ""}
-                placeholder="Ex: Auxílio-doença, Aposentadoria por invalidez…"
+                placeholder="Ex: Auxílio por Incapacidade Temporária, Auxílio por Incapacidade Permanente…"
                 disabled={isPending}
                 className={inputClass}
               />

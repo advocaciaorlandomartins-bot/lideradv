@@ -1337,7 +1337,7 @@ export default function AiDocumentImport({
                   value={tipoBeneficio}
                   onChange={(e) => setTipoBeneficio(e.target.value)}
                   className={inputCls}
-                  placeholder="Ex: Auxílio-doença, BPC/LOAS…"
+                  placeholder="Ex: Auxílio por Incapacidade Temporária, BPC/LOAS…"
                 />
               </Field>
               <Field label="Data de início do benefício">

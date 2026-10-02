@@ -411,6 +411,9 @@ export interface TramitaSignerInput {
   selfieRequired?: boolean;
   documentPhotoRequired?: boolean;
   handwrittenSignatureRequired?: boolean;
+  /** Id do signatário já existente no envelope — junto com `destroy`, remove em vez de criar. */
+  id?: string;
+  destroy?: boolean;
 }
 
 /** Passo 5: define os assinantes do envelope (só aceito enquanto está em rascunho). */
@@ -425,19 +428,28 @@ export async function tramitaAtualizarSignatarios(
       body: JSON.stringify({
         envelope: {
           signers: signers.map((s) => ({
-            signer_type: s.signerType,
-            ...(s.customerId != null ? { customer_id: s.customerId } : {}),
-            ...(s.userId ? { user_id: s.userId } : {}),
-            ...(s.fullName ? { full_name: s.fullName } : {}),
-            ...(s.email ? { email: s.email } : {}),
-            ...(s.signatureType ? { signature_type: s.signatureType } : {}),
-            ...(s.selfieRequired ? { selfie_required: true } : {}),
-            ...(s.documentPhotoRequired
-              ? { document_photo_required: true }
-              : {}),
-            ...(s.handwrittenSignatureRequired
-              ? { handwritten_signature_required: true }
-              : {}),
+            ...(s.id ? { id: s.id } : {}),
+            ...(s.destroy
+              ? { _destroy: true }
+              : {
+                  signer_type: s.signerType,
+                  ...(s.customerId != null
+                    ? { customer_id: s.customerId }
+                    : {}),
+                  ...(s.userId ? { user_id: s.userId } : {}),
+                  ...(s.fullName ? { full_name: s.fullName } : {}),
+                  ...(s.email ? { email: s.email } : {}),
+                  ...(s.signatureType
+                    ? { signature_type: s.signatureType }
+                    : {}),
+                  ...(s.selfieRequired ? { selfie_required: true } : {}),
+                  ...(s.documentPhotoRequired
+                    ? { document_photo_required: true }
+                    : {}),
+                  ...(s.handwrittenSignatureRequired
+                    ? { handwritten_signature_required: true }
+                    : {}),
+                }),
           })),
         },
       }),

@@ -390,9 +390,28 @@ export async function enviarEnvelopeParaTramitaSign(
   }
   await atualizarEnvelopeTramitaSign(envelopeId, criado.id);
 
+  // 3.1. POST /assinaturas com user_id faz o TramitaSign nascer o envelope
+  //      JÁ com o dono da conta (nós, o escritório) como um segundo
+  //      assinante obrigatório — confirmado na documentação oficial deles
+  //      e reproduzido em produção: todo envelope ficava preso
+  //      "aguardando_assinaturas" pra sempre mesmo com o cliente já tendo
+  //      assinado, porque faltava o escritório assinar também, sem
+  //      ninguém ter pedido isso. Busca os signers que já vieram no
+  //      envelope recém-criado e remove (_destroy) qualquer um do tipo
+  //      "user" antes de definir os de verdade — só funciona com o
+  //      envelope ainda em rascunho, por isso roda aqui, antes do envio.
+  const signers: TramitaSignerInput[] = [];
+  const envelopeRecemCriado = await tramitaObterEnvelopeAssinatura(
+    criado.id
+  ).catch(() => null);
+  for (const s of envelopeRecemCriado?.signers ?? []) {
+    if (s.signerType === "user") {
+      signers.push({ signerType: "user", id: s.id, destroy: true });
+    }
+  }
+
   // 4. Cria um cliente (customer) no TramitaSign pra cada assinante e monta
   //    a lista de signers do envelope.
-  const signers: TramitaSignerInput[] = [];
   const assinanteIdPorEmail = new Map<string, string>();
   // Casamento por nome/posição é fallback pro caso (comum em lead do
   // PrevBot, que às vezes só tem telefone) de assinante sem e-mail
@@ -432,7 +451,7 @@ export async function enviarEnvelopeParaTramitaSign(
     assinanteIdPorNome.set(normalizarNome(a.nome), a.id);
     assinantesEnviados.push(a.id);
   }
-  if (signers.length === 0) {
+  if (assinantesEnviados.length === 0) {
     return { error: "Nenhum assinante pôde ser cadastrado no TramitaSign." };
   }
 

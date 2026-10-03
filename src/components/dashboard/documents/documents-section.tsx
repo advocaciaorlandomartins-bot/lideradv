@@ -136,9 +136,16 @@ export default function DocumentsSection({
       "_blank",
       "noopener,noreferrer"
     );
+    // O retorno de window.open não é confiável sozinho pra saber se
+    // bloqueou de verdade — visto em produção: voltava null (entrando
+    // aqui) com o documento tendo aberto normalmente mesmo assim (provável
+    // extensão do navegador interceptando o valor de retorno sem bloquear
+    // a abertura de fato). Sem jeito melhor de checar do lado do JS, a
+    // mensagem agora avisa sem afirmar — evita um erro vermelho alarmante
+    // pra algo que funcionou.
     if (!aberta) {
       setOpenError(
-        `Não consegui abrir "${doc.nome}" — o navegador bloqueou a aba. Tente permitir pop-ups para este site.`
+        `Se "${doc.nome}" não abriu numa aba nova, o navegador pode ter bloqueado — tente permitir pop-ups para este site.`
       );
     }
   }

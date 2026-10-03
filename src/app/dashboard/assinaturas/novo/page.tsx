@@ -39,6 +39,7 @@ export default async function NovoEnvelopePage() {
     nome: c.name,
     email: c.email ?? "",
     menorIncapaz: c.menor_incapaz ?? false,
+    responsavelEmail: c.responsavel_email ?? "",
   }));
 
   return (

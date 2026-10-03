@@ -131,23 +131,18 @@ export default function DocumentsSection({
     // URL da API diretamente deixa o navegador seguir o redirect nativo
     // pra URL assinada do Vercel Blob, com Content-Type/Content-Disposition
     // corretos — sem passar arquivo nenhum por JS.
-    const aberta = window.open(
+    // O retorno de window.open não é confiável pra detectar bloqueio real
+    // — confirmado em produção (2x): vinha falsy com o documento tendo
+    // aberto normalmente mesmo assim, consistentemente, pro mesmo usuário
+    // (provável extensão de navegador interceptando o valor de retorno
+    // sem de fato impedir a abertura). Sem jeito confiável de checar isso
+    // do lado do JS, desistiu de tentar — melhor nunca mostrar um aviso
+    // do que mostrar um errado toda vez que funciona.
+    window.open(
       `/api/documentos/download?id=${doc.id}`,
       "_blank",
       "noopener,noreferrer"
     );
-    // O retorno de window.open não é confiável sozinho pra saber se
-    // bloqueou de verdade — visto em produção: voltava null (entrando
-    // aqui) com o documento tendo aberto normalmente mesmo assim (provável
-    // extensão do navegador interceptando o valor de retorno sem bloquear
-    // a abertura de fato). Sem jeito melhor de checar do lado do JS, a
-    // mensagem agora avisa sem afirmar — evita um erro vermelho alarmante
-    // pra algo que funcionou.
-    if (!aberta) {
-      setOpenError(
-        `Se "${doc.nome}" não abriu numa aba nova, o navegador pode ter bloqueado — tente permitir pop-ups para este site.`
-      );
-    }
   }
 
   async function handleDownloadZip(ids: string[] | null) {

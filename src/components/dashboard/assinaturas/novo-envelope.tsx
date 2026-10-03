@@ -51,6 +51,7 @@ interface Props {
     nome: string;
     email: string;
     menorIncapaz: boolean;
+    responsavelEmail: string;
   }[];
   modelos: ModeloOpt[];
 }
@@ -319,7 +320,14 @@ export default function NovoEnvelope({
       const c = clientes.find((x) => x.id === refId);
       if (c) {
         setNewNome(c.nome);
-        setNewEmail(c.email);
+        // Menor/incapaz não tem e-mail próprio pra receber/assinar — usa o
+        // do responsável legal cadastrado, quando existir. Evita o usuário
+        // ter que digitar isso toda vez manualmente (achado real: campo
+        // ficava em branco mesmo com o responsável já tendo e-mail no
+        // cadastro do cliente).
+        setNewEmail(
+          c.menorIncapaz && c.responsavelEmail ? c.responsavelEmail : c.email
+        );
       }
       return;
     }

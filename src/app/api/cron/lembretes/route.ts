@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
 import { montarResumoDiario } from "@/lib/resumo-diario";
+import { sincronizarEnvelopesPendentes } from "@/lib/assinaturas-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -148,12 +149,30 @@ export async function GET(req: Request) {
       );
     }
 
+    // Verifica envelopes de assinatura "aguardando" — mesmo motivo do
+    // resumo diário acima: encadeado aqui em vez de pedir outro cron.
+    // Isolado em try/catch próprio, não deve derrubar o que já rodou.
+    let envelopesVerificados = 0;
+    let envelopesConcluidos = 0;
+    try {
+      const resultado = await sincronizarEnvelopesPendentes();
+      envelopesVerificados = resultado.verificados;
+      envelopesConcluidos = resultado.concluidos;
+    } catch (err) {
+      console.error(
+        "[cron/lembretes] Falha ao sincronizar envelopes pendentes:",
+        err
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       processados: pendentes.length,
       enviados,
       erros,
       resumoEnviado,
+      envelopesVerificados,
+      envelopesConcluidos,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -2,6 +2,10 @@ import "server-only";
 import { put } from "@vercel/blob";
 import sql from "./db";
 import { converterLeadAssinado } from "./crm-contrato";
+import {
+  tramitaSignAtivo,
+  tramitaObterEnvelopeAssinatura,
+} from "./tramitasign";
 
 export interface SignerAtualizado {
   id: string;
@@ -212,4 +216,53 @@ export async function processarAtualizacaoEnvelope(params: {
   }
 
   return { finalizado: true };
+}
+
+/**
+ * Sincroniza automaticamente os envelopes ainda "aguardando" — sem isso,
+ * o único jeito de um envelope assinado sair de "aguardando" era o
+ * usuário clicar manualmente em "Verificar status" (confirmado em
+ * produção: o webhook do TramitaSign nunca chegou a ser observado
+ * disparando sozinho). Encadeada no cron de lembretes (chamado a cada
+ * ~15 min pelo pinger do PrevBot) em vez de pedir um 3º slot de cron —
+ * mesmo motivo já documentado ali pro resumo diário (plano Hobby da
+ * Vercel só libera 2). Lote pequeno de propósito: essa rota já processa
+ * lembretes + resumo diário no mesmo request, dentro do limite de 60s.
+ */
+export async function sincronizarEnvelopesPendentes(
+  limite = 10
+): Promise<{ verificados: number; concluidos: number }> {
+  if (!tramitaSignAtivo()) return { verificados: 0, concluidos: 0 };
+
+  const pendentes = await sql`
+    SELECT id::text, tramitasign_envelope_id
+    FROM envelopes
+    WHERE status = 'aguardando' AND tramitasign_envelope_id IS NOT NULL
+    ORDER BY tramitasign_ultima_sync ASC NULLS FIRST
+    LIMIT ${limite}
+  `;
+
+  let concluidos = 0;
+  for (const row of pendentes) {
+    const envelopeId = String(row.id);
+    const tramitaId = Number(row.tramitasign_envelope_id);
+    try {
+      const atual = await tramitaObterEnvelopeAssinatura(tramitaId);
+      if (!atual) continue;
+      const resultado = await processarAtualizacaoEnvelope({
+        envelopeId,
+        remoteStatus: atual.status,
+        signers: atual.signers,
+        signedUrls: atual.signedUrls,
+      });
+      if (resultado.finalizado) concluidos++;
+    } catch (err) {
+      console.error(
+        `[assinaturas-sync] sincronizarEnvelopesPendentes falhou pra ${envelopeId}:`,
+        err
+      );
+    }
+  }
+
+  return { verificados: pendentes.length, concluidos };
 }

@@ -89,7 +89,8 @@ const blocks: Block[] = [
     type: "paragraph",
     spans: [
       t(
-        "a) que a composição de sua renda familiar corresponde ao discriminado no quadro abaixo:"
+        "a) que a composição de sua renda familiar corresponde ao discriminado no quadro abaixo:",
+        { bold: true }
       ),
     ],
   },
@@ -144,41 +145,52 @@ const blocks: Block[] = [
   },
   {
     type: "paragraph",
-    spans: [t("b) que reside no imóvel a seguir descrito, mencionando:")],
+    spans: [
+      t("b) que reside no imóvel a seguir descrito, mencionando:", {
+        bold: true,
+      }),
+    ],
   },
   {
     type: "paragraph",
     spans: [
       t(
-        "b.1. os principais bens que o guarnecem (eletrodomésticos; móveis de grande porte, tais como armários, mesas e camas):"
+        "b.1. os principais bens que o guarnecem (eletrodomésticos; móveis de grande porte, tais como armários, mesas e camas):",
+        { bold: true }
       ),
     ],
   },
   { type: "paragraph", spans: [t("{{pergunta_b1}}")] },
   {
     type: "paragraph",
-    spans: [t("b.2. quantidade de cômodos (quartos, salas e banheiros):")],
+    spans: [
+      t("b.2. quantidade de cômodos (quartos, salas e banheiros):", {
+        bold: true,
+      }),
+    ],
   },
   { type: "paragraph", spans: [t("{{pergunta_b2}}")] },
   {
     type: "paragraph",
     spans: [
       t(
-        "b.3. serviços básicos disponíveis na residência (existência de luz elétrica, serviço de água e outros):"
+        "b.3. serviços básicos disponíveis na residência (existência de luz elétrica, serviço de água e outros):",
+        { bold: true }
       ),
     ],
   },
   { type: "paragraph", spans: [t("{{pergunta_b3}}")] },
   {
     type: "paragraph",
-    spans: [t("b.4. área aproximada do imóvel:")],
+    spans: [t("b.4. área aproximada do imóvel:", { bold: true })],
   },
   { type: "paragraph", spans: [t("{{pergunta_b4}}")] },
   {
     type: "paragraph",
     spans: [
       t(
-        "b.5. se o imóvel é próprio ou alugado, indicando, quando existirem, os valores pagos a título de aluguéis ou prestação de financiamento:"
+        "b.5. se o imóvel é próprio ou alugado, indicando, quando existirem, os valores pagos a título de aluguéis ou prestação de financiamento:",
+        { bold: true }
       ),
     ],
   },

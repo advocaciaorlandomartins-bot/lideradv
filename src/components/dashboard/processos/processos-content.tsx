@@ -1095,12 +1095,39 @@ export default function ProcessosContent({
                             const ep =
                               ESTAGIO_PROD[p.estagio_producao] ??
                               ESTAGIO_PROD["analise"];
+                            // "Judicial" sozinho não diz se já deu entrada
+                            // ou se ainda falta — mesmo selo pros dois
+                            // casos (achado real: "não tem como saber se
+                            // foi dado entrada só abrindo"). Complementa
+                            // com um texto curto só pra esse estágio.
+                            const subStatus =
+                              p.estagio_producao === "judicial" &&
+                              !p.resultado_judicial
+                                ? p.data_distribuicao
+                                  ? {
+                                      label: "Aguardando resultado",
+                                      cls: "text-blue-600",
+                                    }
+                                  : {
+                                      label: "Aguardando entrada",
+                                      cls: "text-red-600",
+                                    }
+                                : null;
                             return (
-                              <span
-                                className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${ep.cls}`}
-                              >
-                                {ep.label}
-                              </span>
+                              <div>
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${ep.cls}`}
+                                >
+                                  {ep.label}
+                                </span>
+                                {subStatus && (
+                                  <p
+                                    className={`mt-0.5 font-body text-[10px] font-semibold ${subStatus.cls}`}
+                                  >
+                                    {subStatus.label}
+                                  </p>
+                                )}
+                              </div>
                             );
                           })()}
                         </td>

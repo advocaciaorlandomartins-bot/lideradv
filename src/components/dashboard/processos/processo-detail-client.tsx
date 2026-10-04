@@ -123,12 +123,43 @@ const TIPO_INCAPACIDADE_LABEL: Record<string, string> = {
 
 // ── Linha de Produção ──────────────────────────────────────────
 
-const PIPELINE_PROD = [
-  "analise",
-  "producao",
-  "administrativo",
-  "judicial",
-] as const;
+// "Judicial" era uma posição só, igual pra quem ainda não protocolou e
+// pra quem já protocolou e só espera o julgamento — sem diferença visual
+// nenhuma entre os dois. Vira dois degraus visuais aqui (estágio no banco
+// continua um só) — mesmo critério usado no card do Kanban de Produção.
+function buildVirtualStepsProd(): {
+  key: string;
+  label: string;
+  dot: string;
+}[] {
+  return [
+    {
+      key: "analise",
+      label: ESTAGIO_PRODUCAO_META.analise.label,
+      dot: ESTAGIO_PRODUCAO_META.analise.dot,
+    },
+    {
+      key: "producao",
+      label: ESTAGIO_PRODUCAO_META.producao.label,
+      dot: ESTAGIO_PRODUCAO_META.producao.dot,
+    },
+    {
+      key: "administrativo",
+      label: ESTAGIO_PRODUCAO_META.administrativo.label,
+      dot: ESTAGIO_PRODUCAO_META.administrativo.dot,
+    },
+    {
+      key: "judicial_protocolar",
+      label: "Protocolar na Justiça",
+      dot: ESTAGIO_PRODUCAO_META.judicial.dot,
+    },
+    {
+      key: "judicial_aguardando",
+      label: "Aguardando Resultado",
+      dot: ESTAGIO_PRODUCAO_META.judicial.dot,
+    },
+  ];
+}
 
 function ProducaoBar({
   processo,
@@ -161,9 +192,15 @@ function ProducaoBar({
 
   const estagio = processo.estagio_producao;
   const isArquivado = estagio === "arquivado";
-  const currentIdx = PIPELINE_PROD.indexOf(
-    estagio as (typeof PIPELINE_PROD)[number]
-  );
+  const temDistribuicaoJudicial = !!processo.data_distribuicao_iso;
+  const virtualSteps = buildVirtualStepsProd();
+  const currentVirtualKey =
+    estagio === "judicial"
+      ? temDistribuicaoJudicial
+        ? "judicial_aguardando"
+        : "judicial_protocolar"
+      : estagio;
+  const currentIdx = virtualSteps.findIndex((s) => s.key === currentVirtualKey);
 
   const inputCls2 =
     "w-full rounded-lg border border-border bg-white px-3 py-2 font-body text-sm text-fg focus:border-primary focus:outline-none";
@@ -238,18 +275,17 @@ function ProducaoBar({
       {/* Stepper */}
       <div className="px-5 py-4">
         <div className="flex items-center gap-0 flex-wrap">
-          {PIPELINE_PROD.map((e, i) => {
-            const meta = ESTAGIO_PRODUCAO_META[e];
-            const isCurrent = e === estagio && !isArquivado;
+          {virtualSteps.map((s, i) => {
+            const isCurrent = s.key === currentVirtualKey && !isArquivado;
             const isDone = isArquivado || i < currentIdx;
             const isFuture = !isArquivado && i > currentIdx;
 
             return (
-              <div key={e} className="flex items-center">
+              <div key={s.key} className="flex items-center">
                 <div
-                  title={meta.label}
+                  title={s.label}
                   className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all
-                    ${isCurrent ? `${meta.dot} border-transparent text-white shadow-sm` : ""}
+                    ${isCurrent ? `${s.dot} border-transparent text-white shadow-sm` : ""}
                     ${isDone ? "border-transparent bg-slate-300 text-white" : ""}
                     ${isFuture ? "border-slate-200 bg-white text-slate-300" : ""}
                   `}
@@ -289,11 +325,21 @@ function ProducaoBar({
 
           {/* Label atual */}
           <span
-            className={`ml-3 font-body text-sm font-semibold ${ESTAGIO_PRODUCAO_META[estagio as keyof typeof ESTAGIO_PRODUCAO_META]?.color ?? "text-slate-500"}`}
+            className={`ml-3 font-body text-sm font-semibold ${
+              isArquivado
+                ? ESTAGIO_PRODUCAO_META.arquivado.color
+                : (ESTAGIO_PRODUCAO_META[
+                    estagio as keyof typeof ESTAGIO_PRODUCAO_META
+                  ]?.color ?? "text-slate-500")
+            }`}
           >
-            {ESTAGIO_PRODUCAO_META[
-              estagio as keyof typeof ESTAGIO_PRODUCAO_META
-            ]?.label ?? estagio}
+            {isArquivado
+              ? ESTAGIO_PRODUCAO_META.arquivado.label
+              : (virtualSteps[currentIdx]?.label ??
+                ESTAGIO_PRODUCAO_META[
+                  estagio as keyof typeof ESTAGIO_PRODUCAO_META
+                ]?.label ??
+                estagio)}
           </span>
 
           {/* Resultados */}

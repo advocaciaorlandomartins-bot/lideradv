@@ -31,30 +31,82 @@ import {
 } from "@/lib/producao-actions";
 import { getProximaAcaoProcesso } from "@/lib/processo-fases";
 
-// Estágios lineares (arquivado é ponto final, não entra no stepper)
-const PIPELINE = ["analise", "producao", "administrativo", "judicial"] as const;
-
 // ── Stepper de progressão ─────────────────────────────────────────────────────
 
-function ProgressoStepper({ estagio }: { estagio: EstagioProducao }) {
+interface VirtualStep {
+  key: string;
+  label: string;
+  dot: string;
+}
+
+// "Judicial" era UMA posição só no pipeline (sempre o círculo "4"), igual
+// pra quem ainda não protocolou e pra quem já protocolou e só espera o
+// julgamento — não dava pra perceber avanço nenhum entre os dois estados
+// (achado real do Orlando: "o número mesmo 4 ele mostra nas duas
+// situações, não mudou nada"). Vira dois degraus visuais aqui — o estágio
+// no banco continua um só ("judicial"), isso é só representação.
+function buildVirtualSteps(): VirtualStep[] {
+  return [
+    {
+      key: "analise",
+      label: ESTAGIO_PRODUCAO_META.analise.label,
+      dot: ESTAGIO_PRODUCAO_META.analise.dot,
+    },
+    {
+      key: "producao",
+      label: ESTAGIO_PRODUCAO_META.producao.label,
+      dot: ESTAGIO_PRODUCAO_META.producao.dot,
+    },
+    {
+      key: "administrativo",
+      label: ESTAGIO_PRODUCAO_META.administrativo.label,
+      dot: ESTAGIO_PRODUCAO_META.administrativo.dot,
+    },
+    {
+      key: "judicial_protocolar",
+      label: "Protocolar na Justiça",
+      dot: ESTAGIO_PRODUCAO_META.judicial.dot,
+    },
+    {
+      key: "judicial_aguardando",
+      label: "Aguardando Resultado",
+      dot: ESTAGIO_PRODUCAO_META.judicial.dot,
+    },
+  ];
+}
+
+function ProgressoStepper({
+  estagio,
+  temDistribuicaoJudicial,
+}: {
+  estagio: EstagioProducao;
+  /** Só importa quando estagio === "judicial": diferencia "falta protocolar" de "já protocolou, aguardando julgamento". */
+  temDistribuicaoJudicial: boolean;
+}) {
   const isArquivado = estagio === "arquivado";
-  const currentIdx = PIPELINE.indexOf(estagio as (typeof PIPELINE)[number]);
+  const steps = buildVirtualSteps();
+  const currentKey =
+    estagio === "judicial"
+      ? temDistribuicaoJudicial
+        ? "judicial_aguardando"
+        : "judicial_protocolar"
+      : estagio;
+  const currentIdx = steps.findIndex((s) => s.key === currentKey);
 
   return (
     <div className="flex items-center gap-0">
-      {PIPELINE.map((e, i) => {
-        const meta = ESTAGIO_PRODUCAO_META[e];
-        const isCurrent = e === estagio;
+      {steps.map((s, i) => {
+        const isCurrent = !isArquivado && s.key === currentKey;
         const isDone = isArquivado || i < currentIdx;
         const isFuture = !isArquivado && i > currentIdx;
 
         return (
-          <div key={e} className="flex items-center">
+          <div key={s.key} className="flex items-center">
             {/* Bolinha */}
             <div
-              title={meta.label}
+              title={s.label}
               className={`flex h-5 w-5 items-center justify-center rounded-full border-2 text-[9px] font-bold transition-all
-                ${isCurrent ? `${meta.dot} border-transparent text-white shadow-sm` : ""}
+                ${isCurrent ? `${s.dot} border-transparent text-white shadow-sm` : ""}
                 ${isDone ? "border-transparent bg-slate-300 text-white" : ""}
                 ${isFuture ? "border-slate-200 bg-white text-slate-300" : ""}
               `}
@@ -74,7 +126,7 @@ function ProgressoStepper({ estagio }: { estagio: EstagioProducao }) {
               )}
             </div>
             {/* Linha conectora */}
-            {i < PIPELINE.length - 1 && (
+            {i < steps.length - 1 && (
               <div
                 className={`h-0.5 w-5 ${i < currentIdx || isArquivado ? "bg-slate-300" : "bg-slate-200"}`}
               />
@@ -106,7 +158,9 @@ function ProgressoStepper({ estagio }: { estagio: EstagioProducao }) {
       <span
         className={`ml-2 font-body text-[10px] font-semibold ${ESTAGIO_PRODUCAO_META[estagio].color}`}
       >
-        {ESTAGIO_PRODUCAO_META[estagio].label}
+        {isArquivado
+          ? ESTAGIO_PRODUCAO_META.arquivado.label
+          : (steps[currentIdx]?.label ?? ESTAGIO_PRODUCAO_META[estagio].label)}
       </span>
     </div>
   );
@@ -214,7 +268,10 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
     <div className="rounded-xl border border-border bg-white p-3 shadow-sm">
       {/* Stepper */}
       <div className="mb-3">
-        <ProgressoStepper estagio={estagio} />
+        <ProgressoStepper
+          estagio={estagio}
+          temDistribuicaoJudicial={!!processo.data_distribuicao_iso}
+        />
       </div>
 
       {/* Dados do processo */}
@@ -721,11 +778,52 @@ function KanbanColumn({
             Nenhum caso
           </p>
         )}
-        {processos.map((p) => (
-          <ProducaoCard key={p.id} processo={p} />
-        ))}
+        {estagio === "judicial" ? (
+          <JudicialGroups processos={processos} />
+        ) : (
+          processos.map((p) => <ProducaoCard key={p.id} processo={p} />)
+        )}
       </div>
     </div>
+  );
+}
+
+// Coluna "Judicial" misturava quem ainda precisa protocolar com quem já
+// protocolou e só espera o julgamento — tudo com a mesma aparência numa
+// lista só (achado real do Orlando: "fica o que deu entrada e o que ainda
+// falta, tudo junto"). Separa em dois grupos visuais dentro da mesma
+// coluna, sem criar coluna nova (evita mexer em filtro/contagem em outros
+// lugares que já contam por estagio_producao).
+function JudicialGroups({ processos }: { processos: ProcessoProducao[] }) {
+  const aguardandoEntrada = processos.filter((p) => !p.data_distribuicao_iso);
+  const aguardandoResultado = processos.filter(
+    (p) => !!p.data_distribuicao_iso
+  );
+  return (
+    <>
+      {aguardandoEntrada.length > 0 && (
+        <>
+          <p className="mt-1 flex items-center gap-1.5 px-1 font-body text-[10px] font-bold uppercase tracking-wide text-red-600">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+            Aguardando entrada ({aguardandoEntrada.length})
+          </p>
+          {aguardandoEntrada.map((p) => (
+            <ProducaoCard key={p.id} processo={p} />
+          ))}
+        </>
+      )}
+      {aguardandoResultado.length > 0 && (
+        <>
+          <p className="mt-3 flex items-center gap-1.5 px-1 font-body text-[10px] font-bold uppercase tracking-wide text-blue-600">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+            Aguardando resultado ({aguardandoResultado.length})
+          </p>
+          {aguardandoResultado.map((p) => (
+            <ProducaoCard key={p.id} processo={p} />
+          ))}
+        </>
+      )}
+    </>
   );
 }
 

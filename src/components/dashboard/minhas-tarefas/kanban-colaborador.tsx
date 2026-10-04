@@ -711,6 +711,61 @@ interface ColumnProps {
   onTimesheetChange: (ativo: TimesheetAtivo | null) => void;
 }
 
+// Duas naturezas bem diferentes de card ficavam misturadas na mesma lista,
+// só diferenciadas por um selinho pequeno: a "situação do processo" (sem
+// data, sem "Dar baixa" — é só o estágio atual do caso) e tarefa/controle
+// real (com prazo, cronômetro, "Dar baixa"). Separa em dois grupos com
+// título, sem criar coluna/aba nova.
+function GroupedItems({
+  items,
+  timesheetAtivo,
+  onTimesheetChange,
+}: {
+  items: MinhaItem[];
+  timesheetAtivo: TimesheetAtivo | null;
+  onTimesheetChange: (ativo: TimesheetAtivo | null) => void;
+}) {
+  const situacaoProcessos = items.filter((i) => i.source === "processo");
+  const tarefasReais = items.filter((i) => i.source !== "processo");
+
+  return (
+    <div className="flex flex-col gap-3">
+      {situacaoProcessos.length > 0 && (
+        <div className="flex flex-col gap-2.5">
+          <p className="flex items-center gap-1.5 px-1 font-body text-[10px] font-bold uppercase tracking-wide text-muted">
+            <FolderOpenIcon className="h-3 w-3" />
+            Situação dos processos ({situacaoProcessos.length})
+          </p>
+          {situacaoProcessos.map((item) => (
+            <ItemCard
+              key={`${item.source}-${item.id}`}
+              item={item}
+              timesheetAtivo={timesheetAtivo}
+              onTimesheetChange={onTimesheetChange}
+            />
+          ))}
+        </div>
+      )}
+      {tarefasReais.length > 0 && (
+        <div className="flex flex-col gap-2.5">
+          <p className="flex items-center gap-1.5 px-1 font-body text-[10px] font-bold uppercase tracking-wide text-muted">
+            <ClockIcon className="h-3 w-3" />
+            Tarefas e prazos ({tarefasReais.length})
+          </p>
+          {tarefasReais.map((item) => (
+            <ItemCard
+              key={`${item.source}-${item.id}`}
+              item={item}
+              timesheetAtivo={timesheetAtivo}
+              onTimesheetChange={onTimesheetChange}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KanbanColumn({
   title,
   count,
@@ -737,16 +792,11 @@ function KanbanColumn({
           <p className="font-body text-xs text-muted">{emptyText}</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2.5">
-          {items.map((item) => (
-            <ItemCard
-              key={`${item.source}-${item.id}`}
-              item={item}
-              timesheetAtivo={timesheetAtivo}
-              onTimesheetChange={onTimesheetChange}
-            />
-          ))}
-        </div>
+        <GroupedItems
+          items={items}
+          timesheetAtivo={timesheetAtivo}
+          onTimesheetChange={onTimesheetChange}
+        />
       )}
     </div>
   );

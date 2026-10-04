@@ -37,6 +37,21 @@ function baseUrl(): string {
   }
 }
 
+// O grupo /assinaturas tem v2 (anunciada por e-mail pelo TramitaSign,
+// 04/10/2026) — resto da API (clientes, arquivos, usuarios) continua só
+// na v1, sem equivalente v2. V2 corrige de raiz o problema do dono do
+// envelope virar assinante automático (v1 sempre incluía; v2 só inclui
+// se estiver explicitamente em "signers") — por isso só o grupo de
+// assinatura usa esta base, o resto do arquivo continua em baseUrl().
+function baseUrlV2(): string {
+  const raw = (process.env.TRAMITASIGN_BASE_URL ?? "").trim();
+  try {
+    return `${new URL(raw).origin}/api/v2`;
+  } catch {
+    return `${raw.replace(/\/+$/, "")}/api/v2`;
+  }
+}
+
 function apiKey(): string {
   return process.env.TRAMITASIGN_API_KEY ?? "";
 }
@@ -367,7 +382,7 @@ export async function tramitaCriarEnvelopeAssinatura(params: {
   uploadIds: number[];
 }): Promise<{ id: number } | null> {
   try {
-    const res = await fetch(`${baseUrl()}/assinaturas`, {
+    const res = await fetch(`${baseUrlV2()}/assinaturas`, {
       method: "POST",
       headers: headers(),
       body: JSON.stringify({
@@ -411,45 +426,40 @@ export interface TramitaSignerInput {
   selfieRequired?: boolean;
   documentPhotoRequired?: boolean;
   handwrittenSignatureRequired?: boolean;
-  /** Id do signatário já existente no envelope — junto com `destroy`, remove em vez de criar. */
-  id?: string;
-  destroy?: boolean;
 }
 
-/** Passo 5: define os assinantes do envelope (só aceito enquanto está em rascunho). */
+/**
+ * Passo 5: define os assinantes do envelope (só aceito enquanto está em
+ * rascunho). Na v2 a lista enviada aqui SUBSTITUI a anterior por completo
+ * (quem não está na lista sai do envelope) — não existe mais `_destroy`
+ * (era um recurso só da v1, usado até ontem pra remover o dono do
+ * envelope que a v1 incluía sozinha; a v2 nunca inclui, então nem precisa
+ * mais desse passo de limpeza).
+ */
 export async function tramitaAtualizarSignatarios(
   envelopeId: number,
   signers: TramitaSignerInput[]
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${baseUrl()}/assinaturas/${envelopeId}`, {
+    const res = await fetch(`${baseUrlV2()}/assinaturas/${envelopeId}`, {
       method: "PATCH",
       headers: headers(),
       body: JSON.stringify({
         envelope: {
           signers: signers.map((s) => ({
-            ...(s.id ? { id: s.id } : {}),
-            ...(s.destroy
-              ? { _destroy: true }
-              : {
-                  signer_type: s.signerType,
-                  ...(s.customerId != null
-                    ? { customer_id: s.customerId }
-                    : {}),
-                  ...(s.userId ? { user_id: s.userId } : {}),
-                  ...(s.fullName ? { full_name: s.fullName } : {}),
-                  ...(s.email ? { email: s.email } : {}),
-                  ...(s.signatureType
-                    ? { signature_type: s.signatureType }
-                    : {}),
-                  ...(s.selfieRequired ? { selfie_required: true } : {}),
-                  ...(s.documentPhotoRequired
-                    ? { document_photo_required: true }
-                    : {}),
-                  ...(s.handwrittenSignatureRequired
-                    ? { handwritten_signature_required: true }
-                    : {}),
-                }),
+            signer_type: s.signerType,
+            ...(s.customerId != null ? { customer_id: s.customerId } : {}),
+            ...(s.userId ? { user_id: s.userId } : {}),
+            ...(s.fullName ? { full_name: s.fullName } : {}),
+            ...(s.email ? { email: s.email } : {}),
+            ...(s.signatureType ? { signature_type: s.signatureType } : {}),
+            ...(s.selfieRequired ? { selfie_required: true } : {}),
+            ...(s.documentPhotoRequired
+              ? { document_photo_required: true }
+              : {}),
+            ...(s.handwrittenSignatureRequired
+              ? { handwritten_signature_required: true }
+              : {}),
           })),
         },
       }),
@@ -531,10 +541,14 @@ export async function tramitaEnviarEnvelopeAssinatura(
   signedUrls: string[];
 } | null> {
   try {
-    const res = await fetch(`${baseUrl()}/assinaturas/${envelopeId}/envio`, {
+    // v2: sem corpo (ajustes vão antes, num PATCH) — Idempotency-Key evita
+    // duplicar o envio se a chamada precisar ser repetida por timeout.
+    const res = await fetch(`${baseUrlV2()}/assinaturas/${envelopeId}/envio`, {
       method: "POST",
-      headers: headers(),
-      body: JSON.stringify({}),
+      headers: {
+        ...headers(),
+        "Idempotency-Key": crypto.randomUUID(),
+      },
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
@@ -565,7 +579,7 @@ export async function tramitaObterEnvelopeAssinatura(
   signedUrls: string[];
 } | null> {
   try {
-    const res = await fetch(`${baseUrl()}/assinaturas/${envelopeId}`, {
+    const res = await fetch(`${baseUrlV2()}/assinaturas/${envelopeId}`, {
       headers: headers(),
     });
     if (!res.ok) {

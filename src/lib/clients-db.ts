@@ -1,5 +1,29 @@
 import sql from "./db";
-import { parseChecklist, type ChecklistItem } from "./checklist-types";
+import {
+  parseChecklist,
+  mesclarChecklistsDeProcessos,
+  type ChecklistItem,
+} from "./checklist-types";
+
+/**
+ * Checklist "efetivo" do cliente: quando ele já tem processo, deriva dos
+ * checklists dos processos (sempre em dia, nunca precisa de sincronização
+ * manual); só cai pro checklist próprio do cliente (clients.checklist)
+ * quando ainda não existe nenhum processo — aí sim é a lista inicial
+ * mesmo, antes de qualquer caso ser aberto.
+ */
+function checklistEfetivoCliente(
+  processCount: number,
+  checklistProprio: unknown,
+  processosChecklists: unknown
+): ChecklistItem[] {
+  if (processCount > 0 && Array.isArray(processosChecklists)) {
+    const listas = processosChecklists.map((c) => parseChecklist(c));
+    const mesclado = mesclarChecklistsDeProcessos(listas);
+    if (mesclado.length > 0) return mesclado;
+  }
+  return parseChecklist(checklistProprio);
+}
 
 export interface Client {
   id: string;
@@ -90,6 +114,10 @@ export async function getAllClients(
       col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
       (
+        SELECT COALESCE(jsonb_agg(p.checklist), '[]'::jsonb)
+        FROM processos p WHERE p.client_id = c.id AND p.deleted_at IS NULL
+      ) AS processos_checklists,
+      (
         SELECT COALESCE(array_agg(e.categoria || ':' || e.valor ORDER BY e.categoria, e.valor), ARRAY[]::text[])
         FROM etiquetas_clientes ec
         JOIN etiquetas e ON e.id = ec.etiqueta_id
@@ -127,7 +155,11 @@ export async function getAllClients(
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
     menor_incapaz: r.menor_incapaz ?? false,
     responsavel_email: r.responsavel_email ?? null,
-    checklist: parseChecklist(r.checklist),
+    checklist: checklistEfetivoCliente(
+      r.process_count ?? 0,
+      r.checklist,
+      r.processos_checklists
+    ),
   }));
 }
 
@@ -333,7 +365,11 @@ function mapClientFull(r: any, hasOrigemCols: boolean): ClientFull {
     prevbot_triagens: Array.isArray(r.prevbot_triagens)
       ? r.prevbot_triagens
       : null,
-    checklist: parseChecklist(r.checklist),
+    checklist: checklistEfetivoCliente(
+      r.process_count ?? 0,
+      r.checklist,
+      r.processos_checklists
+    ),
   };
 }
 
@@ -374,7 +410,11 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         c.bloquear_mensagens,
         c.membros_familia, c.renda_familiar_per_capita, c.respostas_extras,
         c.prevbot_triagens, c.checklist,
-        (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
+        (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
+        (
+          SELECT COALESCE(jsonb_agg(p.checklist), '[]'::jsonb)
+          FROM processos p WHERE p.client_id = c.id AND p.deleted_at IS NULL
+        ) AS processos_checklists
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
       WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
@@ -414,7 +454,11 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       c.bloquear_mensagens,
       c.membros_familia, c.renda_familiar_per_capita, c.respostas_extras,
       c.prevbot_triagens, c.checklist,
-      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
+      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
+      (
+        SELECT COALESCE(jsonb_agg(p.checklist), '[]'::jsonb)
+        FROM processos p WHERE p.client_id = c.id AND p.deleted_at IS NULL
+      ) AS processos_checklists
     FROM clients c
     WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
   `;
@@ -531,6 +575,10 @@ export async function getClientById(id: string): Promise<Client | null> {
       col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
       (
+        SELECT COALESCE(jsonb_agg(p.checklist), '[]'::jsonb)
+        FROM processos p WHERE p.client_id = c.id AND p.deleted_at IS NULL
+      ) AS processos_checklists,
+      (
         SELECT COALESCE(array_agg(e.categoria || ':' || e.valor ORDER BY e.categoria, e.valor), ARRAY[]::text[])
         FROM etiquetas_clientes ec
         JOIN etiquetas e ON e.id = ec.etiqueta_id
@@ -561,7 +609,11 @@ export async function getClientById(id: string): Promise<Client | null> {
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
     menor_incapaz: r.menor_incapaz ?? false,
     responsavel_email: r.responsavel_email ?? null,
-    checklist: parseChecklist(r.checklist),
+    checklist: checklistEfetivoCliente(
+      r.process_count ?? 0,
+      r.checklist,
+      r.processos_checklists
+    ),
   };
 }
 

@@ -7,7 +7,6 @@ import { hasPermission } from "./permissoes";
 import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
 import { podeEditarProcesso } from "./processo-ownership";
 import { parseChecklist } from "./checklist-types";
-import { sincronizarChecklistCliente } from "./checklist";
 
 function revalidate(id?: string) {
   revalidatePath("/dashboard/producao");
@@ -16,30 +15,27 @@ function revalidate(id?: string) {
 }
 
 /**
- * Marca todo o checklist de documentos (do processo, e do cliente se TODOS
- * os processos dele já estiverem avançados) como feito — chamado quando o
- * processo chega num ponto que só existe porque os documentos já estavam
- * prontos (protocolo administrativo, distribuição judicial ou
+ * Marca todo o checklist de documentos do processo como feito — chamado
+ * quando o processo chega num ponto que só existe porque os documentos já
+ * estavam prontos (protocolo administrativo, distribuição judicial ou
  * arquivamento). Sem isso, um processo que já deu entrada ou já foi
  * arquivado continuava aparecendo com o selo "Faltam N" (achado real:
  * o checklist nasce com os itens padrão desmarcados e nada marcava os
- * antigos como concluídos quando o caso avançava) — e mesmo corrigindo só
- * o processo, a ficha do Cliente e a lista de Clientes ficavam
- * contraditórias (processo "Completo", cliente "Faltam N"), já que são
- * dois checklists guardados em tabelas separadas.
+ * antigos como concluídos quando o caso avançava). O checklist exibido na
+ * ficha/lista de Clientes é derivado dos checklists dos processos na
+ * hora da leitura (ver checklistEfetivoCliente em clients-db.ts) — não
+ * precisa de um passo extra aqui pra "sincronizar" o cliente.
  */
 async function marcarChecklistCompleto(processoId: string): Promise<void> {
   const [row] =
-    await sql`SELECT checklist, client_id::text FROM processos WHERE id = ${processoId}::uuid`;
+    await sql`SELECT checklist FROM processos WHERE id = ${processoId}::uuid`;
   if (!row) return;
   const checklist = parseChecklist(row.checklist);
-  if (checklist.length > 0 && !checklist.every((i) => i.feito)) {
-    const completo = JSON.stringify(
-      checklist.map((i) => ({ ...i, feito: true }))
-    );
-    await sql`UPDATE processos SET checklist = ${completo}::jsonb WHERE id = ${processoId}::uuid`;
-  }
-  await sincronizarChecklistCliente(row.client_id);
+  if (checklist.length === 0 || checklist.every((i) => i.feito)) return;
+  const completo = JSON.stringify(
+    checklist.map((i) => ({ ...i, feito: true }))
+  );
+  await sql`UPDATE processos SET checklist = ${completo}::jsonb WHERE id = ${processoId}::uuid`;
 }
 
 /**

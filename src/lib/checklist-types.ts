@@ -43,3 +43,30 @@ export function checklistStatus(itens: ChecklistItem[]): {
   const pendentes = itens.filter((i) => !i.feito).length;
   return { completo: pendentes === 0, pendentes, total: itens.length };
 }
+
+/**
+ * Mescla os checklists de todos os processos de um cliente num único
+ * checklist "efetivo" — um item por texto, marcado como feito só se
+ * estiver feito em TODOS os processos que o contêm. Usado pra calcular o
+ * selo do Cliente a partir dos processos reais em vez de guardar uma
+ * cópia separada em clients.checklist que precisa ficar sincronizada à
+ * mão (era a causa raiz de casos como processo "Completo" e cliente
+ * "Faltam N" pro mesmo caso — duas cópias do mesmo dado divergindo).
+ */
+export function mesclarChecklistsDeProcessos(
+  listas: ChecklistItem[][]
+): ChecklistItem[] {
+  const porTexto = new Map<string, boolean>();
+  const ordem: string[] = [];
+  for (const lista of listas) {
+    for (const item of lista) {
+      if (!porTexto.has(item.texto)) ordem.push(item.texto);
+      const atual = porTexto.get(item.texto);
+      porTexto.set(
+        item.texto,
+        atual === undefined ? item.feito : atual && item.feito
+      );
+    }
+  }
+  return ordem.map((texto) => ({ texto, feito: porTexto.get(texto)! }));
+}

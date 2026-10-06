@@ -25,6 +25,7 @@ import {
   PhoneIcon,
   MapPinIcon,
   CheckCircleIcon,
+  CheckIcon,
   AlertIcon,
   PlusIcon,
   ArrowRightIcon,
@@ -1088,11 +1089,51 @@ export default function ClienteDetailTabs({
               </h3>
               <ChecklistBadge checklist={client.checklist} />
             </div>
-            <ChecklistManager
-              origemTipo="cliente"
-              origemId={client.id}
-              itensIniciais={client.checklist}
-            />
+            {processes.length > 0 ? (
+              <div className="space-y-2">
+                <p className="font-body text-xs text-muted">
+                  Reflete o checklist de cada processo — marque/edite na ficha
+                  do processo correspondente.
+                </p>
+                <div className="space-y-1.5">
+                  {client.checklist.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span
+                        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border ${
+                          item.feito
+                            ? "border-emerald-500 bg-emerald-500 text-white"
+                            : "border-border bg-white"
+                        }`}
+                      >
+                        {item.feito && <CheckIcon className="h-3 w-3" />}
+                      </span>
+                      <span
+                        className={`flex-1 font-body text-xs ${item.feito ? "text-muted line-through" : "text-fg"}`}
+                      >
+                        {item.texto}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {processes.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/dashboard/processos/${p.id}`}
+                      className="font-body text-xs text-primary hover:underline"
+                    >
+                      Editar no processo {p.tipo_acao} →
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <ChecklistManager
+                origemTipo="cliente"
+                origemId={client.id}
+                itensIniciais={client.checklist}
+              />
+            )}
           </div>
           <div className="flex items-center justify-between">
             <p className="font-body text-sm text-muted">

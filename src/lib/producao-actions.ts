@@ -15,6 +15,68 @@ function revalidate(id?: string) {
 }
 
 /**
+ * Marca todo o checklist de documentos (do processo, e do cliente se TODOS
+ * os processos dele já estiverem avançados) como feito — chamado quando o
+ * processo chega num ponto que só existe porque os documentos já estavam
+ * prontos (protocolo administrativo, distribuição judicial ou
+ * arquivamento). Sem isso, um processo que já deu entrada ou já foi
+ * arquivado continuava aparecendo com o selo "Faltam N" (achado real:
+ * o checklist nasce com os itens padrão desmarcados e nada marcava os
+ * antigos como concluídos quando o caso avançava) — e mesmo corrigindo só
+ * o processo, a ficha do Cliente e a lista de Clientes ficavam
+ * contraditórias (processo "Completo", cliente "Faltam N"), já que são
+ * dois checklists guardados em tabelas separadas.
+ */
+async function marcarChecklistCompleto(processoId: string): Promise<void> {
+  const [row] =
+    await sql`SELECT checklist, client_id::text FROM processos WHERE id = ${processoId}::uuid`;
+  if (!row) return;
+  const checklist = parseChecklist(row.checklist);
+  if (checklist.length > 0 && !checklist.every((i) => i.feito)) {
+    const completo = JSON.stringify(
+      checklist.map((i) => ({ ...i, feito: true }))
+    );
+    await sql`UPDATE processos SET checklist = ${completo}::jsonb WHERE id = ${processoId}::uuid`;
+  }
+  await sincronizarChecklistCliente(row.client_id);
+}
+
+/**
+ * Só marca o checklist do cliente como completo se TODOS os processos dele
+ * (não só o que acabou de avançar) já estiverem num estágio avançado — um
+ * cliente com outro processo ainda em análise não pode ser dado como
+ * "documentação completa" só porque um dos casos já foi protocolado.
+ */
+async function sincronizarChecklistCliente(clientId: string): Promise<void> {
+  const processos = await sql`
+    SELECT estagio_producao, data_protocolo_inss, data_distribuicao,
+           resultado_administrativo, resultado_judicial
+    FROM processos WHERE client_id = ${clientId}::uuid AND deleted_at IS NULL
+  `;
+  if (processos.length === 0) return;
+  const todosAvancados = processos.every(
+    (p) =>
+      p.estagio_producao === "arquivado" ||
+      p.data_protocolo_inss != null ||
+      p.data_distribuicao != null ||
+      p.resultado_administrativo != null ||
+      p.resultado_judicial != null
+  );
+  if (!todosAvancados) return;
+
+  const [row] =
+    await sql`SELECT checklist FROM clients WHERE id = ${clientId}::uuid`;
+  const checklist = parseChecklist(row?.checklist);
+  if (checklist.length === 0 || checklist.every((i) => i.feito)) return;
+  const completo = JSON.stringify(
+    checklist.map((i) => ({ ...i, feito: true }))
+  );
+  await sql`UPDATE clients SET checklist = ${completo}::jsonb WHERE id = ${clientId}::uuid`;
+  revalidatePath("/dashboard/clientes");
+  revalidatePath(`/dashboard/clientes/${clientId}`);
+}
+
+/**
  * Tarefas que o Cérebro Jurídico gera como "próxima ação" (ex: "Verificar
  * documentação com cliente") são pensadas pro estágio do processo em que
  * foram criadas — quando o processo avança sozinho (ex: resultado do INSS
@@ -27,26 +89,6 @@ function revalidate(id?: string) {
  * avança — a próxima ação certa pro estágio novo já é calculada à parte
  * por getProximaAcaoProcesso, então nenhuma orientação real se perde.
  */
-/**
- * Marca todo o checklist de documentos como feito — chamado quando o
- * processo chega num ponto que só existe porque os documentos já estavam
- * prontos (protocolo administrativo, distribuição judicial ou
- * arquivamento). Sem isso, um processo que já deu entrada ou já foi
- * arquivado continuava aparecendo com o selo "Faltam N" (achado real:
- * o checklist nasce com os itens padrão desmarcados e nada marcava os
- * antigos como concluídos quando o caso avançava).
- */
-async function marcarChecklistCompleto(processoId: string): Promise<void> {
-  const [row] =
-    await sql`SELECT checklist FROM processos WHERE id = ${processoId}::uuid`;
-  const checklist = parseChecklist(row?.checklist);
-  if (checklist.length === 0 || checklist.every((i) => i.feito)) return;
-  const completo = JSON.stringify(
-    checklist.map((i) => ({ ...i, feito: true }))
-  );
-  await sql`UPDATE processos SET checklist = ${completo}::jsonb WHERE id = ${processoId}::uuid`;
-}
-
 async function concluirTarefasCerebroObsoletas(processoId: string) {
   await sql`
     UPDATE tarefas_processo

@@ -371,23 +371,6 @@ export default function ClienteDetailTabs({
                   bg: "bg-indigo-50",
                   tab: "documentos",
                 },
-                {
-                  icon: checklistStatusClient.completo
-                    ? CheckCircleIcon
-                    : AlertIcon,
-                  label: "P/ dar entrada",
-                  value: checklistStatusClient.completo
-                    ? "Completo"
-                    : `Faltam ${checklistStatusClient.pendentes}`,
-                  sub: "documentos necessários",
-                  color: checklistStatusClient.completo
-                    ? "text-emerald-600"
-                    : "text-amber-600",
-                  bg: checklistStatusClient.completo
-                    ? "bg-emerald-50"
-                    : "bg-amber-50",
-                  tab: "documentos",
-                },
               ].map(
                 ({
                   icon: Icon,
@@ -416,6 +399,36 @@ export default function ClienteDetailTabs({
                   </button>
                 )
               )}
+              {/* Selo de "pode dar entrada" — cor sólida (não o mesmo
+                  pastel dos outros cards) de propósito, pra chamar atenção
+                  antes de qualquer outro número da Visão Geral. */}
+              <button
+                onClick={() => setTab("documentos")}
+                className={`rounded-xl px-4 py-4 text-left w-full shadow-sm transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+                  checklistStatusClient.completo
+                    ? "bg-emerald-600"
+                    : "bg-red-600"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  {checklistStatusClient.completo ? (
+                    <CheckCircleIcon className="h-4 w-4 text-white" />
+                  ) : (
+                    <AlertIcon className="h-4 w-4 text-white" />
+                  )}
+                  <p className="font-body text-xs font-semibold uppercase tracking-wide text-white/90">
+                    P/ dar entrada
+                  </p>
+                </div>
+                <p className="font-heading text-xl font-bold text-white">
+                  {checklistStatusClient.completo
+                    ? "Completo"
+                    : `Faltam ${checklistStatusClient.pendentes}`}
+                </p>
+                <p className="font-body text-xs text-white/80">
+                  documentos necessários
+                </p>
+              </button>
             </div>
           </div>
 

@@ -28,6 +28,8 @@ export interface ModeloDocumento {
   // neutros.
   ocultar_identificacao_escritorio: boolean;
   perguntas_extras: PerguntaExtra[] | null;
+  /** Override opcional de tamanho de fonte (pt) só pra esse modelo — null usa o padrão do escritório (Configurações). */
+  fonte_tamanho: number | null;
   created_at_formatted: string;
   updated_at_formatted: string;
 }
@@ -58,6 +60,7 @@ function mapRow(r: any): ModeloDocumento {
     perguntas_extras: Array.isArray(r.perguntas_extras)
       ? r.perguntas_extras.filter(isPerguntaExtra)
       : null,
+    fonte_tamanho: r.fonte_tamanho != null ? Number(r.fonte_tamanho) : null,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
     updated_at_formatted: new Date(r.updated_at).toLocaleDateString("pt-BR"),
   };
@@ -66,7 +69,7 @@ function mapRow(r: any): ModeloDocumento {
 export async function getAllModelos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, fonte_tamanho, created_at, updated_at
     FROM modelos_documento
     ORDER BY categoria NULLS LAST, titulo
   `;
@@ -76,7 +79,7 @@ export async function getAllModelos(): Promise<ModeloDocumento[]> {
 export async function getModelosAtivos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, fonte_tamanho, created_at, updated_at
     FROM modelos_documento
     WHERE ativo = TRUE
     ORDER BY categoria NULLS LAST, titulo
@@ -89,7 +92,7 @@ export async function getModeloById(
 ): Promise<ModeloDocumento | null> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, fonte_tamanho, created_at, updated_at
     FROM modelos_documento
     WHERE id = ${id}::uuid
   `;

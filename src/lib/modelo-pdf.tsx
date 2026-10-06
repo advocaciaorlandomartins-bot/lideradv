@@ -1,7 +1,7 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import { configParaDocumento, type EscritorioConfig } from "./escritorio-db";
 import { TimbradoHeader, TimbradoFooter } from "./pdf-timbrado";
-import { getPdfConfig, buildStyles } from "./pdf-config";
+import { getPdfConfig, buildStyles, type PdfPageConfig } from "./pdf-config";
 import { renderBlocks } from "./modelo-pdf-blocks";
 import type { Block } from "./modelo-blocks";
 
@@ -15,6 +15,10 @@ interface Props {
   logoData?: string | null;
   usarTimbrado?: boolean;
   ocultarIdentificacao?: boolean;
+  /** modelos_documento.fonte_tamanho — override por modelo (ex: Procuração e
+   * Contrato, que é texto denso e não precisa do tamanho pensado pra
+   * petições longas). null usa o padrão do escritório sem alteração. */
+  fonteTamanho?: number | null;
 }
 
 export function ModeloPdfDoc({
@@ -27,13 +31,21 @@ export function ModeloPdfDoc({
   logoData,
   usarTimbrado,
   ocultarIdentificacao,
+  fonteTamanho,
 }: Props) {
   const withLetterhead =
     !ocultarIdentificacao &&
     (usarTimbrado ?? false) &&
     !!config &&
     config.modelo_timbrado_ativo;
-  const pdfCfg = getPdfConfig(config, withLetterhead);
+  const baseCfg = getPdfConfig(config, withLetterhead);
+  const pdfCfg: PdfPageConfig = fonteTamanho
+    ? {
+        ...baseCfg,
+        fontSize: fonteTamanho,
+        lineHeight: Math.max(baseCfg.lineHeight - 0.4, 1.3),
+      }
+    : baseCfg;
   const s = buildStyles(pdfCfg);
   const identificacaoAtiva =
     !ocultarIdentificacao && (!config || config.identificacao_ativo);

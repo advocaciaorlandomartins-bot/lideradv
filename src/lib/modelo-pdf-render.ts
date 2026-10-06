@@ -45,6 +45,7 @@ export async function renderModeloParaPdf(params: {
     logoData,
     usarTimbrado: modelo.usar_timbrado,
     ocultarIdentificacao: modelo.ocultar_identificacao_escritorio,
+    fonteTamanho: modelo.fonte_tamanho,
   }) as ReactElement<DocumentProps>;
 
   let buffer = await renderToBuffer(doc);

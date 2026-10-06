@@ -86,7 +86,7 @@ export function renderBlocks(
             key={idx}
             style={[
               s.body,
-              { textAlign: block.align ?? "justify", marginBottom: 10 },
+              { textAlign: block.align ?? "justify", marginBottom: 8 },
             ]}
           >
             {renderSpans(block.spans, pdfCfg, pdfCfg.fontSize)}
@@ -150,8 +150,8 @@ export function renderBlocks(
             style={{
               borderBottomWidth: 1,
               borderBottomColor: "#1E3A8A",
-              marginTop: 8,
-              marginBottom: 14,
+              marginTop: 6,
+              marginBottom: 10,
             }}
           />
         );
@@ -213,15 +213,22 @@ export function renderBlocks(
         // detalhada em várias situações A-K, isso sozinho somava mais de uma
         // página inteira só em margens/padding repetidos). Ajuste puramente
         // visual, não muda o texto nem a estrutura do conteúdo.
+        // wrap={false}: sem isso, um callout que cai bem na quebra de
+        // página rachava ao meio — a barra/fundo cinza continuava sozinha
+        // no topo da página seguinte, sem texto nenhum (artefato visual
+        // visto num PDF real gerado). Cada callout é curto (uma pergunta +
+        // resposta), cabe inteiro numa página sem gerar espaço em branco
+        // relevante.
         return (
           <View
             key={idx}
+            wrap={false}
             style={{
-              marginBottom: 8,
+              marginBottom: 6,
               backgroundColor: "#f8f8f8",
               borderLeftWidth: 3,
               borderLeftColor: "#1a1a1a",
-              padding: 7,
+              padding: 6,
             }}
           >
             {block.title && (

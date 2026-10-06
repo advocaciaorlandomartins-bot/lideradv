@@ -555,6 +555,65 @@ export async function getClientsWithBirthdays(): Promise<BirthdayClient[]> {
   }));
 }
 
+export interface ClienteDocumentoPendente {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  processos: number;
+  itensFaltando: string[];
+  totalItens: number;
+}
+
+/**
+ * Relatório "quem está faltando documento e o que está faltando" — usa o
+ * mesmo checklist efetivo (derivado dos processos, ver checklistEfetivoCliente)
+ * que já alimenta o selo "Completo"/"Faltam N" em Clientes/Processos, só que
+ * aqui lista os TEXTOS dos itens pendentes em vez de só a contagem, pra dar
+ * pra ligar pro cliente já sabendo exatamente o que cobrar.
+ */
+export async function getClientesComDocumentosPendentes(): Promise<
+  ClienteDocumentoPendente[]
+> {
+  const rows = await sql`
+    SELECT
+      c.id::text,
+      c.name,
+      c.email,
+      c.phone,
+      c.checklist,
+      (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
+      (
+        SELECT COALESCE(jsonb_agg(p.checklist), '[]'::jsonb)
+        FROM processos p WHERE p.client_id = c.id AND p.deleted_at IS NULL
+      ) AS processos_checklists
+    FROM clients c
+    WHERE c.deleted_at IS NULL
+    ORDER BY c.name
+  `;
+
+  const resultado: ClienteDocumentoPendente[] = [];
+  for (const r of rows) {
+    const checklist = checklistEfetivoCliente(
+      r.process_count ?? 0,
+      r.checklist,
+      r.processos_checklists
+    );
+    const itensFaltando = checklist.filter((i) => !i.feito).map((i) => i.texto);
+    if (itensFaltando.length === 0) continue;
+    resultado.push({
+      id: r.id,
+      name: r.name,
+      email: r.email ?? "",
+      phone: r.phone ?? "",
+      processos: r.process_count ?? 0,
+      itensFaltando,
+      totalItens: checklist.length,
+    });
+  }
+  return resultado;
+}
+
 export async function getClientById(id: string): Promise<Client | null> {
   const rows = await sql`
     SELECT

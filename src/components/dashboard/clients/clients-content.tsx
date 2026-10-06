@@ -22,6 +22,7 @@ import {
   BookmarkIcon,
   DocumentArrowUpIcon,
   CalendarIcon,
+  AlertIcon,
 } from "@/components/icons";
 import ClientesFiltroModal, {
   type FiltroCliente,
@@ -682,6 +683,16 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
             >
               <CalendarIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Aniversários</span>
+            </Link>
+
+            {/* Documentos Pendentes */}
+            <Link
+              href="/dashboard/clientes/documentos-pendentes"
+              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-white px-3 font-body text-sm font-semibold text-muted transition-colors hover:border-primary/40 hover:text-fg"
+              title="Documentos Pendentes"
+            >
+              <AlertIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Doc. Pendentes</span>
             </Link>
 
             {/* Export */}

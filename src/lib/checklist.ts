@@ -207,6 +207,55 @@ export async function removerChecklistItemAction(
   }
 }
 
+/**
+ * Marca/desmarca um item do checklist "efetivo" do cliente (ver
+ * checklistEfetivoCliente em clients-db.ts) escrevendo direto no(s)
+ * processo(s) dele que têm esse mesmo texto — não existe mais uma cópia
+ * separada em clients.checklist pra manter sincronizada quando o cliente
+ * já tem processo, então editar aqui tem que alterar a fonte real.
+ * Aplica o mesmo valor (novoFeito) em todos os processos que contêm esse
+ * texto, pra sair de um estado "misto" (feito em um processo, pendente em
+ * outro) de forma previsível.
+ */
+export async function toggleChecklistItemClienteViaProcessosAction(
+  clientId: string,
+  texto: string,
+  novoFeito: boolean
+): Promise<{ error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+  if (!hasPermission(session, "processos", "editar"))
+    return { error: "Sem permissão." };
+
+  try {
+    const processos = await sql`
+      SELECT id::text, checklist FROM processos
+      WHERE client_id = ${clientId}::uuid AND deleted_at IS NULL
+    `;
+    let alterouAlgum = false;
+    for (const p of processos) {
+      if (!(await podeAcessarEntidade(session, "processo", p.id))) continue;
+      const checklist = parseChecklist(p.checklist);
+      const idx = checklist.findIndex((i) => i.texto === texto);
+      if (idx === -1) continue;
+      checklist[idx] = { ...checklist[idx], feito: novoFeito };
+      await sql`UPDATE processos SET checklist = ${JSON.stringify(checklist)}::jsonb WHERE id = ${p.id}::uuid`;
+      alterouAlgum = true;
+    }
+    if (!alterouAlgum)
+      return { error: "Item não encontrado em nenhum processo." };
+
+    revalidatePath("/dashboard/clientes");
+    revalidatePath(`/dashboard/clientes/${clientId}`);
+    revalidatePath("/dashboard/processos");
+    revalidatePath("/dashboard/producao");
+    return {};
+  } catch (e) {
+    console.error("[checklist] falha ao alternar item efetivo do cliente:", e);
+    return { error: "Erro ao atualizar checklist." };
+  }
+}
+
 /** Substitui a lista inteira — usado ao criar/editar um controle/tarefa. */
 export async function salvarChecklistAction(
   origemTipo: OrigemChecklist,

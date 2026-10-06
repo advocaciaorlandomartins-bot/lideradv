@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { ClientFull, ClienteCid } from "@/lib/clients-db";
 import type { Processo } from "@/lib/processos-db";
 import type { ClientDebito } from "@/lib/lancamentos-db";
 import type { Documento } from "@/lib/documents-db";
 import type { ModeloDocumento } from "@/lib/modelos-db";
-import { checklistStatus } from "@/lib/checklist-types";
+import { checklistStatus, type ChecklistItem } from "@/lib/checklist-types";
 import ChecklistManager from "../controladoria/checklist-manager";
+import { toggleChecklistItemClienteViaProcessosAction } from "@/lib/checklist";
 import ChecklistBadge from "../checklist-badge";
 import type {
   InboundEmailAddress,
@@ -92,6 +93,84 @@ function BloquearMensagensToggle({
             className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${bloqueado ? "translate-x-0" : "translate-x-5"}`}
           />
         </button>
+      </div>
+      {erro && (
+        <p className="mt-1.5 font-body text-xs font-semibold text-red-600">
+          {erro}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Checklist "efetivo" do cliente (derivado dos processos — ver
+ * checklistEfetivoCliente em clients-db.ts): marcar/desmarcar aqui escreve
+ * direto no(s) processo(s) que têm aquele mesmo item, já que não existe
+ * mais uma cópia separada em clients.checklist pra editar quando o
+ * cliente já tem processo.
+ */
+function ChecklistClienteDerivado({
+  clientId,
+  itensIniciais,
+}: {
+  clientId: string;
+  itensIniciais: ChecklistItem[];
+}) {
+  const [itens, setItens] = useState(itensIniciais);
+  const [isPending, startTransition] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+
+  function toggle(item: ChecklistItem) {
+    const novoFeito = !item.feito;
+    setErro(null);
+    setItens((prev) =>
+      prev.map((i) => (i.texto === item.texto ? { ...i, feito: novoFeito } : i))
+    );
+    startTransition(async () => {
+      const r = await toggleChecklistItemClienteViaProcessosAction(
+        clientId,
+        item.texto,
+        novoFeito
+      );
+      if (r.error) {
+        setErro(r.error);
+        setItens((prev) =>
+          prev.map((i) =>
+            i.texto === item.texto ? { ...i, feito: !novoFeito } : i
+          )
+        );
+      }
+    });
+  }
+
+  return (
+    <div>
+      <div className={`space-y-1.5 ${isPending ? "opacity-60" : ""}`}>
+        {itens.map((item, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => toggle(item)}
+            disabled={isPending}
+            className="flex w-full items-center gap-2 text-left cursor-pointer"
+          >
+            <span
+              className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition-colors ${
+                item.feito
+                  ? "border-emerald-500 bg-emerald-500 text-white"
+                  : "border-border bg-white"
+              }`}
+            >
+              {item.feito && <CheckIcon className="h-3 w-3" />}
+            </span>
+            <span
+              className={`flex-1 font-body text-xs ${item.feito ? "text-muted line-through" : "text-fg"}`}
+            >
+              {item.texto}
+            </span>
+          </button>
+        ))}
       </div>
       {erro && (
         <p className="mt-1.5 font-body text-xs font-semibold text-red-600">
@@ -1092,29 +1171,13 @@ export default function ClienteDetailTabs({
             {processes.length > 0 ? (
               <div className="space-y-2">
                 <p className="font-body text-xs text-muted">
-                  Reflete o checklist de cada processo — marque/edite na ficha
-                  do processo correspondente.
+                  Reflete o checklist de cada processo — marcar/desmarcar aqui
+                  já atualiza o processo correspondente.
                 </p>
-                <div className="space-y-1.5">
-                  {client.checklist.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span
-                        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border ${
-                          item.feito
-                            ? "border-emerald-500 bg-emerald-500 text-white"
-                            : "border-border bg-white"
-                        }`}
-                      >
-                        {item.feito && <CheckIcon className="h-3 w-3" />}
-                      </span>
-                      <span
-                        className={`flex-1 font-body text-xs ${item.feito ? "text-muted line-through" : "text-fg"}`}
-                      >
-                        {item.texto}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <ChecklistClienteDerivado
+                  clientId={client.id}
+                  itensIniciais={client.checklist}
+                />
                 <div className="flex flex-wrap gap-2 pt-1">
                   {processes.map((p) => (
                     <Link

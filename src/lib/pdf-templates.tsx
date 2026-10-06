@@ -114,7 +114,19 @@ export function ProcuracaoDoc({
   config,
   logoData,
 }: { client: ClientFull; date: string } & SharedProps) {
-  const pdfCfg = getPdfConfig(config, !!config && config.modelo_timbrado_ativo);
+  const baseCfg = getPdfConfig(
+    config,
+    !!config && config.modelo_timbrado_ativo
+  );
+  // Fonte/entrelinha menores só nesses dois documentos — texto curto de
+  // qualquer jeito, mas com o tamanho/entrelinha padrão do escritório
+  // (pensados pra petições longas) acabava passando de 1 folha e
+  // assustando o cliente na hora de assinar.
+  const pdfCfg: PdfPageConfig = {
+    ...baseCfg,
+    fontSize: Math.max(baseCfg.fontSize - 2, 9),
+    lineHeight: Math.max(baseCfg.lineHeight - 0.4, 1.3),
+  };
   const s = buildStyles(pdfCfg);
   const tipoDoc = client.type === "PF" ? "CPF" : "CNPJ";
   const qualificacao =
@@ -212,7 +224,16 @@ export function ContratoHonorariosDoc({
   config,
   logoData,
 }: { client: ClientFull; date: string } & SharedProps) {
-  const pdfCfg = getPdfConfig(config, !!config && config.modelo_timbrado_ativo);
+  const baseCfg = getPdfConfig(
+    config,
+    !!config && config.modelo_timbrado_ativo
+  );
+  // Mesmo ajuste do ProcuracaoDoc — ver comentário lá.
+  const pdfCfg: PdfPageConfig = {
+    ...baseCfg,
+    fontSize: Math.max(baseCfg.fontSize - 2, 9),
+    lineHeight: Math.max(baseCfg.lineHeight - 0.4, 1.3),
+  };
   const s = buildStyles(pdfCfg);
   const qualificacao =
     client.type === "PF"

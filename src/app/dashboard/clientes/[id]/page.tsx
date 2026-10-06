@@ -52,7 +52,7 @@ export default async function ClienteDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; processo_id?: string }>;
 }) {
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "ver")) notFound();
@@ -61,7 +61,7 @@ export default async function ClienteDetailPage({
   if (!(await podeAcessarCliente(session, id))) notFound();
 
   const podeVerFinanceiro = hasPermission(session, "financeiro", "ver");
-  const { tab: tabParam } = await searchParams;
+  const { tab: tabParam, processo_id: processoIdFiltro } = await searchParams;
   const validTabs = [
     "geral",
     "processos",
@@ -220,6 +220,7 @@ export default async function ClienteDetailPage({
         podeVerFinanceiro={podeVerFinanceiro}
         modelos={modelos}
         cids={cids}
+        processoIdFiltro={processoIdFiltro ?? null}
       />
 
       {/* LGPD — only for Administrador */}

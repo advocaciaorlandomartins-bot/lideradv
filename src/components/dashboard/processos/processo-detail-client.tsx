@@ -3236,7 +3236,7 @@ export default function ProcessoDetailClient({
             </Link>
             {podeVerFinanceiro && (
               <Link
-                href={`/dashboard/financeiro/novo?client_id=${processo.client_id}&processo_id=${processo.id}`}
+                href={`/dashboard/clientes/${processo.client_id}?tab=financeiro&processo_id=${processo.id}`}
                 className={btnOutline}
               >
                 Financeiro

@@ -14,9 +14,16 @@ function fmt(v: number) {
 interface Props {
   clientId: string;
   debito: ClientDebito;
+  /** Veio da ficha de um processo específico — pré-seleciona esse processo ao criar nova Receita/Despesa. */
+  processoId?: string | null;
 }
 
-export default function ClientDebitsSection({ clientId, debito }: Props) {
+export default function ClientDebitsSection({
+  clientId,
+  debito,
+  processoId = null,
+}: Props) {
+  const processoQuery = processoId ? `&processo_id=${processoId}` : "";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -62,13 +69,13 @@ export default function ClientDebitsSection({ clientId, debito }: Props) {
             </div>
           )}
           <Link
-            href={`/dashboard/financeiro/novo?tipo=entrada&client_id=${clientId}&back=${encodeURIComponent(`/dashboard/clientes/${clientId}?tab=financeiro`)}`}
+            href={`/dashboard/financeiro/novo?tipo=entrada&client_id=${clientId}${processoQuery}&back=${encodeURIComponent(`/dashboard/clientes/${clientId}?tab=financeiro`)}`}
             className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-emerald-700"
           >
             + Receita
           </Link>
           <Link
-            href={`/dashboard/financeiro/novo?tipo=saida&client_id=${clientId}&back=${encodeURIComponent(`/dashboard/clientes/${clientId}?tab=financeiro`)}`}
+            href={`/dashboard/financeiro/novo?tipo=saida&client_id=${clientId}${processoQuery}&back=${encodeURIComponent(`/dashboard/clientes/${clientId}?tab=financeiro`)}`}
             className="flex h-9 items-center gap-1.5 rounded-lg bg-cta px-4 font-body text-sm font-semibold text-white transition-colors duration-150 hover:bg-cta-hover"
           >
             + Despesa

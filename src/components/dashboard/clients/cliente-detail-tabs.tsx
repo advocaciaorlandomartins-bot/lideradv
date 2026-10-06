@@ -328,6 +328,8 @@ interface Props {
   podeVerFinanceiro?: boolean;
   modelos: ModeloDocumento[];
   cids: ClienteCid[];
+  /** Veio de "Financeiro" na ficha de um processo — pré-seleciona esse processo ao criar nova Receita/Despesa daqui. */
+  processoIdFiltro?: string | null;
 }
 
 export default function ClienteDetailTabs({
@@ -341,6 +343,7 @@ export default function ClienteDetailTabs({
   podeVerFinanceiro = true,
   modelos,
   cids,
+  processoIdFiltro = null,
 }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "geral");
   const tabsVisiveis = podeVerFinanceiro
@@ -1151,7 +1154,11 @@ export default function ClienteDetailTabs({
               </div>
             ))}
           </div>
-          <ClientDebitsSection clientId={client.id} debito={debito} />
+          <ClientDebitsSection
+            clientId={client.id}
+            debito={debito}
+            processoId={processoIdFiltro}
+          />
           <BloquearMensagensToggle
             clientId={client.id}
             inicial={client.bloquear_mensagens ?? false}

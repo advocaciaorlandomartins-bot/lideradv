@@ -39,17 +39,20 @@ const POR_CODIGO: Record<string, string[]> = {
     "Laudo/PPP de condição especial",
   ],
   B80: [
-    "Certidão de nascimento do(a) filho(a) ou laudo de pré-natal",
-    "Comprovante de afastamento do trabalho",
+    "Comprovante de pelo menos uma contribuição ao INSS",
+    "Certidão de nascimento da criança (ou laudo de pré-natal, se ainda não nascida)",
   ],
   B87: [
-    "Declaração de composição familiar",
-    "Comprovante de renda de todos os membros da família",
-    "Laudo médico (avaliação de deficiência)",
+    "RG e CPF de todos os moradores da residência (inclusive crianças)",
+    "Inscrição atualizada no CadÚnico (CRAS, menos de 2 anos)",
+    "Comprovante de renda de todos os moradores da residência",
+    "Laudo médico atualizado com CID, assinatura e carimbo",
+    "Exames/receitas que comprovem o impedimento de longo prazo (mín. 2 anos)",
   ],
   B88: [
-    "Declaração de composição familiar",
-    "Comprovante de renda de todos os membros da família",
+    "RG e CPF de todos os moradores da residência (inclusive crianças)",
+    "Inscrição atualizada no CadÚnico (CRAS, menos de 2 anos)",
+    "Comprovante de renda de todos os moradores da residência",
   ],
   B91: [
     "Comunicação de Acidente de Trabalho (CAT)",

@@ -23,6 +23,7 @@ import { getDocumentosByEntityId } from "@/lib/documents-db";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import { getBonusMetaStatus } from "@/lib/metas-bonus";
 import GerarBonusButton from "@/components/dashboard/colaboradores/gerar-bonus-button";
+import EnviarContratoParceriaButton from "@/components/dashboard/colaboradores/enviar-contrato-parceria-button";
 import {
   ChevronRightIcon,
   UserPlusIcon,
@@ -152,6 +153,14 @@ export default async function ColaboradorDetailPage({
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
+            {podeEditar &&
+              colaborador.cargo === "advogado_parceiro" &&
+              hasPermission(session, "assinaturas", "criar") && (
+                <EnviarContratoParceriaButton
+                  colaboradorId={colaborador.id}
+                  colaboradorNome={colaborador.nome}
+                />
+              )}
             <DeleteColaboradorButton id={colaborador.id} />
             <Link
               href={`/dashboard/colaboradores/${colaborador.id}/editar`}

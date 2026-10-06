@@ -1,6 +1,6 @@
 import type { ClientFull } from "./clients-db";
 import type { EscritorioConfig } from "./escritorio-db";
-import type { AdvogadoParaDocumento } from "./colaboradores-db";
+import type { AdvogadoParaDocumento, Colaborador } from "./colaboradores-db";
 
 // Não inclui a cidade individual de cada advogado aqui — antes causava um
 // texto inconsistente dentro da mesma lista corrida (só aparecia "com
@@ -152,6 +152,83 @@ export function buildModeloVars(
       .filter(Boolean)
       .join(", "),
   };
+}
+
+function formatPct(pct: number | null): string {
+  return pct != null ? `${pct}` : "a combinar";
+}
+
+/**
+ * Mapa {{variavel}} → valor pro Contrato de Parceria entre Advogados — o
+ * colaborador é a "outra parte" do documento (não há cliente envolvido).
+ * Reaproveita as mesmas tags de escritório já usadas em
+ * procuração/contrato de honorários ({{advogado}}, {{endereco_escritorio}},
+ * {{data_hoje}}) pra não duplicar nomenclatura, e adiciona as tags
+ * {{colaborador_*}}/{{comissao_*}} específicas desse modelo.
+ */
+export function buildModeloVarsColaborador(
+  colaborador: Colaborador,
+  escritorioConfig: EscritorioConfig,
+  date: string
+): Record<string, string> {
+  const enderecoParts = [
+    colaborador.street,
+    colaborador.addr_number,
+    colaborador.complement,
+  ].filter(Boolean);
+  const enderecoColaborador = [
+    enderecoParts.join(", "),
+    colaborador.neighborhood,
+    colaborador.city && colaborador.state
+      ? `${colaborador.city}/${colaborador.state}`
+      : colaborador.city,
+    colaborador.cep ? `CEP ${colaborador.cep}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return {
+    "{{data_hoje}}": date,
+    "{{advogado}}":
+      escritorioConfig.oab && escritorioConfig.oab_uf
+        ? `${escritorioConfig.nome}, inscrito(a) na OAB/${escritorioConfig.oab_uf} sob o nº ${escritorioConfig.oab}`
+        : escritorioConfig.nome,
+    "{{endereco_escritorio}}": [
+      escritorioConfig.endereco,
+      escritorioConfig.cidade && escritorioConfig.estado
+        ? `${escritorioConfig.cidade}/${escritorioConfig.estado}`
+        : escritorioConfig.cidade,
+      escritorioConfig.cep ? `CEP ${escritorioConfig.cep}` : null,
+    ]
+      .filter(Boolean)
+      .join(", "),
+    "{{nome_escritorio}}": escritorioConfig.nome,
+    "{{oab_escritorio}}": escritorioConfig.oab ?? "",
+    "{{cidade_escritorio}}": escritorioConfig.cidade ?? "",
+    "{{estado_escritorio}}": escritorioConfig.estado ?? "",
+    "{{colaborador_nome}}": colaborador.nome,
+    "{{colaborador_oab}}": colaborador.oab ?? "",
+    "{{colaborador_oab_uf}}": colaborador.oab_uf ?? "",
+    "{{colaborador_oab_numero}}": colaborador.oab ?? "",
+    "{{colaborador_endereco}}": enderecoColaborador,
+    "{{comissao_administrativo_pct}}": formatPct(
+      colaborador.comissao_administrativo_pct
+    ),
+    "{{comissao_judicial_pct}}": formatPct(colaborador.comissao_judicial_pct),
+    "{{comissao_ambos_pct}}": formatPct(colaborador.comissao_ambos_pct),
+  };
+}
+
+/** Verifica se o colaborador tem os dados mínimos pro Contrato de Parceria (OAB + endereço) — sem isso o PDF sai com lacunas em branco no meio da cláusula. */
+export function colaboradorDadosCompletosParaContrato(
+  colaborador: Colaborador
+): string[] {
+  const faltando: string[] = [];
+  if (!colaborador.email) faltando.push("e-mail");
+  if (!colaborador.oab || !colaborador.oab_uf) faltando.push("OAB");
+  if (!colaborador.street || !colaborador.city || !colaborador.state)
+    faltando.push("endereço");
+  return faltando;
 }
 
 /**

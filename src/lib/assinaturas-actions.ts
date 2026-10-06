@@ -18,8 +18,15 @@ import {
 import { getClientFull } from "./clients-db";
 import { getModeloById } from "./modelos-db";
 import { getEscritorioConfig } from "./escritorio-db";
-import { getAdvogadosParaDocumento } from "./colaboradores-db";
-import { buildModeloVars, replaceVars } from "./modelo-vars";
+import {
+  getAdvogadosParaDocumento,
+  getColaboradorFull,
+} from "./colaboradores-db";
+import {
+  buildModeloVars,
+  buildModeloVarsColaborador,
+  replaceVars,
+} from "./modelo-vars";
 import {
   blocksToHtml,
   textToHtml,
@@ -310,13 +317,12 @@ export async function enviarEnvelopeParaTramitaSign(
     }
   };
 
-  const client = await getClientFull(env.clienteId);
-  if (!client) {
-    const erro = "Cliente do envelope não encontrado.";
-    await gravarErroEmTodos(erro);
-    return { error: erro };
-  }
-
+  // Envelope é SEMPRE de um cliente OU de um colaborador (ex: Contrato de
+  // Parceria), nunca os dois — monta vars a partir de qualquer um que
+  // esteja presente, já que o restante do envio (upload, signers, envio)
+  // não depende de qual dos dois é.
+  let nomeParte: string;
+  let vars: Record<string, string>;
   const escritorioConfig = await getEscritorioConfig();
   const date = new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -324,8 +330,30 @@ export async function enviarEnvelopeParaTramitaSign(
     year: "numeric",
     timeZone: "America/Sao_Paulo",
   });
-  const advogados = await getAdvogadosParaDocumento().catch(() => []);
-  const vars = buildModeloVars(client, escritorioConfig, date, advogados);
+  if (env.clienteId) {
+    const client = await getClientFull(env.clienteId);
+    if (!client) {
+      const erro = "Cliente do envelope não encontrado.";
+      await gravarErroEmTodos(erro);
+      return { error: erro };
+    }
+    const advogados = await getAdvogadosParaDocumento().catch(() => []);
+    nomeParte = client.name;
+    vars = buildModeloVars(client, escritorioConfig, date, advogados);
+  } else if (env.colaboradorId) {
+    const colaborador = await getColaboradorFull(env.colaboradorId);
+    if (!colaborador) {
+      const erro = "Colaborador do envelope não encontrado.";
+      await gravarErroEmTodos(erro);
+      return { error: erro };
+    }
+    nomeParte = colaborador.nome;
+    vars = buildModeloVarsColaborador(colaborador, escritorioConfig, date);
+  } else {
+    const erro = "Envelope sem cliente ou colaborador vinculado.";
+    await gravarErroEmTodos(erro);
+    return { error: erro };
+  }
 
   // 1. Usuário do escritório dono do envelope (obrigatório na criação — a
   //    chave de API não é uma pessoa). Confere isso primeiro, antes de
@@ -351,7 +379,7 @@ export async function enviarEnvelopeParaTramitaSign(
     try {
       pdfBuffer = await renderModeloParaPdf({
         modelo,
-        client,
+        nomeParte,
         escritorioConfig,
         vars,
         date,

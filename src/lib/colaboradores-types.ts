@@ -4,6 +4,7 @@ export type CargoColaborador =
   | "recepcao"
   | "agente"
   | "advogado_associado"
+  | "advogado_parceiro"
   | "comercial";
 
 export const CARGO_LABELS: Record<CargoColaborador, string> = {
@@ -12,6 +13,7 @@ export const CARGO_LABELS: Record<CargoColaborador, string> = {
   recepcao: "Recepção",
   agente: "Agente",
   advogado_associado: "Advogado Associado",
+  advogado_parceiro: "Advogado(a) Parceiro(a)",
   comercial: "Comercial",
 };
 
@@ -21,6 +23,7 @@ export const CARGO_COLORS: Record<CargoColaborador, string> = {
   recepcao: "bg-pink-50 text-pink-700",
   agente: "bg-orange-50 text-orange-700",
   advogado_associado: "bg-indigo-50 text-indigo-700",
+  advogado_parceiro: "bg-violet-50 text-violet-700",
   comercial: "bg-teal-50 text-teal-700",
 };
 

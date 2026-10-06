@@ -98,7 +98,7 @@ async function gerarPdf(
   try {
     buffer = await renderModeloParaPdf({
       modelo,
-      client,
+      nomeParte: client.name,
       escritorioConfig,
       vars,
       date,

@@ -56,6 +56,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 const CARGO_LIST: CargoColaborador[] = [
   "advogado",
   "advogado_associado",
+  "advogado_parceiro",
   "estagiario",
   "agente",
   "recepcao",

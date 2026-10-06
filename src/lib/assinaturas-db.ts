@@ -67,6 +67,7 @@ export interface EnvelopeDetalhe {
   criado_por: string;
   criado_em: string;
   cliente_nome: string | null;
+  colaborador_nome: string | null;
   tramitasignUltimoStatus: string | null;
   tramitasignUltimaSync: string | null;
   documentos: {
@@ -94,9 +95,11 @@ export async function getEnvelopeById(
   const [env] = await sql`
     SELECT e.id::text, e.nome, e.prazo, e.status, e.criado_por, e.criado_em,
            c.name AS cliente_nome,
+           col.nome AS colaborador_nome,
            e.tramitasign_ultimo_status, e.tramitasign_ultima_sync
     FROM envelopes e
     LEFT JOIN clients c ON c.id = e.client_id
+    LEFT JOIN colaboradores col ON col.id = e.colaborador_id
     WHERE e.id = ${id}::uuid
   `;
   if (!env) return null;
@@ -125,6 +128,7 @@ export async function getEnvelopeById(
     criado_por: env.criado_por,
     criado_em: String(env.criado_em),
     cliente_nome: env.cliente_nome ?? null,
+    colaborador_nome: env.colaborador_nome ?? null,
     tramitasignUltimoStatus: env.tramitasign_ultimo_status ?? null,
     tramitasignUltimaSync: env.tramitasign_ultima_sync
       ? String(env.tramitasign_ultima_sync)
@@ -167,17 +171,19 @@ export async function criarEnvelope(data: {
   notifCriador: boolean;
   notifEscritorio: boolean;
   criadoPor: string;
-  clienteId: string;
+  /** Exatamente um dos dois: cliente (fluxo normal) ou colaborador (ex: Contrato de Parceria). */
+  clienteId?: string;
+  colaboradorId?: string;
   assinantes: AssinanteInput[];
   documentos: DocumentoInput[];
 }): Promise<{ id: string; assinantes: AssinanteCriado[] }> {
   const [env] = await sql`
     INSERT INTO envelopes
-      (nome, prazo, status, notif_assinantes, notif_criador, notif_escritorio, criado_por, client_id)
+      (nome, prazo, status, notif_assinantes, notif_criador, notif_escritorio, criado_por, client_id, colaborador_id)
     VALUES
       (${data.nome}, ${data.prazo ?? null}, ${data.status},
        ${data.notifAssinantes}, ${data.notifCriador}, ${data.notifEscritorio},
-       ${data.criadoPor}, ${data.clienteId}::uuid)
+       ${data.criadoPor}, ${data.clienteId ?? null}::uuid, ${data.colaboradorId ?? null}::uuid)
     RETURNING id::text
   `;
   const envId = env.id as string;
@@ -272,7 +278,8 @@ export interface AssinanteParaEnvio {
 export interface EnvelopeParaEnvio {
   id: string;
   nome: string;
-  clienteId: string;
+  clienteId: string | null;
+  colaboradorId: string | null;
   notifAssinantes: boolean;
   documentos: DocumentoParaEnvio[];
   assinantes: AssinanteParaEnvio[];
@@ -283,7 +290,7 @@ export async function getEnvelopeParaEnvio(
   envelopeId: string
 ): Promise<EnvelopeParaEnvio | null> {
   const [env] = await sql`
-    SELECT id::text, nome, client_id::text, notif_assinantes
+    SELECT id::text, nome, client_id::text, colaborador_id::text, notif_assinantes
     FROM envelopes
     WHERE id = ${envelopeId}::uuid
   `;
@@ -308,7 +315,8 @@ export async function getEnvelopeParaEnvio(
   return {
     id: env.id,
     nome: env.nome,
-    clienteId: env.client_id,
+    clienteId: env.client_id ?? null,
+    colaboradorId: env.colaborador_id ?? null,
     notifAssinantes: env.notif_assinantes,
     documentos: documentos.map((d) => ({
       modeloId: d.modelo_id ?? null,

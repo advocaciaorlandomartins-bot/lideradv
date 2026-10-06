@@ -127,6 +127,64 @@ export function aplicarComissao(valor: number, pct: number | null): number {
 }
 
 /**
+ * Congela o % de comissão vigente AGORA pra um colaborador num processo —
+ * chamado no momento em que ele "assume" uma fase (protocolo administrativo
+ * registrado ou distribuição judicial registrada), os mesmos dois pontos
+ * que já congelam responsavel_administrativo_id/responsavel_judicial_id.
+ * Sem isso, mudar o % de um colaborador parceiro no cadastro alterava
+ * silenciosamente a comissão de processos que já estavam em andamento com
+ * ele — o pagamento só é calculado de verdade na hora em que o cliente
+ * paga, não quando o processo é aberto, e até lá sempre lia o % "ao vivo".
+ * processos.comissao_pct_snapshot é um mapa { [colaboradorId]: ComissaoConfig }
+ * — cada colaborador guarda o próprio snapshot, independente de outros que
+ * também tenham atuado no mesmo processo.
+ */
+export async function congelarComissaoSnapshot(
+  processoId: string,
+  colaboradorId: string | null
+): Promise<void> {
+  if (!colaboradorId) return;
+  try {
+    const [colab] = await sql`
+      SELECT comissao_administrativo_pct, comissao_judicial_pct, comissao_ambos_pct
+      FROM colaboradores WHERE id = ${colaboradorId}::uuid
+    `;
+    if (!colab) return;
+
+    const [proc] = await sql`
+      SELECT comissao_pct_snapshot FROM processos WHERE id = ${processoId}::uuid
+    `;
+    const atual = (proc?.comissao_pct_snapshot ?? {}) as Record<
+      string,
+      ComissaoConfig
+    >;
+    atual[colaboradorId] = {
+      comissao_administrativo_pct:
+        colab.comissao_administrativo_pct != null
+          ? Number(colab.comissao_administrativo_pct)
+          : null,
+      comissao_judicial_pct:
+        colab.comissao_judicial_pct != null
+          ? Number(colab.comissao_judicial_pct)
+          : null,
+      comissao_ambos_pct:
+        colab.comissao_ambos_pct != null
+          ? Number(colab.comissao_ambos_pct)
+          : null,
+    };
+    await sql`
+      UPDATE processos SET comissao_pct_snapshot = ${JSON.stringify(atual)}::jsonb
+      WHERE id = ${processoId}::uuid
+    `;
+  } catch (e) {
+    console.error(
+      `[comissao-colaborador] falha ao congelar snapshot do processo ${processoId}:`,
+      e
+    );
+  }
+}
+
+/**
  * Quando um lançamento de honorário do cliente (entrada, vinculado a um
  * processo) é marcado como pago, gera automaticamente a comissão de quem
  * entregou o resultado favorável — sem precisar que o admin digite o valor
@@ -157,12 +215,18 @@ export async function gerarComissaoAutomaticaPorPagamento(
         p.numero, p.tipo_acao, p.client_id::text,
         p.estagio_producao, p.resultado_administrativo, p.resultado_judicial,
         p.responsavel_id::text,
-        p.responsavel_administrativo_id::text, p.responsavel_judicial_id::text
+        p.responsavel_administrativo_id::text, p.responsavel_judicial_id::text,
+        p.comissao_pct_snapshot
       FROM processos p
       WHERE p.id = ${processoId}::uuid
     `;
     const p = rows[0];
     if (!p) return;
+
+    const snapshot = (p.comissao_pct_snapshot ?? {}) as Record<
+      string,
+      ComissaoConfig
+    >;
 
     const ownership: ProcessoFaseOwnership = {
       estagio_producao: p.estagio_producao,
@@ -207,7 +271,11 @@ export async function gerarComissaoAutomaticaPorPagamento(
 
     for (const colab of colabRows) {
       const colaboradorId = String(colab.id);
-      const config: ComissaoConfig = {
+      // Snapshot congelado no momento em que esse colaborador assumiu a
+      // fase (ver congelarComissaoSnapshot) tem prioridade sobre o % atual
+      // do cadastro — processo aberto antes dessa funcionalidade existir
+      // não tem snapshot, cai no % ao vivo (comportamento de sempre).
+      const config: ComissaoConfig = snapshot[colaboradorId] ?? {
         comissao_administrativo_pct:
           colab.comissao_administrativo_pct != null
             ? Number(colab.comissao_administrativo_pct)

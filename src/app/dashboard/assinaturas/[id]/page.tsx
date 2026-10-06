@@ -99,8 +99,11 @@ export default async function EnvelopeDetalhePage({
             </span>
           </div>
           <p className="mt-1 font-body text-sm text-muted">
-            Cliente: {envelope.cliente_nome ?? "—"} · Prazo:{" "}
-            {fmtDate(envelope.prazo)} · Criado em {fmtDate(envelope.criado_em)}
+            {envelope.colaborador_nome
+              ? `Colaborador: ${envelope.colaborador_nome}`
+              : `Cliente: ${envelope.cliente_nome ?? "—"}`}{" "}
+            · Prazo: {fmtDate(envelope.prazo)} · Criado em{" "}
+            {fmtDate(envelope.criado_em)}
           </p>
           {envelope.status !== "concluido" &&
             envelope.tramitasignUltimoStatus && (

@@ -16,13 +16,15 @@ export interface SignerAtualizado {
 /**
  * Baixa o PDF assinado (URL autenticada, exige o Bearer da API do
  * TramitaSign) e sobe pro NOSSO storage, salvando como documento do
- * cliente — pra abrir/baixar dali funcionar igual a qualquer outro
- * documento do sistema, sem depender de credencial do TramitaSign depois.
- * Roda pra QUALQUER envelope finalizado (criado manualmente em
- * Assinaturas ou pelo fluxo automático do PrevBot), não só leads.
+ * cliente OU do colaborador (ex: Contrato de Parceria) — pra abrir/baixar
+ * dali funcionar igual a qualquer outro documento do sistema, sem depender
+ * de credencial do TramitaSign depois. Roda pra QUALQUER envelope
+ * finalizado (criado manualmente em Assinaturas ou pelo fluxo automático
+ * do PrevBot), não só leads.
  */
-async function salvarPdfAssinadoNoCliente(
-  clientId: string,
+async function salvarPdfAssinado(
+  entityType: "cliente" | "colaborador",
+  entityId: string,
   nomeDocumento: string,
   signedUrl: string
 ): Promise<void> {
@@ -39,9 +41,10 @@ async function salvarPdfAssinadoNoCliente(
     }
     const bytes = Buffer.from(await res.arrayBuffer());
     const nomeArquivo = `${nomeDocumento.replace(/[/\\]/g, "-")} (assinado).pdf`;
+    const pasta = entityType === "cliente" ? "clientes" : "colaboradores";
 
     const blob = await put(
-      `documentos/clientes/${clientId}/${nomeArquivo}`,
+      `documentos/${pasta}/${entityId}/${nomeArquivo}`,
       bytes,
       {
         access: "private",
@@ -53,10 +56,10 @@ async function salvarPdfAssinadoNoCliente(
 
     await sql`
       INSERT INTO documentos (entity_type, entity_id, nome, tipo, tamanho, caminho, url)
-      VALUES ('cliente', ${clientId}::uuid, ${nomeArquivo}, 'application/pdf', ${bytes.byteLength}, ${blob.pathname}, ${blob.url})
+      VALUES (${entityType}, ${entityId}::uuid, ${nomeArquivo}, 'application/pdf', ${bytes.byteLength}, ${blob.pathname}, ${blob.url})
     `;
   } catch (err) {
-    console.error("[assinaturas-sync] salvarPdfAssinadoNoCliente error:", err);
+    console.error("[assinaturas-sync] salvarPdfAssinado error:", err);
   }
 }
 
@@ -96,7 +99,8 @@ export async function processarAtualizacaoEnvelope(params: {
   }
 
   const [nosso] = await sql`
-    SELECT status, nome, client_id::text FROM envelopes WHERE id = ${envelopeId}::uuid
+    SELECT status, nome, client_id::text, colaborador_id::text
+    FROM envelopes WHERE id = ${envelopeId}::uuid
   `;
   const finalizado = remoteStatus === "finalizado";
   const jaConcluido = nosso?.status === "concluido";
@@ -149,11 +153,20 @@ export async function processarAtualizacaoEnvelope(params: {
   if (!finalizado) return { finalizado: false };
   if (!transicaoParaConcluido) return { finalizado: true };
 
-  // Salva TODOS os documentos assinados do envelope na área do cliente —
-  // um envelope pode ter mais de um documento (wizard permite selecionar
-  // vários modelos), correlacionados pela mesma ordem em que foram
-  // enviados ao TramitaSign (envelope_documentos.ordem).
-  if (signedUrls.length > 0 && nosso?.client_id) {
+  // Salva TODOS os documentos assinados do envelope na área do cliente (ou
+  // do colaborador, ex: Contrato de Parceria) — um envelope pode ter mais
+  // de um documento (wizard permite selecionar vários modelos),
+  // correlacionados pela mesma ordem em que foram enviados ao TramitaSign
+  // (envelope_documentos.ordem).
+  const entidadeDestino: {
+    type: "cliente" | "colaborador";
+    id: string;
+  } | null = nosso?.client_id
+    ? { type: "cliente", id: nosso.client_id }
+    : nosso?.colaborador_id
+      ? { type: "colaborador", id: nosso.colaborador_id }
+      : null;
+  if (signedUrls.length > 0 && entidadeDestino) {
     const documentos = await sql`
       SELECT nome FROM envelope_documentos
       WHERE envelope_id = ${envelopeId}::uuid
@@ -163,7 +176,12 @@ export async function processarAtualizacaoEnvelope(params: {
       const nomeDoc =
         (documentos[i]?.nome as string | undefined) ??
         `${nosso.nome} (${i + 1})`;
-      await salvarPdfAssinadoNoCliente(nosso.client_id, nomeDoc, signedUrls[i]);
+      await salvarPdfAssinado(
+        entidadeDestino.type,
+        entidadeDestino.id,
+        nomeDoc,
+        signedUrls[i]
+      );
     }
   }
 

@@ -7,6 +7,7 @@ import { hasPermission } from "./permissoes";
 import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
 import { podeEditarProcesso } from "./processo-ownership";
 import { parseChecklist } from "./checklist-types";
+import { congelarComissaoSnapshot } from "./comissao-colaborador";
 
 function revalidate(id?: string) {
   revalidatePath("/dashboard/producao");
@@ -189,14 +190,16 @@ export async function registrarProtocoloAdminAction(
   // administrativa — se o processo for reatribuído depois (ex: pra alguém
   // tocar o judicial), a comissão do administrativo continua sendo desse
   // colaborador, não de quem assumir depois.
-  await sql`
+  const [{ responsavel_administrativo_id: responsavelAdminId }] = await sql`
     UPDATE processos
     SET protocolo_inss                = ${protocolo.trim() || null},
         data_protocolo_inss           = ${data || null}::date,
         responsavel_administrativo_id = responsavel_id,
         updated_at                    = NOW()
     WHERE id = ${id}::uuid
+    RETURNING responsavel_administrativo_id::text
   `;
+  await congelarComissaoSnapshot(id, responsavelAdminId);
   await marcarChecklistCompleto(id);
   revalidate(id);
   return {};
@@ -219,14 +222,16 @@ export async function registrarDistribuicaoJudicialAction(
   // Mesma lógica do protocolo administrativo: quem é responsável na hora de
   // distribuir a ação fica marcado como dono da fase judicial pra fins de
   // comissão, mesmo que o responsável do processo mude depois disso.
-  await sql`
+  const [{ responsavel_judicial_id: responsavelJudId }] = await sql`
     UPDATE processos
     SET numero                   = COALESCE(NULLIF(${numero.trim()}, ''), numero),
         data_distribuicao        = ${data || null}::date,
         responsavel_judicial_id  = responsavel_id,
         updated_at               = NOW()
     WHERE id = ${id}::uuid
+    RETURNING responsavel_judicial_id::text
   `;
+  await congelarComissaoSnapshot(id, responsavelJudId);
   await marcarChecklistCompleto(id);
   revalidate(id);
   return {};

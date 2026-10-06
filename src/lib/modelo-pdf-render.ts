@@ -2,7 +2,6 @@ import "server-only";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { createElement, type ReactElement } from "react";
 import type { ModeloDocumento } from "./modelos-db";
-import type { ClientFull } from "./clients-db";
 import type { EscritorioConfig } from "./escritorio-db";
 import { fetchLogoAsDataUri } from "./pdf-timbrado";
 import { applyFundoTimbrado } from "./pdf-fundo";
@@ -11,19 +10,22 @@ import { substituteVariablesInBlocks } from "./modelo-blocks";
 import { replaceVars } from "./modelo-vars";
 
 /**
- * Renderiza um modelo + cliente num PDF de verdade (bytes), mesma lógica de
+ * Renderiza um modelo num PDF de verdade (bytes), mesma lógica de
  * /api/gerar-modelo — extraída pra cá pra ser reaproveitada pelo envio de
  * Assinaturas ao TramitaSign, que precisa de PDFs reais (a API deles só
- * aceita upload de arquivo, não HTML solto).
+ * aceita upload de arquivo, não HTML solto). `nomeParte`: nome de quem o
+ * documento se refere (cliente ou colaborador, conforme o modelo) — usado
+ * só no título/nome do arquivo do PDF, não troca nenhum {{tag}} (isso já
+ * vem pronto em `vars`).
  */
 export async function renderModeloParaPdf(params: {
   modelo: ModeloDocumento;
-  client: ClientFull;
+  nomeParte: string;
   escritorioConfig: EscritorioConfig;
   vars: Record<string, string>;
   date: string;
 }): Promise<Buffer> {
-  const { modelo, client, escritorioConfig, vars, date } = params;
+  const { modelo, nomeParte, escritorioConfig, vars, date } = params;
 
   const logoData =
     escritorioConfig.logo_ativo && escritorioConfig.logo_url
@@ -40,7 +42,7 @@ export async function renderModeloParaPdf(params: {
     conteudo,
     blocks,
     date,
-    clientName: client.name,
+    clientName: nomeParte,
     config: escritorioConfig,
     logoData,
     usarTimbrado: modelo.usar_timbrado,

@@ -6,6 +6,7 @@ import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
 import { podeEditarProcesso } from "./processo-ownership";
+import { parseChecklist } from "./checklist-types";
 
 function revalidate(id?: string) {
   revalidatePath("/dashboard/producao");
@@ -26,6 +27,26 @@ function revalidate(id?: string) {
  * avança — a próxima ação certa pro estágio novo já é calculada à parte
  * por getProximaAcaoProcesso, então nenhuma orientação real se perde.
  */
+/**
+ * Marca todo o checklist de documentos como feito — chamado quando o
+ * processo chega num ponto que só existe porque os documentos já estavam
+ * prontos (protocolo administrativo, distribuição judicial ou
+ * arquivamento). Sem isso, um processo que já deu entrada ou já foi
+ * arquivado continuava aparecendo com o selo "Faltam N" (achado real:
+ * o checklist nasce com os itens padrão desmarcados e nada marcava os
+ * antigos como concluídos quando o caso avançava).
+ */
+async function marcarChecklistCompleto(processoId: string): Promise<void> {
+  const [row] =
+    await sql`SELECT checklist FROM processos WHERE id = ${processoId}::uuid`;
+  const checklist = parseChecklist(row?.checklist);
+  if (checklist.length === 0 || checklist.every((i) => i.feito)) return;
+  const completo = JSON.stringify(
+    checklist.map((i) => ({ ...i, feito: true }))
+  );
+  await sql`UPDATE processos SET checklist = ${completo}::jsonb WHERE id = ${processoId}::uuid`;
+}
+
 async function concluirTarefasCerebroObsoletas(processoId: string) {
   await sql`
     UPDATE tarefas_processo
@@ -113,6 +134,7 @@ export async function registrarResultadoAdminAction(
   `;
   if (arquivando)
     await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
+  await marcarChecklistCompleto(id);
   await concluirTarefasCerebroObsoletas(id);
   revalidate(id);
   return {};
@@ -138,6 +160,7 @@ export async function registrarResultadoJudicialAction(
     WHERE id = ${id}::uuid
   `;
   await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
+  await marcarChecklistCompleto(id);
   await concluirTarefasCerebroObsoletas(id);
   revalidate(id);
   return {};
@@ -170,6 +193,7 @@ export async function registrarProtocoloAdminAction(
         updated_at                    = NOW()
     WHERE id = ${id}::uuid
   `;
+  await marcarChecklistCompleto(id);
   revalidate(id);
   return {};
 }
@@ -199,6 +223,7 @@ export async function registrarDistribuicaoJudicialAction(
         updated_at               = NOW()
     WHERE id = ${id}::uuid
   `;
+  await marcarChecklistCompleto(id);
   revalidate(id);
   return {};
 }
@@ -232,6 +257,7 @@ export async function arquivarProcessoAction(
       WHERE id = ${id}::uuid
     `;
     await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
+    await marcarChecklistCompleto(id);
     await concluirTarefasCerebroObsoletas(id);
     revalidate(id);
     return {};

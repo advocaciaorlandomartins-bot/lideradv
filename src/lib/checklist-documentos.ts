@@ -48,11 +48,13 @@ const POR_CODIGO: Record<string, string[]> = {
     "Comprovante de renda de todos os moradores da residência",
     "Laudo médico atualizado com CID, assinatura e carimbo",
     "Exames/receitas que comprovem o impedimento de longo prazo (mín. 2 anos)",
+    "Formulário LOAS preenchido (gerar em Modelos)",
   ],
   B88: [
     "RG e CPF de todos os moradores da residência (inclusive crianças)",
     "Inscrição atualizada no CadÚnico (CRAS, menos de 2 anos)",
     "Comprovante de renda de todos os moradores da residência",
+    "Formulário LOAS preenchido (gerar em Modelos)",
   ],
   B91: [
     "Comunicação de Acidente de Trabalho (CAT)",

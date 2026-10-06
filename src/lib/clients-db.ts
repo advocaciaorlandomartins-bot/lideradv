@@ -1,4 +1,5 @@
 import sql from "./db";
+import { parseChecklist, type ChecklistItem } from "./checklist-types";
 
 export interface Client {
   id: string;
@@ -20,6 +21,7 @@ export interface Client {
   etiquetas: string[];
   menor_incapaz: boolean;
   responsavel_email: string | null;
+  checklist: ChecklistItem[];
 }
 
 /**
@@ -84,6 +86,7 @@ export async function getAllClients(
       c.created_at,
       c.menor_incapaz,
       c.responsavel_email,
+      c.checklist,
       col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
       (
@@ -124,6 +127,7 @@ export async function getAllClients(
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
     menor_incapaz: r.menor_incapaz ?? false,
     responsavel_email: r.responsavel_email ?? null,
+    checklist: parseChecklist(r.checklist),
   }));
 }
 
@@ -202,6 +206,10 @@ export interface ClientFull {
   // Histórico de triagens do PrevBot (WhatsApp) — documento médico
   // analisado + resumo da conversa, antes do cliente chegar ao escritório.
   prevbot_triagens: PrevbotTriagem[] | null;
+  // Documentos necessários pra dar entrada (administrativa/judicial) —
+  // nasce com um modelo padrão por tipo de benefício (checklistPadrao em
+  // checklist-documentos.ts), editável pelo advogado.
+  checklist: ChecklistItem[];
 }
 
 export interface MembroFamilia {
@@ -325,6 +333,7 @@ function mapClientFull(r: any, hasOrigemCols: boolean): ClientFull {
     prevbot_triagens: Array.isArray(r.prevbot_triagens)
       ? r.prevbot_triagens
       : null,
+    checklist: parseChecklist(r.checklist),
   };
 }
 
@@ -364,7 +373,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
         c.num_contribuicoes,
         c.bloquear_mensagens,
         c.membros_familia, c.renda_familiar_per_capita, c.respostas_extras,
-        c.prevbot_triagens,
+        c.prevbot_triagens, c.checklist,
         (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
       FROM clients c
       LEFT JOIN colaboradores col ON col.id = c.indicador_id
@@ -404,7 +413,7 @@ export async function getClientFull(id: string): Promise<ClientFull | null> {
       c.num_contribuicoes,
       c.bloquear_mensagens,
       c.membros_familia, c.renda_familiar_per_capita, c.respostas_extras,
-      c.prevbot_triagens,
+      c.prevbot_triagens, c.checklist,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count
     FROM clients c
     WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
@@ -518,6 +527,7 @@ export async function getClientById(id: string): Promise<Client | null> {
       c.created_at,
       c.menor_incapaz,
       c.responsavel_email,
+      c.checklist,
       col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
       (
@@ -551,6 +561,7 @@ export async function getClientById(id: string): Promise<Client | null> {
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
     menor_incapaz: r.menor_incapaz ?? false,
     responsavel_email: r.responsavel_email ?? null,
+    checklist: parseChecklist(r.checklist),
   };
 }
 

@@ -6,6 +6,7 @@ import { logAction } from "./audit";
 import { getSession, type SessionUser } from "./session";
 import { hasPermission } from "./permissoes";
 import { notificarPrevBot } from "./prevbot-outbound";
+import { checklistPadrao } from "./checklist-documentos";
 
 export type ClientFormState = { error: string } | null;
 
@@ -181,6 +182,8 @@ async function criarClienteCore(
     }
   }
 
+  const checklistInicial = JSON.stringify(checklistPadrao(tipoBeneficio));
+
   let novoId: string;
   try {
     const rows = await sql`
@@ -199,7 +202,7 @@ async function criarClienteCore(
          data_inicio_beneficio, valor_beneficio, categoria_contribuinte,
          carencia_atingida, cid_principal, tipo_incapacidade, data_diagnostico,
          naturalidade_cidade, naturalidade_estado, filiacao_mae, filiacao_pai,
-         data_afastamento, atividade_anterior, num_contribuicoes)
+         data_afastamento, atividade_anterior, num_contribuicoes, checklist)
       VALUES
         (${type}, ${name}, ${doc}, ${tradeName},
          ${birthDate ? birthDate : null}::date,
@@ -219,7 +222,8 @@ async function criarClienteCore(
          ${cidPrincipal}, ${tipoIncapacidade}, ${dataDiagnostico}::date,
          ${naturalidadeCidade}, ${naturalidadeEstado},
          ${filiacaoMae}, ${filiacaoPai},
-         ${dataAfastamento}::date, ${atividadeAnterior}, ${numContribuicoes})
+         ${dataAfastamento}::date, ${atividadeAnterior}, ${numContribuicoes},
+         ${checklistInicial}::jsonb)
       RETURNING id::text
     `;
     novoId = rows[0].id as string;

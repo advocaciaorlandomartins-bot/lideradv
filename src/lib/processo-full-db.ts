@@ -1,5 +1,6 @@
 import sql from "./db";
 import type { ProcessoFull } from "./processos-db";
+import { parseChecklist } from "./checklist-types";
 
 export type { ProcessoFull };
 
@@ -134,7 +135,8 @@ export async function getProcessoExtended(
       to_char(p.der, 'YYYY-MM-DD')                         AS der,
       to_char(p.dib, 'YYYY-MM-DD')                         AS dib,
       to_char(p.dcb, 'YYYY-MM-DD')                         AS dcb,
-      c.cid_principal, c.tipo_incapacidade
+      c.cid_principal, c.tipo_incapacidade,
+      p.checklist
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     LEFT JOIN colaboradores col ON col.id = p.responsavel_id
@@ -197,6 +199,7 @@ export async function getProcessoExtended(
     dcb: r.dcb ? String(r.dcb).slice(0, 10) : null,
     cid_principal: r.cid_principal ?? null,
     tipo_incapacidade: r.tipo_incapacidade ?? null,
+    checklist: parseChecklist(r.checklist),
     // Etiquetas são buscadas à parte (getEtiquetasDeProcesso/getEtiquetasHerdadasDoCliente)
     // e passadas como props próprias pro ProcessoDetailClient — não usado daqui.
     etiquetas: [],

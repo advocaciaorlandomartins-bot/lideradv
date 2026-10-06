@@ -72,6 +72,9 @@ import {
   ActivityIcon,
 } from "@/components/icons";
 import { descreverCid } from "@/lib/cid-map";
+import { checklistStatus } from "@/lib/checklist-types";
+import ChecklistManager from "@/components/dashboard/controladoria/checklist-manager";
+import ChecklistBadge from "@/components/dashboard/checklist-badge";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -2091,6 +2094,35 @@ function TarefasSection({
 
 // ── Pendências Section ─────────────────────────────────────────
 
+function DocumentosNecessariosSection({
+  processo,
+}: {
+  processo: ProcessoExtended;
+}) {
+  const status = checklistStatus(processo.checklist);
+  return (
+    <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-heading text-sm font-semibold text-fg">
+          Documentos p/ dar entrada
+        </h3>
+        <ChecklistBadge checklist={processo.checklist} />
+      </div>
+      {status.total === 0 ? (
+        <p className="font-body text-xs text-muted">
+          Nenhum documento necessário cadastrado.
+        </p>
+      ) : (
+        <ChecklistManager
+          origemTipo="processo"
+          origemId={processo.id}
+          itensIniciais={processo.checklist}
+        />
+      )}
+    </div>
+  );
+}
+
 function PendenciasSection({
   pendencias,
   processo,
@@ -3134,6 +3166,7 @@ export default function ProcessoDetailClient({
                     ? "Arquivado"
                     : "Encerrado"}
               </span>
+              <ChecklistBadge checklist={processo.checklist} />
             </div>
             <p className="font-heading text-base font-semibold text-fg">
               {processo.tipo_acao}
@@ -3302,6 +3335,7 @@ export default function ProcessoDetailClient({
             onNova={() => setNovaTarefaOpen(true)}
             sessionNome={sessionNome}
           />
+          <DocumentosNecessariosSection processo={processo} />
           <PendenciasSection
             pendencias={pendencias}
             processo={processo}

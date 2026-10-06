@@ -5,6 +5,7 @@ import type {
   ResultadoAdmin,
   ResultadoJudicial,
 } from "./producao-types";
+import { parseChecklist } from "./checklist-types";
 
 export interface EstagioSnapshot {
   porEstagio: { estagio: EstagioProducao; count: number }[];
@@ -92,6 +93,7 @@ function mapRow(r: any): ProcessoProducao {
     protocolo_inss: r.protocolo_inss ?? null,
     data_protocolo_inss_iso: r.data_protocolo_inss_iso ?? null,
     data_distribuicao_iso: r.data_distribuicao_iso ?? null,
+    checklist: parseChecklist(r.checklist),
   };
 }
 
@@ -127,6 +129,7 @@ export async function getAllProcessosProducao(
       p.protocolo_inss,
       to_char(p.data_protocolo_inss, 'YYYY-MM-DD') AS data_protocolo_inss_iso,
       to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao_iso,
+      p.checklist,
       COUNT(t.id) FILTER (WHERE t.status IN ('Pendente', 'Em andamento'))::int AS tarefas_pendentes
     FROM processos p
     JOIN clients c ON c.id = p.client_id

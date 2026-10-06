@@ -5,6 +5,7 @@
 
 import crypto from "crypto";
 import sql from "./db";
+import { checklistPadrao } from "./checklist-documentos";
 
 export async function converterLeadAssinado(
   leadId: string,
@@ -90,6 +91,7 @@ export async function converterLeadAssinado(
   if (!processoId && clientId) {
     const area = (lead.area_interesse as string | null) ?? "Previdenciário";
     const novoProcessoId = crypto.randomUUID();
+    const checklistInicial = JSON.stringify(checklistPadrao(area));
     const pr = await sql`
       WITH claim AS (
         UPDATE crm_leads SET processo_id = ${novoProcessoId}::uuid
@@ -98,7 +100,7 @@ export async function converterLeadAssinado(
       )
       INSERT INTO processos (
         id, client_id, lead_id, tipo_acao, area,
-        status, estagio_producao, data_estagio_at
+        status, estagio_producao, data_estagio_at, checklist
       )
       SELECT
         ${novoProcessoId}::uuid,
@@ -108,7 +110,8 @@ export async function converterLeadAssinado(
         ${area},
         'ativo',
         'analise',
-        NOW()
+        NOW(),
+        ${checklistInicial}::jsonb
       WHERE EXISTS (SELECT 1 FROM claim)
       RETURNING id::text
     `;

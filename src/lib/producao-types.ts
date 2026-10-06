@@ -1,3 +1,5 @@
+import type { ChecklistItem } from "./checklist-types";
+
 export const ESTAGIOS_PRODUCAO = [
   "analise",
   "producao",
@@ -110,4 +112,5 @@ export interface ProcessoProducao {
   protocolo_inss: string | null;
   data_protocolo_inss_iso: string | null;
   data_distribuicao_iso: string | null;
+  checklist: ChecklistItem[];
 }

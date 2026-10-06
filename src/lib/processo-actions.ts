@@ -7,6 +7,7 @@ import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { notificarPrevBot } from "./prevbot-outbound";
 import { podeEditarProcesso } from "./processo-ownership";
+import { checklistPadrao } from "./checklist-documentos";
 
 export type ProcessoFormState = { error: string } | null;
 
@@ -79,6 +80,8 @@ export async function createProcessoAction(
   if (!tipoAcao) return { error: "Informe o tipo de ação." };
   if (!area) return { error: "Selecione a área jurídica." };
 
+  const checklistInicial = JSON.stringify(checklistPadrao(tipoAcao));
+
   try {
     await sql`
       INSERT INTO processos
@@ -88,7 +91,7 @@ export async function createProcessoAction(
          data_protocolo_inss, protocolo_inss, agencia_inss,
          resultado_admin, data_resultado_admin, motivo_indeferimento,
          modelo_honorario, valor_honorario, percentual_honorario,
-         num_beneficio_concedido, der, dib, dcb)
+         num_beneficio_concedido, der, dib, dcb, checklist)
       VALUES
         (${clientId}::uuid, ${numero}, ${tipoAcao}, ${area}, ${fase},
          ${vara}, ${comarca}, ${parteContraria}, ${parteContrariaDoc},
@@ -98,7 +101,8 @@ export async function createProcessoAction(
          ${dataProtocoloInss}::date, ${protocoloInss}, ${agenciaInss},
          ${resultadoAdmin}, ${dataResultadoAdmin}::date, ${motivoIndeferimento},
          ${modeloHonorario}, ${valorHonorario}, ${percentualHonorario},
-         ${numBeneficioConcedido}, ${der}::date, ${dib}::date, ${dcb}::date)
+         ${numBeneficioConcedido}, ${der}::date, ${dib}::date, ${dcb}::date,
+         ${checklistInicial}::jsonb)
     `;
   } catch (err) {
     console.error("createProcessoAction DB error:", err);

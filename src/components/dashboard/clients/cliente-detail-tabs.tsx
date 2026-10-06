@@ -7,6 +7,9 @@ import type { Processo } from "@/lib/processos-db";
 import type { ClientDebito } from "@/lib/lancamentos-db";
 import type { Documento } from "@/lib/documents-db";
 import type { ModeloDocumento } from "@/lib/modelos-db";
+import { checklistStatus } from "@/lib/checklist-types";
+import ChecklistManager from "../controladoria/checklist-manager";
+import ChecklistBadge from "../checklist-badge";
 import type {
   InboundEmailAddress,
   InboundEmail,
@@ -271,6 +274,7 @@ export default function ClienteDetailTabs({
     (p) => p.status === "ativo" || p.status === "em_andamento"
   );
   const valorTotal = processes.reduce((s, p) => s + (p.valor_causa ?? 0), 0);
+  const checklistStatusClient = checklistStatus(client.checklist);
 
   return (
     <div className="space-y-4">
@@ -365,6 +369,23 @@ export default function ClienteDetailTabs({
                   sub: "arquivos",
                   color: "text-indigo-600",
                   bg: "bg-indigo-50",
+                  tab: "documentos",
+                },
+                {
+                  icon: checklistStatusClient.completo
+                    ? CheckCircleIcon
+                    : AlertIcon,
+                  label: "P/ dar entrada",
+                  value: checklistStatusClient.completo
+                    ? "Completo"
+                    : `Faltam ${checklistStatusClient.pendentes}`,
+                  sub: "documentos necessários",
+                  color: checklistStatusClient.completo
+                    ? "text-emerald-600"
+                    : "text-amber-600",
+                  bg: checklistStatusClient.completo
+                    ? "bg-emerald-50"
+                    : "bg-amber-50",
                   tab: "documentos",
                 },
               ].map(
@@ -1047,6 +1068,19 @@ export default function ClienteDetailTabs({
 
       {tab === "documentos" && (
         <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-heading text-sm font-bold text-fg">
+                Documentos necessários pra dar entrada
+              </h3>
+              <ChecklistBadge checklist={client.checklist} />
+            </div>
+            <ChecklistManager
+              origemTipo="cliente"
+              origemId={client.id}
+              itensIniciais={client.checklist}
+            />
+          </div>
           <div className="flex items-center justify-between">
             <p className="font-body text-sm text-muted">
               {documentos.length}{" "}

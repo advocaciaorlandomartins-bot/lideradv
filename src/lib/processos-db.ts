@@ -1,4 +1,5 @@
 import sql from "./db";
+import { parseChecklist, type ChecklistItem } from "./checklist-types";
 
 export interface Processo {
   id: string;
@@ -41,6 +42,9 @@ export interface Processo {
   // Diagnóstico herdado do cadastro do cliente, pra priorizar visualmente
   // qual processo tratar primeiro direto na listagem.
   cid_principal: string | null;
+  // Documentos necessários pra dar entrada — ver checklistPadrao em
+  // checklist-documentos.ts.
+  checklist: ChecklistItem[];
 }
 
 export interface ProcessoFull extends Processo {
@@ -97,6 +101,7 @@ function mapRow(r: any): Processo {
     dcb: r.dcb ? String(r.dcb).slice(0, 10) : null,
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
     cid_principal: r.cid_principal ?? null,
+    checklist: parseChecklist(r.checklist),
   };
 }
 
@@ -159,6 +164,7 @@ export async function getAllProcessos(
           to_char(p.dib, 'YYYY-MM-DD') AS dib,
           to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
           c.cid_principal,
+          p.checklist,
           (
             SELECT COALESCE(array_agg(DISTINCT e.categoria || ':' || e.valor), ARRAY[]::text[])
             FROM etiquetas e
@@ -204,6 +210,7 @@ export async function getAllProcessos(
           to_char(p.dib, 'YYYY-MM-DD') AS dib,
           to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
           c.cid_principal,
+          p.checklist,
           (
             SELECT COALESCE(array_agg(DISTINCT e.categoria || ':' || e.valor), ARRAY[]::text[])
             FROM etiquetas e
@@ -249,7 +256,8 @@ export async function getProcessoById(id: string): Promise<Processo | null> {
       p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
       to_char(p.der, 'YYYY-MM-DD') AS der,
       to_char(p.dib, 'YYYY-MM-DD') AS dib,
-      to_char(p.dcb, 'YYYY-MM-DD') AS dcb
+      to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+      p.checklist
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.id = ${id}::uuid AND p.deleted_at IS NULL
@@ -288,7 +296,8 @@ export async function getProcessoFull(
       p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
       to_char(p.der, 'YYYY-MM-DD') AS der,
       to_char(p.dib, 'YYYY-MM-DD') AS dib,
-      to_char(p.dcb, 'YYYY-MM-DD') AS dcb
+      to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+      p.checklist
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.id = ${id}::uuid AND p.deleted_at IS NULL
@@ -332,7 +341,8 @@ export async function getProcessosByClientId(
       p.protocolo_inss, p.agencia_inss, p.resultado_admin,
       to_char(p.data_resultado_admin, 'YYYY-MM-DD') AS data_resultado_admin,
       p.motivo_indeferimento, p.modelo_honorario,
-      p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido
+      p.valor_honorario, p.percentual_honorario, p.num_beneficio_concedido,
+      p.checklist
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.client_id = ${clientId}::uuid

@@ -33,6 +33,7 @@ import ProcessosSettingsModal, {
   useProcessosSettings,
 } from "./processos-settings-modal";
 import CadastroSimplesModal from "./cadastro-simples-modal";
+import ChecklistBadge from "../checklist-badge";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -1114,7 +1115,7 @@ export default function ProcessosContent({
                                     }
                                 : null;
                             return (
-                              <div>
+                              <div className="space-y-1">
                                 <span
                                   className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${ep.cls}`}
                                 >
@@ -1122,11 +1123,12 @@ export default function ProcessosContent({
                                 </span>
                                 {subStatus && (
                                   <p
-                                    className={`mt-0.5 font-body text-[10px] font-semibold ${subStatus.cls}`}
+                                    className={`font-body text-[10px] font-semibold ${subStatus.cls}`}
                                   >
                                     {subStatus.label}
                                   </p>
                                 )}
+                                <ChecklistBadge checklist={p.checklist} />
                               </div>
                             );
                           })()}
@@ -1195,8 +1197,9 @@ export default function ProcessosContent({
                             ` — ${descreverCid(p.cid_principal)}`}
                         </p>
                       )}
-                      <div className="mt-1">
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
                         <StatusBadge status={p.status} />
+                        <ChecklistBadge checklist={p.checklist} />
                       </div>
                     </div>
                     <ChevronRightIcon className="h-4 w-4 flex-shrink-0 text-muted" />

@@ -30,6 +30,7 @@ import {
   voltarEstagioAction,
 } from "@/lib/producao-actions";
 import { getProximaAcaoProcesso } from "@/lib/processo-fases";
+import ChecklistBadge from "../checklist-badge";
 
 // ── Stepper de progressão ─────────────────────────────────────────────────────
 
@@ -291,6 +292,9 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
           <p className="truncate font-body text-[11px] text-muted">
             Resp.: {processo.responsavel_nome ?? "Sem responsável"}
           </p>
+          <div className="mt-1">
+            <ChecklistBadge checklist={processo.checklist} />
+          </div>
         </div>
         <DiasBadge dias={processo.dias_no_estagio} />
       </div>

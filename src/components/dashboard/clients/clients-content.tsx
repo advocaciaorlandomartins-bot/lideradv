@@ -28,6 +28,7 @@ import ClientesFiltroModal, {
   FILTRO_CLIENTE_INICIAL,
   countFiltrosCliente,
 } from "./clientes-filtro-modal";
+import ChecklistBadge from "../checklist-badge";
 import AiDocumentImport from "./ai-document-import";
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -928,7 +929,10 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                         {c.since}
                       </td>
                       <td className="px-4 py-3.5">
-                        <StatusBadge status={c.status} />
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusBadge status={c.status} />
+                          <ChecklistBadge checklist={c.checklist} />
+                        </div>
                       </td>
                       <td
                         className="px-5 py-3.5"
@@ -977,11 +981,12 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                           Indicado por {c.indicador_nome}
                         </p>
                       )}
-                      <div className="mt-1 flex items-center gap-3">
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
                         <StatusBadge status={c.status} />
                         <span className="font-body text-xs text-muted">
                           {c.processes} processo{c.processes !== 1 ? "s" : ""}
                         </span>
+                        <ChecklistBadge checklist={c.checklist} />
                       </div>
                     </div>
                     <ChevronRightIcon className="h-4 w-4 flex-shrink-0 text-muted" />
@@ -1051,6 +1056,9 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                   <span className="font-body text-xs text-muted">
                     {c.since}
                   </span>
+                </div>
+                <div className="mt-2">
+                  <ChecklistBadge checklist={c.checklist} />
                 </div>
               </div>
             ))}

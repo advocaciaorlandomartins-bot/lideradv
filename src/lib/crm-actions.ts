@@ -7,6 +7,7 @@ import { hasPermission } from "./permissoes";
 import { logAction } from "./audit";
 import { podeGerenciarLead } from "./crm-ownership";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
+import { checklistPadrao } from "./checklist-documentos";
 
 export type CrmFormState = { error?: string; success?: boolean } | null;
 
@@ -165,8 +166,9 @@ async function garantirClienteEProcesso(leadId: string): Promise<void> {
   // 2. Cria processo em Análise se ainda não existe
   if (!lead.processo_id) {
     const area = (lead.area_interesse as string | null) ?? "A Definir";
+    const checklistInicial = JSON.stringify(checklistPadrao(area));
     const pr = await sql`
-      INSERT INTO processos (client_id, lead_id, tipo_acao, area, status, estagio_producao, data_estagio_at)
+      INSERT INTO processos (client_id, lead_id, tipo_acao, area, status, estagio_producao, data_estagio_at, checklist)
       VALUES (
         ${clientId}::uuid,
         ${leadId}::uuid,
@@ -174,7 +176,8 @@ async function garantirClienteEProcesso(leadId: string): Promise<void> {
         ${area},
         'ativo',
         'analise',
-        NOW()
+        NOW(),
+        ${checklistInicial}::jsonb
       )
       RETURNING id::text
     `;

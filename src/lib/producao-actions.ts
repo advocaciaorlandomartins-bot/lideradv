@@ -7,6 +7,7 @@ import { hasPermission } from "./permissoes";
 import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
 import { podeEditarProcesso } from "./processo-ownership";
 import { parseChecklist } from "./checklist-types";
+import { sincronizarChecklistCliente } from "./checklist";
 
 function revalidate(id?: string) {
   revalidatePath("/dashboard/producao");
@@ -39,41 +40,6 @@ async function marcarChecklistCompleto(processoId: string): Promise<void> {
     await sql`UPDATE processos SET checklist = ${completo}::jsonb WHERE id = ${processoId}::uuid`;
   }
   await sincronizarChecklistCliente(row.client_id);
-}
-
-/**
- * Só marca o checklist do cliente como completo se TODOS os processos dele
- * (não só o que acabou de avançar) já estiverem num estágio avançado — um
- * cliente com outro processo ainda em análise não pode ser dado como
- * "documentação completa" só porque um dos casos já foi protocolado.
- */
-async function sincronizarChecklistCliente(clientId: string): Promise<void> {
-  const processos = await sql`
-    SELECT estagio_producao, data_protocolo_inss, data_distribuicao,
-           resultado_administrativo, resultado_judicial
-    FROM processos WHERE client_id = ${clientId}::uuid AND deleted_at IS NULL
-  `;
-  if (processos.length === 0) return;
-  const todosAvancados = processos.every(
-    (p) =>
-      p.estagio_producao === "arquivado" ||
-      p.data_protocolo_inss != null ||
-      p.data_distribuicao != null ||
-      p.resultado_administrativo != null ||
-      p.resultado_judicial != null
-  );
-  if (!todosAvancados) return;
-
-  const [row] =
-    await sql`SELECT checklist FROM clients WHERE id = ${clientId}::uuid`;
-  const checklist = parseChecklist(row?.checklist);
-  if (checklist.length === 0 || checklist.every((i) => i.feito)) return;
-  const completo = JSON.stringify(
-    checklist.map((i) => ({ ...i, feito: true }))
-  );
-  await sql`UPDATE clients SET checklist = ${completo}::jsonb WHERE id = ${clientId}::uuid`;
-  revalidatePath("/dashboard/clientes");
-  revalidatePath(`/dashboard/clientes/${clientId}`);
 }
 
 /**

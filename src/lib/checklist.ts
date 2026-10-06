@@ -100,6 +100,70 @@ async function podeAlterarChecklist(
   return ownerCheck.length > 0;
 }
 
+/**
+ * Mantém o checklist do Cliente alinhado com os checklists dos processos
+ * dele — sem isso, um item desmarcado no checklist de UM processo (ex:
+ * "Procuração e contrato assinados" precisa ser renovada pro judicial)
+ * não refletia na ficha/lista de Clientes, que continuava mostrando
+ * "Completo" mesmo com o processo real mostrando "Faltam N" (achado
+ * real: cliente e processo guardam checklists em tabelas separadas).
+ * Regra: se todo processo do cliente estiver 100% marcado, o checklist do
+ * cliente também fica todo marcado; senão, qualquer item do cliente cujo
+ * texto apareça desmarcado em algum processo é desmarcado também — só
+ * reflete o que já existe nos processos, nunca inventa pendência nova.
+ */
+export async function sincronizarChecklistCliente(
+  clientId: string
+): Promise<void> {
+  const processos = await sql`
+    SELECT checklist FROM processos
+    WHERE client_id = ${clientId}::uuid AND deleted_at IS NULL
+  `;
+  if (processos.length === 0) return;
+
+  const checklistsProcessos = processos.map((p) => parseChecklist(p.checklist));
+  const todosCompletos = checklistsProcessos.every(
+    (c) => c.length > 0 && c.every((i) => i.feito)
+  );
+
+  const clienteChecklist = parseChecklist(
+    await lerChecklistRaw("clients", clientId)
+  );
+  if (clienteChecklist.length === 0) return;
+
+  let mudou = false;
+  const atualizado = clienteChecklist.map((item) => {
+    if (todosCompletos) {
+      if (!item.feito) mudou = true;
+      return { ...item, feito: true };
+    }
+    const desmarcadoEmAlgumProcesso = checklistsProcessos.some((checklist) =>
+      checklist.some((pi) => pi.texto === item.texto && !pi.feito)
+    );
+    if (desmarcadoEmAlgumProcesso && item.feito) {
+      mudou = true;
+      return { ...item, feito: false };
+    }
+    return item;
+  });
+  if (!mudou) return;
+
+  await gravarChecklist("clients", clientId, JSON.stringify(atualizado));
+  revalidatePath("/dashboard/clientes");
+  revalidatePath(`/dashboard/clientes/${clientId}`);
+}
+
+/** Propaga a mudança pro checklist do cliente logo após editar o checklist de um processo. */
+async function sincronizarSeProcesso(
+  tabela: string,
+  origemId: string
+): Promise<void> {
+  if (tabela !== "processos") return;
+  const [row] =
+    await sql`SELECT client_id::text FROM processos WHERE id = ${origemId}::uuid`;
+  if (row?.client_id) await sincronizarChecklistCliente(row.client_id);
+}
+
 function revalidarChecklist(tabela: string): void {
   if (tabela === "clients") {
     revalidatePath("/dashboard/clientes");
@@ -134,6 +198,7 @@ export async function toggleChecklistItemAction(
     checklist[index] = { ...checklist[index], feito: !checklist[index].feito };
 
     await gravarChecklist(tabela, origemId, JSON.stringify(checklist));
+    await sincronizarSeProcesso(tabela, origemId);
 
     revalidarChecklist(tabela);
     return { checklist };
@@ -170,6 +235,7 @@ export async function adicionarChecklistItemAction(
     checklist.push({ texto: textoLimpo, feito: false });
 
     await gravarChecklist(tabela, origemId, JSON.stringify(checklist));
+    await sincronizarSeProcesso(tabela, origemId);
     revalidarChecklist(tabela);
     return { checklist };
   } catch (e) {
@@ -199,6 +265,7 @@ export async function removerChecklistItemAction(
     checklist.splice(index, 1);
 
     await gravarChecklist(tabela, origemId, JSON.stringify(checklist));
+    await sincronizarSeProcesso(tabela, origemId);
     revalidarChecklist(tabela);
     return { checklist };
   } catch (e) {
@@ -227,6 +294,7 @@ export async function salvarChecklistAction(
 
   try {
     await gravarChecklist(tabelaCheck, origemId, JSON.stringify(checklist));
+    await sincronizarSeProcesso(tabelaCheck, origemId);
     revalidarChecklist(tabelaCheck);
     return {};
   } catch (e) {

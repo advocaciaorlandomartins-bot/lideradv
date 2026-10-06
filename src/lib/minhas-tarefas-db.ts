@@ -50,6 +50,7 @@ export interface MinhaAcaoProcesso {
   cliente_nome: string | null;
   cliente_id: string | null;
   estagio_producao: string | null;
+  checklist: ChecklistItem[];
   source: "processo";
 }
 
@@ -168,6 +169,7 @@ export async function getMinhasTarefas(
             p.resultado_judicial, p.protocolo_inss,
             to_char(p.data_protocolo_inss, 'YYYY-MM-DD') AS data_protocolo_inss,
             to_char(p.data_distribuicao, 'YYYY-MM-DD') AS data_distribuicao,
+            p.checklist,
             cl.id::text AS cliente_id, cl.name AS cliente_nome
           FROM processos p
           LEFT JOIN clients cl ON cl.id = p.client_id
@@ -262,6 +264,7 @@ export async function getMinhasTarefas(
         estagio_producao: r.estagio_producao
           ? String(r.estagio_producao)
           : null,
+        checklist: parseChecklist(r.checklist),
         source: "processo" as const,
       };
     })

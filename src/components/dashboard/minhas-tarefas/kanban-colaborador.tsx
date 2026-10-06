@@ -27,6 +27,7 @@ import {
 } from "@/components/icons";
 import { ESTAGIO_PRODUCAO_META } from "@/lib/producao-types";
 import ChecklistManager from "@/components/dashboard/controladoria/checklist-manager";
+import ChecklistBadge from "@/components/dashboard/checklist-badge";
 import type { ChecklistItem } from "@/lib/checklist-types";
 import { AvatarStack } from "@/components/dashboard/avatar";
 import {
@@ -246,15 +247,18 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
           </p>
         )}
 
-        {estagioMeta && (
-          <Link
-            href="/dashboard/producao"
-            className={`mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-body text-[10px] font-semibold transition-opacity hover:opacity-80 ${estagioMeta.bg} ${estagioMeta.color}`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${estagioMeta.dot}`} />
-            {estagioMeta.label}
-          </Link>
-        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {estagioMeta && (
+            <Link
+              href="/dashboard/producao"
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-body text-[10px] font-semibold transition-opacity hover:opacity-80 ${estagioMeta.bg} ${estagioMeta.color}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${estagioMeta.dot}`} />
+              {estagioMeta.label}
+            </Link>
+          )}
+          <ChecklistBadge checklist={item.checklist} />
+        </div>
       </div>
 
       <div className="border-t border-border px-3 pb-3 pt-3">

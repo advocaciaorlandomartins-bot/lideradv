@@ -19,11 +19,12 @@ function avatarColor(name: string) {
     "bg-blue-100 text-blue-700",
     "bg-violet-100 text-violet-700",
   ];
-  return colors[name.charCodeAt(0) % colors.length];
+  return colors[(name.charCodeAt(0) || 0) % colors.length];
 }
 
 function initials(name: string) {
   const parts = name.split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }

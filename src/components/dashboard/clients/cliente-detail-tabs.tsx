@@ -109,13 +109,24 @@ function BloquearMensagensToggle({
  * direto no(s) processo(s) que têm aquele mesmo item, já que não existe
  * mais uma cópia separada em clients.checklist pra editar quando o
  * cliente já tem processo.
+ *
+ * `readOnly`: usado quando o cliente tem MAIS DE UM processo — nesse caso
+ * a ação de marcar por texto (toggleChecklistItemClienteViaProcessosAction)
+ * aplicaria o mesmo valor em TODOS os processos que têm um item com aquele
+ * texto (ex: "CNIS atualizado" existe em dois processos de benefícios
+ * diferentes do mesmo cliente), podendo marcar como entregue num processo
+ * um documento que só foi conferido no outro. Com um processo só isso não
+ * é ambíguo, então só fica clicável nesse caso — com mais de um, cada item
+ * é editado direto no processo correspondente (links abaixo).
  */
 function ChecklistClienteDerivado({
   clientId,
   itensIniciais,
+  readOnly = false,
 }: {
   clientId: string;
   itensIniciais: ChecklistItem[];
+  readOnly?: boolean;
 }) {
   const [itens, setItens] = useState(itensIniciais);
   const [isPending, startTransition] = useTransition();
@@ -147,14 +158,8 @@ function ChecklistClienteDerivado({
   return (
     <div>
       <div className={`space-y-1.5 ${isPending ? "opacity-60" : ""}`}>
-        {itens.map((item, idx) => (
-          <button
-            key={idx}
-            type="button"
-            onClick={() => toggle(item)}
-            disabled={isPending}
-            className="flex w-full items-center gap-2 text-left cursor-pointer"
-          >
+        {itens.map((item, idx) => {
+          const checkbox = (
             <span
               className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition-colors ${
                 item.feito
@@ -164,13 +169,35 @@ function ChecklistClienteDerivado({
             >
               {item.feito && <CheckIcon className="h-3 w-3" />}
             </span>
+          );
+          const label = (
             <span
               className={`flex-1 font-body text-xs ${item.feito ? "text-muted line-through" : "text-fg"}`}
             >
               {item.texto}
             </span>
-          </button>
-        ))}
+          );
+          if (readOnly) {
+            return (
+              <div key={idx} className="flex w-full items-center gap-2">
+                {checkbox}
+                {label}
+              </div>
+            );
+          }
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => toggle(item)}
+              disabled={isPending}
+              className="flex w-full items-center gap-2 text-left cursor-pointer"
+            >
+              {checkbox}
+              {label}
+            </button>
+          );
+        })}
       </div>
       {erro && (
         <p className="mt-1.5 font-body text-xs font-semibold text-red-600">
@@ -1178,12 +1205,14 @@ export default function ClienteDetailTabs({
             {processes.length > 0 ? (
               <div className="space-y-2">
                 <p className="font-body text-xs text-muted">
-                  Reflete o checklist de cada processo — marcar/desmarcar aqui
-                  já atualiza o processo correspondente.
+                  {processes.length === 1
+                    ? "Reflete o checklist do processo — marcar/desmarcar aqui já atualiza ele."
+                    : "Reflete o checklist de cada processo — como são vários, edite direto no processo correspondente."}
                 </p>
                 <ChecklistClienteDerivado
                   clientId={client.id}
                   itensIniciais={client.checklist}
+                  readOnly={processes.length > 1}
                 />
                 <div className="flex flex-wrap gap-2 pt-1">
                   {processes.map((p) => (

@@ -189,21 +189,21 @@ async function main() {
   `;
 
   if (existente) {
+    // Não sobrescreve conteúdo/conteudo_blocks num reexecução — achado de
+    // revisão: isso descartava em silêncio qualquer ajuste feito depois
+    // pelo editor em /dashboard/modelos/[id]/editar. Reexecutar este
+    // script só garante que o modelo existe e está ativo; pra mudar o
+    // texto depois de criado, edite direto na tela (ou apague a linha no
+    // banco antes de rodar de novo, de propósito).
     await sql`
       UPDATE modelos_documento
-      SET categoria = ${CATEGORIA},
-          descricao = ${DESCRICAO},
-          conteudo = ${conteudo},
-          conteudo_blocks = ${JSON.stringify(blocks)},
-          usar_timbrado = true,
-          usar_fundo_timbrado = false,
-          ocultar_identificacao_escritorio = false,
-          requer_responsavel_legal = false,
-          ativo = true,
+      SET ativo = true,
           updated_at = now()
       WHERE id = ${existente.id}::uuid
     `;
-    console.log(`✓ Modelo "${TITULO}" atualizado (id ${existente.id}).`);
+    console.log(
+      `✓ Modelo "${TITULO}" já existia (id ${existente.id}) — conteúdo preservado, só confirmei que está ativo. Pra atualizar o texto, edite pela tela de Modelos.`
+    );
   } else {
     await sql`
       INSERT INTO modelos_documento

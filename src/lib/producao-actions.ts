@@ -190,7 +190,7 @@ export async function registrarProtocoloAdminAction(
   // administrativa — se o processo for reatribuído depois (ex: pra alguém
   // tocar o judicial), a comissão do administrativo continua sendo desse
   // colaborador, não de quem assumir depois.
-  const [{ responsavel_administrativo_id: responsavelAdminId }] = await sql`
+  const linhas = await sql`
     UPDATE processos
     SET protocolo_inss                = ${protocolo.trim() || null},
         data_protocolo_inss           = ${data || null}::date,
@@ -199,7 +199,16 @@ export async function registrarProtocoloAdminAction(
     WHERE id = ${id}::uuid
     RETURNING responsavel_administrativo_id::text
   `;
-  await congelarComissaoSnapshot(id, responsavelAdminId);
+  // RETURNING vem vazio se o id não bater com nenhuma linha (processo
+  // excluído entre a checagem de permissão e este UPDATE) — sem essa
+  // checagem, a desestruturação abaixo lançava uma exceção não tratada
+  // em vez de devolver um erro limpo.
+  if (linhas.length === 0) return { error: "Processo não encontrado." };
+  await congelarComissaoSnapshot(
+    id,
+    linhas[0].responsavel_administrativo_id,
+    "administrativo"
+  );
   await marcarChecklistCompleto(id);
   revalidate(id);
   return {};
@@ -222,7 +231,7 @@ export async function registrarDistribuicaoJudicialAction(
   // Mesma lógica do protocolo administrativo: quem é responsável na hora de
   // distribuir a ação fica marcado como dono da fase judicial pra fins de
   // comissão, mesmo que o responsável do processo mude depois disso.
-  const [{ responsavel_judicial_id: responsavelJudId }] = await sql`
+  const linhas = await sql`
     UPDATE processos
     SET numero                   = COALESCE(NULLIF(${numero.trim()}, ''), numero),
         data_distribuicao        = ${data || null}::date,
@@ -231,7 +240,12 @@ export async function registrarDistribuicaoJudicialAction(
     WHERE id = ${id}::uuid
     RETURNING responsavel_judicial_id::text
   `;
-  await congelarComissaoSnapshot(id, responsavelJudId);
+  if (linhas.length === 0) return { error: "Processo não encontrado." };
+  await congelarComissaoSnapshot(
+    id,
+    linhas[0].responsavel_judicial_id,
+    "judicial"
+  );
   await marcarChecklistCompleto(id);
   revalidate(id);
   return {};

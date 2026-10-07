@@ -224,10 +224,20 @@ export function colaboradorDadosCompletosParaContrato(
   colaborador: Colaborador
 ): string[] {
   const faltando: string[] = [];
+  if (!colaborador.nome.trim()) faltando.push("nome");
   if (!colaborador.email) faltando.push("e-mail");
   if (!colaborador.oab || !colaborador.oab_uf) faltando.push("OAB");
   if (!colaborador.street || !colaborador.city || !colaborador.state)
     faltando.push("endereço");
+  // Sem isso, dava pra mandar o contrato com a cláusula de honorários
+  // inteira em branco ("a combinar" nas 3 fases) — assinatura vinculante
+  // de um texto obviamente incompleto.
+  if (
+    colaborador.comissao_administrativo_pct == null &&
+    colaborador.comissao_judicial_pct == null &&
+    colaborador.comissao_ambos_pct == null
+  )
+    faltando.push("percentual de comissão (Comissão por fase do processo)");
   return faltando;
 }
 

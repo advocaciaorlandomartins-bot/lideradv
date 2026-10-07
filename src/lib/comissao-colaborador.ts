@@ -126,6 +126,23 @@ export function aplicarComissao(valor: number, pct: number | null): number {
   return Math.round(valor * (pct / 100) * 100) / 100;
 }
 
+/** Monta um ComissaoConfig a partir de uma linha de `colaboradores` — mesma conversão usada em congelarComissaoSnapshot e no fallback de gerarComissaoAutomaticaPorPagamento. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function comissaoConfigFromRow(row: any): ComissaoConfig {
+  return {
+    comissao_administrativo_pct:
+      row.comissao_administrativo_pct != null
+        ? Number(row.comissao_administrativo_pct)
+        : null,
+    comissao_judicial_pct:
+      row.comissao_judicial_pct != null
+        ? Number(row.comissao_judicial_pct)
+        : null,
+    comissao_ambos_pct:
+      row.comissao_ambos_pct != null ? Number(row.comissao_ambos_pct) : null,
+  };
+}
+
 /**
  * Congela o % de comissão vigente AGORA pra um colaborador num processo —
  * chamado no momento em que ele "assume" uma fase (protocolo administrativo
@@ -138,10 +155,28 @@ export function aplicarComissao(valor: number, pct: number | null): number {
  * processos.comissao_pct_snapshot é um mapa { [colaboradorId]: ComissaoConfig }
  * — cada colaborador guarda o próprio snapshot, independente de outros que
  * também tenham atuado no mesmo processo.
+ *
+ * Dois cuidados que a primeira versão não tinha (achados de revisão):
+ * 1. Só grava o campo da FASE que está sendo congelada agora
+ *    (comissao_administrativo_pct ou comissao_judicial_pct) — nunca o
+ *    objeto inteiro. Gravar tudo de novo a cada chamada fazia a 2ª fase
+ *    (ex: judicial, depois que o administrativo já tinha sido negado)
+ *    sobrescrever o valor da 1ª com o % atual do cadastro, perdendo
+ *    justamente o congelamento que essa função existe pra garantir.
+ * 2. "comissao_ambos_pct" só é gravado se ainda não tinha sido — regra
+ *    "primeira vez vale" pra refletir o % vigente quando o colaborador
+ *    assumiu o processo pela primeira vez (não quando a 2ª fase dele
+ *    for registrada depois).
+ * 3. Tudo num único UPDATE (jsonb_set lendo a própria coluna na mesma
+ *    instrução) em vez de SELECT + UPDATE em dois passos — evita
+ *    "lost update" se dois congelamentos do mesmo processo acontecerem
+ *    quase ao mesmo tempo (ex: admin e judicial registrados em sequência
+ *    rápida por pessoas diferentes).
  */
 export async function congelarComissaoSnapshot(
   processoId: string,
-  colaboradorId: string | null
+  colaboradorId: string | null,
+  fase: "administrativo" | "judicial"
 ): Promise<void> {
   if (!colaboradorId) return;
   try {
@@ -151,29 +186,30 @@ export async function congelarComissaoSnapshot(
     `;
     if (!colab) return;
 
-    const [proc] = await sql`
-      SELECT comissao_pct_snapshot FROM processos WHERE id = ${processoId}::uuid
-    `;
-    const atual = (proc?.comissao_pct_snapshot ?? {}) as Record<
-      string,
-      ComissaoConfig
-    >;
-    atual[colaboradorId] = {
-      comissao_administrativo_pct:
-        colab.comissao_administrativo_pct != null
-          ? Number(colab.comissao_administrativo_pct)
-          : null,
-      comissao_judicial_pct:
-        colab.comissao_judicial_pct != null
-          ? Number(colab.comissao_judicial_pct)
-          : null,
-      comissao_ambos_pct:
-        colab.comissao_ambos_pct != null
-          ? Number(colab.comissao_ambos_pct)
-          : null,
-    };
+    const config = comissaoConfigFromRow(colab);
+    const campoFase =
+      fase === "administrativo"
+        ? "comissao_administrativo_pct"
+        : "comissao_judicial_pct";
+    const pctFase =
+      fase === "administrativo"
+        ? config.comissao_administrativo_pct
+        : config.comissao_judicial_pct;
+
     await sql`
-      UPDATE processos SET comissao_pct_snapshot = ${JSON.stringify(atual)}::jsonb
+      UPDATE processos
+      SET comissao_pct_snapshot = jsonb_set(
+        COALESCE(comissao_pct_snapshot, '{}'::jsonb),
+        ARRAY[${colaboradorId}]::text[],
+        COALESCE(comissao_pct_snapshot -> ${colaboradorId}, '{}'::jsonb)
+          || jsonb_build_object(${campoFase}, ${pctFase}::numeric)
+          || CASE
+               WHEN (comissao_pct_snapshot -> ${colaboradorId} -> 'comissao_ambos_pct') IS NULL
+               THEN jsonb_build_object('comissao_ambos_pct', ${config.comissao_ambos_pct}::numeric)
+               ELSE '{}'::jsonb
+             END,
+        true
+      )
       WHERE id = ${processoId}::uuid
     `;
   } catch (e) {
@@ -275,20 +311,8 @@ export async function gerarComissaoAutomaticaPorPagamento(
       // fase (ver congelarComissaoSnapshot) tem prioridade sobre o % atual
       // do cadastro — processo aberto antes dessa funcionalidade existir
       // não tem snapshot, cai no % ao vivo (comportamento de sempre).
-      const config: ComissaoConfig = snapshot[colaboradorId] ?? {
-        comissao_administrativo_pct:
-          colab.comissao_administrativo_pct != null
-            ? Number(colab.comissao_administrativo_pct)
-            : null,
-        comissao_judicial_pct:
-          colab.comissao_judicial_pct != null
-            ? Number(colab.comissao_judicial_pct)
-            : null,
-        comissao_ambos_pct:
-          colab.comissao_ambos_pct != null
-            ? Number(colab.comissao_ambos_pct)
-            : null,
-      };
+      const config: ComissaoConfig =
+        snapshot[colaboradorId] ?? comissaoConfigFromRow(colab);
       const pct = resolveComissaoPctParaColaborador(
         colaboradorId,
         config,

@@ -40,6 +40,17 @@ export async function enviarContratoParceriaAction(
   const colaborador = await getColaboradorFull(colaboradorId);
   if (!colaborador) return { error: "Colaborador não encontrado." };
 
+  // Só a tela checava o cargo (botão só aparece pra Advogado(a) Parceiro(a))
+  // — sem essa checagem aqui, qualquer chamada direta à action mandava o
+  // contrato (com "PARCEIRO(A)" no texto, pra assinatura vinculante) pra
+  // um colaborador de qualquer outro cargo.
+  if (colaborador.cargo !== "advogado_parceiro") {
+    return {
+      error:
+        'O Contrato de Parceria só pode ser enviado pra colaborador com cargo "Advogado(a) Parceiro(a)".',
+    };
+  }
+
   const faltando = colaboradorDadosCompletosParaContrato(colaborador);
   if (faltando.length > 0) {
     return {

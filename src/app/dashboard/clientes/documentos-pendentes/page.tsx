@@ -3,6 +3,7 @@ import { getClientesComDocumentosPendentes } from "@/lib/clients-db";
 import DocumentosPendentesContent from "@/components/dashboard/clients/documentos-pendentes-content";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 
 export const metadata = {
   title: "Documentos Pendentes — LiderAdv",
@@ -14,7 +15,16 @@ export default async function DocumentosPendentesPage() {
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "ver")) notFound();
 
-  const clientes = await getClientesComDocumentosPendentes();
+  // Mesma regra de escopo da lista de Clientes — sem "clientes_ver_todos"
+  // só entra cliente com processo em que o usuário é responsável.
+  const podeVerTodos = hasPermission(session, "clientes_ver_todos", "ver");
+  const colaboradorId = podeVerTodos
+    ? null
+    : await getColaboradorIdForUser(session.id);
+  const clientes = await getClientesComDocumentosPendentes(
+    podeVerTodos,
+    colaboradorId
+  );
 
   return (
     <div className="space-y-6">

@@ -38,7 +38,22 @@ export default function ClientDebitsSection({
     });
   }
 
-  const { items, totalPendente, totalPago } = debito;
+  // processoId filtra de fato a lista exibida (não só os links de criar
+  // novo) — achado de revisão: antes só os botões "+Receita"/"+Despesa"
+  // recebiam o processo, a lista continuava mostrando TODOS os
+  // lançamentos do cliente mesmo vindo da ficha de um processo
+  // específico, contrariando o que o botão "Financeiro" do processo
+  // prometia mostrar.
+  const itemsFiltrados = processoId
+    ? debito.items.filter((i) => i.processo_id === processoId)
+    : debito.items;
+  const items = itemsFiltrados;
+  const totalPendente = processoId
+    ? items.reduce((s, i) => (i.status !== "pago" ? s + i.valor : s), 0)
+    : debito.totalPendente;
+  const totalPago = processoId
+    ? items.reduce((s, i) => (i.status === "pago" ? s + i.valor : s), 0)
+    : debito.totalPago;
 
   return (
     <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
@@ -48,7 +63,19 @@ export default function ClientDebitsSection({
             Lançamentos do cliente
           </h2>
           <p className="mt-0.5 font-body text-xs text-muted">
-            Receitas e despesas vinculadas
+            {processoId ? (
+              <>
+                Mostrando só os lançamentos deste processo —{" "}
+                <Link
+                  href={`/dashboard/clientes/${clientId}?tab=financeiro`}
+                  className="text-primary hover:underline"
+                >
+                  ver todos do cliente
+                </Link>
+              </>
+            ) : (
+              "Receitas e despesas vinculadas"
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -87,7 +114,9 @@ export default function ClientDebitsSection({
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
           <BanknotesIcon className="h-8 w-8 text-slate-300" />
           <p className="font-body text-sm text-muted">
-            Nenhum débito registrado
+            {processoId
+              ? "Nenhum lançamento deste processo"
+              : "Nenhum débito registrado"}
           </p>
         </div>
       ) : (

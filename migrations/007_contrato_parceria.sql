@@ -12,3 +12,17 @@ ALTER TABLE envelopes ADD COLUMN IF NOT EXISTS colaborador_id UUID REFERENCES co
 -- administrativo/distribuição judicial é registrado — uma mudança futura no
 -- percentual do colaborador não altera processos já em andamento.
 ALTER TABLE processos ADD COLUMN IF NOT EXISTS comissao_pct_snapshot JSONB;
+
+-- Garante no banco que um envelope nunca aponta pros dois ao mesmo tempo
+-- (achado de revisão: só existia como comentário no código, sem garantia
+-- real de integridade).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'envelopes_client_ou_colaborador'
+  ) THEN
+    ALTER TABLE envelopes
+    ADD CONSTRAINT envelopes_client_ou_colaborador
+    CHECK (client_id IS NULL OR colaborador_id IS NULL);
+  END IF;
+END $$;

@@ -146,15 +146,21 @@ async function garantirClienteEProcesso(leadId: string): Promise<void> {
   // 1. Cria cliente se ainda não existe
   let clientId: string = lead.client_id ?? "";
   if (!clientId) {
+    // Sem checklist aqui, o cliente nascia com clients.checklist = NULL
+    // (checklistEfetivoCliente só preenche de verdade quando um processo
+    // é criado logo em seguida — mas até lá, ou se esse passo falhar,
+    // o selo "P/ dar entrada" mostrava "Completo" indevidamente).
+    const checklistInicial = JSON.stringify(checklistPadrao(null));
     const cr = await sql`
-      INSERT INTO clients (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+      INSERT INTO clients (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status, checklist)
       VALUES (
         ${lead.tipo ?? "PF"},
         ${lead.nome},
         '',
         ${lead.email ?? ""},
         ${lead.telefone ?? ""},
-        '', '', '', '', '', '', 'ativo'
+        '', '', '', '', '', '', 'ativo',
+        ${checklistInicial}::jsonb
       )
       RETURNING id::text
     `;

@@ -50,6 +50,7 @@ export async function converterLeadAssinado(
   let clientId: string = lead.client_id ?? "";
   if (!clientId) {
     const novoClientId = crypto.randomUUID();
+    const checklistInicialCliente = JSON.stringify(checklistPadrao(null));
     const cr = await sql`
       WITH claim AS (
         UPDATE crm_leads SET client_id = ${novoClientId}::uuid
@@ -59,7 +60,7 @@ export async function converterLeadAssinado(
       INSERT INTO clients (
         id, type, name, doc, email, phone,
         cep, street, addr_number, neighborhood, city, state,
-        status, notes
+        status, notes, checklist
       )
       SELECT
         ${novoClientId}::uuid,
@@ -70,7 +71,8 @@ export async function converterLeadAssinado(
         ${lead.telefone ?? ""},
         '', '', '', '', '', '',
         'ativo',
-        ${lead.empresa ? `Empresa: ${lead.empresa}` : null}
+        ${lead.empresa ? `Empresa: ${lead.empresa}` : null},
+        ${checklistInicialCliente}::jsonb
       WHERE EXISTS (SELECT 1 FROM claim)
       RETURNING id::text
     `;

@@ -11,16 +11,24 @@ import {
  * manual); só cai pro checklist próprio do cliente (clients.checklist)
  * quando ainda não existe nenhum processo — aí sim é a lista inicial
  * mesmo, antes de qualquer caso ser aberto.
+ *
+ * Importante: uma vez que o cliente TEM processo, o resultado da mesclagem
+ * vale mesmo que venha vazio — nunca cai de volta pro clients.checklist
+ * nesse caso. Achado de revisão: a versão anterior caía pro checklist
+ * antigo do cliente quando a mesclagem dava vazia (processo com checklist
+ * null/esvaziado de propósito), ressuscitando pendência desatualizada e
+ * sem relação com o processo real.
  */
 function checklistEfetivoCliente(
   processCount: number,
   checklistProprio: unknown,
   processosChecklists: unknown
 ): ChecklistItem[] {
-  if (processCount > 0 && Array.isArray(processosChecklists)) {
-    const listas = processosChecklists.map((c) => parseChecklist(c));
-    const mesclado = mesclarChecklistsDeProcessos(listas);
-    if (mesclado.length > 0) return mesclado;
+  if (processCount > 0) {
+    const listas = Array.isArray(processosChecklists)
+      ? processosChecklists.map((c) => parseChecklist(c))
+      : [];
+    return mesclarChecklistsDeProcessos(listas);
   }
   return parseChecklist(checklistProprio);
 }
@@ -572,9 +580,15 @@ export interface ClienteDocumentoPendente {
  * aqui lista os TEXTOS dos itens pendentes em vez de só a contagem, pra dar
  * pra ligar pro cliente já sabendo exatamente o que cobrar.
  */
-export async function getClientesComDocumentosPendentes(): Promise<
-  ClienteDocumentoPendente[]
-> {
+export async function getClientesComDocumentosPendentes(
+  podeVerTodos: boolean = true,
+  colaboradorId: string | null = null
+): Promise<ClienteDocumentoPendente[]> {
+  // Mesma regra de posse de getAllClients — sem isso, qualquer usuário com
+  // só "clientes:ver" enxergava nome/e-mail/telefone e o que falta de
+  // TODOS os clientes do escritório, inclusive os que não são dele
+  // (achado de revisão: único leitor de clients nesse arquivo que não
+  // aplicava esse filtro).
   const rows = await sql`
     SELECT
       c.id::text,
@@ -589,6 +603,14 @@ export async function getClientesComDocumentosPendentes(): Promise<
       ) AS processos_checklists
     FROM clients c
     WHERE c.deleted_at IS NULL
+      AND (
+        ${podeVerTodos}
+        OR EXISTS (
+          SELECT 1 FROM processos p2
+          WHERE p2.client_id = c.id AND p2.deleted_at IS NULL
+            AND p2.responsavel_id = ${colaboradorId}::uuid
+        )
+      )
     ORDER BY c.name
   `;
 

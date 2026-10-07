@@ -224,6 +224,7 @@ export interface ClientSaidaItem {
   status: string;
   data_vencimento: string | null;
   data_pagamento: string | null;
+  processo_id: string | null;
 }
 
 export interface ClientDebito {
@@ -242,7 +243,8 @@ export async function getClientDebito(clientId: string): Promise<ClientDebito> {
       l.valor,
       l.status,
       to_char(l.data_vencimento, 'DD/MM/YYYY') AS data_vencimento,
-      to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento
+      to_char(l.data_pagamento,  'DD/MM/YYYY') AS data_pagamento,
+      l.processo_id::text
     FROM lancamentos l
     WHERE l.client_id = ${clientId}::uuid
       AND l.status != 'cancelado'
@@ -265,6 +267,7 @@ export async function getClientDebito(clientId: string): Promise<ClientDebito> {
       status: r.status,
       data_vencimento: r.data_vencimento ?? null,
       data_pagamento: r.data_pagamento ?? null,
+      processo_id: r.processo_id ?? null,
     };
   });
 

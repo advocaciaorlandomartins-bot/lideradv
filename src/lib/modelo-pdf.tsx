@@ -39,13 +39,14 @@ export function ModeloPdfDoc({
     !!config &&
     config.modelo_timbrado_ativo;
   const baseCfg = getPdfConfig(config, withLetterhead);
-  const pdfCfg: PdfPageConfig = fonteTamanho
-    ? {
-        ...baseCfg,
-        fontSize: fonteTamanho,
-        lineHeight: Math.max(baseCfg.lineHeight - 0.4, 1.3),
-      }
-    : baseCfg;
+  const pdfCfg: PdfPageConfig =
+    fonteTamanho != null
+      ? {
+          ...baseCfg,
+          fontSize: fonteTamanho,
+          lineHeight: Math.max(baseCfg.lineHeight - 0.4, 1.3),
+        }
+      : baseCfg;
   const s = buildStyles(pdfCfg);
   const identificacaoAtiva =
     !ocultarIdentificacao && (!config || config.identificacao_ativo);

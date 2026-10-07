@@ -30,7 +30,7 @@ import {
   voltarEstagioAction,
 } from "@/lib/producao-actions";
 import { getProximaAcaoProcesso } from "@/lib/processo-fases";
-import ChecklistBadge from "../checklist-badge";
+import ChecklistBadge, { ChecklistInlineIcon } from "../checklist-badge";
 
 // ── Stepper de progressão ─────────────────────────────────────────────────────
 
@@ -278,8 +278,9 @@ function ProducaoCard({ processo }: { processo: ProcessoProducao }) {
       {/* Dados do processo */}
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate font-body text-sm font-semibold text-fg leading-tight">
-            {processo.client_name}
+          <p className="flex items-center gap-1.5 truncate font-body text-sm font-semibold text-fg leading-tight">
+            <ChecklistInlineIcon checklist={processo.checklist} />
+            <span className="truncate">{processo.client_name}</span>
           </p>
           <p className="truncate font-body text-xs text-muted">
             {processo.tipo_acao} · {processo.area}

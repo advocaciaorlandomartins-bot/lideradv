@@ -33,7 +33,7 @@ import ProcessosSettingsModal, {
   useProcessosSettings,
 } from "./processos-settings-modal";
 import CadastroSimplesModal from "./cadastro-simples-modal";
-import ChecklistBadge from "../checklist-badge";
+import ChecklistBadge, { ChecklistInlineIcon } from "../checklist-badge";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -1029,6 +1029,7 @@ export default function ProcessosContent({
                                 className="flex cursor-pointer items-center gap-1.5 font-body text-sm font-semibold text-fg hover:text-primary"
                               >
                                 <UsersIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted" />
+                                <ChecklistInlineIcon checklist={p.checklist} />
                                 <span className="truncate">
                                   {p.client_name}
                                 </span>
@@ -1172,8 +1173,9 @@ export default function ProcessosContent({
                       <FolderOpenIcon className="h-5 w-5 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-body text-sm font-semibold text-fg">
-                        {p.client_name}
+                      <p className="flex items-center gap-1.5 truncate font-body text-sm font-semibold text-fg">
+                        <ChecklistInlineIcon checklist={p.checklist} />
+                        <span className="truncate">{p.client_name}</span>
                       </p>
                       <div className="mt-0.5 flex items-center gap-1.5">
                         <p className="truncate font-body text-xs text-muted">

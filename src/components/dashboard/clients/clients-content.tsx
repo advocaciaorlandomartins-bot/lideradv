@@ -29,7 +29,8 @@ import ClientesFiltroModal, {
   FILTRO_CLIENTE_INICIAL,
   countFiltrosCliente,
 } from "./clientes-filtro-modal";
-import ChecklistBadge from "../checklist-badge";
+import ChecklistBadge, { ChecklistInlineIcon } from "../checklist-badge";
+import { checklistStatus } from "@/lib/checklist-types";
 import AiDocumentImport from "./ai-document-import";
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -225,6 +226,10 @@ interface ClientsContentProps {
 
 export default function ClientsContent({ clients }: ClientsContentProps) {
   const router = useRouter();
+  const docsPendentesCount = useMemo(
+    () => clients.filter((c) => !checklistStatus(c.checklist).completo).length,
+    [clients]
+  );
   const novoRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
   const quickRef = useRef<HTMLDivElement>(null);
@@ -685,14 +690,25 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
               <span className="hidden sm:inline">Aniversários</span>
             </Link>
 
-            {/* Documentos Pendentes */}
+            {/* Documentos Pendentes — cor sólida de propósito quando tem
+                pendência (mesmo padrão do selo "P/ dar entrada" na ficha do
+                cliente), pra chamar mais atenção que os outros botões. */}
             <Link
               href="/dashboard/clientes/documentos-pendentes"
-              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-white px-3 font-body text-sm font-semibold text-muted transition-colors hover:border-primary/40 hover:text-fg"
+              className={`flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-3 font-body text-sm font-semibold transition-colors ${
+                docsPendentesCount > 0
+                  ? "bg-red-600 text-white shadow-sm hover:bg-red-700"
+                  : "border border-border bg-white text-muted hover:border-primary/40 hover:text-fg"
+              }`}
               title="Documentos Pendentes"
             >
               <AlertIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Doc. Pendentes</span>
+              {docsPendentesCount > 0 && (
+                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-white px-1 font-body text-[11px] font-bold text-red-700">
+                  {docsPendentesCount}
+                </span>
+              )}
             </Link>
 
             {/* Export */}
@@ -896,8 +912,9 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                             {initials(c.name)}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate font-body text-sm font-semibold text-fg">
-                              {c.name}
+                            <p className="flex items-center gap-1.5 truncate font-body text-sm font-semibold text-fg">
+                              <ChecklistInlineIcon checklist={c.checklist} />
+                              <span className="truncate">{c.name}</span>
                             </p>
                             {c.trade_name && (
                               <p className="truncate font-body text-xs text-muted">
@@ -978,7 +995,8 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                       {initials(c.name)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <ChecklistInlineIcon checklist={c.checklist} />
                         <p className="truncate font-body text-sm font-semibold text-fg">
                           {c.name}
                         </p>
@@ -1025,6 +1043,7 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                 </div>
                 <div className="mt-3">
                   <div className="flex items-center gap-1.5">
+                    <ChecklistInlineIcon checklist={c.checklist} />
                     <p className="truncate font-body text-sm font-semibold text-fg">
                       {c.name}
                     </p>

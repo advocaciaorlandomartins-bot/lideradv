@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     title: "LiderAdv",
   },
   icons: {
-    apple: "/logo.png",
+    apple: "/logo-icon.png",
   },
 };
 

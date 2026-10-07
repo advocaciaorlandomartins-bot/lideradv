@@ -345,8 +345,12 @@ export default function Sidebar({
         >
           {!collapsed && (
             <div className="flex items-center gap-2">
+              {/* Marca só com o símbolo (sem "LIDERADV" escrito) — o
+                  logo.png completo tem o nome embutido na imagem, que em
+                  48px vira um borrão dourado ilegível; o nome já aparece
+                  do lado como texto de verdade. */}
               <Image
-                src="/logo.png"
+                src="/logo-icon.png"
                 alt="LiderAdv"
                 width={48}
                 height={48}
@@ -363,7 +367,7 @@ export default function Sidebar({
 
           {collapsed && (
             <Image
-              src="/logo.png"
+              src="/logo-icon.png"
               alt="LiderAdv"
               width={40}
               height={40}

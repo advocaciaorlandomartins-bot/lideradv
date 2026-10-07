@@ -1,4 +1,5 @@
 import ResetSenhaForm from "@/components/reset-senha-form";
+import { getBrandingSrcs } from "@/lib/branding";
 
 export default async function ResetSenhaPage({
   searchParams,
@@ -6,5 +7,6 @@ export default async function ResetSenhaPage({
   searchParams: Promise<{ token?: string; redefinido?: string }>;
 }) {
   const params = await searchParams;
-  return <ResetSenhaForm token={params.token ?? null} />;
+  const { logoSrc } = await getBrandingSrcs();
+  return <ResetSenhaForm token={params.token ?? null} logoSrc={logoSrc} />;
 }

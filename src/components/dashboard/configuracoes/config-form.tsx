@@ -311,13 +311,64 @@ export default function ConfigForm({ config }: Props) {
     FormData
   >(saveEscritorioConfigAction, null);
 
-  // Logo
+  // Logo (documentos gerados)
   const [logoUrl, setLogoUrl] = useState(config.logo_url ?? "");
   const [previewUrl, setPreviewUrl] = useState(config.logo_url ?? "");
   const [logoAtivo, setLogoAtivo] = useState(config.logo_ativo ?? true);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Identidade visual do sistema (sidebar, login, ícone do app) —
+  // independente da logo acima, que só aparece nos documentos gerados.
+  const [logoAppUrl, setLogoAppUrl] = useState(config.logo_app_url ?? "");
+  const [logoAppIconUrl, setLogoAppIconUrl] = useState(
+    config.logo_app_icon_url ?? ""
+  );
+  const [appUploading, setAppUploading] = useState<"logo" | "icon" | null>(
+    null
+  );
+  const [appUploadError, setAppUploadError] = useState<string | null>(null);
+  const appLogoFileRef = useRef<HTMLInputElement>(null);
+  const appIconFileRef = useRef<HTMLInputElement>(null);
+
+  async function handleAppImageUpload(file: File, kind: "logo" | "icon") {
+    if (!file.type.startsWith("image/")) {
+      setAppUploadError("Selecione um arquivo de imagem (PNG, JPG, SVG).");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setAppUploadError("A imagem deve ter no máximo 2 MB.");
+      return;
+    }
+    setAppUploading(kind);
+    setAppUploadError(null);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Falha ao ler o arquivo."));
+        reader.readAsDataURL(file);
+      });
+      if (kind === "logo") setLogoAppUrl(dataUrl);
+      else setLogoAppIconUrl(dataUrl);
+    } catch (err) {
+      console.error("app branding upload error:", err);
+      setAppUploadError("Erro ao processar imagem. Tente novamente.");
+    } finally {
+      setAppUploading(null);
+    }
+  }
+
+  function removeAppImage(kind: "logo" | "icon") {
+    if (kind === "logo") {
+      setLogoAppUrl("");
+      if (appLogoFileRef.current) appLogoFileRef.current.value = "";
+    } else {
+      setLogoAppIconUrl("");
+      if (appIconFileRef.current) appIconFileRef.current.value = "";
+    }
+  }
 
   // Letterhead model
   const [modeloTimbrado, setModeloTimbrado] = useState(
@@ -692,6 +743,148 @@ export default function ConfigForm({ config }: Props) {
           Configurações salvas com sucesso.
         </div>
       )}
+
+      {/* ── Identidade visual do sistema ── */}
+      <div className="rounded-xl border border-border bg-white p-5">
+        <div className="mb-4">
+          <h2 className="font-heading text-sm font-semibold text-fg">
+            Identidade visual do sistema
+          </h2>
+          <p className="font-body text-xs text-muted mt-0.5">
+            Essa é a logo que aparece na tela de login, no menu lateral e no
+            ícone do app (quando instalado no celular ou computador). É
+            diferente da &quot;Logo marca&quot; abaixo, que é só para os
+            documentos gerados.
+          </p>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="flex items-start gap-5">
+            <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border bg-slate-900 overflow-hidden">
+              {logoAppUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoAppUrl}
+                  alt="Logo completa"
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/logo.png"
+                  alt="Logo completa (padrão)"
+                  className="h-full w-full object-contain p-1"
+                />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <p className="font-body text-sm font-semibold text-fg">
+                Logo completa
+              </p>
+              <p className="font-body text-xs text-muted">
+                Com o nome do escritório. Usada no login e nas páginas públicas.
+              </p>
+              <input
+                ref={appLogoFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleAppImageUpload(f, "logo");
+                }}
+              />
+              <button
+                type="button"
+                disabled={appUploading === "logo"}
+                onClick={() => appLogoFileRef.current?.click()}
+                className="flex h-9 items-center gap-2 rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary disabled:opacity-60 cursor-pointer"
+              >
+                {appUploading === "logo" && <SpinnerIcon className="h-4 w-4" />}
+                {appUploading === "logo"
+                  ? "Enviando…"
+                  : logoAppUrl
+                    ? "Alterar"
+                    : "Enviar"}
+              </button>
+              {logoAppUrl && (
+                <button
+                  type="button"
+                  onClick={() => removeAppImage("logo")}
+                  className="h-9 rounded-lg border border-red-200 px-4 font-body text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 cursor-pointer"
+                >
+                  Usar padrão
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-start gap-5">
+            <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border bg-slate-900 overflow-hidden">
+              {logoAppIconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoAppIconUrl}
+                  alt="Ícone"
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/logo-icon.png"
+                  alt="Ícone (padrão)"
+                  className="h-full w-full object-contain p-1"
+                />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <p className="font-body text-sm font-semibold text-fg">Ícone</p>
+              <p className="font-body text-xs text-muted">
+                Só a marca, sem texto, de preferência quadrada. Usada no menu
+                lateral recolhido, favicon e ícone do app instalado.
+              </p>
+              <input
+                ref={appIconFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleAppImageUpload(f, "icon");
+                }}
+              />
+              <button
+                type="button"
+                disabled={appUploading === "icon"}
+                onClick={() => appIconFileRef.current?.click()}
+                className="flex h-9 items-center gap-2 rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary disabled:opacity-60 cursor-pointer"
+              >
+                {appUploading === "icon" && <SpinnerIcon className="h-4 w-4" />}
+                {appUploading === "icon"
+                  ? "Enviando…"
+                  : logoAppIconUrl
+                    ? "Alterar"
+                    : "Enviar"}
+              </button>
+              {logoAppIconUrl && (
+                <button
+                  type="button"
+                  onClick={() => removeAppImage("icon")}
+                  className="h-9 rounded-lg border border-red-200 px-4 font-body text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 cursor-pointer"
+                >
+                  Usar padrão
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        {appUploadError && (
+          <p className="font-body text-xs text-red-600 mt-3">
+            {appUploadError}
+          </p>
+        )}
+        <input type="hidden" name="logo_app_url" value={logoAppUrl} />
+        <input type="hidden" name="logo_app_icon_url" value={logoAppIconUrl} />
+      </div>
 
       {/* ── Logo e Modelo de Timbrado ── */}
       <div className="rounded-xl border border-border bg-white p-5">

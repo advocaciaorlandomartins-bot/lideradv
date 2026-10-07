@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTransition } from "react";
-import Image from "next/image";
 import {
   HomeIcon,
   UsersIcon,
@@ -241,6 +240,7 @@ interface SidebarProps {
   user: SessionUser;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  iconSrc: string;
 }
 
 export default function Sidebar({
@@ -249,6 +249,7 @@ export default function Sidebar({
   user,
   collapsed = false,
   onToggleCollapse,
+  iconSrc,
 }: SidebarProps) {
   const pathname = usePathname();
   const [, startTransition] = useTransition();
@@ -346,16 +347,18 @@ export default function Sidebar({
           {!collapsed && (
             <div className="flex items-center gap-2">
               {/* Marca só com o símbolo (sem "LIDERADV" escrito) — o
-                  logo.png completo tem o nome embutido na imagem, que em
+                  logo completa tem o nome embutido na imagem, que em
                   48px vira um borrão dourado ilegível; o nome já aparece
-                  do lado como texto de verdade. */}
-              <Image
-                src="/logo-icon.png"
+                  do lado como texto de verdade. iconSrc pode ser um data
+                  URI (logo customizada em Configurações), por isso <img>
+                  simples em vez de next/image. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={iconSrc}
                 alt="LiderAdv"
                 width={48}
                 height={48}
-                className="rounded-xl"
-                priority
+                className="h-12 w-12 rounded-xl object-contain"
               />
               <span
                 className={`font-body text-lg font-bold tracking-wide ${tc.logoText}`}
@@ -366,13 +369,13 @@ export default function Sidebar({
           )}
 
           {collapsed && (
-            <Image
-              src="/logo-icon.png"
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={iconSrc}
               alt="LiderAdv"
               width={40}
               height={40}
-              className="rounded-xl"
-              priority
+              className="h-10 w-10 rounded-xl object-contain"
             />
           )}
 

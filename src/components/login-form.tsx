@@ -5,9 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginAction, type LoginState } from "@/lib/auth-actions";
 import { EyeIcon, EyeOffIcon, SpinnerIcon } from "@/components/icons";
-import Image from "next/image";
 
-export default function LoginForm() {
+export default function LoginForm({ logoSrc }: { logoSrc: string }) {
   const [state, formAction, isPending] = useActionState<LoginState, FormData>(
     loginAction,
     null
@@ -20,13 +19,13 @@ export default function LoginForm() {
     <div className="w-full max-w-md">
       {/* Mobile: logo grande centralizada sobre fundo escuro */}
       <div className="lg:hidden flex justify-center mb-10">
-        <Image
-          src="/logo.png"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoSrc}
           alt="LiderAdv"
           width={160}
           height={160}
-          className="rounded-3xl"
-          priority
+          className="rounded-3xl object-contain"
         />
       </div>
 

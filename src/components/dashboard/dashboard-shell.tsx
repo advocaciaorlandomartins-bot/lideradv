@@ -10,9 +10,11 @@ import type { SessionUser } from "@/lib/session";
 export default function DashboardShell({
   children,
   user,
+  iconSrc,
 }: {
   children: React.ReactNode;
   user: SessionUser;
+  iconSrc: string;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(
@@ -38,6 +40,7 @@ export default function DashboardShell({
         user={user}
         collapsed={collapsed}
         onToggleCollapse={toggleCollapse}
+        iconSrc={iconSrc}
       />
       <main
         id="main-content"

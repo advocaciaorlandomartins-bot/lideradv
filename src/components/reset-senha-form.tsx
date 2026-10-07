@@ -9,7 +9,6 @@ import {
   type ResetPasswordState,
 } from "@/lib/auth-actions";
 import { EyeIcon, EyeOffIcon, SpinnerIcon } from "@/components/icons";
-import Image from "next/image";
 
 /* ── Solicitar link de reset ── */
 function SolicitarForm() {
@@ -337,7 +336,13 @@ function RedefinirForm({ token }: { token: string }) {
 }
 
 /* ── Página principal ── */
-export default function ResetSenhaForm({ token }: { token: string | null }) {
+export default function ResetSenhaForm({
+  token,
+  logoSrc,
+}: {
+  token: string | null;
+  logoSrc: string;
+}) {
   return (
     <div className="h-screen overflow-hidden flex flex-col lg:flex-row">
       {/* Painel esquerdo — mesmo padrão do login */}
@@ -349,13 +354,13 @@ export default function ResetSenhaForm({ token }: { token: string | null }) {
         }}
       >
         <div className="relative flex flex-col justify-center items-center w-full h-full p-10 gap-8">
-          <Image
-            src="/logo.png"
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoSrc}
             alt="LiderAdv"
             width={200}
             height={200}
-            className="rounded-3xl"
-            priority
+            className="rounded-3xl object-contain"
           />
           <div className="text-center">
             <h2 className="font-body text-2xl font-bold text-white mb-3">
@@ -373,13 +378,13 @@ export default function ResetSenhaForm({ token }: { token: string | null }) {
       <main className="flex flex-1 items-center justify-center p-8 lg:w-1/2 overflow-auto">
         <div className="w-full max-w-md">
           <div className="lg:hidden flex justify-center mb-10">
-            <Image
-              src="/logo.png"
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoSrc}
               alt="LiderAdv"
               width={140}
               height={140}
-              className="rounded-3xl"
-              priority
+              className="rounded-3xl object-contain"
             />
           </div>
 

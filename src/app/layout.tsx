@@ -21,14 +21,11 @@ export const metadata: Metadata = {
   title: "LiderAdv — Sistema de Gestão Jurídica",
   description:
     "Gestão completa para advogados: clientes, processos, perícias, controle financeiro e busca automática de processos por OAB.",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "LiderAdv",
-  },
-  icons: {
-    apple: "/logo-icon.png",
   },
 };
 

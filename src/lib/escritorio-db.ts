@@ -15,6 +15,11 @@ export interface EscritorioConfig {
   cep: string | null;
   logo_url: string | null;
   logo_ativo: boolean;
+  // Identidade visual do sistema (sidebar, login, ícone do app/PWA) —
+  // independente da "logo marca" acima, que é só para documentos gerados.
+  // null = usa os arquivos padrão em /public (logo.png / logo-icon.png).
+  logo_app_url: string | null;
+  logo_app_icon_url: string | null;
   // Typography & page layout
   font_padrao: string;
   tamanho_padrao: number;
@@ -41,6 +46,7 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
   const rows = await sql`
     SELECT id::text, nome, oab, oab_uf, cnpj, telefone, email, site,
            endereco, cidade, estado, cep, logo_url, logo_ativo,
+           logo_app_url, logo_app_icon_url,
            identificacao_ativo,
            font_padrao, tamanho_padrao::float AS tamanho_padrao,
            line_height::float AS line_height,
@@ -86,6 +92,8 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
       estado: null,
       cep: null,
       logo_url: null,
+      logo_app_url: null,
+      logo_app_icon_url: null,
       ...DEFAULTS,
     };
   }
@@ -105,6 +113,8 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
     cep: r.cep ?? null,
     logo_url: r.logo_url ?? null,
     logo_ativo: r.logo_ativo ?? DEFAULTS.logo_ativo,
+    logo_app_url: r.logo_app_url ?? null,
+    logo_app_icon_url: r.logo_app_icon_url ?? null,
     identificacao_ativo: r.identificacao_ativo ?? DEFAULTS.identificacao_ativo,
     font_padrao: r.font_padrao ?? DEFAULTS.font_padrao,
     tamanho_padrao: r.tamanho_padrao ?? DEFAULTS.tamanho_padrao,

@@ -1,7 +1,12 @@
 import { Suspense } from "react";
 import LoginForm from "@/components/login-form";
 import { CheckIcon } from "@/components/icons";
-import Image from "next/image";
+import { getBrandingSrcs } from "@/lib/branding";
+
+// A logo é configurável em Configurações e precisa refletir sem redeploy —
+// sem isso o Next prerenderia esta página estática, congelando a logo do
+// momento do build.
+export const dynamic = "force-dynamic";
 
 const features = [
   { label: "Gestão de Clientes", desc: "Cadastro completo e histórico" },
@@ -15,7 +20,8 @@ const features = [
   },
 ];
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const { logoSrc } = await getBrandingSrcs();
   return (
     <div className="h-screen overflow-hidden flex flex-col lg:flex-row">
       {/* ── Left Brand Panel ── */}
@@ -38,13 +44,13 @@ export default function LoginPage() {
         <div className="relative flex flex-col justify-between w-full h-full p-10">
           {/* Logo */}
           <div className="flex justify-center">
-            <Image
-              src="/logo.png"
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoSrc}
               alt="LiderAdv"
               width={220}
               height={220}
-              className="rounded-3xl"
-              priority
+              className="rounded-3xl object-contain"
             />
           </div>
 
@@ -85,7 +91,7 @@ export default function LoginPage() {
       {/* ── Right Form Panel ── */}
       <main className="login-form-panel flex flex-1 items-center justify-center p-8 lg:w-1/2 overflow-auto">
         <Suspense>
-          <LoginForm />
+          <LoginForm logoSrc={logoSrc} />
         </Suspense>
       </main>
     </div>

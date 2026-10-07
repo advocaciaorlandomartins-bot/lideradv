@@ -32,6 +32,10 @@ export async function saveEscritorioConfigAction(
   const cep = ((formData.get("cep") as string) ?? "").trim() || null;
   const logoUrl = ((formData.get("logo_url") as string) ?? "").trim() || null;
   const logoAtivo = formData.get("logo_ativo") !== "false";
+  const logoAppUrl =
+    ((formData.get("logo_app_url") as string) ?? "").trim() || null;
+  const logoAppIconUrl =
+    ((formData.get("logo_app_icon_url") as string) ?? "").trim() || null;
   const identificacaoAtivo = formData.get("identificacao_ativo") !== "false";
 
   // Typography & layout
@@ -75,6 +79,7 @@ export async function saveEscritorioConfigAction(
           telefone = ${telefone}, email = ${email}, site = ${site},
           endereco = ${endereco}, cidade = ${cidade}, estado = ${estado},
           cep = ${cep}, logo_url = ${logoUrl}, logo_ativo = ${logoAtivo},
+          logo_app_url = ${logoAppUrl}, logo_app_icon_url = ${logoAppIconUrl},
           identificacao_ativo = ${identificacaoAtivo},
           font_padrao = ${fontPadrao}, tamanho_padrao = ${tamanhoPadrao},
           line_height = ${lineHeight}, margem_topo = ${margemTopo},
@@ -91,13 +96,15 @@ export async function saveEscritorioConfigAction(
       await sql`
         INSERT INTO escritorio_config
           (nome, oab, oab_uf, cnpj, telefone, email, site, endereco, cidade, estado, cep,
-           logo_url, logo_ativo, identificacao_ativo, font_padrao, tamanho_padrao, line_height,
+           logo_url, logo_ativo, logo_app_url, logo_app_icon_url,
+           identificacao_ativo, font_padrao, tamanho_padrao, line_height,
            margem_topo, margem_direita, margem_inferior, margem_esquerda,
            modelo_timbrado, modelo_timbrado_ativo,
            fundo_timbrado, fundo_timbrado_ativo, salario_minimo)
         VALUES
           (${nome}, ${oab}, ${oabUf}, ${cnpj}, ${telefone}, ${email}, ${site},
            ${endereco}, ${cidade}, ${estado}, ${cep}, ${logoUrl}, ${logoAtivo},
+           ${logoAppUrl}, ${logoAppIconUrl},
            ${identificacaoAtivo},
            ${fontPadrao}, ${tamanhoPadrao}, ${lineHeight},
            ${margemTopo}, ${margemDireita}, ${margemInferior}, ${margemEsquerda},

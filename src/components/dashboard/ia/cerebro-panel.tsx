@@ -353,6 +353,14 @@ export default function CerebroPanel({
               </div>
             </div>
           )}
+          {prob === null && meta?.probabilidade_insuficiente && (
+            <div className="flex items-center gap-2">
+              <span className="font-body text-xs text-muted">Êxito:</span>
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-body text-xs font-bold text-amber-700">
+                Dados insuficientes pra estimar
+              </span>
+            </div>
+          )}
           {ultima.proxima_acao && (
             <div className="flex items-start gap-1.5">
               <span className="font-body text-xs text-muted flex-shrink-0">

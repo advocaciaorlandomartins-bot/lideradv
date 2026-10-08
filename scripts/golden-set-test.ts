@@ -528,7 +528,10 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
     "T4-miserabilidade",
     "jurisprudência (STF/STJ/TNU) ainda não tem base própria (Fase 2)",
   ],
-  ["T8-dados-insuficientes", "Estrategista com INSUFICIENTE não implementado"],
+  [
+    "T8-dados-insuficientes",
+    'implementado em cerebroJuridico.ts:salvarAnalise (2+ dados críticos faltando → probabilidade forçada pra null + flag probabilidade_insuficiente), mas sem teste automatizado — a função só roda dentro de uma análise de IA completa (chamada real à Anthropic) e o arquivo usa "server-only", que não resolve fora do Next; revisão manual de código + typecheck/build/lint limpos, não verificação end-to-end',
+  ],
   [
     "T9-aprovacao-humana",
     "não existe tabela 'pecas' com estado/aprovação ainda",

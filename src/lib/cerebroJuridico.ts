@@ -349,6 +349,12 @@ export interface MetadadosCerebro {
   stop_reason?: string;
   tentativas_geracao?: number;
   truncada?: boolean;
+  /** true quando faltam dados críticos demais pra uma probabilidade
+   * numérica fazer sentido — nesse caso probabilidade_sucesso vem null de
+   * propósito (sobrescrito mesmo que o modelo tenha arriscado um número),
+   * e a tela deve mostrar "dados insuficientes" com a lista do que falta,
+   * nunca um percentual. Ver T8 do golden-set. */
+  probabilidade_insuficiente?: boolean;
 }
 
 // ─── Helpers de análise (server-side, sem IA) ────────────────────────────────
@@ -2081,7 +2087,7 @@ export async function salvarAnalise(
     : riscoMatch?.[1]?.toLowerCase().includes("baixo")
       ? "baixo"
       : "medio";
-  const prob = probMatch
+  const probBruto = probMatch
     ? Math.min(100, Math.max(0, parseInt(probMatch[1])))
     : (() => {
         // fallback: qualquer "XX%" que apareça no bloco de probabilidade
@@ -2092,6 +2098,16 @@ export async function salvarAnalise(
           ? Math.min(100, Math.max(0, parseInt(fallback[1])))
           : null;
       })();
+  // T8 do golden-set: com 2+ dados críticos faltando, uma probabilidade
+  // numérica é só um número arriscado por cima de base insuficiente — a IA
+  // é instruída a não inventar, mas o parecer determinístico aqui sobrepõe
+  // mesmo que o texto tenha arriscado um valor (defesa em profundidade,
+  // não depende só do modelo se autopoliciar).
+  const faltantesCriticos = faltantes.filter(
+    (f) => f.prioridade === "alta"
+  ).length;
+  const probabilidadeInsuficiente = faltantesCriticos >= 2;
+  const prob = probabilidadeInsuficiente ? null : probBruto;
   const proximaAcao =
     acaoMatch?.[1]?.trim().split("\n")[0] ||
     "Verificar documentação com cliente";
@@ -2188,6 +2204,7 @@ export async function salvarAnalise(
     stop_reason: diagnosticoGeracao?.stopReason,
     tentativas_geracao: diagnosticoGeracao?.tentativas,
     truncada: diagnosticoGeracao?.truncada,
+    probabilidade_insuficiente: probabilidadeInsuficiente,
   };
 
   try {

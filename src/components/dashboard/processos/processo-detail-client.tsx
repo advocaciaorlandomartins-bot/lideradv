@@ -1122,6 +1122,7 @@ interface AnaliseCerebroResumo {
   probabilidade_sucesso: number | null;
   proxima_acao: string | null;
   created_at: string;
+  metadata: { probabilidade_insuficiente?: boolean } | null;
 }
 
 const RESUMO_COR_RISCO: Record<string, string> = {
@@ -1230,6 +1231,12 @@ function ResumoIaTab({ processoId }: { processoId: string }) {
                 {diagnostico.probabilidade_sucesso}% de êxito
               </span>
             )}
+            {diagnostico.probabilidade_sucesso == null &&
+              diagnostico.metadata?.probabilidade_insuficiente && (
+                <span className="rounded-full border border-amber-300 bg-white px-2 py-0.5 font-body text-[10px] font-bold text-amber-700">
+                  Dados insuficientes pra estimar
+                </span>
+              )}
           </div>
           <div className="space-y-1">
             {renderTextoAnalise(diagnostico.analise)}

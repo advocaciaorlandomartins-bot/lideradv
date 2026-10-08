@@ -1003,6 +1003,17 @@ async function executarFerramentaIrisInterno(
             : `Atrasadas: ${cronsAtrasados.map((c) => `${c.rota} (última: ${c.ultimaExecucao ?? "nunca"})`).join(", ")}`,
       });
 
+      const { getAlertasSyncAtivos } = await import("./legislacao-sync");
+      const alertasLegislacao = await getAlertasSyncAtivos();
+      checks.push({
+        componente: "Legislação (LOAS/autismo/salário-maternidade)",
+        ok: alertasLegislacao.length === 0,
+        detalhe:
+          alertasLegislacao.length === 0
+            ? "Texto oficial confere com a Base Legal Viva"
+            : `Possível mudança em: ${alertasLegislacao.map((a) => `${a.norma} ${a.caminho}`).join(", ")} — confirme manualmente no Planalto`,
+      });
+
       return JSON.stringify(checks);
     }
 

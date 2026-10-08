@@ -18,6 +18,7 @@ const CRONS_MONITORADOS: { rota: string; limiteHoras: number }[] = [
   { rota: "/api/cron/prazos", limiteHoras: 50 },
   { rota: "/api/cron/limpeza", limiteHoras: 50 },
   { rota: "/api/cron/atualizacoes-legais", limiteHoras: 50 },
+  { rota: "/api/cron/legislacao-sync", limiteHoras: 50 },
   { rota: "/api/cerebro/scheduler", limiteHoras: 50 },
 ];
 

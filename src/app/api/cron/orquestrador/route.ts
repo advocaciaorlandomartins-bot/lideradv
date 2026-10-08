@@ -10,6 +10,9 @@ const CRONS = [
   "/api/cron/prazos",
   "/api/cron/limpeza",
   "/api/cron/atualizacoes-legais",
+  // Confere o texto oficial de LOAS/autismo/salário-maternidade contra a
+  // Base Legal Viva — escopo reduzido a pedido do Orlando (2026-10-08).
+  "/api/cron/legislacao-sync",
   // Aprendizado do Cérebro Jurídico a partir de casos encerrados — antes só
   // rodava se alguém reabrisse o painel de um caso já concluído por acaso.
   "/api/cerebro/scheduler",

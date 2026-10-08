@@ -672,6 +672,64 @@ async function testarAutismoB87Lei12764() {
   }
 }
 
+async function testarPontoAtencaoAutismo() {
+  // Regra nova: CID F84 (espectro autista) + B87 (deficiência) deve gerar
+  // o ponto de atenção lembrando que TEA já é deficiência por força de lei
+  // (Lei 12.764/2012); o mesmo CID num processo B88 (idoso) NÃO deve
+  // disparar — a equiparação não tem relação com o critério de idade.
+  const { listarPontosAtencao, avaliarPontosAtencao } =
+    await import("../src/lib/pontos-atencao-db");
+  const sqlMod = await import("../src/lib/db");
+  const sql = sqlMod.default;
+
+  const [cliente] = await sql`
+    INSERT INTO clients
+      (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status, cid_principal)
+    VALUES
+      ('PF', '_TESTE GOLDEN SET autismo', '444.444.444-44', '_teste5@teste.local',
+       '00000000000', '00000-000', 'Rua Teste', '0', 'Teste', 'Teste', 'AL', 'Ativo', 'F84.0')
+    RETURNING id::text
+  `;
+  const [b87] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status)
+    VALUES (${cliente.id}::uuid, 'B87 - BPC pessoa com deficiência', 'Previdenciário', 'Em andamento')
+    RETURNING id::text
+  `;
+  const [b88] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status)
+    VALUES (${cliente.id}::uuid, 'B88 - BPC pessoa idosa', 'Previdenciário', 'Em andamento')
+    RETURNING id::text
+  `;
+  try {
+    await avaliarPontosAtencao(b87.id);
+    await avaliarPontosAtencao(b88.id);
+    const codigo = "bpc_autismo_equiparacao_legal";
+    const disparouB87 = (await listarPontosAtencao(b87.id)).some(
+      (p) => p.codigo === codigo
+    );
+    const naoDisparouB88 = !(await listarPontosAtencao(b88.id)).some(
+      (p) => p.codigo === codigo
+    );
+    if (disparouB87 && naoDisparouB88) {
+      registrar(
+        "ponto-atencao-autismo (regressão)",
+        "PASS",
+        "CID F84 + B87 gera lembrete da equiparação legal (Lei 12.764/2012); B88 (idoso) não dispara"
+      );
+    } else {
+      registrar(
+        "ponto-atencao-autismo (regressão)",
+        "FAIL",
+        `disparouB87=${disparouB87} naoDisparouB88=${naoDisparouB88}`
+      );
+    }
+  } finally {
+    await sql`DELETE FROM pontos_atencao WHERE processo_id IN (${b87.id}::uuid, ${b88.id}::uuid)`;
+    await sql`DELETE FROM processos WHERE id IN (${b87.id}::uuid, ${b88.id}::uuid)`;
+    await sql`DELETE FROM clients WHERE id = ${cliente.id}::uuid`;
+  }
+}
+
 async function testarT14KillSwitch() {
   const { agentesEstaoAtivos, definirAgentesAtivos } =
     await import("../src/lib/config-agentes-db");
@@ -736,6 +794,7 @@ async function main() {
   await testarT8DadosInsuficientes();
   await testarTransicaoEC103();
   await testarAutismoB87Lei12764();
+  await testarPontoAtencaoAutismo();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();
   await testarCitacaoGateMultiplasNormas();

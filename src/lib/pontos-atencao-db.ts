@@ -61,6 +61,7 @@ function contemTermo(texto: string, termos: string[]): boolean {
  * dispositivo exato da Base Legal Viva que o fundamenta. */
 async function avaliarRegrasBpc(
   processoId: string,
+  codigo: string | null,
   cliente: {
     status_beneficio: string | null;
     tipo_beneficio: string | null;
@@ -68,6 +69,7 @@ async function avaliarRegrasBpc(
     doc: string | null;
     renda_familiar_per_capita: string | null;
     membros_familia: unknown;
+    cid_principal: string | null;
   },
   processo: {
     motivo_indeferimento: string | null;
@@ -99,6 +101,25 @@ async function avaliarRegrasBpc(
       gravidade: "medio",
       descricao: `O cadastro indica incapacidade "temporária", mas o BPC por deficiência exige impedimento de longo prazo (efeitos por no mínimo 2 anos, art. 20 §10) — não incapacidade laborativa temporária. Confirme se o quadro clínico documentado realmente atende ao critério de longo prazo antes de montar a tese; se não atender, pode ser caso de outro benefício (auxílio por incapacidade), não de BPC.`,
       baseLegal: "Lei 8.742/1993, art. 20, §§ 2º e 10",
+    });
+  }
+
+  // 2b. TEA (autismo) já é equiparado a pessoa com deficiência por força de
+  // lei (Lei 12.764/2012, art. 1º, § 2º) — só vale pra B87 (deficiência),
+  // não B88 (idoso, que não depende de ser ou não deficiência). Gravidade
+  // 'baixo': não é um problema a resolver, é uma informação estratégica
+  // pro advogado (não precisa de perícia discutindo SE é deficiência, só
+  // o GRAU/impedimento de longo prazo).
+  if (
+    codigo === "B87" &&
+    cliente.cid_principal &&
+    /^F84/i.test(cliente.cid_principal.trim())
+  ) {
+    resultados.push({
+      codigo: "bpc_autismo_equiparacao_legal",
+      gravidade: "baixo",
+      descricao: `O CID principal (${cliente.cid_principal}) é do espectro autista. A Lei 12.764/2012, art. 1º, § 2º, já equipara TEA a pessoa com deficiência "para todos os efeitos legais" — não precisa argumentar ou provar que o TEA É deficiência, isso já está na lei. A perícia/prova deve focar só no GRAU do impedimento (longo prazo, mínimo 2 anos) e na miserabilidade, não em discutir se o diagnóstico conta como deficiência.`,
+      baseLegal: "Lei 12.764/2012, art. 1º, § 2º",
     });
   }
 
@@ -271,7 +292,7 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
     SELECT p.tipo_acao, p.der::text, p.motivo_indeferimento, p.resultado_admin,
            c.name, c.status_beneficio, c.tipo_beneficio,
            c.tipo_incapacidade, c.doc, c.renda_familiar_per_capita,
-           c.membros_familia
+           c.membros_familia, c.cid_principal
     FROM processos p
     JOIN clients c ON c.id = p.client_id
     WHERE p.id = ${processoId}::uuid
@@ -285,6 +306,7 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
     ...(ehBpc
       ? await avaliarRegrasBpc(
           processoId,
+          codigo,
           {
             status_beneficio: processo.status_beneficio ?? null,
             tipo_beneficio: processo.tipo_beneficio ?? null,
@@ -293,6 +315,7 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
             renda_familiar_per_capita:
               processo.renda_familiar_per_capita ?? null,
             membros_familia: processo.membros_familia,
+            cid_principal: processo.cid_principal ?? null,
           },
           {
             motivo_indeferimento: processo.motivo_indeferimento ?? null,

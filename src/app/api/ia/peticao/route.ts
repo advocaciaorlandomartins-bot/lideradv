@@ -17,6 +17,8 @@ import {
   getAtualizacoesLegaisRecentes,
   formatarAtualizacoesLegaisTexto,
 } from "@/lib/atualizacoes-legais-db";
+import { listarDispositivosPorNorma } from "@/lib/base-legal-db";
+import { codigoDoTipo } from "@/lib/checklist-documentos";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -102,7 +104,41 @@ export async function POST(req: Request) {
       ? `=== MUDANÇAS LEGAIS/NORMATIVAS RECENTES (últimos 6 meses) ===\n${formatarAtualizacoesLegaisTexto(atualizacoesLegais)}\n\nUse essas informações apenas se forem relevantes pro caso — não force a citação se não se aplicar.`
       : "";
 
-  const instrucaoFinal = [cerebroCtx, atualizacoesTexto, instrucaoExtra]
+  // Base Legal Viva (migração 009) — injeta o texto oficial verificado
+  // (hash + redação dada por cada lei alteradora) quando o benefício é
+  // BPC/LOAS, pra Gerar Petição citar o dispositivo real em vez de depender
+  // da memória do modelo. Cobertura ainda só do art. 20 da LOAS — outros
+  // benefícios continuam sem essa camada até a base ser ampliada.
+  const codigoBeneficio = processo?.tipo_acao
+    ? codigoDoTipo(processo.tipo_acao)
+    : null;
+  const ehBpc =
+    codigoBeneficio === "B80" ||
+    codigoBeneficio === "B87" ||
+    codigoBeneficio === "B88";
+  const baseLegalViva = ehBpc
+    ? await listarDispositivosPorNorma("Lei 8.742/1993").catch(() => [])
+    : [];
+  const baseLegalVivaTexto =
+    baseLegalViva.length > 0
+      ? `=== BASE LEGAL APLICÁVEL (VERIFICADA — Lei 8.742/1993, LOAS) ===\n${baseLegalViva
+          .map(
+            (d) =>
+              `${d.caminho}${d.revogado ? " [REVOGADO]" : ""}: "${d.texto}"${
+                d.redacaoDadaPor ? ` (${d.redacaoDadaPor})` : ""
+              }`
+          )
+          .join(
+            "\n"
+          )}\n\nEsses são os dispositivos EXATOS, coletados de planalto.gov.br — cite SOMENTE estes números de artigo/parágrafo quando se referir à LOAS. Não cite nenhum outro parágrafo da LOAS além dos listados acima.`
+      : "";
+
+  const instrucaoFinal = [
+    cerebroCtx,
+    baseLegalVivaTexto,
+    atualizacoesTexto,
+    instrucaoExtra,
+  ]
     .filter(Boolean)
     .join("\n\n");
 

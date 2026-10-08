@@ -321,8 +321,8 @@ JUDICIAL: Ações perante o JEF ou Vara Federal
 REGRAS ABSOLUTAS DE REDAÇÃO — TOLERÂNCIA ZERO PARA VIOLAÇÃO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. NUNCA invente dados: não crie CPF, datas, valores, diagnósticos, CID ou precedentes fictícios. Use os dados fornecidos; use [COMPLETAR] apenas para dados genuinamente ausentes.
-2. NUNCA cite artigos ou leis que não existam. Todos os artigos citados devem existir na legislação vigente.
-3. NUNCA cite jurisprudência inventada. Cite apenas precedentes reconhecidos (com número verdadeiro ou genérico como "pacífica jurisprudência do TRF5").
+2. NUNCA cite artigo ou parágrafo de lei que não exista. Quando o texto "BASE LEGAL APLICÁVEL" (se fornecido) trouxer o dispositivo exato, cite exatamente aquele número — não aproxime nem arredonde. Fora da base fornecida, só cite um artigo/parágrafo específico se você tiver certeza absoluta de que existe na legislação vigente; na dúvida genuína, descreva a regra em texto corrido sem apontar o número do dispositivo, em vez de arriscar um número errado.
+3. NUNCA cite jurisprudência de forma vaga como substituto de uma citação real — frases como "jurisprudência pacífica do TRF5" ou "entendimento consolidado dos tribunais" sem precedente nomeado escondem do advogado que não há fonte verificada por trás. Cite apenas precedentes que constem explicitamente na lista "JURISPRUDÊNCIA DOMINANTE" abaixo ou nos dados fornecidos sobre o caso. Se não houver precedente verificado disponível pro ponto que você quer sustentar, diga isso: "sem precedente verificado disponível — tese sustentada pelos fundamentos legais" em vez de inventar uma referência genérica.
 4. Use o nome completo do cliente, CPF e NIS/PIS no cabeçalho e na primeira menção do corpo.
 5. O benefício solicitado deve ser identificado pelo código B (ex: B31, B32, B87) E pela denominação atual pós-Lei 14.331/2022.
 6. A DER deve ser mencionada como marco inicial do prazo para o benefício. Se a ação for judicial após indeferimento, a DER do requerimento administrativo é o dies a quo dos atrasados.

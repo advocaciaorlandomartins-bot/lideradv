@@ -326,6 +326,73 @@ async function testarPrescricaoQuinquenal() {
   }
 }
 
+async function testarTransicaoEC103() {
+  // Regra nova (T12, parcial): aposentadoria (B41/B42/B46) com DER antes de
+  // 13/11/2019 deve alertar pra conferir direito adquirido pela regra
+  // anterior à EC 103/2019; depois dessa data, e benefícios por
+  // incapacidade (B31), não deve disparar.
+  const { listarPontosAtencao, avaliarPontosAtencao } =
+    await import("../src/lib/pontos-atencao-db");
+  const sqlMod = await import("../src/lib/db");
+  const sql = sqlMod.default;
+
+  const [cliente] = await sql`
+    INSERT INTO clients
+      (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+    VALUES
+      ('PF', '_TESTE GOLDEN SET ec103', '333.333.333-33', '_teste4@teste.local',
+       '00000000000', '00000-000', 'Rua Teste', '0', 'Teste', 'Teste', 'AL', 'Ativo')
+    RETURNING id::text
+  `;
+  const [antes] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, der)
+    VALUES (${cliente.id}::uuid, 'B42 - Aposentadoria por Tempo de Contribuição', 'Previdenciário', 'Em andamento', '2018-01-01')
+    RETURNING id::text
+  `;
+  const [depois] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, der)
+    VALUES (${cliente.id}::uuid, 'B42 - Aposentadoria por Tempo de Contribuição', 'Previdenciário', 'Em andamento', '2022-01-01')
+    RETURNING id::text
+  `;
+  const [incapacidade] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, der)
+    VALUES (${cliente.id}::uuid, 'B31 - Auxílio-doença', 'Previdenciário', 'Em andamento', '2018-01-01')
+    RETURNING id::text
+  `;
+  try {
+    await avaliarPontosAtencao(antes.id);
+    await avaliarPontosAtencao(depois.id);
+    await avaliarPontosAtencao(incapacidade.id);
+    const codigo = "transicao_ec103_direito_adquirido";
+    const disparouAntes = (await listarPontosAtencao(antes.id)).some(
+      (p) => p.codigo === codigo
+    );
+    const naoDisparouDepois = !(await listarPontosAtencao(depois.id)).some(
+      (p) => p.codigo === codigo
+    );
+    const naoDisparouIncapacidade = !(
+      await listarPontosAtencao(incapacidade.id)
+    ).some((p) => p.codigo === codigo);
+    if (disparouAntes && naoDisparouDepois && naoDisparouIncapacidade) {
+      registrar(
+        "transicao-ec103 (regressão)",
+        "PASS",
+        "B42 com DER pré-reforma alerta direito adquirido; pós-reforma e B31 não disparam"
+      );
+    } else {
+      registrar(
+        "transicao-ec103 (regressão)",
+        "FAIL",
+        `disparouAntes=${disparouAntes} naoDisparouDepois=${naoDisparouDepois} naoDisparouIncapacidade=${naoDisparouIncapacidade}`
+      );
+    }
+  } finally {
+    await sql`DELETE FROM pontos_atencao WHERE processo_id IN (${antes.id}::uuid, ${depois.id}::uuid, ${incapacidade.id}::uuid)`;
+    await sql`DELETE FROM processos WHERE id IN (${antes.id}::uuid, ${depois.id}::uuid, ${incapacidade.id}::uuid)`;
+    await sql`DELETE FROM clients WHERE id = ${cliente.id}::uuid`;
+  }
+}
+
 async function testarCitacaoComIncisoDentroDeParagrafo() {
   // Regressão de um 3º bug real achado na prática: "art. 2º, § 1º, I" (um
   // inciso DENTRO de um parágrafo) não batia com nada, porque o
@@ -575,7 +642,7 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
   ],
   [
     "T12-vigencia-temporal",
-    "Auditor Legal por data do fato/DER não implementado",
+    "Parcial: EC 103/2019 tem vigente_de verificado e uma regra própria de Pontos de Atenção (ver teste 'transicao-ec103' acima, PASS) alertando direito adquirido quando DER é anterior à reforma. Auditor Legal genérico por data do fato pra QUALQUER dispositivo da Base Legal Viva não foi implementado — exigiria vigência verificada uma por uma pras ~35 leis que alteraram os outros 3 textos cadastrados (LOAS, Lei 8.213, Lei 13.146), o que é pesquisa jurídica dedicada, não preenchimento de coluna",
   ],
   ["T13-tema-afetado", "Jurisprudência Viva não existe ainda (Fase 2)"],
 ];
@@ -587,6 +654,7 @@ async function main() {
   await testarT5NomeDivergente();
   await testarCessacaoIndevida();
   await testarPrescricaoQuinquenal();
+  await testarTransicaoEC103();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();
   await testarCitacaoGateMultiplasNormas();

@@ -171,6 +171,39 @@ function avaliarPrescricaoQuinquenal(der: string | null): RegraResultado[] {
   ];
 }
 
+const DATA_EC_103 = new Date("2019-11-13T00:00:00-03:00");
+// B41/B42/B46 — aposentadorias cujo direito pode ter sido adquirido ANTES da
+// reforma (regra antiga mais favorável) quando o segurado já preenchia os
+// requisitos antes de 13/11/2019 (EC 103/2019, art. 3º — direito adquirido
+// — vigência conferida contra fonte oficial, ver dispositivos.vigente_de
+// pra EC 103/2019). Não inclui B31/B32 (incapacidade) nem B87/B88 (BPC),
+// que não têm essa transição de regra por tempo de contribuição/idade.
+const CODIGOS_APOSENTADORIA_TRANSICAO = new Set(["B41", "B42", "B46"]);
+
+/** DER anterior à reforma não PROVA direito adquirido (isso depende de
+ * quando o segurado completou os requisitos, dado que o sistema não
+ * guarda) — é só um indício forte o bastante pra merecer conferência
+ * manual, por isso gravidade 'medio' e descrição em tom de pergunta, não
+ * de conclusão. */
+function avaliarTransicaoEC103(
+  tipoAcao: string | null,
+  der: string | null
+): RegraResultado[] {
+  if (!tipoAcao || !der) return [];
+  const codigo = codigoDoTipo(tipoAcao);
+  if (!codigo || !CODIGOS_APOSENTADORIA_TRANSICAO.has(codigo)) return [];
+  const dataDer = new Date(der);
+  if (Number.isNaN(dataDer.getTime()) || dataDer >= DATA_EC_103) return [];
+  return [
+    {
+      codigo: "transicao_ec103_direito_adquirido",
+      gravidade: "medio",
+      descricao: `A DER deste processo (${dataDer.toLocaleDateString("pt-BR")}) é anterior à Reforma da Previdência (EC 103/2019, em vigor desde 13/11/2019). Confirme se o cliente já preenchia os requisitos da regra ANTERIOR (mais favorável, sem pedágio/pontos) antes dessa data — se sim, há direito adquirido e a regra de transição pode não ser a mais vantajosa a pedir.`,
+      baseLegal: "EC 103/2019, art. 3º (direito adquirido)",
+    },
+  ];
+}
+
 function normalizarNome(nome: string): string {
   return nome
     .trim()
@@ -268,6 +301,7 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
         )
       : []),
     ...avaliarPrescricaoQuinquenal(processo.der ?? null),
+    ...avaliarTransicaoEC103(processo.tipo_acao ?? null, processo.der ?? null),
     ...avaliarNomeDivergente(
       processo.name ?? null,
       processo.doc ?? null,

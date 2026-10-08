@@ -87,6 +87,7 @@ const NORMAS_POR_BENEFICIO: Record<string, string[]> = {
   B46: ["Lei 8.213/1991", "EC 103/2019"], // aposentadoria especial
   B91: ["Lei 8.213/1991"], // acidentário
   B92: ["Lei 8.213/1991"],
+  B94: ["Lei 8.213/1991"], // auxílio-acidente (art. 86 — ainda não seedado; citação cai em "não coberta")
 };
 
 /** Dispositivos da Base Legal Viva relevantes pro código de benefício

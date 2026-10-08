@@ -237,6 +237,98 @@ const LOAS_ART_20: DispositivoSeed[] = [
       "O valor referente ao comprometimento do orçamento do núcleo familiar com gastos de que trata o inciso III do caput deste artigo será definido em ato conjunto do Ministério da Cidadania, da Secretaria Especial de Previdência e Trabalho do Ministério da Economia e do INSS, a partir de valores médios dos gastos realizados pelas famílias exclusivamente com essas finalidades, facultada ao interessado a possibilidade de comprovação, conforme critérios definidos em regulamento, de que os gastos efetivos ultrapassam os valores médios.",
     redacaoDadaPor: "Lei nº 14.176, de 2021",
   },
+
+  // ─── Revisão, suspensão e cessação do BPC (art. 21, 21-A, 21-B) ──────
+  {
+    caminho: "art. 21, caput",
+    texto:
+      "O benefício de prestação continuada deve ser revisto a cada 2 (dois) anos para avaliação da continuidade das condições que lhe deram origem.",
+    redacaoDadaPor: null,
+    observacao: "Vide Lei nº 9.720, de 30.11.1998",
+  },
+  {
+    caminho: "art. 21, § 1º",
+    texto:
+      "O pagamento do benefício cessa no momento em que forem superadas as condições referidas no caput, ou em caso de morte do beneficiário.",
+    redacaoDadaPor: null,
+  },
+  {
+    caminho: "art. 21, § 2º",
+    texto:
+      "O benefício será cancelado quando se constatar irregularidade na sua concessão ou utilização.",
+    redacaoDadaPor: null,
+  },
+  {
+    caminho: "art. 21, § 3º",
+    texto:
+      "O desenvolvimento das capacidades cognitivas, motoras ou educacionais e a realização de atividades não remuneradas de habilitação e reabilitação, entre outras, não constituem motivo de suspensão ou cessação do benefício da pessoa com deficiência.",
+    redacaoDadaPor: "Lei nº 12.435, de 2011",
+  },
+  {
+    caminho: "art. 21, § 4º",
+    texto:
+      "A cessação do benefício de prestação continuada concedido à pessoa com deficiência não impede nova concessão do benefício, desde que atendidos os requisitos definidos em regulamento.",
+    redacaoDadaPor: "Lei nº 12.470, de 2011",
+  },
+  {
+    caminho: "art. 21, § 5º",
+    texto:
+      "O beneficiário do benefício de prestação continuada é dispensado de avaliação médico-pericial periódica, desde que o impedimento de que trata o § 2º do art. 20 desta Lei seja permanente, irreversível ou irrecuperável, salvo quando houver fundamentada suspeita de fraude ou erro.",
+    redacaoDadaPor: "Lei nº 15.157, de 2025",
+  },
+  {
+    caminho: "art. 21-A, caput",
+    texto:
+      "O benefício de prestação continuada será suspenso pelo órgão concedente quando a pessoa com deficiência exercer atividade remunerada, inclusive na condição de microempreendedor individual.",
+    redacaoDadaPor: "Lei nº 12.470, de 2011",
+  },
+  {
+    caminho: "art. 21-A, § 1º",
+    texto:
+      "Extinta a relação trabalhista ou a atividade empreendedora de que trata o caput deste artigo e, quando for o caso, encerrado o prazo de pagamento do seguro-desemprego e não tendo o beneficiário adquirido direito a qualquer benefício previdenciário, poderá ser requerida a continuidade do pagamento do benefício suspenso, sem necessidade de realização de perícia médica ou reavaliação da deficiência e do grau de incapacidade para esse fim, respeitado o período de revisão previsto no caput do art. 21.",
+    redacaoDadaPor: "Lei nº 12.470, de 2011",
+  },
+  {
+    caminho: "art. 21-A, § 2º",
+    texto:
+      "A contratação de pessoa com deficiência como aprendiz não acarreta a suspensão do benefício de prestação continuada, limitado a 2 (dois) anos o recebimento concomitante da remuneração e do benefício.",
+    redacaoDadaPor: "Lei nº 12.470, de 2011",
+  },
+  {
+    caminho: "art. 21-B, caput",
+    texto:
+      "Os beneficiários do benefício de prestação continuada, quando não estiverem inscritos no CadÚnico ou quando estiverem com o cadastro desatualizado há mais de 24 (vinte e quatro) meses, deverão regularizar a situação nos seguintes prazos, contados a partir da efetiva notificação bancária ou por outros canais de atendimento:",
+    redacaoDadaPor: "Lei nº 15.077, de 2024",
+  },
+  {
+    caminho: "art. 21-B, I",
+    texto: "45 (quarenta e cinco) dias para Municípios de pequeno porte;",
+    redacaoDadaPor: "Lei nº 14.973, de 2024",
+  },
+  {
+    caminho: "art. 21-B, II",
+    texto:
+      "90 (noventa) dias para Municípios de médio e grande porte ou metrópole, com população acima de 50.000 (cinquenta mil) habitantes.",
+    redacaoDadaPor: "Lei nº 14.973, de 2024",
+  },
+  {
+    caminho: "art. 21-B, § 1º",
+    texto:
+      "Na falta da ciência da notificação bancária ou por outros canais de atendimento, o crédito do benefício será bloqueado em 30 (trinta) dias após o envio da notificação.",
+    redacaoDadaPor: "Lei nº 14.973, de 2024",
+  },
+  {
+    caminho: "art. 21-B, § 2º",
+    texto:
+      "O não cumprimento do disposto no caput implicará a suspensão do benefício, desde que comprovada a ciência da notificação.",
+    redacaoDadaPor: "Lei nº 14.973, de 2024",
+  },
+  {
+    caminho: "art. 21-B, § 3º",
+    texto:
+      "O beneficiário poderá realizar a inclusão ou a atualização no CadÚnico até o final do prazo de suspensão, sem que haja prejuízo no pagamento do benefício.",
+    redacaoDadaPor: "Lei nº 14.973, de 2024",
+  },
 ];
 
 async function seedFonte(

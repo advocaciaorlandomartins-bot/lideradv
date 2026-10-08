@@ -53,7 +53,7 @@ Lei 8.213/91 — LBPS (Plano de Benefícios):
 
 Decreto 3.048/99 — RPS:
 • Arts. 64-70: aposentadoria especial (agentes nocivos físicos/químicos/biológicos)
-• Art. 161: recuperação da qualidade de segurado (1 contribuição nova — art. 27-A LBPS)
+• Recuperação da qualidade de segurado após perda (metade da carência com nova filiação): art. 27-A da Lei 8.213/91 (espelhado no art. 27-A do Decreto 3.048/99) — NÃO "art. 161", que trata de serviço social (achado e corrigido em 2026-10-08, conferido contra o texto oficial)
 
 Lei 8.742/93 — LOAS (BPC):
 • Art. 20: BPC ao idoso (65+) e pessoa com deficiência

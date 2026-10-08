@@ -166,6 +166,36 @@ async function avaliarRegrasBpc(
   return resultados;
 }
 
+/** Regra específica de B80 (salário-maternidade): o STF declarou
+ * inconstitucional a exigência de carência pro salário-maternidade (ADIs
+ * 2.110 e 2.111, julgadas em 21/03/2024, confirmado contra fonte oficial
+ * em 2026-10-08) — desde 05/04/2024 o único requisito é qualidade de
+ * segurada na data do fato gerador, pra qualquer categoria (inclusive
+ * contribuinte individual/facultativa, que antes precisava de 10
+ * contribuições). Indeferimento por "falta de carência"/"contribuições
+ * insuficientes" citado no motivo é sinal forte de que o INSS aplicou
+ * regra já superada — vale conferir mesmo em requerimento anterior a
+ * 05/04/2024, contanto que ainda esteja dentro da prescrição quinquenal. */
+function avaliarSalarioMaternidadeCarencia(
+  motivoIndeferimento: string | null,
+  resultadoAdmin: string | null
+): RegraResultado[] {
+  const texto = `${motivoIndeferimento ?? ""} ${resultadoAdmin ?? ""}`;
+  const mencionaCarencia =
+    /car[êe]ncia|n[úu]mero (de |insuficiente de )?contribui[çc][õo]es|contribui[çc][õo]es insuficientes/i.test(
+      texto
+    );
+  if (!mencionaCarencia) return [];
+  return [
+    {
+      codigo: "salario_maternidade_carencia_inconstitucional",
+      gravidade: "alto",
+      descricao: `O motivo do indeferimento/resultado administrativo menciona carência ou número de contribuições insuficiente. O STF declarou inconstitucional a exigência de carência pro salário-maternidade (ADIs 2.110 e 2.111, julgadas em 21/03/2024) — desde 05/04/2024, o único requisito é ter qualidade de segurada na data do parto/adoção, mesmo pra contribuinte individual ou facultativa (que antes precisava de 10 contribuições). Se o indeferimento foi por esse motivo, este caso provavelmente tem direito a revisão administrativa ou ação judicial — inclusive se o requerimento é anterior a 05/04/2024, desde que ainda dentro da prescrição quinquenal.`,
+      baseLegal: "ADIs 2.110 e 2.111 (STF, 21/03/2024)",
+    },
+  ];
+}
+
 const CINCO_ANOS_MS = 5 * 365.25 * 24 * 60 * 60 * 1000;
 
 /** Regra genérica (qualquer benefício, não só BPC): DER com mais de 5 anos
@@ -325,6 +355,12 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
       : []),
     ...avaliarPrescricaoQuinquenal(processo.der ?? null),
     ...avaliarTransicaoEC103(processo.tipo_acao ?? null, processo.der ?? null),
+    ...(codigo === "B80"
+      ? avaliarSalarioMaternidadeCarencia(
+          processo.motivo_indeferimento ?? null,
+          processo.resultado_admin ?? null
+        )
+      : []),
     ...avaliarNomeDivergente(
       processo.name ?? null,
       processo.doc ?? null,

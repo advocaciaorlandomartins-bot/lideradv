@@ -730,6 +730,64 @@ async function testarPontoAtencaoAutismo() {
   }
 }
 
+async function testarSalarioMaternidadeCarencia() {
+  // Regra nova: B80 indeferido citando "carência"/"contribuições
+  // insuficientes" deve alertar que isso foi declarado inconstitucional
+  // pelo STF (ADIs 2.110/2.111, 21/03/2024) — indeferimento por outro
+  // motivo (ex.: documentação) não deve disparar.
+  const { listarPontosAtencao, avaliarPontosAtencao } =
+    await import("../src/lib/pontos-atencao-db");
+  const sqlMod = await import("../src/lib/db");
+  const sql = sqlMod.default;
+
+  const [cliente] = await sql`
+    INSERT INTO clients
+      (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+    VALUES
+      ('PF', '_TESTE GOLDEN SET salmat', '555.555.555-55', '_teste6@teste.local',
+       '00000000000', '00000-000', 'Rua Teste', '0', 'Teste', 'Teste', 'AL', 'Ativo')
+    RETURNING id::text
+  `;
+  const [comCarencia] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, motivo_indeferimento)
+    VALUES (${cliente.id}::uuid, 'B80 - Salário-Maternidade', 'Previdenciário', 'Em andamento', 'Indeferido por não cumprir carência mínima de 10 contribuições')
+    RETURNING id::text
+  `;
+  const [semCarencia] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, motivo_indeferimento)
+    VALUES (${cliente.id}::uuid, 'B80 - Salário-Maternidade', 'Previdenciário', 'Em andamento', 'Indeferido por ausência de documentação médica')
+    RETURNING id::text
+  `;
+  try {
+    await avaliarPontosAtencao(comCarencia.id);
+    await avaliarPontosAtencao(semCarencia.id);
+    const codigo = "salario_maternidade_carencia_inconstitucional";
+    const disparouComCarencia = (
+      await listarPontosAtencao(comCarencia.id)
+    ).some((p) => p.codigo === codigo);
+    const naoDisparouSemCarencia = !(
+      await listarPontosAtencao(semCarencia.id)
+    ).some((p) => p.codigo === codigo);
+    if (disparouComCarencia && naoDisparouSemCarencia) {
+      registrar(
+        "salario-maternidade-carencia (regressão)",
+        "PASS",
+        "indeferimento citando carência alerta ADIs 2.110/2.111; indeferimento por outro motivo não dispara"
+      );
+    } else {
+      registrar(
+        "salario-maternidade-carencia (regressão)",
+        "FAIL",
+        `disparouComCarencia=${disparouComCarencia} naoDisparouSemCarencia=${naoDisparouSemCarencia}`
+      );
+    }
+  } finally {
+    await sql`DELETE FROM pontos_atencao WHERE processo_id IN (${comCarencia.id}::uuid, ${semCarencia.id}::uuid)`;
+    await sql`DELETE FROM processos WHERE id IN (${comCarencia.id}::uuid, ${semCarencia.id}::uuid)`;
+    await sql`DELETE FROM clients WHERE id = ${cliente.id}::uuid`;
+  }
+}
+
 async function testarT14KillSwitch() {
   const { agentesEstaoAtivos, definirAgentesAtivos } =
     await import("../src/lib/config-agentes-db");
@@ -795,6 +853,7 @@ async function main() {
   await testarTransicaoEC103();
   await testarAutismoB87Lei12764();
   await testarPontoAtencaoAutismo();
+  await testarSalarioMaternidadeCarencia();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();
   await testarCitacaoGateMultiplasNormas();

@@ -1,6 +1,21 @@
-# LiderAdv — Auditoria técnica (Fase 0)
+# LiderAdv — Auditoria técnica (Fase 0) + status da Fase 1
 
 Data: 2026-10-07. Baseada em leitura direta do código em `src/`, `migrations/` e `vercel.json` — não em suposição e não no conteúdo de `docs/pacote-especialista/` (que é um **plano proposto, não implementado**; ver seção 8).
+
+## 0. Status da Fase 1 (atualizado 2026-10-08)
+
+| Passo                 | Status                                                                                                                                                        | Onde                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 1. Base Legal Viva    | Feito (cobertura: só art. 20/20-A/20-B da LOAS)                                                                                                               | `migrations/009`, `src/lib/base-legal-db.ts`, `scripts/seed-base-legal.ts`            |
+| 2. Fact Ledger        | Feito, sem página/trecho por campo (limitação conhecida)                                                                                                      | `migrations/010`, `src/lib/fact-ledger-db.ts`                                         |
+| 3. Citation Gate      | Feito pra citação de LEI; jurisprudência é Fase 2                                                                                                             | `src/lib/citation-gate.ts`, rodando automático em Gerar Petição                       |
+| 4. Reescrever prompts | Feito: Gerar Petição + Cérebro (diagnóstico principal) recebem a Base Legal Viva quando é BPC; fechada a brecha de "jurisprudência pacífica do TRF5" genérica | `ai-juridico-skills.ts`, `ia/peticao/route.ts`, `cerebroJuridico.ts: prepararAnalise` |
+| 5. Pontos de Atenção  | Feito só pra BPC (acumulação, impedimento de prazo, miserabilidade, CPF); regras genéricas (nome divergente, prescrição) não feitas                           | `src/lib/pontos-atencao-db.ts`                                                        |
+| 6. Painel na tela     | Feito (pontos de atenção); "estado da peça" (rascunho/bloqueada/aprovada) não existe ainda                                                                    | `pontos-atencao-panel.tsx`                                                            |
+
+Testado contra `docs/pacote-especialista/tests/golden-set.json` em `scripts/golden-set-test.ts`: 4 dos 14 casos têm implementação real testável hoje (T1, T2, T6-equivalente, T7) — todos passando. Os outros 10 dependem de peças da Fase 2 (Juiz Revisor, Jurisprudência Viva, Auditor Legal por data) ou de partes da Fase 1 ainda não feitas (nome divergente, estado da peça, kill switch, mascaramento LGPD).
+
+**Decisão já tomada com o Orlando:** Citation Gate roda automático e silencioso, só avisa quando acha problema — não bloqueia nada ainda (bloquear hoje pegaria qualquer petição fora de BPC, já que a base só cobre a LOAS).
 
 ## 1. Stack real
 

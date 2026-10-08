@@ -2,6 +2,7 @@ import "server-only";
 import sql from "./db";
 import { getCargaColaboradores } from "./controladoria-db";
 import { getCronsAtrasados, getLoginFalhosRecentes } from "./saude-sistema";
+import { getResumoUsoIA } from "./ia-uso-db";
 import { getAtualizacoesLegaisRecentes } from "./atualizacoes-legais-db";
 import { enviarMensagemDireta } from "./prevbot-outbound";
 import { getAllProcessosProducao } from "./producao-db";
@@ -59,6 +60,7 @@ export async function montarResumoDiario(): Promise<string | null> {
     processos,
     financeiro,
     clientesSemResposta,
+    usoIA,
     valorAtrasadoRows,
   ] = await Promise.all([
     sql`
@@ -79,6 +81,7 @@ export async function montarResumoDiario(): Promise<string | null> {
     getAllProcessosProducao(),
     getLancamentoKpis(),
     getClientesAguardandoResposta().catch(() => []),
+    getResumoUsoIA(24).catch(() => null),
     // getLancamentoKpis só conta atrasados, não soma o valor — mesma
     // definição de "atrasado" que ela usa (pendente, tipo entrada, vencido,
     // ignorando a data-sentinela 9998-01-01 de "sem vencimento definido").
@@ -183,6 +186,21 @@ export async function montarResumoDiario(): Promise<string | null> {
     }
     if (clientesSemResposta.length > 5)
       linhas.push(`+${clientesSemResposta.length - 5} outro(s)`);
+  }
+
+  // Só aparece se o preço por token estiver configurado (ANTHROPIC_PRECO_*)
+  // e o gasto estimado das últimas 24h passar do limite de alerta — sem
+  // essas envs, fica em silêncio (não vira ruído diário por padrão).
+  const limiteAlertaUsd = Number(process.env.ALERTA_CUSTO_IA_DIARIO_USD ?? "");
+  if (
+    usoIA?.custoEstimadoUsd != null &&
+    Number.isFinite(limiteAlertaUsd) &&
+    limiteAlertaUsd > 0 &&
+    usoIA.custoEstimadoUsd > limiteAlertaUsd
+  ) {
+    linhas.push(
+      `\n💸 *Custo de IA acima do esperado:* ~US$ ${usoIA.custoEstimadoUsd.toFixed(2)} nas últimas 24h (${usoIA.totalChamadas} chamada(s), limite configurado: US$ ${limiteAlertaUsd.toFixed(2)}). Veja em Configurações → Agentes de IA se é preciso pausar.`
+    );
   }
 
   if (linhas.length === 0) {

@@ -152,6 +152,7 @@ export async function POST(req: Request) {
       processo: processo ?? undefined,
       instrucaoExtra: instrucaoFinal || undefined,
     },
+    usuarioId: session.id,
   });
 
   return new Response(stream, {

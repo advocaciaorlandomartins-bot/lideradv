@@ -239,6 +239,7 @@ export async function POST(req: Request) {
         processo: processo ?? undefined,
       },
       extrairDados: !!clienteId,
+      usuarioId: session.id,
     });
 
     // Grava automaticamente no cadastro do cliente (só campos vazios, nunca

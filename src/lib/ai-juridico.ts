@@ -11,6 +11,7 @@ import type { EscritorioConfig } from "./escritorio-db";
 import type { SkillId } from "./ai-juridico-skills";
 import { SKILLS } from "./ai-juridico-skills";
 import { extractText } from "./anthropic-text";
+import { registrarUsoIA } from "./ia-uso-db";
 
 export type { SkillId, Skill, EstrategiaResult } from "./ai-juridico-skills";
 export { SKILLS } from "./ai-juridico-skills";
@@ -119,6 +120,7 @@ export interface GerarPeticaoParams {
   skill: SkillId;
   tipoPeticao: string;
   contexto: ContextoJuridico;
+  usuarioId?: string | null;
 }
 
 export async function gerarPeticaoStream(
@@ -192,6 +194,18 @@ QUALIDADE TÉCNICA:
         }
       } finally {
         controller.close();
+        stream
+          .finalMessage()
+          .then((msg) =>
+            registrarUsoIA(
+              "/api/ia/peticao",
+              "claude-sonnet-5",
+              msg.usage.input_tokens,
+              msg.usage.output_tokens,
+              params.usuarioId ?? null
+            )
+          )
+          .catch(() => {});
       }
     },
     cancel() {
@@ -324,6 +338,7 @@ export interface DadosPrevidenciarios {
 
 export interface AnalisarDocumentoExtendidoParams extends AnalisarDocumentoParams {
   extrairDados?: boolean;
+  usuarioId?: string | null;
 }
 
 export async function analisarDocumentoExtendido(
@@ -462,6 +477,13 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
     );
     return stream.finalMessage();
   })();
+  registrarUsoIA(
+    "/api/ia/analisar",
+    "claude-sonnet-5",
+    res.usage.input_tokens,
+    res.usage.output_tokens,
+    params.usuarioId ?? null
+  ).catch(() => {});
   const fullText = extractText(res) || "Não foi possível analisar o documento.";
 
   // Extrai o bloco JSON de dados previdenciários
@@ -538,6 +560,13 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
         },
         isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
       );
+      registrarUsoIA(
+        "/api/ia/analisar (extração)",
+        "claude-haiku-4-5-20251001",
+        extraRes.usage.input_tokens,
+        extraRes.usage.output_tokens,
+        params.usuarioId ?? null
+      ).catch(() => {});
       const extraText = extractText(extraRes);
       const objMatch = extraText.match(/\{[\s\S]*\}/);
       if (objMatch) {

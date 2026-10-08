@@ -14,6 +14,7 @@ import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { extractText } from "@/lib/anthropic-text";
 import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
+import { registrarUsoIA } from "@/lib/ia-uso-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -193,6 +194,14 @@ impacto baixo = informativo sem efeito prático imediato`,
         },
       ],
     });
+
+    registrarUsoIA(
+      "/api/cron/atualizacoes-legais",
+      "claude-haiku-4-5-20251001",
+      msg.usage.input_tokens,
+      msg.usage.output_tokens,
+      null
+    ).catch(() => {});
 
     const raw = extractText(msg).trim();
     const jsonStr = raw.includes("{")

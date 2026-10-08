@@ -7,6 +7,7 @@ import { podeAcessarEntidade } from "@/lib/acesso";
 import { prepararAnalise, salvarAnalise } from "@/lib/cerebroJuridico";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
+import { registrarUsoIA } from "@/lib/ia-uso-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -154,6 +155,13 @@ export async function POST(req: NextRequest) {
 
             const finalMsg = await claudeStream.finalMessage();
             stopReason = finalMsg.stop_reason;
+            registrarUsoIA(
+              "/api/cerebro/analisar",
+              "claude-sonnet-5",
+              finalMsg.usage.input_tokens,
+              finalMsg.usage.output_tokens,
+              session.id
+            ).catch(() => {});
           } catch (streamErr) {
             if (tentativa === MAX_TENTATIVAS) throw streamErr;
             stopReason = null;

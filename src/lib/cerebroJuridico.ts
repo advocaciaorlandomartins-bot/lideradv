@@ -186,9 +186,9 @@ Incapacidade e qualidade de segurado:
 • Neoplasia maligna: carência sempre dispensada (art. 26, II, Lei 8.213/91) — citar no diagnóstico
 
 Revisão de RMI:
-• Portaria MTP 87/2023: revisão de renda mensal inicial de aposentadoria por incapacidade concedida pré-EC 103/2019
+• Portaria Conjunta DIRBEN/PFE/INSS nº 87/2023 (02/10/2023): suspende cobrança na conversão de auxílio por incapacidade temporária (B31) em aposentadoria por incapacidade permanente (B32) calculada conforme a EC 103/2019 — aplica-se a B32 com DIB a partir de 14/11/2019 precedido de B31 com DII até 13/11/2019 (não é "Portaria MTP" — é portaria conjunta de órgãos internos do INSS, não do Ministério)
 
-Lei 15.156/2025: pensão por morte para genitores de vítimas da síndrome congênita do Zika vírus (B21)
+Lei 15.156/2025: NÃO é pensão por morte (não é B21) — é indenização por dano moral (parcela única, R$ 50.000, isenta de IR) + pensão especial mensal e vitalícia (valor do maior salário de benefício do RGPS), pagas diretamente à PRÓPRIA pessoa com deficiência permanente decorrente da síndrome congênita do Zika vírus (não aos genitores), mediante laudo de junta médica — benefício específico dessa lei, fora do catálogo usual de benefícios do INSS
 
 ════════════════════════════════════════════════
 ALGORITMO DE RACIOCÍNIO (5 PASSOS — Prof. Frederico Martins)
@@ -1341,7 +1341,7 @@ AUXÍLIO-ACIDENTE (B94) — PONTOS CRÍTICOS:
 DCB INDEVIDA — ESTRATÉGIA:
 • 1ª via: recurso no CRPS (30 dias da cessação) — mais ágil e gratuito
 • 2ª via: mandado de segurança na JF (célere, liminar possível)
-• Revisão de RMI: Portaria MTP 87/2023 — aposentadoria por incapacidade concedida antes da EC 103/2019
+• Revisão de RMI: Portaria Conjunta DIRBEN/PFE/INSS nº 87/2023 — B32 com DIB desde 14/11/2019 precedido de B31 com DII até 13/11/2019
 
 INCAPACIDADE > 2 ANOS: avaliar conversão B31→B32 com perícia especializada em biopsicossocial`;
     case "Análise CNIS":

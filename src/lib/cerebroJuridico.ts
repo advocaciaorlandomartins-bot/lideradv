@@ -812,6 +812,52 @@ function calcularCompletude(processo: Record<string, unknown>): {
   return { pct: Math.round((preenchido / totalPeso) * 100), faltantes };
 }
 
+// resultado_admin ("indeferido"/"deferido") é escrito pela extração
+// automática do Dr. Lex; resultado_administrativo ("negado"/"concedido") é
+// escrito pelo fluxo manual de Produção (registrarResultadoAdminAction) —
+// dois campos reais e paralelos, não um "certo" e um "errado" (mesmo
+// problema já documentado em aprenderComResultado). Checar só um dos dois
+// deixava alerta sem disparar pra todo processo cujo resultado só está
+// registrado no outro campo — confirmado em dado real: 6 processos com
+// resultado_administrativo='negado' e resultado_admin NULL, nenhum teria
+// gerado o alerta de prazo de recurso antes dessa correção.
+function temResultadoAdministrativo(
+  processo: Record<string, unknown>
+): boolean {
+  const a = processo.resultado_admin;
+  const b = processo.resultado_administrativo;
+  return (
+    (typeof a === "string" && a.trim() !== "" && a !== "pendente") ||
+    (typeof b === "string" && b.trim() !== "" && b !== "pendente")
+  );
+}
+
+/** Data da decisão administrativa — data_resultado_admin pareia com
+ * resultado_admin (fluxo Dr. Lex); o fluxo de Produção (resultado_
+ * administrativo) não grava uma data dedicada, só atualiza data_estagio_at
+ * na mesma UPDATE que grava o resultado (ver registrarResultadoAdminAction)
+ * — usa como aproximação (pode ficar desatualizada se o processo mudar de
+ * estágio de novo depois, mas erra pro lado seguro: data_estagio_at só
+ * cresce, então o prazo pareceria vencer mais tarde, nunca mais cedo do
+ * que o real). */
+function dataDecisaoAdministrativa(
+  processo: Record<string, unknown>
+): Date | null {
+  if (
+    processo.resultado_admin === "indeferido" &&
+    processo.data_resultado_admin
+  ) {
+    return new Date(processo.data_resultado_admin as string);
+  }
+  if (
+    processo.resultado_administrativo === "negado" &&
+    processo.data_estagio_at
+  ) {
+    return new Date(processo.data_estagio_at as string);
+  }
+  return null;
+}
+
 function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
   if ((processo.area as string)?.toLowerCase() !== "previdenciário") return [];
 
@@ -836,7 +882,11 @@ function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
     }
   }
 
-  // Prescrição quinquenal de parcelas — Art. 103, §1° Lei 8.213/91
+  // Prescrição quinquenal de parcelas — Art. 103, parágrafo único, Lei
+  // 8.213/91 (NÃO "§1º" — esse artigo não tem §1º, só I, II e parágrafo
+  // único; conferido contra o texto oficial do Planalto em 2026-10-08,
+  // corrigindo citação errada que estava aqui desde antes da Base Legal
+  // Viva existir).
   if (processo.der) {
     const der = new Date(processo.der as string);
     const anos = (hoje.getTime() - der.getTime()) / (365.25 * 24 * 3600 * 1000);
@@ -848,7 +898,8 @@ function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
         tipo: "prescricao",
         nivel: "critico",
         mensagem: `PRESCRIÇÃO QUINQUENAL EM CURSO: Parcelas anteriores a ${dataCorte.toLocaleDateString("pt-BR")} já estão prescritas. ${Math.floor(anos - 5)} ano(s) de parcelas perdidos. Ajuizar URGENTE para estancar a perda.`,
-        base_legal: "Art. 103, §1° da Lei 8.213/91 — prescrição quinquenal",
+        base_legal:
+          "Art. 103, parágrafo único, da Lei 8.213/91 — prescrição quinquenal",
       });
     } else if (anos >= 4) {
       const mesesAtePrescrever = Math.ceil((5 - anos) * 12);
@@ -856,38 +907,44 @@ function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
         tipo: "prescricao",
         nivel: "atencao",
         mensagem: `ALERTA PRESCRIÇÃO: Em ~${mesesAtePrescrever} meses as primeiras parcelas começarão a prescrever (DER: ${new Date(processo.der as string).toLocaleDateString("pt-BR")}). Ajuizar antes que parcelas sejam perdidas.`,
-        base_legal: "Art. 103, §1° da Lei 8.213/91 — prescrição quinquenal",
+        base_legal:
+          "Art. 103, parágrafo único, da Lei 8.213/91 — prescrição quinquenal",
       });
     }
   }
 
-  // Prazo de recurso CRPS — 30 dias do indeferimento (Art. 304, Dec. 3.048/99)
-  if (processo.resultado_admin === "indeferido" && processo.der) {
-    const der = new Date(processo.der as string);
-    const diasDesdeDeR = Math.floor(
-      (hoje.getTime() - der.getTime()) / (24 * 3600 * 1000)
+  // Prazo de recurso CRPS — 30 dias da CIÊNCIA do indeferimento. Usa a data
+  // real da decisão (ver dataDecisaoAdministrativa), não der (data do
+  // requerimento original) — contar do DER sempre dava um prazo errado, já
+  // que o INSS normalmente demora semanas/meses entre o requerimento e a
+  // decisão. Citação também corrigida em 2026-10-08: o art. 304 do Decreto
+  // 3.048/99 é sobre competência do Ministro pra aprovar regimento, não tem
+  // nada a ver com prazo de recurso — a regra real (30 dias, CRPS) está no
+  // art. 60, § 11, da Lei 8.213/91 (já verificado na Base Legal Viva) e no
+  // seu espelho regulamentar, art. 78, § 7º, do Decreto 3.048/99.
+  const dataDecisao = dataDecisaoAdministrativa(processo);
+  if (dataDecisao) {
+    const diasDesdeDecisao = Math.floor(
+      (hoje.getTime() - dataDecisao.getTime()) / (24 * 3600 * 1000)
     );
-    if (diasDesdeDeR >= 1 && diasDesdeDeR <= 35) {
-      const diasRestantes = 30 - diasDesdeDeR;
+    if (diasDesdeDecisao >= 1 && diasDesdeDecisao <= 35) {
+      const diasRestantes = 30 - diasDesdeDecisao;
       alertas.push({
         tipo: "prazo_recurso",
         nivel: diasRestantes <= 5 ? "critico" : "atencao",
         mensagem:
           diasRestantes > 0
-            ? `PRAZO RECURSO CRPS: ${diasRestantes} dia(s) restantes para interpor recurso administrativo (indeferido em ${der.toLocaleDateString("pt-BR")}).`
+            ? `PRAZO RECURSO CRPS: ${diasRestantes} dia(s) restantes para interpor recurso administrativo (indeferido em ${dataDecisao.toLocaleDateString("pt-BR")}).`
             : `PRAZO RECURSO CRPS POSSIVELMENTE VENCIDO: Verificar data exata da ciência do indeferimento — prazo de 30 dias para CRPS.`,
-        base_legal: "Art. 304, Decreto 3.048/99 — recurso ao CRPS em 30 dias",
+        base_legal:
+          "Lei 8.213/1991, art. 60, § 11 (espelhado no art. 78, § 7º, do Decreto 3.048/99) — recurso ao CRPS em 30 dias",
       });
     }
   }
 
   // Processo parado no INSS — Avanço Tático (45/90 dias sem resposta)
   // Fase Aceleração: 45 dias → Reabertura de Tarefa / Ouvidoria; 90 dias → MS
-  if (
-    processo.der &&
-    (!processo.resultado_admin || processo.resultado_admin === "pendente") &&
-    !processo.dcb
-  ) {
+  if (processo.der && !temResultadoAdministrativo(processo) && !processo.dcb) {
     const der = new Date(processo.der as string);
     const dias = Math.floor(
       (hoje.getTime() - der.getTime()) / (24 * 3600 * 1000)
@@ -896,17 +953,23 @@ function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
       alertas.push({
         tipo: "processo_parado",
         nivel: "critico",
-        mensagem: `PROCESSO PARADO HÁ ${dias} DIAS — MANDADO DE SEGURANÇA CABÍVEL: INSS descumpriu prazo legal (Lei 9.784/99, art. 24 — 90 dias). Preparar MS imediatamente para garantir análise em 30 dias. Blindagem: protocolo INSS + print da tela de acompanhamento.`,
+        mensagem: `PROCESSO PARADO HÁ ${dias} DIAS — MANDADO DE SEGURANÇA CABÍVEL: INSS descumpriu o prazo de 30 dias (prorrogável por mais 30) pra decidir (Lei 9.784/99, art. 49). Preparar MS imediatamente. Blindagem: protocolo INSS + print da tela de acompanhamento.`,
+        // Art. 24 da Lei 9.784/99 é sobre prazo genérico de 5 dias pra atos
+        // do processo (quando não há regra específica) — não tem nada a
+        // ver com decisão administrativa. O prazo de 30 dias (prorrogável
+        // por mais 30) pra decidir está no art. 49. Os "90 dias" aqui são
+        // critério tático do escritório (folga de segurança), não um
+        // prazo legal com esse número — corrigido em 2026-10-08.
         base_legal:
-          "Art. 24 Lei 9.784/99 — prazo máximo 90 dias. MS: Art. 5°, LXIX, CF/88",
+          "Art. 49 Lei 9.784/99 — prazo de 30 dias (prorrogável por mais 30) para decisão administrativa. MS: Art. 5º, LXIX, CF/88",
       });
     } else if (dias >= 45) {
       alertas.push({
         tipo: "processo_parado",
         nivel: "atencao",
-        mensagem: `AVANÇO TÁTICO: Processo sem resposta há ${dias} dias. Acionar Reabertura de Tarefa no portal Meu INSS + Ouvidoria (0800-722-8477). Em ${90 - dias} dias caberá Mandado de Segurança se não houver resposta.`,
+        mensagem: `AVANÇO TÁTICO: Processo sem resposta há ${dias} dias — já passou do prazo legal de 30 dias (prorrogável por mais 30) pra decisão administrativa (Lei 9.784/99, art. 49). Acionar Reabertura de Tarefa no portal Meu INSS + Ouvidoria (0800-722-8477). Em ${90 - dias} dias caberá Mandado de Segurança se não houver resposta.`,
         base_legal:
-          "Art. 24 Lei 9.784/99 — prazo máximo 90 dias para decisão administrativa",
+          "Art. 49 Lei 9.784/99 — prazo de 30 dias (prorrogável por mais 30) para decisão administrativa",
       });
     }
   }
@@ -922,8 +985,12 @@ function calcularAlertas(processo: Record<string, unknown>): AlertaJuridico[] {
         tipo: "dcb_vencida",
         nivel: dias > 60 ? "critico" : "atencao",
         mensagem: `BENEFÍCIO CESSADO há ${dias} dias (DCB: ${dcb.toLocaleDateString("pt-BR")}). ${dias > 60 ? "Ação de restabelecimento urgente." : "Verificar recurso administrativo ou judicial."}`,
+        // Art. 62 é sobre reabilitação profissional, não sobre cessação por
+        // alta médica — citação errada corrigida em 2026-10-08 (conferida
+        // contra o texto oficial do Planalto). O art. 101 é quem trata da
+        // obrigação de avaliação/perícia sob pena de suspensão do benefício.
         base_legal:
-          "Art. 62 da Lei 8.213/91 — cessação por alta médica indevida",
+          "Art. 101 da Lei 8.213/91 — cessação por não comparecimento a avaliação/perícia (verificar se a cessação observou esse rito)",
       });
     }
   }

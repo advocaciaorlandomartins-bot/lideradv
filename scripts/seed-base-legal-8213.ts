@@ -602,6 +602,32 @@ const LEI_8213: DispositivoSeed[] = [
     redacaoDadaPor: null,
   },
 
+  // ─── Reavaliação/cessação por não comparecimento a perícia (art. 101) ──
+  {
+    caminho: "art. 101, caput",
+    texto:
+      "O segurado em gozo de auxílio por incapacidade temporária, auxílio-acidente ou aposentadoria por incapacidade permanente e o pensionista inválido, cujos benefícios tenham sido concedidos judicial ou administrativamente, estão obrigados, sob pena de suspensão do benefício, a submeter-se a:",
+    redacaoDadaPor: "Lei nº 14.441, de 2022",
+  },
+  {
+    caminho: "art. 101, I",
+    texto:
+      "exame médico a cargo da Previdência Social para avaliação das condições que ensejaram sua concessão ou manutenção;",
+    redacaoDadaPor: "Lei nº 14.441, de 2022",
+  },
+  {
+    caminho: "art. 101, II",
+    texto:
+      "processo de reabilitação profissional prescrito e custeado pela Previdência Social; e",
+    redacaoDadaPor: "Lei nº 14.441, de 2022",
+  },
+  {
+    caminho: "art. 101, III",
+    texto:
+      "tratamento oferecido gratuitamente, exceto o cirúrgico e a transfusão de sangue, que são facultativos.",
+    redacaoDadaPor: "Lei nº 14.441, de 2022",
+  },
+
   // ─── Decadência e prescrição (art. 103, 103-A) ───────────────────────
   {
     caminho: "art. 103, caput",

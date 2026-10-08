@@ -106,6 +106,64 @@ async function testarT2Acumulacao() {
   }
 }
 
+async function testarPrescricaoQuinquenal() {
+  // Não é um caso do golden-set original — regra genérica (qualquer
+  // benefício) que criei além do que o pacote pedia, por isso tratado como
+  // teste próprio, não um "T-" do golden-set.
+  const { listarPontosAtencao, avaliarPontosAtencao } =
+    await import("../src/lib/pontos-atencao-db");
+  const sqlMod = await import("../src/lib/db");
+  const sql = sqlMod.default;
+
+  const [cliente] = await sql`
+    INSERT INTO clients
+      (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+    VALUES
+      ('PF', '_TESTE GOLDEN SET prescricao', '222.222.222-22', '_teste3@teste.local',
+       '00000000000', '00000-000', 'Rua Teste', '0', 'Teste', 'Teste', 'AL', 'Ativo')
+    RETURNING id::text
+  `;
+  const [antigo] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, der)
+    VALUES (${cliente.id}::uuid, 'B31 - Auxílio-doença', 'Previdenciário', 'Em andamento', '2015-01-01')
+    RETURNING id::text
+  `;
+  const [recente] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, der)
+    VALUES (${cliente.id}::uuid, 'B31 - Auxílio-doença', 'Previdenciário', 'Em andamento', NOW())
+    RETURNING id::text
+  `;
+  try {
+    await avaliarPontosAtencao(antigo.id);
+    await avaliarPontosAtencao(recente.id);
+    const pontosAntigo = await listarPontosAtencao(antigo.id);
+    const pontosRecente = await listarPontosAtencao(recente.id);
+    const disparouNoAntigo = pontosAntigo.some(
+      (p) => p.codigo === "prescricao_quinquenal"
+    );
+    const naoDisparouNoRecente = !pontosRecente.some(
+      (p) => p.codigo === "prescricao_quinquenal"
+    );
+    if (disparouNoAntigo && naoDisparouNoRecente) {
+      registrar(
+        "prescricao-quinquenal",
+        "PASS",
+        "alerta dispara pra DER de 2015, não dispara pra DER de hoje"
+      );
+    } else {
+      registrar(
+        "prescricao-quinquenal",
+        "FAIL",
+        `disparouNoAntigo=${disparouNoAntigo} naoDisparouNoRecente=${naoDisparouNoRecente}`
+      );
+    }
+  } finally {
+    await sql`DELETE FROM pontos_atencao WHERE processo_id IN (${antigo.id}::uuid, ${recente.id}::uuid)`;
+    await sql`DELETE FROM processos WHERE id IN (${antigo.id}::uuid, ${recente.id}::uuid)`;
+    await sql`DELETE FROM clients WHERE id = ${cliente.id}::uuid`;
+  }
+}
+
 async function testarT6EquivalenteCitacaoFabricada() {
   // golden-set T6 descreve um ACÓRDÃO inventado (jurisprudência) — isso é
   // Fase 2 (Jurisprudência Viva), ainda não construída. O equivalente que
@@ -207,6 +265,7 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
 async function main() {
   await testarT1LeiDesatualizada();
   await testarT2Acumulacao();
+  await testarPrescricaoQuinquenal();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();
   await testarCitacaoGateMultiplasNormas();

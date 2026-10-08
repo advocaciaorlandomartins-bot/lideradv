@@ -126,13 +126,40 @@ async function avaliarRegrasBpc(
   return resultados;
 }
 
-/** Roda as regras determinísticas aplicáveis ao processo (hoje: só BPC/LOAS,
- * B80/B87/B88) e grava em pontos_atencao. Idempotente: um ponto já resolvido
- * manualmente pelo advogado não é reaberto automaticamente — só re-avaliado
- * se ainda não tinha sido resolvido. */
+const CINCO_ANOS_MS = 5 * 365.25 * 24 * 60 * 60 * 1000;
+
+/** Regra genérica (qualquer benefício, não só BPC): DER com mais de 5 anos
+ * sinaliza risco de prescrição das parcelas mais antigas (prescrição
+ * quinquenal das prestações, Decreto nº 20.910/1932, art. 1º — entendimento
+ * pacífico de que não atinge o fundo de direito, só as parcelas vencidas há
+ * mais de 5 anos da propositura/requerimento). Gravidade 'medio': é alerta
+ * pro advogado conferir o cálculo dos atrasados, não motivo pra travar o
+ * processo. */
+function avaliarPrescricaoQuinquenal(der: string | null): RegraResultado[] {
+  if (!der) return [];
+  const dataDer = new Date(der);
+  if (Number.isNaN(dataDer.getTime())) return [];
+  const anosDesdeDer = (Date.now() - dataDer.getTime()) / CINCO_ANOS_MS;
+  if (anosDesdeDer <= 1) return [];
+  return [
+    {
+      codigo: "prescricao_quinquenal",
+      gravidade: "medio",
+      descricao: `A DER deste processo (${dataDer.toLocaleDateString("pt-BR")}) foi há mais de 5 anos. Parcelas vencidas há mais de 5 anos contados da propositura/requerimento podem estar prescritas (prescrição quinquenal das prestações) — confira o cálculo dos atrasados antes de pedir retroativo ao limite da DER.`,
+      baseLegal:
+        "Decreto nº 20.910/1932, art. 1º (prescrição quinquenal das prestações periódicas)",
+    },
+  ];
+}
+
+/** Roda as regras determinísticas aplicáveis ao processo e grava em
+ * pontos_atencao. As regras de BPC só rodam pra B80/B87/B88; a de
+ * prescrição roda pra qualquer processo com DER preenchida. Idempotente:
+ * um ponto já resolvido manualmente pelo advogado não é reaberto
+ * automaticamente — só re-avaliado se ainda não tinha sido resolvido. */
 export async function avaliarPontosAtencao(processoId: string): Promise<void> {
   const [processo] = await sql`
-    SELECT p.tipo_acao, c.status_beneficio, c.tipo_beneficio,
+    SELECT p.tipo_acao, p.der::text, c.status_beneficio, c.tipo_beneficio,
            c.tipo_incapacidade, c.doc, c.renda_familiar_per_capita,
            c.membros_familia
     FROM processos p
@@ -143,16 +170,20 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
 
   const codigo = processo.tipo_acao ? codigoDoTipo(processo.tipo_acao) : null;
   const ehBpc = codigo === "B80" || codigo === "B87" || codigo === "B88";
-  if (!ehBpc) return;
 
-  const resultados = await avaliarRegrasBpc(processoId, {
-    status_beneficio: processo.status_beneficio ?? null,
-    tipo_beneficio: processo.tipo_beneficio ?? null,
-    tipo_incapacidade: processo.tipo_incapacidade ?? null,
-    doc: processo.doc ?? null,
-    renda_familiar_per_capita: processo.renda_familiar_per_capita ?? null,
-    membros_familia: processo.membros_familia,
-  });
+  const resultados = [
+    ...(ehBpc
+      ? await avaliarRegrasBpc(processoId, {
+          status_beneficio: processo.status_beneficio ?? null,
+          tipo_beneficio: processo.tipo_beneficio ?? null,
+          tipo_incapacidade: processo.tipo_incapacidade ?? null,
+          doc: processo.doc ?? null,
+          renda_familiar_per_capita: processo.renda_familiar_per_capita ?? null,
+          membros_familia: processo.membros_familia,
+        })
+      : []),
+    ...avaliarPrescricaoQuinquenal(processo.der ?? null),
+  ];
 
   for (const r of resultados) {
     await sql`

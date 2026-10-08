@@ -130,8 +130,8 @@ STJ:
 STF:
 • ADIs 2.110/2.111 (21/03/2024): carência para salário-maternidade inconstitucional
 • RE 586.068 (Tema 100): coisa julgada de juizado especial revisável quando fundada em lei inconstitucional
-• Tema 995: BPC — critério de renda não é absoluto (miserabilidade)
-• RE 636.941: incapacidade — perícia biopsicossocial (ICF)
+• Tema 27 STF (RE 567.985/RE 580.963): BPC — critério de renda não é absoluto (miserabilidade) — NÃO "Tema 995", que é sobre responsabilidade civil de imprensa, assunto completamente diferente (achado e corrigido em 2026-10-08)
+• RE 636.941: incapacidade — perícia biopsicossocial (ICF) — não confirmado contra fonte oficial nesta auditoria; conceito em si é real (perícia biopsicossocial é entendimento consolidado), mas não achei confirmação específica pra esse número de RE
 • ADPF 182: BPC — família de acolhimento
 • ARE 930.647 AgR: precedente STF vinculante aplicável imediatamente, independente de publicação do paradigma
 
@@ -1214,7 +1214,7 @@ function promptModoEspecializado(modo: string): string {
 • Deficiência: modelo biopsicossocial ICF (Lei 13.146/2015 — EPCD) — impedimento de longo prazo (≥2 anos) físico, mental, intelectual ou sensorial que restrinja participação social
 
 CRITÉRIO DE RENDA — ANÁLISE BPC 360 (holística):
-• Critério legal ¼ SM per capita NÃO é absoluto: Tema 995 STF + Súmula 54 TNU + ADPF 182 + Temas 27 e 312 STF
+• Critério legal ¼ SM per capita NÃO é absoluto: Tema 27 STF (RE 567.985/580.963) + Súmula 54 TNU + ADPF 182 + Tema 312 STF
 • Lei 13.982/2020 — rendas EXCLUÍDAS: BPC do cônjuge, 1 SM de pensão por morte, benefícios assistenciais eventuais, bolsa família, rendimentos da própria PcD
 • Art. 20, §11-A, Lei 8.742/93: GASTOS com medicamentos, cuidador, aluguel, transporte, dívidas REDUZEM renda efetiva
 • Art. 20-B, Lei 8.742/93: critérios adicionais de flexibilização — aplicar sempre
@@ -1274,7 +1274,7 @@ ESTRATÉGIA PAP:
     case "Contribuinte Individual":
       return `\n═══ MODO ESPECIALIZADO: CONTRIBUINTE INDIVIDUAL ═══
 • Verificar recolhimentos GPS no CNIS — autônomos frequentemente têm lacunas
-• Recolhimento em atraso possível (art. 27-A Lei 8.213/91 + Dec. 3.048/99 art. 161) com juros e multa
+• Recolhimento em atraso possível (art. 27-A Lei 8.213/91, espelhado no art. 27-A do Decreto 3.048/99 — NÃO art. 161, que trata de serviço social) com juros e multa
 • Carência: apenas contribuições efetivamente recolhidas contam
 • MEI: benefícios limitados ao salário mínimo (exceto por incapacidade com adicional de 25%)
 • Atenção ao período de graça: 12 a 36 meses (art. 15 Lei 8.213/91)`;
@@ -1909,7 +1909,7 @@ NIS/PIS: ${processoAug.nis || "Não informado"}${campoDeDoc("nis") ? " ✓doc" :
 ${(() => {
   const p = processoAug;
   if (isBPC(p))
-    return `⚠️ CASO BPC/LOAS — benefício ASSISTENCIAL: NÃO exige carência, contribuições nem histórico trabalhista.\nCritério: deficiência (impedimento de longo prazo ≥2 anos) + miserabilidade (renda per capita ≤ ¼ SM — relativizável via Tema 995 STF).`;
+    return `⚠️ CASO BPC/LOAS — benefício ASSISTENCIAL: NÃO exige carência, contribuições nem histórico trabalhista.\nCritério: deficiência (impedimento de longo prazo ≥2 anos) + miserabilidade (renda per capita ≤ ¼ SM — relativizável via Tema 27 STF).`;
   if (isPensao(p))
     return `⚠️ PENSÃO POR MORTE — SEM carência (art. 26, I, Lei 8.213/91). Verificar QUALIDADE DE SEGURADO DO FALECIDO na data do óbito e grau de parentesco do dependente.`;
   if (isMaternidade(p))

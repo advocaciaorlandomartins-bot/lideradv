@@ -788,6 +788,64 @@ async function testarSalarioMaternidadeCarencia() {
   }
 }
 
+async function testarRegrasBpcNaoDisparamEmB88() {
+  // Achado ao revisar o bug de B87/B88 invertidos: as regras de
+  // "impedimento de longo prazo" (2) e "cessação possivelmente indevida"
+  // (5) checavam tipo_incapacidade sem conferir o código do benefício —
+  // disparavam igual num B88 (idoso), que não tem relação nenhuma com
+  // incapacidade/deficiência (é só idade + renda). Um cliente com
+  // tipo_incapacidade preenchido (ex.: herdado de outro processo) e
+  // processo B88 não deve receber nenhum dos dois alertas.
+  const { listarPontosAtencao, avaliarPontosAtencao } =
+    await import("../src/lib/pontos-atencao-db");
+  const sqlMod = await import("../src/lib/db");
+  const sql = sqlMod.default;
+
+  const [cliente] = await sql`
+    INSERT INTO clients
+      (type, name, doc, email, phone, cep, street, addr_number, neighborhood,
+       city, state, status, tipo_incapacidade)
+    VALUES
+      ('PF', '_TESTE GOLDEN SET b88gate', '666.666.666-66', '_teste7@teste.local',
+       '00000000000', '00000-000', 'Rua Teste', '0', 'Teste', 'Teste', 'AL',
+       'Ativo', 'permanente')
+    RETURNING id::text
+  `;
+  const [processo] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, motivo_indeferimento)
+    VALUES (${cliente.id}::uuid, 'B88 - BPC pessoa idosa', 'Previdenciário',
+            'Em andamento', 'Benefício cessado em revisão bienal')
+    RETURNING id::text
+  `;
+  try {
+    await avaliarPontosAtencao(processo.id);
+    const pontos = await listarPontosAtencao(processo.id);
+    const naoDisparouImpedimento = !pontos.some(
+      (p) => p.codigo === "bpc_impedimento_prazo"
+    );
+    const naoDisparouCessacao = !pontos.some(
+      (p) => p.codigo === "bpc_cessacao_possivelmente_indevida"
+    );
+    if (naoDisparouImpedimento && naoDisparouCessacao) {
+      registrar(
+        "regras-bpc-gate-b88 (regressão)",
+        "PASS",
+        "B88 (idoso) com tipo_incapacidade preenchido não dispara os alertas de impedimento/cessação (só fazem sentido pra B87)"
+      );
+    } else {
+      registrar(
+        "regras-bpc-gate-b88 (regressão)",
+        "FAIL",
+        `naoDisparouImpedimento=${naoDisparouImpedimento} naoDisparouCessacao=${naoDisparouCessacao}`
+      );
+    }
+  } finally {
+    await sql`DELETE FROM pontos_atencao WHERE processo_id = ${processo.id}::uuid`;
+    await sql`DELETE FROM processos WHERE id = ${processo.id}::uuid`;
+    await sql`DELETE FROM clients WHERE id = ${cliente.id}::uuid`;
+  }
+}
+
 async function testarT14KillSwitch() {
   const { agentesEstaoAtivos, definirAgentesAtivos } =
     await import("../src/lib/config-agentes-db");
@@ -854,6 +912,7 @@ async function main() {
   await testarAutismoB87Lei12764();
   await testarPontoAtencaoAutismo();
   await testarSalarioMaternidadeCarencia();
+  await testarRegrasBpcNaoDisparamEmB88();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();
   await testarCitacaoGateMultiplasNormas();

@@ -94,8 +94,13 @@ async function avaliarRegrasBpc(
   }
 
   // 2. Impedimento de longo prazo inconsistente com BPC-deficiência
-  // (LOAS art. 20, §§ 2º e 10 — mínimo 2 anos de efeitos)
-  if (cliente.tipo_incapacidade === "temporaria") {
+  // (LOAS art. 20, §§ 2º e 10 — mínimo 2 anos de efeitos). Só B87
+  // (deficiência) — B88 (idoso) não depende de incapacidade/deficiência
+  // nenhuma, é só idade + renda; achado ao revisar o mesmo bug de
+  // B87/B88 trocados: essa regra não tinha esse gate e disparava sem
+  // sentido num B88 se o cadastro tivesse tipo_incapacidade preenchido
+  // (ex.: herdado de outro processo do mesmo cliente).
+  if (codigo === "B87" && cliente.tipo_incapacidade === "temporaria") {
     resultados.push({
       codigo: "bpc_impedimento_prazo",
       gravidade: "medio",
@@ -150,11 +155,18 @@ async function avaliarRegrasBpc(
   }
 
   // 5. Cessação possivelmente indevida — impedimento permanente dispensa
-  // reavaliação periódica (LOAS art. 21, § 5º)
+  // reavaliação periódica (LOAS art. 21, § 5º). Só B87 (deficiência) —
+  // mesmo motivo do gate da regra 2: reavaliação médico-pericial
+  // periódica é coisa de impedimento/deficiência, não existe esse
+  // conceito pro BPC idoso (B88, que é só idade + renda).
   const textoMotivo = `${processo.motivo_indeferimento ?? ""} ${processo.resultado_admin ?? ""}`;
   const pareceCessacao =
     /cessa[çc][ãa]o|cessad[oa]|suspens[ãa]o|suspenso/i.test(textoMotivo);
-  if (pareceCessacao && cliente.tipo_incapacidade === "permanente") {
+  if (
+    codigo === "B87" &&
+    pareceCessacao &&
+    cliente.tipo_incapacidade === "permanente"
+  ) {
     resultados.push({
       codigo: "bpc_cessacao_possivelmente_indevida",
       gravidade: "alto",

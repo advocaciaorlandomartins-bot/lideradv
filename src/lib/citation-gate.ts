@@ -77,9 +77,13 @@ function escapeRegex(s: string): string {
 function candidatosCaminho(trecho: string, posicaoNorma: number): string[] {
   // [ºo°]? depois do número consome o ordinal de "art. 2º" — sem isso, o
   // "º" sobra no início de depoisDoArtigo (abaixo) e quebra o paragMatch/
-  // incisoMatch/caputMatch, que esperam começar com vírgula/espaço.
+  // incisoMatch/caputMatch, que esperam começar com vírgula/espaço. "s?"
+  // depois de "art"/"artigo" cobre o plural ("arts. 57 e 58 da Lei
+  // 8.213/91") — sem isso o "s" antes do "." quebrava o match inteiro e a
+  // citação não aparecia no relatório (nem verificada nem não encontrada,
+  // simplesmente ignorada).
   const todosArtMatches = [
-    ...trecho.matchAll(/art(?:igo)?\.?\s*(\d+)\s*[ºo°]?(-[A-Z])?/gi),
+    ...trecho.matchAll(/art(?:igo)?s?\.?\s*(\d+)\s*[ºo°]?(-[A-Z])?/gi),
   ];
   if (todosArtMatches.length === 0) return [];
 
@@ -193,7 +197,7 @@ export async function verificarCitacoesLegais(
       // ", caput" (ver seed-base-legal*.ts) — inclui as duas formas como
       // candidato extra antes de marcar como não encontrada.
       const candidatosComFallback = [...candidatos];
-      if (/^art\. \d+[A-Z]?$/.test(caminho)) {
+      if (/^art\. \d+(-[A-Z])?$/.test(caminho)) {
         candidatosComFallback.push(`${caminho}, caput`);
       }
       if (caminho.endsWith(", caput")) {

@@ -280,6 +280,50 @@ const LEI_8213: DispositivoSeed[] = [
     redacaoDadaPor: null,
   },
 
+  // ─── Aposentadoria especial / tempo especial (art. 57-58) ────────────
+  {
+    caminho: "art. 57, caput",
+    texto:
+      "A aposentadoria especial será devida, uma vez cumprida a carência exigida nesta Lei, ao segurado que tiver trabalhado sujeito a condições especiais que prejudiquem a saúde ou a integridade física, durante 15 (quinze), 20 (vinte) ou 25 (vinte e cinco) anos, conforme dispuser a lei.",
+    redacaoDadaPor: "Lei nº 9.032, de 1995",
+  },
+  {
+    caminho: "art. 57, § 1º",
+    texto:
+      "A aposentadoria especial, observado o disposto no art. 33 desta Lei, consistirá numa renda mensal equivalente a 100% (cem por cento) do salário-de-benefício.",
+    redacaoDadaPor: "Lei nº 9.032, de 1995",
+  },
+  {
+    caminho: "art. 57, § 3º",
+    texto:
+      "A concessão da aposentadoria especial dependerá de comprovação pelo segurado, perante o Instituto Nacional do Seguro Social — INSS, do tempo de trabalho permanente, não ocasional nem intermitente, em condições especiais que prejudiquem a saúde ou a integridade física, durante o período mínimo fixado.",
+    redacaoDadaPor: "Lei nº 9.032, de 1995",
+  },
+  {
+    caminho: "art. 57, § 4º",
+    texto:
+      "O segurado deverá comprovar, além do tempo de trabalho, exposição aos agentes nocivos químicos, físicos, biológicos ou associação de agentes prejudiciais à saúde ou à integridade física, pelo período equivalente ao exigido para a concessão do benefício.",
+    redacaoDadaPor: "Lei nº 9.032, de 1995",
+  },
+  {
+    caminho: "art. 57, § 5º",
+    texto:
+      "O tempo de trabalho exercido sob condições especiais que sejam ou venham a ser consideradas prejudiciais à saúde ou à integridade física será somado, após a respectiva conversão ao tempo de trabalho exercido em atividade comum, segundo critérios estabelecidos pelo Ministério da Previdência e Assistência Social, para efeito de concessão de qualquer benefício.",
+    redacaoDadaPor: "Lei nº 9.032, de 1995",
+  },
+  {
+    caminho: "art. 58, caput",
+    texto:
+      "A relação dos agentes nocivos químicos, físicos e biológicos ou associação de agentes prejudiciais à saúde ou à integridade física considerados para fins de concessão da aposentadoria especial de que trata o artigo anterior será definida pelo Poder Executivo.",
+    redacaoDadaPor: "Lei nº 9.528, de 1997",
+  },
+  {
+    caminho: "art. 58, § 1º",
+    texto:
+      "A comprovação da efetiva exposição do segurado aos agentes nocivos será feita mediante formulário, na forma estabelecida pelo Instituto Nacional do Seguro Social - INSS, emitido pela empresa ou seu preposto, com base em laudo técnico de condições ambientais do trabalho expedido por médico do trabalho ou engenheiro de segurança do trabalho nos termos da legislação trabalhista.",
+    redacaoDadaPor: "Lei nº 9.732, de 11.12.98",
+  },
+
   // ─── Auxílio-doença (art. 59-63) ─────────────────────────────────────
   {
     caminho: "art. 59, caput",

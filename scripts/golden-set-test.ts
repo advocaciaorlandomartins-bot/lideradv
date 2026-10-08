@@ -193,6 +193,44 @@ async function testarCitacaoComIncisoDentroDeParagrafo() {
   }
 }
 
+async function testarCitacaoPluralEArtigoComHifen() {
+  // 5º e 6º bugs reais achados: "arts. 57 e 58" (plural, sem a palavra
+  // "artigo" no singular) não gerava NENHUM match — a citação ficava
+  // completamente invisível pro relatório, nem verificada nem não
+  // encontrada. E "art. 20-B" (artigo com sufixo de letra, comum: 20-A,
+  // 20-B, 27-A...) não achava o fallback ", caput" porque o regex do
+  // fallback não previa o hífen antes da letra.
+  const { verificarCitacoesLegais } = await import("../src/lib/citation-gate");
+
+  const rPlural = await verificarCitacoesLegais(
+    "Nos termos dos arts. 57 e 58 da Lei 8.213/91, a atividade especial..."
+  );
+  const achouPlural = rPlural.verificadas.some(
+    (c) => c.norma === "Lei 8.213/1991" && c.caminho === "art. 57"
+  );
+
+  const rHifen = await verificarCitacoesLegais(
+    "O art. 20-B da Lei 8.742/93 trata dos elementos probatórios."
+  );
+  const achouHifen = rHifen.verificadas.some(
+    (c) => c.norma === "Lei 8.742/1993" && c.caminho === "art. 20-B"
+  );
+
+  if (achouPlural && achouHifen) {
+    registrar(
+      "citation-gate-plural-e-hifen (regressão)",
+      "PASS",
+      "'arts. 57 e 58' (plural) e 'art. 20-B' (hífen+letra) verificados corretamente"
+    );
+  } else {
+    registrar(
+      "citation-gate-plural-e-hifen (regressão)",
+      "FAIL",
+      `achouPlural=${achouPlural} achouHifen=${achouHifen}`
+    );
+  }
+}
+
 async function testarT6EquivalenteCitacaoFabricada() {
   // golden-set T6 descreve um ACÓRDÃO inventado (jurisprudência) — isso é
   // Fase 2 (Jurisprudência Viva), ainda não construída. O equivalente que
@@ -299,6 +337,7 @@ async function main() {
   await testarT7Lacuna();
   await testarCitacaoGateMultiplasNormas();
   await testarCitacaoComIncisoDentroDeParagrafo();
+  await testarCitacaoPluralEArtigoComHifen();
   for (const [id, motivo] of NAO_IMPLEMENTADOS) {
     registrar(id, "SKIP", motivo);
   }

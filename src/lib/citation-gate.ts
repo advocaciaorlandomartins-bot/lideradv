@@ -48,6 +48,12 @@ const VARIACOES_NORMA: Record<string, string[]> = {
     "ec\\s*103/2019",
     "ec\\s*n[ºo°]?\\s*103",
   ],
+  "Lei 13.146/2015": [
+    "lei 13.146/2015",
+    "lei 13.146/15",
+    "lei n[ºo°]?\\s*13\\.146,?\\s*de\\s*2015",
+    "estatuto da pessoa com defici[êe]ncia",
+  ],
 };
 
 function escapeRegex(s: string): string {
@@ -55,20 +61,27 @@ function escapeRegex(s: string): string {
 }
 
 /** Normaliza "art. 20, §4º" / "artigo 20, parágrafo 4º" / "art. 15, II" /
- * "art. 20 § 4o" pro mesmo formato usado em dispositivos.caminho. Recebe a
- * posição da menção da norma dentro da janela e escolhe a ocorrência de
- * "art." MAIS PRÓXIMA dela (podendo vir antes ou depois no texto) — uma
- * janela com duas leis diferentes perto uma da outra (ex.: "art. 20 da
- * LOAS... art. 15 da Lei 8.213") não pode pegar o artigo errado só porque
- * apareceu primeiro na string. Retorna null se não achar nenhum artigo. */
-function normalizarCaminho(
-  trecho: string,
-  posicaoNorma: number
-): string | null {
+ * "art. 20 § 4o" / "art. 2º, §1º, I" pro(s) mesmo(s) formato(s) usado(s) em
+ * dispositivos.caminho. Recebe a posição da menção da norma dentro da
+ * janela e escolhe a ocorrência de "art." MAIS PRÓXIMA dela (podendo vir
+ * antes ou depois no texto) — uma janela com duas leis diferentes perto uma
+ * da outra (ex.: "art. 20 da LOAS... art. 15 da Lei 8.213") não pode pegar
+ * o artigo errado só porque apareceu primeiro na string.
+ *
+ * Retorna uma lista de candidatos do MAIS pro MENOS específico (ex.:
+ * ["art. 2, § 1º, I", "art. 2, § 1º", "art. 2"]) — alguns dispositivos
+ * foram seedados no nível de inciso dentro do parágrafo, outros só no
+ * nível do parágrafo inteiro; sem isso, citar "art. 2º, §1º, I" nunca bate
+ * com um dispositivo seedado como "art. 2, § 1º, I" OU como "art. 2, § 1º"
+ * dependendo de como a base foi montada. Retorna [] se não achar artigo. */
+function candidatosCaminho(trecho: string, posicaoNorma: number): string[] {
+  // [ºo°]? depois do número consome o ordinal de "art. 2º" — sem isso, o
+  // "º" sobra no início de depoisDoArtigo (abaixo) e quebra o paragMatch/
+  // incisoMatch/caputMatch, que esperam começar com vírgula/espaço.
   const todosArtMatches = [
-    ...trecho.matchAll(/art(?:igo)?\.?\s*(\d+)(-[A-Z])?/gi),
+    ...trecho.matchAll(/art(?:igo)?\.?\s*(\d+)\s*[ºo°]?(-[A-Z])?/gi),
   ];
-  if (todosArtMatches.length === 0) return null;
+  if (todosArtMatches.length === 0) return [];
 
   const artMatch = todosArtMatches.reduce((maisPerto, atual) => {
     const distAtual = Math.abs((atual.index ?? 0) - posicaoNorma);
@@ -78,6 +91,7 @@ function normalizarCaminho(
 
   const artigoNum = artMatch[1];
   const sufixoArtigo = artMatch[2] ? artMatch[2].toUpperCase() : "";
+  const base = `art. ${artigoNum}${sufixoArtigo}`;
 
   const depoisDoArtigo = trecho.slice(
     (artMatch.index ?? 0) + artMatch[0].length,
@@ -90,22 +104,35 @@ function normalizarCaminho(
   );
   // "art. 15, inciso II" OU a forma mais comum na prática, "art. 15, II"
   // (vírgula + numeral romano, sem a palavra "inciso")
-  const incisoMatch = depoisDoArtigo.match(
-    /^[,\s]*(?:inciso\s+)?([IVX]{1,4})\b/i
-  );
+  const incisoRe = /^[,\s]*(?:inciso\s+)?([IVX]{1,4})\b/i;
+  const incisoMatch = depoisDoArtigo.match(incisoRe);
   const caputMatch = /^[,\s]*caput\b/i.test(depoisDoArtigo);
 
-  let caminho = `art. ${artigoNum}${sufixoArtigo}`;
+  const candidatos: string[] = [];
   if (paragMatch) {
     const num = paragMatch[1] ?? paragMatch[3];
     const sufixoParag = paragMatch[2] ? paragMatch[2].toUpperCase() : "";
-    caminho += `, § ${num}º${sufixoParag}`;
+    const paragStr = `, § ${num}º${sufixoParag}`;
+    // Inciso DENTRO do parágrafo citado (ex.: "art. 2º, §1º, I") — tenta o
+    // caminho de 3 níveis primeiro, antes de cair pro parágrafo inteiro.
+    const incisoDoParag = depoisDoArtigo
+      .slice(paragMatch[0].length)
+      .match(incisoRe);
+    if (incisoDoParag) {
+      candidatos.push(`${base}${paragStr}, ${incisoDoParag[1].toUpperCase()}`);
+    }
+    candidatos.push(`${base}${paragStr}`);
+    // Alguns parágrafos têm caput próprio seguido de incisos (ex.: "art. 2,
+    // § 1º, caput" + "art. 2, § 1º, I"..) — citar só "art. 2º, §1º" sem
+    // apontar inciso deve também achar o caput do parágrafo.
+    candidatos.push(`${base}${paragStr}, caput`);
   } else if (incisoMatch) {
-    caminho += `, ${incisoMatch[1].toUpperCase()}`;
+    candidatos.push(`${base}, ${incisoMatch[1].toUpperCase()}`);
   } else if (caputMatch) {
-    caminho += ", caput";
+    candidatos.push(`${base}, caput`);
   }
-  return caminho;
+  candidatos.push(base);
+  return candidatos;
 }
 
 /** Varre o texto gerado procurando citações de artigo/parágrafo associadas a
@@ -140,9 +167,15 @@ export async function verificarCitacoesLegais(
       const fim = Math.min(texto.length, match.index + match[0].length + 150);
       const janela = texto.slice(inicio, fim);
       const posicaoNormaNaJanela = match.index - inicio;
-      const caminho = normalizarCaminho(janela, posicaoNormaNaJanela);
-      if (!caminho) continue; // menciona a norma mas sem artigo específico — nada a verificar
+      const candidatos = candidatosCaminho(janela, posicaoNormaNaJanela);
+      if (candidatos.length === 0) continue; // menciona a norma mas sem artigo específico — nada a verificar
 
+      // Caminho mais específico é o que entra no relatório (é o que o
+      // texto realmente parece citar); os outros candidatos são só
+      // tentativas de achar o dispositivo com granularidade diferente da
+      // que foi seedada (ex.: citou o inciso, mas só o parágrafo inteiro
+      // está salvo, ou vice-versa).
+      const caminho = candidatos[0];
       const citacao: CitacaoDetectada = {
         normaDetectada: match[0],
         norma,
@@ -157,16 +190,22 @@ export async function verificarCitacoesLegais(
 
       // "art. N" sem sub-parte normalmente se refere ao caput, mas um
       // artigo sem parágrafo nenhum às vezes é seedado sem o sufixo
-      // ", caput" (ver seed-base-legal*.ts) — tenta as duas formas nos dois
-      // sentidos antes de marcar como não encontrada.
-      const ehArtigoSemSubparte = /^art\. \d+[A-Z]?$/.test(caminho);
-      const dispositivo =
-        (await getDispositivo(norma, caminho)) ??
-        (ehArtigoSemSubparte
-          ? await getDispositivo(norma, `${caminho}, caput`)
-          : caminho.endsWith(", caput")
-            ? await getDispositivo(norma, caminho.replace(", caput", ""))
-            : null);
+      // ", caput" (ver seed-base-legal*.ts) — inclui as duas formas como
+      // candidato extra antes de marcar como não encontrada.
+      const candidatosComFallback = [...candidatos];
+      if (/^art\. \d+[A-Z]?$/.test(caminho)) {
+        candidatosComFallback.push(`${caminho}, caput`);
+      }
+      if (caminho.endsWith(", caput")) {
+        candidatosComFallback.push(caminho.replace(", caput", ""));
+      }
+
+      let dispositivo = null;
+      for (const c of candidatosComFallback) {
+        dispositivo = await getDispositivo(norma, c);
+        if (dispositivo) break;
+      }
+
       if (dispositivo) {
         // Evita duplicar a mesma citação já verificada nesta mesma passada
         if (

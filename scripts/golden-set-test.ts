@@ -164,6 +164,35 @@ async function testarPrescricaoQuinquenal() {
   }
 }
 
+async function testarCitacaoComIncisoDentroDeParagrafo() {
+  // Regressão de um 3º bug real achado na prática: "art. 2º, § 1º, I" (um
+  // inciso DENTRO de um parágrafo) não batia com nada, porque o
+  // normalizador só sabia montar caminho de 2 níveis (art+parág OU
+  // art+inciso, nunca os três juntos). Também cobre o "º" grudado no
+  // número do artigo ("art. 2º") que quebrava a detecção do que vinha
+  // depois.
+  const { verificarCitacoesLegais } = await import("../src/lib/citation-gate");
+  const r = await verificarCitacoesLegais(
+    "Nos termos do art. 2º, § 1º, I, da Lei 13.146/2015, consideram-se os impedimentos nas funções e nas estruturas do corpo."
+  );
+  const achou = r.verificadas.find(
+    (c) => c.norma === "Lei 13.146/2015" && c.caminho === "art. 2, § 1º, I"
+  );
+  if (achou) {
+    registrar(
+      "citation-gate-inciso-em-paragrafo (regressão)",
+      "PASS",
+      "citação de 3 níveis (artigo + parágrafo + inciso) verificada corretamente"
+    );
+  } else {
+    registrar(
+      "citation-gate-inciso-em-paragrafo (regressão)",
+      "FAIL",
+      `esperado 'art. 2, § 1º, I' verificado; veio verificadas=${JSON.stringify(r.verificadas.map((c) => c.caminho))} naoEncontradas=${JSON.stringify(r.naoEncontradas.map((c) => c.caminho))}`
+    );
+  }
+}
+
 async function testarT6EquivalenteCitacaoFabricada() {
   // golden-set T6 descreve um ACÓRDÃO inventado (jurisprudência) — isso é
   // Fase 2 (Jurisprudência Viva), ainda não construída. O equivalente que
@@ -269,6 +298,7 @@ async function main() {
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();
   await testarCitacaoGateMultiplasNormas();
+  await testarCitacaoComIncisoDentroDeParagrafo();
   for (const [id, motivo] of NAO_IMPLEMENTADOS) {
     registrar(id, "SKIP", motivo);
   }

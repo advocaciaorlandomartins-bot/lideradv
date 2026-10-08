@@ -280,7 +280,7 @@ Audiência telepresencial: a pedido da parte (Resolução CNJ 354/2020 + 481/202
 Pedido indeferido de audiência: CERCEAMENTO DE DEFESA → JEF: recurso inominado; VARA: agravo de instrumento (CPC art. 1.015)
 
 CÁLCULOS:
-• Teto INSS 2026: R$ 8.157,41
+• Teto INSS 2026: R$ 8.475,55 (Portaria Interministerial MPS/MF nº 13, de 09/01/2026 — reajuste de 3,90% sobre o teto de 2025, R$ 8.157,41; corrigido em 2026-10-08, o valor anterior aqui era o teto de 2025 rotulado como se fosse 2026)
 • Salário mínimo 2026: R$ 1.621,00
 ⚠️ IMPORTANTE: Use SEMPRE os valores atuais fornecidos no contexto do processo (campo "Salário mínimo vigente"). NUNCA cite valores de anos anteriores (2024: R$ 1.412 / 2025: R$ 1.518) como "atuais".
 • GPS Salário-Maternidade (mensal, 11%): Facultativa=1473 (R$178,42), Individual=1163 (R$178,42), Especial Rural=1503 (20%, R$324,40)
@@ -1889,7 +1889,7 @@ export async function prepararAnalise(
 ⚠️ DADOS FINANCEIROS VIGENTES — USE SEMPRE ESTES VALORES, NUNCA VALORES DE ANOS ANTERIORES:
 Salário mínimo vigente (${new Date().getFullYear()}): ${smVigente}
 BPC/LOAS = 1 salário mínimo = ${smVigente}
-Teto INSS vigente: R$ 8.157,41
+Teto INSS vigente: R$ 8.475,55
 
 PROCESSO Nº ${processo.numero || "Sem número CNJ"}
 Tipo de ação: ${processo.tipo_acao || "Não informado"}

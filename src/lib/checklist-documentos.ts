@@ -39,7 +39,12 @@ const POR_CODIGO: Record<string, string[]> = {
     "Laudo/PPP de condição especial",
   ],
   B80: [
-    "Comprovante de pelo menos uma contribuição ao INSS",
+    // "Comprovante de pelo menos uma contribuição" era o item antigo — a
+    // carência foi declarada inconstitucional pelo STF (ADIs 2.110/2.111,
+    // 21/03/2024); hoje o requisito é só qualidade de segurada na data do
+    // fato gerador, que se prova de formas diferentes por categoria
+    // (ver Enunciado 19 CRPS e Ofício-Circular DIRBEN/INSS 63/2025).
+    "Comprovante de qualidade de segurada na data do parto/adoção (vínculo de emprego, contribuição como individual/facultativa, ou documento de atividade rural anterior ao fato gerador para segurada especial)",
     "Certidão de nascimento da criança (ou laudo de pré-natal, se ainda não nascida)",
   ],
   B87: [

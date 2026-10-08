@@ -106,6 +106,65 @@ async function testarT2Acumulacao() {
   }
 }
 
+async function testarT5NomeDivergente() {
+  // T5 do golden-set original: nome do cliente com grafia diferente entre
+  // cadastro e documentos. Implementado comparando clients.name com
+  // membros_familia[].nome QUANDO O CPF BATE (mesma pessoa provada por
+  // CPF, não por similaridade de nome — evita falso positivo comparando
+  // pessoas diferentes). Caso real que motivou a regra: "ANTHONY EMANUEL"
+  // no cadastro vs "ANTHONY EMANOEL" extraído de documento, mesmo CPF.
+  const { avaliarPontosAtencao, listarPontosAtencao } =
+    await import("../src/lib/pontos-atencao-db");
+  const sqlMod = await import("../src/lib/db");
+  const sql = sqlMod.default;
+
+  const membros = JSON.stringify([
+    {
+      nome: "ANTHONY EMANOEL SILVA SOARES",
+      parentesco: "Filho(a)",
+      cpf: "508.612.608-80",
+      data_nascimento: "2016-02-10",
+    },
+  ]);
+  const [cliente] = await sql`
+    INSERT INTO clients
+      (type, name, doc, email, phone, cep, street, addr_number, neighborhood,
+       city, state, status, membros_familia)
+    VALUES
+      ('PF', 'ANTHONY EMANUEL SILVA SOARES', '508.612.608-80',
+       '_teste_golden_t5@teste.local', '00000000000', '00000-000', 'Rua Teste',
+       '0', 'Teste', 'Teste', 'AL', 'Ativo', ${membros}::jsonb)
+    RETURNING id::text
+  `;
+  const [processo] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status)
+    VALUES (${cliente.id}::uuid, 'B87 - BPC à pessoa com deficiência', 'Previdenciário', 'Em andamento')
+    RETURNING id::text
+  `;
+  try {
+    await avaliarPontosAtencao(processo.id);
+    const pontos = await listarPontosAtencao(processo.id);
+    const achou = pontos.find((p) => p.codigo === "nome_divergente");
+    if (achou) {
+      registrar(
+        "T5-nome-divergente",
+        "PASS",
+        "divergência de grafia detectada via CPF em comum (cadastro × membros_familia)"
+      );
+    } else {
+      registrar(
+        "T5-nome-divergente",
+        "FAIL",
+        "regra nome_divergente não disparou"
+      );
+    }
+  } finally {
+    await sql`DELETE FROM pontos_atencao WHERE processo_id = ${processo.id}::uuid`;
+    await sql`DELETE FROM processos WHERE id = ${processo.id}::uuid`;
+    await sql`DELETE FROM clients WHERE id = ${cliente.id}::uuid`;
+  }
+}
+
 async function testarCessacaoIndevida() {
   // Regra nova (art. 21, § 5º da LOAS, seedado depois do golden-set
   // original): motivo de indeferimento/resultado administrativo mencionando
@@ -469,7 +528,6 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
     "T4-miserabilidade",
     "jurisprudência (STF/STJ/TNU) ainda não tem base própria (Fase 2)",
   ],
-  ["T5-nome-divergente", "detecção de nome divergente não implementada"],
   ["T8-dados-insuficientes", "Estrategista com INSUFICIENTE não implementado"],
   [
     "T9-aprovacao-humana",
@@ -495,6 +553,7 @@ async function main() {
   await testarT1LeiDesatualizada();
   await testarT2Acumulacao();
   await testarB80NaoEhBpc();
+  await testarT5NomeDivergente();
   await testarCessacaoIndevida();
   await testarPrescricaoQuinquenal();
   await testarT6EquivalenteCitacaoFabricada();

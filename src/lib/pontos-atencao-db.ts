@@ -171,6 +171,63 @@ function avaliarPrescricaoQuinquenal(der: string | null): RegraResultado[] {
   ];
 }
 
+function normalizarNome(nome: string): string {
+  return nome
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // remove acentos pra não marcar "José" × "JOSE" como divergência
+    .replace(/\s+/g, " ");
+}
+
+function normalizarDoc(doc: string): string {
+  return doc.replace(/\D/g, "");
+}
+
+interface MembroFamiliaMinimo {
+  nome?: unknown;
+  cpf?: unknown;
+}
+
+/** Regra genérica (qualquer benefício): mesmo CPF, nome diferente entre o
+ * cadastro do cliente e um membro do grupo familiar extraído de documento
+ * (CadÚnico etc.) — é o mesmo CPF, então é a mesma pessoa; se o nome não
+ * bate, é erro de digitação/grafia em um dos dois lugares (ex.: "ANTHONY
+ * EMANUEL" no cadastro × "ANTHONY EMANOEL" extraído do documento — caso
+ * real que motivou essa regra). Não usa aproximação por similaridade de
+ * nome sozinha (sem CPF em comum) porque isso arriscaria comparar duas
+ * pessoas diferentes com nome parecido — só compara quando o CPF já prova
+ * que é a mesma pessoa. */
+function avaliarNomeDivergente(
+  nomeCliente: string | null,
+  docCliente: string | null,
+  membrosFamilia: unknown
+): RegraResultado[] {
+  if (!nomeCliente || !docCliente || !Array.isArray(membrosFamilia)) return [];
+  const docClienteNorm = normalizarDoc(docCliente);
+  if (!docClienteNorm) return [];
+  const nomeClienteNorm = normalizarNome(nomeCliente);
+
+  for (const membroRaw of membrosFamilia as MembroFamiliaMinimo[]) {
+    const membroNome =
+      typeof membroRaw?.nome === "string" ? membroRaw.nome : null;
+    const membroCpf = typeof membroRaw?.cpf === "string" ? membroRaw.cpf : null;
+    if (!membroNome || !membroCpf) continue;
+    if (normalizarDoc(membroCpf) !== docClienteNorm) continue; // CPF diferente — pessoa diferente, não compara nome
+    if (normalizarNome(membroNome) === nomeClienteNorm) continue; // nome bate (ignorando acento/caixa) — sem divergência
+
+    return [
+      {
+        codigo: "nome_divergente",
+        gravidade: "alto",
+        descricao: `O cadastro do cliente tem o nome "${nomeCliente}", mas um documento analisado (mesmo CPF) registra o nome como "${membroNome}" — divergência de grafia. Confira qual está correto antes de gerar petição ou protocolar: nome errado numa peça é erro evitável e pode gerar impugnação.`,
+        baseLegal: null,
+      },
+    ];
+  }
+  return [];
+}
+
 /** Roda as regras determinísticas aplicáveis ao processo e grava em
  * pontos_atencao. As regras de BPC só rodam pra B87/B88; a de prescrição
  * roda pra qualquer processo com DER preenchida. Idempotente:
@@ -179,7 +236,7 @@ function avaliarPrescricaoQuinquenal(der: string | null): RegraResultado[] {
 export async function avaliarPontosAtencao(processoId: string): Promise<void> {
   const [processo] = await sql`
     SELECT p.tipo_acao, p.der::text, p.motivo_indeferimento, p.resultado_admin,
-           c.status_beneficio, c.tipo_beneficio,
+           c.name, c.status_beneficio, c.tipo_beneficio,
            c.tipo_incapacidade, c.doc, c.renda_familiar_per_capita,
            c.membros_familia
     FROM processos p
@@ -211,6 +268,11 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
         )
       : []),
     ...avaliarPrescricaoQuinquenal(processo.der ?? null),
+    ...avaliarNomeDivergente(
+      processo.name ?? null,
+      processo.doc ?? null,
+      processo.membros_familia
+    ),
   ];
 
   for (const r of resultados) {

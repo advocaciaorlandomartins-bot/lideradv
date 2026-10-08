@@ -35,8 +35,8 @@ const GRUPOS_PREV: TiposPeticaoGrupo[] = [
       "Requerimento de Auxílio por Incapacidade Temporária (B31)",
       "Requerimento de Aposentadoria por Incapacidade Permanente (B32)",
       "Requerimento de Auxílio-Acidente (B94)",
-      "Requerimento de BPC/LOAS — Pessoa Idosa (B87)",
-      "Requerimento de BPC/LOAS — Pessoa com Deficiência (B88)",
+      "Requerimento de BPC/LOAS — Pessoa com Deficiência (B87)",
+      "Requerimento de BPC/LOAS — Pessoa Idosa (B88)",
       "Requerimento de Pensão por Morte (B21/B22)",
       "Requerimento de Salário-Maternidade (B80)",
       "Requerimento de Aposentadoria por Idade Urbana (B41)",
@@ -230,8 +230,8 @@ B21/B22 — Pensão por Morte
   • Dependência econômica presumida para cônjuge; deve ser comprovada para outros
 
 B87/B88 — BPC/LOAS
-  • B87 (Idoso): 65 anos + renda per capita familiar ≤ 1/4 SM
-  • B88 (Deficiência): deficiência + impedimentos de longo prazo + renda per capita ≤ 1/4 SM
+  • B87 (Deficiência): deficiência + impedimentos de longo prazo + renda per capita ≤ 1/4 SM — pessoa com TEA (Lei 12.764/2012, art. 1º, §2º) já é equiparada a pessoa com deficiência por força de lei
+  • B88 (Idoso): 65 anos + renda per capita familiar ≤ 1/4 SM
   • Miserabilidade: STJ e STF flexibilizam — renda per capita pode ultrapassar 1/4 SM se demonstradas outras condições de vulnerabilidade (RE 567.985 / AgRg)
   • Não é benefício previdenciário — não incide contribuição previdenciária
   • Não acumula com outro benefício de prestação continuada

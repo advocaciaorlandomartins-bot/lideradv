@@ -54,6 +54,12 @@ const VARIACOES_NORMA: Record<string, string[]> = {
     "lei n[ºo°]?\\s*13\\.146,?\\s*de\\s*2015",
     "estatuto da pessoa com defici[êe]ncia",
   ],
+  "Lei 12.764/2012": [
+    "lei 12.764/2012",
+    "lei 12.764/12",
+    "lei n[ºo°]?\\s*12\\.764,?\\s*de\\s*2012",
+    "lei berenice piva",
+  ],
 };
 
 function escapeRegex(s: string): string {

@@ -634,6 +634,44 @@ async function testarCitacaoGateMultiplasNormas() {
   }
 }
 
+async function testarAutismoB87Lei12764() {
+  // Regressão de dois achados juntos: (1) B87/B88 estavam invertidos em
+  // ai-juridico-skills.ts (B87 é deficiência, B88 é idoso — conferido
+  // contra new-client-form.tsx, a fonte real); (2) Lei 12.764/2012 (Lei
+  // Berenice Piva — TEA é pessoa com deficiência por força de lei) não
+  // estava na Base Legal Viva nem no Citation Gate.
+  const { verificarCitacoesLegais } = await import("../src/lib/citation-gate");
+  const { getBaseLegalParaBeneficio } =
+    await import("../src/lib/base-legal-db");
+
+  const r = await verificarCitacoesLegais(
+    "Nos termos do art. 1º, § 2º, da Lei 12.764/2012, a pessoa com TEA é considerada pessoa com deficiência para todos os efeitos legais."
+  );
+  const citacaoOk =
+    r.verificadas.some(
+      (c) => c.norma === "Lei 12.764/2012" && c.caminho === "art. 1, § 2º"
+    ) && r.naoEncontradas.length === 0;
+
+  const dispositivosB87 = await getBaseLegalParaBeneficio("B87");
+  const mapeamentoOk = dispositivosB87.some(
+    (d) => d.norma === "Lei 12.764/2012"
+  );
+
+  if (citacaoOk && mapeamentoOk) {
+    registrar(
+      "autismo-lei-12764 (regressão)",
+      "PASS",
+      "Lei 12.764/2012 art. 1º §2º verificada pelo Citation Gate e mapeada pro código B87 (deficiência)"
+    );
+  } else {
+    registrar(
+      "autismo-lei-12764 (regressão)",
+      "FAIL",
+      `citacaoOk=${citacaoOk} mapeamentoOk=${mapeamentoOk}`
+    );
+  }
+}
+
 async function testarT14KillSwitch() {
   const { agentesEstaoAtivos, definirAgentesAtivos } =
     await import("../src/lib/config-agentes-db");
@@ -697,6 +735,7 @@ async function main() {
   await testarPrescricaoQuinquenal();
   await testarT8DadosInsuficientes();
   await testarTransicaoEC103();
+  await testarAutismoB87Lei12764();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();
   await testarCitacaoGateMultiplasNormas();

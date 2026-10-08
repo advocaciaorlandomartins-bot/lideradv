@@ -239,6 +239,7 @@ GUIA DE INJEÇÃO DE CONTEXTO (identificar antes de analisar):
 BPC/LOAS — REGRAS ADICIONAIS (2021-2025)
 ════════════════════════════════════════════════
 
+Lei 12.764/2012 (Lei Berenice Piva), art. 1º, § 2º: pessoa com transtorno do espectro autista (TEA) é CONSIDERADA PESSOA COM DEFICIÊNCIA para todos os efeitos legais, inclusive BPC — essa equiparação já está na lei, não depende de a perícia "reconhecer" que é deficiência; a perícia biopsicossocial entra só pra medir o GRAU/impedimento de longo prazo, não pra discutir se TEA conta como deficiência
 Lei 14.126/2021: visão monocular classificada como DEFICIÊNCIA SENSORIAL (tipo visual) para todos os efeitos legais, inclusive BPC
 STF Tema 27: repetitório geral sobre BPC — renda per capita ¼ SM pode ser relativizada
 STF Tema 312: exclusão de benefícios de renda mínima e transferência de renda do cálculo da renda familiar BPC

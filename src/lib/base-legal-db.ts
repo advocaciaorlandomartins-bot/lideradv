@@ -79,9 +79,12 @@ const NORMAS_POR_BENEFICIO: Record<string, string[]> = {
   B80: ["Lei 8.742/1993"],
   B87: ["Lei 8.742/1993"],
   B88: ["Lei 8.742/1993"],
-  B21: ["Lei 8.213/1991"], // pensão por morte
+  B21: ["Lei 8.213/1991", "EC 103/2019"], // pensão por morte (EC 103 mudou o cálculo e a acumulação)
   B31: ["Lei 8.213/1991"], // auxílio-doença / incapacidade temporária
   B32: ["Lei 8.213/1991"], // aposentadoria por invalidez / incapacidade permanente
+  B41: ["Lei 8.213/1991", "EC 103/2019"], // aposentadoria por idade
+  B42: ["Lei 8.213/1991", "EC 103/2019"], // aposentadoria por tempo de contribuição — regras de transição
+  B46: ["Lei 8.213/1991", "EC 103/2019"], // aposentadoria especial
   B91: ["Lei 8.213/1991"], // acidentário
   B92: ["Lei 8.213/1991"],
 };

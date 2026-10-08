@@ -104,3 +104,30 @@ Orlando confirmou que a leitura foi feita só na tela do processo aberto (nada a
 ## 9. Próximo passo
 
 Conforme o plano mestre, a Fase 1 (Base Legal Viva + Fact Ledger + Citation Gate + Pontos de Atenção determinísticos + reescrita dos prompts pra proibir citar lei fora da base) é o próximo passo, mas só começo depois da sua aprovação explícita desta Fase 0 — e da decisão sobre o item 8 acima.
+
+## 10. Fase 3 — automação 24h (2026-10-08, sessão final)
+
+Conforme instrução de terminar todas as fases que der, sem parar pra validação intermediária. Resumo do que foi feito — detalhe completo no relatório final que vou te mandar:
+
+- **Kill switch** (interruptor de emergência): tabela `config_agentes`, novo toggle em Configurações → Agentes de IA, pausa as 3 rotas que chamam a Anthropic a pedido do usuário (petição, Cérebro, análise de documento) + o resumo diário de DOU/INSS. Não pausa os crons determinísticos (publicações, prazos, limpeza) — eles não usam IA, não tem porquê parar.
+- **Rastreamento de uso/custo de IA**: tabela `ia_uso`, grava tokens reais de cada chamada; alerta opcional no resumo diário (só liga se você configurar o preço do token e um limite nas envs — não virou ruído por padrão).
+- **"Painel de saúde dos agentes" e "relatório diário"** (outros dois itens da Fase 3 do plano): já existiam de sessão anterior a esta — `src/lib/saude-sistema.ts` (consumido pela Íris via tool `verificar_saude`) e `src/lib/resumo-diario.ts` (WhatsApp às 8h). Não precisei construir do zero, só emendei o custo de IA no segundo.
+- **Legislação-sync / jurisprudência-radar** (scraping novo pra manter a Base Legal Viva e jurisprudência atualizadas sozinhas): **não implementado**. `cron/atualizacoes-legais` já cobre notícia regulatória (portaria/IN), mas não o texto de lei nem acórdão — construir isso de verdade é escopo de scraper + parser por fonte (Planalto, STF, STJ, TNU), trabalho grande, melhor como projeto à parte.
+
+## 11. Auditoria da jurisprudência em `ai-juridico-skills.ts` (2026-10-08)
+
+Pendência que a seção 0 já tinha marcado como "priorizada, não auditada". Resultado — ver `git log` do commit de correção pro texto exato:
+
+- **Achado grave**: a tese "Revisão da Vida Toda" estava descrita no prompt como favorável/consolidada no STF — o STF na verdade **julgou contra** em 21/03/2024 (Tema 1102) e fechou em definitivo em 26/11/2025. Corrigido o texto e o nome do tipo de petição selecionável.
+- Mais 2 citações erradas corrigidas (ADI 4.232 → RCL 4.374/PE; um número de acórdão do TRF5 com cara de placeholder, trocado por descrição sem número).
+- Confirmados corretos: Súmula 568 STJ, RE 626.489/SE, Súmula 198 TFR, RE 567.985, Tema 416 STJ.
+- **Não verificado nesta rodada**: os enunciados específicos da TNU (6, 33, 47, 48, 57, 72, 83) e o Tema 962/REsp 1.682.714 STJ — não achei fonte que confirmasse ou contradissesse o conteúdo exato citado. Mesma recomendação da seção 0: útil fazer uma varredura dedicada, um item de cada vez, contra fonte oficial.
+
+## 12. Itens do plano que ficaram de fora desta sessão (de propósito)
+
+- **T9 (aprovação humana antes de "protocolar" uma peça gerada por IA)**: o modelo de dados do plano mestre pressupõe um estado rascunho→aprovada→protocolada numa única peça. Não existe assim no LiderAdv: `ia_peticoes` já tem um campo `aprovada` (gate de admin pra virar referência no banco de petições), e "protocolado" é um conceito completamente separado, vivendo no fluxo de Produção/Controles (prazo de audiência, controle). Construir uma trava nova ligando os dois seria inventar fluxo que você não usa hoje — fica como pergunta de produto pra você, não decisão minha.
+- **T10 (mascaramento LGPD antes de mandar dado pro modelo)**: não dá pra aplicar um mascaramento genérico sem risco real de quebrar a própria utilidade do Dr. Lex/Cérebro — CPF, CID, renda e data de nascimento são exatamente os dados que a IA precisa pra calcular carência, miserabilidade, DER etc. Mascarar "errado" aqui é pior que não mascarar: o sistema erraria silenciosamente. Isso pede uma decisão sua de produto (o que é seguro mascarar sem quebrar a análise), não um palpite meu.
+- **T12 (vigência por data exata do fato/DER)**: o schema já suporta (`dispositivos.vigente_de`/`vigente_ate` existem desde a migração 009), mas preencher a data real de ~35 leis que alteraram os 4 textos já cadastrados exigiria o mesmo nível de rigor usado pra transcrever o texto em si (uma verificação por lei). Não é uma tarefa de "preencher uma coluna", é uma tarefa de pesquisa jurídica — não quis arriscar inventar uma data.
+- **Fase 2 inteira (Jurisprudência Viva, Juiz Revisor, Estrategista com fator de incerteza explícito)** e **Fase 4 inteira (Curador do Cérebro, cálculo previdenciário com memória, espelhamento de peças vencedoras)**: infraestrutura nova e grande, não dá pra fazer de forma honesta "de leve" numa sessão só sem virar meia-implementação. Fase 4 em particular também depende de volume de casos reais encerrados no sistema (que hoje é baixo) pra ter dado suficiente pra aprender algo.
+
+Lembrete de arquitetura que vale manter daqui pra frente: **não existe e não deve existir um segundo agente de IA** no sistema — qualquer coisa parecida com "Juiz Revisor" deveria ser uma tool nova pra Íris chamar (como as ~25 que ela já tem), não um agente separado.

@@ -10,6 +10,8 @@ import { adicionarCidsCliente } from "./clients-db";
 import { extractText } from "./anthropic-text";
 import { registrarFatosEmLote } from "./fact-ledger-db";
 import { avaliarPontosAtencao } from "./pontos-atencao-db";
+import { listarDispositivosPorNorma } from "./base-legal-db";
+import { codigoDoTipo } from "./checklist-documentos";
 
 function getClaudeClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -1889,8 +1891,33 @@ ${faltantes.map((f) => `• [${f.prioridade.toUpperCase()}] ${f.campo}`).join("\
 Data da análise: ${new Date().toLocaleDateString("pt-BR")}
 `;
 
-  // Parte ESTÁTICA (cacheável) — BASE_LEGAL + modo + contexto + formato de resposta
+  // Base Legal Viva (migração 009) — texto oficial verificado (hash +
+  // redação de cada parágrafo), só pra BPC/LOAS por enquanto. Some junto
+  // com o BASE_LEGAL estático abaixo (não troca, complementa) pra IA citar
+  // o dispositivo real quando o caso for de BPC.
+  const codigoBeneficio = codigoDoTipo(String(processo.tipo_acao || ""));
+  const ehBpc =
+    codigoBeneficio === "B80" ||
+    codigoBeneficio === "B87" ||
+    codigoBeneficio === "B88";
+  const dispositivosBpc = ehBpc
+    ? await listarDispositivosPorNorma("Lei 8.742/1993").catch(() => [])
+    : [];
+  const baseLegalVivaTexto =
+    dispositivosBpc.length > 0
+      ? `\n════════════════════════════════════════════\nBASE LEGAL APLICÁVEL (VERIFICADA — Lei 8.742/1993, LOAS, coletada de planalto.gov.br)\n════════════════════════════════════════════\n${dispositivosBpc
+          .map(
+            (d) =>
+              `${d.caminho}${d.revogado ? " [REVOGADO]" : ""}: "${d.texto}"${d.redacaoDadaPor ? ` (${d.redacaoDadaPor})` : ""}`
+          )
+          .join(
+            "\n"
+          )}\nCite SOMENTE estes números de artigo/parágrafo da LOAS — não cite nenhum outro parágrafo dela além dos listados acima.\n`
+      : "";
+
+  // Parte ESTÁTICA (cacheável) — BASE_LEGAL + base viva + modo + contexto + formato de resposta
   const systemPrompt = `${BASE_LEGAL}
+${baseLegalVivaTexto}
 ${promptModoEspecializado(modo)}
 ${contexto}
 

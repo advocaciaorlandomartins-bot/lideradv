@@ -61,6 +61,9 @@ export default function IaPeticaoModal({
   const [salvou, setSalvou] = useState<string | null>(null);
   const [peticoesBanco, setPeticoesBanco] = useState<PeticaoBanco[]>([]);
   const [carregandoBanco, setCarregandoBanco] = useState(false);
+  const [citacoesNaoEncontradas, setCitacoesNaoEncontradas] = useState<
+    { caminho: string; norma: string }[]
+  >([]);
   const abortRef = useRef<AbortController | null>(null);
 
   const skillAtual = SKILLS[skill];
@@ -110,6 +113,7 @@ export default function IaPeticaoModal({
     setTextoCorrigido("");
     setAba("gerar");
     setSalvou(null);
+    setCitacoesNaoEncontradas([]);
     abortRef.current = new AbortController();
 
     try {
@@ -144,6 +148,25 @@ export default function IaPeticaoModal({
         if (done) break;
         acc += decoder.decode(value, { stream: true });
         setTexto(acc);
+      }
+
+      // Citation Gate — confere em segundo plano, sem travar nem pedir
+      // clique nenhum; só aparece aviso se achar citação que não bate com
+      // a Base Legal Viva. Silencioso no erro (não deixa a petição gerada
+      // de parecer que falhou por causa de uma checagem auxiliar).
+      if (acc.trim()) {
+        fetch("/api/ia/peticao/verificar-citacoes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texto: acc }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((relatorio) => {
+            if (relatorio?.naoEncontradas?.length > 0) {
+              setCitacoesNaoEncontradas(relatorio.naoEncontradas);
+            }
+          })
+          .catch(() => {});
       }
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
@@ -529,11 +552,32 @@ export default function IaPeticaoModal({
 
               {/* Aba petição gerada */}
               {aba === "gerar" && texto && (
-                <textarea
-                  value={texto}
-                  onChange={(e) => setTexto(e.target.value)}
-                  className="w-full h-full min-h-[420px] rounded-lg border border-border p-4 font-mono text-sm text-fg focus:border-primary focus:outline-none resize-none leading-relaxed"
-                />
+                <div className="flex h-full flex-col gap-3">
+                  {citacoesNaoEncontradas.length > 0 && (
+                    <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3">
+                      <p className="font-body text-sm font-semibold text-red-700">
+                        ⚠ {citacoesNaoEncontradas.length}{" "}
+                        {citacoesNaoEncontradas.length === 1
+                          ? "citação não bate"
+                          : "citações não batem"}{" "}
+                        com a Base Legal Viva
+                      </p>
+                      <ul className="mt-1 font-body text-xs text-red-700 space-y-0.5">
+                        {citacoesNaoEncontradas.map((c, i) => (
+                          <li key={i}>
+                            {c.norma}, {c.caminho} — não encontrado no texto
+                            oficial cadastrado. Confira antes de usar.
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <textarea
+                    value={texto}
+                    onChange={(e) => setTexto(e.target.value)}
+                    className="w-full flex-1 min-h-[380px] rounded-lg border border-border p-4 font-mono text-sm text-fg focus:border-primary focus:outline-none resize-none leading-relaxed"
+                  />
+                </div>
               )}
 
               {/* Aba revisão */}

@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { getMensagensConfig } from "@/lib/mensagens-config-db";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
 import ConfigTabs from "@/components/dashboard/configuracoes/config-tabs";
 
 export const metadata = { title: "Configurações — LiderAdv" };
@@ -12,9 +13,10 @@ export default async function ConfiguracoesPage() {
   const user = await getSession();
   if (!user || !hasPermission(user, "configuracoes", "ver")) notFound();
 
-  const [config, mensagensConfig] = await Promise.all([
+  const [config, mensagensConfig, agentesAtivos] = await Promise.all([
     getEscritorioConfig(),
     getMensagensConfig(),
+    agentesEstaoAtivos(),
   ]);
 
   return (
@@ -29,7 +31,11 @@ export default async function ConfiguracoesPage() {
         </p>
       </div>
 
-      <ConfigTabs config={config} mensagensConfig={mensagensConfig} />
+      <ConfigTabs
+        config={config}
+        mensagensConfig={mensagensConfig}
+        agentesAtivos={agentesAtivos}
+      />
     </div>
   );
 }

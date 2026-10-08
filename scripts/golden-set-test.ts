@@ -522,6 +522,35 @@ async function testarCitacaoGateMultiplasNormas() {
   }
 }
 
+async function testarT14KillSwitch() {
+  const { agentesEstaoAtivos, definirAgentesAtivos } =
+    await import("../src/lib/config-agentes-db");
+  const estadoOriginal = await agentesEstaoAtivos();
+  try {
+    await definirAgentesAtivos(false, null);
+    const desligado = await agentesEstaoAtivos();
+    await definirAgentesAtivos(true, null);
+    const ligado = await agentesEstaoAtivos();
+    if (desligado === false && ligado === true) {
+      registrar(
+        "T14-kill-switch",
+        "PASS",
+        "agentesEstaoAtivos() reflete corretamente false→true após definirAgentesAtivos()"
+      );
+    } else {
+      registrar(
+        "T14-kill-switch",
+        "FAIL",
+        `esperado desligado=false ligado=true; veio desligado=${desligado} ligado=${ligado}`
+      );
+    }
+  } finally {
+    // restaura o estado real de produção, não deixa o teste como efeito
+    // colateral pausando os agentes de verdade
+    await definirAgentesAtivos(estadoOriginal, null);
+  }
+}
+
 const NAO_IMPLEMENTADOS: [string, string][] = [
   ["T3-contradicao-avaliacao", "Juiz Revisor não existe ainda (Fase 2)"],
   [
@@ -549,7 +578,6 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
     "Auditor Legal por data do fato/DER não implementado",
   ],
   ["T13-tema-afetado", "Jurisprudência Viva não existe ainda (Fase 2)"],
-  ["T14-kill-switch", "config_agentes/kill switch não implementado"],
 ];
 
 async function main() {
@@ -566,6 +594,7 @@ async function main() {
   await testarCitacaoPluralEArtigoComHifen();
   await testarParagrafoUnico();
   await testarParagrafoDuploSimbolo();
+  await testarT14KillSwitch();
   for (const [id, motivo] of NAO_IMPLEMENTADOS) {
     registrar(id, "SKIP", motivo);
   }

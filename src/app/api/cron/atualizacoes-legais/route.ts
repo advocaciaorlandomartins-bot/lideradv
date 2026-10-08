@@ -13,6 +13,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { extractText } from "@/lib/anthropic-text";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -231,6 +232,17 @@ async function handler(req: Request) {
     if (!session || session.categoria !== "Administrador(a)") {
       return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
     }
+  }
+
+  // Esta rota resume o DOU/INSS/Previdência com o Claude (ao contrário dos
+  // demais crons do orquestrador, que são só coleta/cálculo determinístico)
+  // — por isso é a única sub-rota do orquestrador que respeita o kill switch.
+  if (!(await agentesEstaoAtivos())) {
+    return NextResponse.json({
+      ok: true,
+      pulado: true,
+      motivo: "Kill switch ativo (config_agentes.agentes_ativos = false).",
+    });
   }
 
   const hoje = new Date(

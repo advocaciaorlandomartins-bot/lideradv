@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade } from "@/lib/acesso";
 import { prepararAnalise, salvarAnalise } from "@/lib/cerebroJuridico";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,6 +24,16 @@ export async function POST(req: NextRequest) {
           "Limite de requisições de IA excedido. Tente novamente em 1 hora.",
       },
       { status: 429 }
+    );
+  }
+
+  if (!(await agentesEstaoAtivos())) {
+    return NextResponse.json(
+      {
+        error:
+          "Os agentes de IA estão pausados temporariamente (kill switch ativo). Fale com um administrador.",
+      },
+      { status: 503 }
     );
   }
 

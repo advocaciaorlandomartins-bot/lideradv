@@ -24,6 +24,7 @@ import {
 import { adicionarCidsCliente } from "@/lib/clients-db";
 import { registrarFatosEmLote } from "@/lib/fact-ledger-db";
 import { avaliarPontosAtencao } from "@/lib/pontos-atencao-db";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -87,6 +88,16 @@ export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       { error: "Chave de IA não configurada." },
+      { status: 503 }
+    );
+  }
+
+  if (!(await agentesEstaoAtivos())) {
+    return NextResponse.json(
+      {
+        error:
+          "Os agentes de IA estão pausados temporariamente (kill switch ativo). Fale com um administrador.",
+      },
       { status: 503 }
     );
   }

@@ -3,11 +3,12 @@
 import { useState } from "react";
 import ConfigForm from "./config-form";
 import MensagensSection from "./mensagens-section";
-import { CogIcon, BellIcon } from "@/components/icons";
+import AgentesIaSection from "./agentes-ia-section";
+import { CogIcon, BellIcon, PauseCircleIcon } from "@/components/icons";
 import type { EscritorioConfig } from "@/lib/escritorio-db";
 import type { MensagensConfig } from "@/config/mensagens";
 
-type Tab = "escritorio" | "mensagens";
+type Tab = "escritorio" | "mensagens" | "agentes";
 
 interface TabMeta {
   key: Tab;
@@ -19,6 +20,7 @@ interface TabMeta {
 interface Props {
   config: EscritorioConfig;
   mensagensConfig: MensagensConfig;
+  agentesAtivos: boolean;
 }
 
 const TABS: TabMeta[] = [
@@ -34,9 +36,19 @@ const TABS: TabMeta[] = [
     description: "Templates e intervalos de WhatsApp",
     icon: BellIcon,
   },
+  {
+    key: "agentes",
+    label: "Agentes de IA",
+    description: "Interruptor de emergência",
+    icon: PauseCircleIcon,
+  },
 ];
 
-export default function ConfigTabs({ config, mensagensConfig }: Props) {
+export default function ConfigTabs({
+  config,
+  mensagensConfig,
+  agentesAtivos,
+}: Props) {
   const [tab, setTab] = useState<Tab>("escritorio");
 
   const activeMeta = TABS.find((t) => t.key === tab)!;
@@ -105,6 +117,9 @@ export default function ConfigTabs({ config, mensagensConfig }: Props) {
           )}
           {tab === "mensagens" && (
             <MensagensSection initialConfig={mensagensConfig} />
+          )}
+          {tab === "agentes" && (
+            <AgentesIaSection ativoInicial={agentesAtivos} />
           )}
         </div>
       </div>

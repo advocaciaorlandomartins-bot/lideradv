@@ -106,6 +106,58 @@ async function testarT2Acumulacao() {
   }
 }
 
+async function testarCessacaoIndevida() {
+  // Regra nova (art. 21, § 5º da LOAS, seedado depois do golden-set
+  // original): motivo de indeferimento/resultado administrativo mencionando
+  // cessação/suspensão + incapacidade "permanente" no cadastro deve gerar
+  // alerta de possível cessação indevida (dispensa de perícia periódica).
+  const { listarPontosAtencao, avaliarPontosAtencao } =
+    await import("../src/lib/pontos-atencao-db");
+  const sqlMod = await import("../src/lib/db");
+  const sql = sqlMod.default;
+
+  const [cliente] = await sql`
+    INSERT INTO clients
+      (type, name, doc, email, phone, cep, street, addr_number, neighborhood,
+       city, state, status, tipo_incapacidade)
+    VALUES
+      ('PF', '_TESTE GOLDEN SET cessacao', '555.555.555-55', '_teste6@teste.local',
+       '00000000000', '00000-000', 'Rua Teste', '0', 'Teste', 'Teste', 'AL',
+       'Ativo', 'permanente')
+    RETURNING id::text
+  `;
+  const [processo] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status, motivo_indeferimento)
+    VALUES (${cliente.id}::uuid, 'B87 - BPC à pessoa com deficiência', 'Previdenciário',
+            'Em andamento', 'Benefício cessado em revisão bienal')
+    RETURNING id::text
+  `;
+  try {
+    await avaliarPontosAtencao(processo.id);
+    const pontos = await listarPontosAtencao(processo.id);
+    const achou = pontos.find(
+      (p) => p.codigo === "bpc_cessacao_possivelmente_indevida"
+    );
+    if (achou && achou.baseLegal?.includes("§ 5º")) {
+      registrar(
+        "cessacao-indevida",
+        "PASS",
+        `ponto de atenção gerado: [${achou.gravidade}] ${achou.baseLegal}`
+      );
+    } else {
+      registrar(
+        "cessacao-indevida",
+        "FAIL",
+        "regra bpc_cessacao_possivelmente_indevida não disparou"
+      );
+    }
+  } finally {
+    await sql`DELETE FROM pontos_atencao WHERE processo_id = ${processo.id}::uuid`;
+    await sql`DELETE FROM processos WHERE id = ${processo.id}::uuid`;
+    await sql`DELETE FROM clients WHERE id = ${cliente.id}::uuid`;
+  }
+}
+
 async function testarB80NaoEhBpc() {
   // Bug real achado em produção: B80 é Salário-Maternidade (sem teste de
   // renda), mas o código tratava B80 junto com B87/B88 (BPC) por engano —
@@ -443,6 +495,7 @@ async function main() {
   await testarT1LeiDesatualizada();
   await testarT2Acumulacao();
   await testarB80NaoEhBpc();
+  await testarCessacaoIndevida();
   await testarPrescricaoQuinquenal();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();

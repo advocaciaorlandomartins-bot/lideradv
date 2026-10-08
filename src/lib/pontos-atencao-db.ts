@@ -68,6 +68,10 @@ async function avaliarRegrasBpc(
     doc: string | null;
     renda_familiar_per_capita: string | null;
     membros_familia: unknown;
+  },
+  processo: {
+    motivo_indeferimento: string | null;
+    resultado_admin: string | null;
   }
 ): Promise<RegraResultado[]> {
   const resultados: RegraResultado[] = [];
@@ -124,6 +128,20 @@ async function avaliarRegrasBpc(
     });
   }
 
+  // 5. Cessação possivelmente indevida — impedimento permanente dispensa
+  // reavaliação periódica (LOAS art. 21, § 5º)
+  const textoMotivo = `${processo.motivo_indeferimento ?? ""} ${processo.resultado_admin ?? ""}`;
+  const pareceCessacao =
+    /cessa[çc][ãa]o|cessad[oa]|suspens[ãa]o|suspenso/i.test(textoMotivo);
+  if (pareceCessacao && cliente.tipo_incapacidade === "permanente") {
+    resultados.push({
+      codigo: "bpc_cessacao_possivelmente_indevida",
+      gravidade: "alto",
+      descricao: `O motivo do indeferimento/resultado administrativo menciona cessação ou suspensão, e o cadastro indica incapacidade "permanente". Se o impedimento é mesmo permanente, irreversível ou irrecuperável, o beneficiário é dispensado de avaliação médico-pericial periódica — a cessação pode ter sido feita sem essa dispensa ter sido respeitada. Vale conferir o histórico de avaliações antes de montar a defesa.`,
+      baseLegal: "Lei 8.742/1993, art. 21, § 5º",
+    });
+  }
+
   return resultados;
 }
 
@@ -160,7 +178,8 @@ function avaliarPrescricaoQuinquenal(der: string | null): RegraResultado[] {
  * automaticamente — só re-avaliado se ainda não tinha sido resolvido. */
 export async function avaliarPontosAtencao(processoId: string): Promise<void> {
   const [processo] = await sql`
-    SELECT p.tipo_acao, p.der::text, c.status_beneficio, c.tipo_beneficio,
+    SELECT p.tipo_acao, p.der::text, p.motivo_indeferimento, p.resultado_admin,
+           c.status_beneficio, c.tipo_beneficio,
            c.tipo_incapacidade, c.doc, c.renda_familiar_per_capita,
            c.membros_familia
     FROM processos p
@@ -174,14 +193,22 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
 
   const resultados = [
     ...(ehBpc
-      ? await avaliarRegrasBpc(processoId, {
-          status_beneficio: processo.status_beneficio ?? null,
-          tipo_beneficio: processo.tipo_beneficio ?? null,
-          tipo_incapacidade: processo.tipo_incapacidade ?? null,
-          doc: processo.doc ?? null,
-          renda_familiar_per_capita: processo.renda_familiar_per_capita ?? null,
-          membros_familia: processo.membros_familia,
-        })
+      ? await avaliarRegrasBpc(
+          processoId,
+          {
+            status_beneficio: processo.status_beneficio ?? null,
+            tipo_beneficio: processo.tipo_beneficio ?? null,
+            tipo_incapacidade: processo.tipo_incapacidade ?? null,
+            doc: processo.doc ?? null,
+            renda_familiar_per_capita:
+              processo.renda_familiar_per_capita ?? null,
+            membros_familia: processo.membros_familia,
+          },
+          {
+            motivo_indeferimento: processo.motivo_indeferimento ?? null,
+            resultado_admin: processo.resultado_admin ?? null,
+          }
+        )
       : []),
     ...avaliarPrescricaoQuinquenal(processo.der ?? null),
   ];

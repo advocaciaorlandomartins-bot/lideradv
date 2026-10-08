@@ -22,6 +22,8 @@ import {
   parseCidsEncontrados,
 } from "@/lib/cliente-documento-auto";
 import { adicionarCidsCliente } from "@/lib/clients-db";
+import { registrarFatosEmLote } from "@/lib/fact-ledger-db";
+import { avaliarPontosAtencao } from "@/lib/pontos-atencao-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -242,22 +244,23 @@ export async function POST(req: Request) {
         "dr_lex_auto"
       ).catch(() => {});
 
+      // Resolve o documento_id pela URL quando a análise partiu de um
+      // documento já salvo (modo "existente" do modal) — liga o fato/CID ao
+      // laudo que comprova; fica sem link (null) quando é upload avulso só
+      // pra análise, sem ter sido salvo como documento do cliente ainda.
+      const documentoId = documentoUrl
+        ? await sql`SELECT id::text FROM documentos WHERE url = ${documentoUrl} LIMIT 1`
+            .then((r) => (r.length > 0 ? String(r[0].id) : null))
+            .catch(() => null)
+        : null;
+
       // Mesmo problema já corrigido nos outros dois pipelines de análise
       // (cliente-documento-auto.ts, cerebroJuridico.ts): cid_principal só
-      // guarda um valor, documento real costuma trazer vários. Resolve o
-      // documento_id pela URL quando a análise partiu de um documento já
-      // salvo (modo "existente" do modal) — liga o CID ao laudo que
-      // comprova; fica sem link (null) quando é upload avulso só pra
-      // análise, sem ter sido salvo como documento do cliente ainda.
+      // guarda um valor, documento real costuma trazer vários.
       const cidsEncontrados = parseCidsEncontrados(
         (dadosExtraidos as { cids_encontrados?: unknown }).cids_encontrados
       );
       if (cidsEncontrados.length > 0) {
-        const documentoId = documentoUrl
-          ? await sql`SELECT id::text FROM documentos WHERE url = ${documentoUrl} LIMIT 1`
-              .then((r) => (r.length > 0 ? String(r[0].id) : null))
-              .catch(() => null)
-          : null;
         await adicionarCidsCliente(
           clienteId,
           cidsEncontrados.map((c) => ({
@@ -271,6 +274,30 @@ export async function POST(req: Request) {
           }))
         ).catch((e) =>
           console.error("[/api/ia/analisar] falha ao gravar cliente_cids:", e)
+        );
+      }
+
+      // Fact Ledger — cada campo extraído vira um fato rastreável (ver
+      // docs/pacote-especialista/01-PROMPT-MESTRE-CLAUDE-CODE.md, regra R2).
+      // Página/trecho por campo ainda não são capturados nesta extração
+      // (limitação conhecida, documentada na auditoria técnica).
+      if (processoId) {
+        const camposParaLedger = { ...dadosExtraidos } as Record<
+          string,
+          unknown
+        >;
+        delete camposParaLedger.cids_encontrados; // já viram fato próprio via cliente_cids
+        await registrarFatosEmLote(processoId, camposParaLedger, {
+          documentoId,
+          extraidoPor: "dr_lex_auto",
+        }).catch((e) =>
+          console.error("[/api/ia/analisar] falha ao gravar fatos_caso:", e)
+        );
+        await avaliarPontosAtencao(processoId).catch((e) =>
+          console.error(
+            "[/api/ia/analisar] falha ao avaliar pontos de atenção:",
+            e
+          )
         );
       }
     }

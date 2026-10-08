@@ -28,7 +28,9 @@ import {
 import DeleteProcessoButton from "@/components/dashboard/processos/delete-processo-button";
 import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import ProcessoDetailClient from "@/components/dashboard/processos/processo-detail-client";
+import PontosAtencaoPanel from "@/components/dashboard/processos/pontos-atencao-panel";
 import { ChevronRightIcon } from "@/components/icons";
+import { listarPontosAtencao } from "@/lib/pontos-atencao-db";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +94,10 @@ export default async function ProcessoDetailPage({
   ]);
   const documentos = [...docsProcesso, ...docsCliente];
 
+  const pontosAtencao = (await listarPontosAtencao(id)).filter(
+    (p) => !p.resolvido
+  );
+
   return (
     <div className="space-y-5">
       {/* Breadcrumb */}
@@ -114,6 +120,10 @@ export default async function ProcessoDetailPage({
           {processo.tipo_acao}
         </span>
       </nav>
+
+      {pontosAtencao.length > 0 && (
+        <PontosAtencaoPanel processoId={processo.id} pontos={pontosAtencao} />
+      )}
 
       {/* Client interactive area */}
       <ProcessoDetailClient

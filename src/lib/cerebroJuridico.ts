@@ -8,6 +8,8 @@ import {
 } from "./cliente-documento-auto";
 import { adicionarCidsCliente } from "./clients-db";
 import { extractText } from "./anthropic-text";
+import { registrarFatosEmLote } from "./fact-ledger-db";
+import { avaliarPontosAtencao } from "./pontos-atencao-db";
 
 function getClaudeClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -2118,6 +2120,11 @@ export async function salvarAnalise(
     console.error("[cerebro] Falha ao salvar análise:", err);
   }
 
+  // Pontos de Atenção determinísticos — roda a cada diagnóstico salvo, não só
+  // quando um documento novo é analisado, já que dado do cliente pode ter
+  // sido editado manualmente desde a última vez.
+  await avaliarPontosAtencao(processoId).catch(() => null);
+
   // ── Aprendizado imediato: salva tese principal extraída no banco de teses ──
   // Não espera o caso fechar — cada análise já alimenta a inteligência coletiva
   try {
@@ -2435,6 +2442,18 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
       await sql`UPDATE processos SET motivo_indeferimento = ${motivoVal}, updated_at = NOW() WHERE id = ${processoId}::uuid AND (motivo_indeferimento IS NULL OR motivo_indeferimento = '') AND deleted_at IS NULL`.catch(
         () => null
       );
+
+    // Fact Ledger — mesma lógica do pipeline de análise avulsa
+    // (api/ia/analisar/route.ts): cada campo extraído vira um fato
+    // rastreável, ligado ao documento de origem.
+    const camposParaLedger = { ...extracted } as Record<string, unknown>;
+    delete camposParaLedger.cids_encontrados;
+    delete camposParaLedger.membros_familia;
+    await registrarFatosEmLote(processoId, camposParaLedger, {
+      documentoId,
+      extraidoPor: "dr_lex_auto",
+    }).catch(() => null);
+    await avaliarPontosAtencao(processoId).catch(() => null);
   }
 
   await sql`

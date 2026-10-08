@@ -76,7 +76,7 @@ const POR_PALAVRA_CHAVE: [RegExp, string[]][] = [
   [/acr[eé]scimo de 25/i, ["Laudo pericial de grande invalidez"]],
 ];
 
-function codigoDoTipo(tipo: string): string | null {
+export function codigoDoTipo(tipo: string): string | null {
   const m = tipo.match(/^([A-Z]{1,2}\d{0,2})\s*-/);
   return m ? m[1] : null;
 }

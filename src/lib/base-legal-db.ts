@@ -76,7 +76,7 @@ export async function getDispositivo(
 // benefício contributivo, por isso entra em todos os códigos abaixo exceto
 // BPC (que é assistencial, não depende de carência/qualidade de segurado).
 const NORMAS_POR_BENEFICIO: Record<string, string[]> = {
-  B80: ["Lei 8.742/1993"],
+  B80: ["Lei 8.213/1991"], // salário-maternidade (art. 71-73) — NÃO é BPC, não depende da LOAS
   B87: ["Lei 8.742/1993", "Lei 13.146/2015"], // B87 é deficiência — art. 20-B da LOAS cita o art. 2º do Estatuto
   B88: ["Lei 8.742/1993"],
   B21: ["Lei 8.213/1991", "EC 103/2019"], // pensão por morte (EC 103 mudou o cálculo e a acumulação)

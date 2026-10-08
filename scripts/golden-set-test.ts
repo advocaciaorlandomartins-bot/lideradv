@@ -106,6 +106,57 @@ async function testarT2Acumulacao() {
   }
 }
 
+async function testarB80NaoEhBpc() {
+  // Bug real achado em produção: B80 é Salário-Maternidade (sem teste de
+  // renda), mas o código tratava B80 junto com B87/B88 (BPC) por engano —
+  // 2 processos reais de salário-maternidade receberam o alerta
+  // "bpc_miserabilidade_dados_faltando" (pedindo renda familiar/grupo
+  // familiar, que não tem nada a ver com salário-maternidade). Já corrigi
+  // os dados reais; este teste é pra nunca mais regredir.
+  const { listarPontosAtencao, avaliarPontosAtencao } =
+    await import("../src/lib/pontos-atencao-db");
+  const sqlMod = await import("../src/lib/db");
+  const sql = sqlMod.default;
+
+  const [cliente] = await sql`
+    INSERT INTO clients
+      (type, name, doc, email, phone, cep, street, addr_number, neighborhood, city, state, status)
+    VALUES
+      ('PF', '_TESTE GOLDEN SET B80', '333.333.333-33', '_teste4@teste.local',
+       '00000000000', '00000-000', 'Rua Teste', '0', 'Teste', 'Teste', 'AL', 'Ativo')
+    RETURNING id::text
+  `;
+  // Propositalmente SEM renda_familiar_per_capita/membros_familia — se o
+  // bug voltar, isso dispararia bpc_miserabilidade_dados_faltando de novo.
+  const [processo] = await sql`
+    INSERT INTO processos (client_id, tipo_acao, area, status)
+    VALUES (${cliente.id}::uuid, 'B80 - Salário Maternidade', 'Previdenciário', 'Em andamento')
+    RETURNING id::text
+  `;
+  try {
+    await avaliarPontosAtencao(processo.id);
+    const pontos = await listarPontosAtencao(processo.id);
+    const algumBpc = pontos.some((p) => p.codigo.startsWith("bpc_"));
+    if (!algumBpc) {
+      registrar(
+        "b80-nao-eh-bpc (regressão)",
+        "PASS",
+        "processo B80 (salário-maternidade) não recebeu nenhuma regra de BPC"
+      );
+    } else {
+      registrar(
+        "b80-nao-eh-bpc (regressão)",
+        "FAIL",
+        `B80 recebeu regra(s) de BPC indevidamente: ${pontos.map((p) => p.codigo).join(", ")}`
+      );
+    }
+  } finally {
+    await sql`DELETE FROM pontos_atencao WHERE processo_id = ${processo.id}::uuid`;
+    await sql`DELETE FROM processos WHERE id = ${processo.id}::uuid`;
+    await sql`DELETE FROM clients WHERE id = ${cliente.id}::uuid`;
+  }
+}
+
 async function testarPrescricaoQuinquenal() {
   // Não é um caso do golden-set original — regra genérica (qualquer
   // benefício) que criei além do que o pacote pedia, por isso tratado como
@@ -391,6 +442,7 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
 async function main() {
   await testarT1LeiDesatualizada();
   await testarT2Acumulacao();
+  await testarB80NaoEhBpc();
   await testarPrescricaoQuinquenal();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();

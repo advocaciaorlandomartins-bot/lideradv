@@ -54,9 +54,10 @@ function contemTermo(texto: string, termos: string[]): boolean {
   return termos.some((t) => lower.includes(t));
 }
 
-/** Regras determinísticas pra processos de BPC/LOAS (B80 deficiência, B87
- * deficiência, B88 idoso) — codificadas em código, não em prompt de IA,
- * conforme regra R1/R2 do pacote especialista: cada alerta cita o
+/** Regras determinísticas pra processos de BPC/LOAS (B87 deficiência, B88
+ * idoso — NÃO inclui B80, que é Salário-Maternidade, benefício totalmente
+ * diferente sem teste de renda) — codificadas em código, não em prompt de
+ * IA, conforme regra R1/R2 do pacote especialista: cada alerta cita o
  * dispositivo exato da Base Legal Viva que o fundamenta. */
 async function avaliarRegrasBpc(
   processoId: string,
@@ -153,8 +154,8 @@ function avaliarPrescricaoQuinquenal(der: string | null): RegraResultado[] {
 }
 
 /** Roda as regras determinísticas aplicáveis ao processo e grava em
- * pontos_atencao. As regras de BPC só rodam pra B80/B87/B88; a de
- * prescrição roda pra qualquer processo com DER preenchida. Idempotente:
+ * pontos_atencao. As regras de BPC só rodam pra B87/B88; a de prescrição
+ * roda pra qualquer processo com DER preenchida. Idempotente:
  * um ponto já resolvido manualmente pelo advogado não é reaberto
  * automaticamente — só re-avaliado se ainda não tinha sido resolvido. */
 export async function avaliarPontosAtencao(processoId: string): Promise<void> {
@@ -169,7 +170,7 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
   if (!processo) return;
 
   const codigo = processo.tipo_acao ? codigoDoTipo(processo.tipo_acao) : null;
-  const ehBpc = codigo === "B80" || codigo === "B87" || codigo === "B88";
+  const ehBpc = codigo === "B87" || codigo === "B88"; // NÃO B80 (Salário-Maternidade, sem teste de renda)
 
   const resultados = [
     ...(ehBpc

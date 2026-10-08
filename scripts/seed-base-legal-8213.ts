@@ -280,6 +280,93 @@ const LEI_8213: DispositivoSeed[] = [
     redacaoDadaPor: null,
   },
 
+  // ─── Salário-maternidade (art. 71-73) ─────────────────────────────────
+  {
+    caminho: "art. 71, caput",
+    texto:
+      "O salário-maternidade é devido à segurada da Previdência Social, durante 120 (cento e vinte) dias, com início no período entre 28 (vinte e oito) dias antes do parto e a data de ocorrência deste, observadas as situações e condições previstas na legislação no que concerne à proteção à maternidade.",
+    redacaoDadaPor: "Lei nº 10.710, de 2003",
+    observacao: "Vide Lei nº 13.985, de 2020; Vide ADI 6327",
+  },
+  {
+    caminho: "art. 71, § 2º",
+    texto:
+      "O salário-maternidade de que trata o caput deste artigo será prorrogado por 60 (sessenta) dias em razão de nascimento de criança com deficiência permanente decorrente de síndrome congênita associada Zika.",
+    redacaoDadaPor: "Lei nº 15.156, de 2025",
+  },
+  {
+    caminho: "art. 71, § 3º",
+    texto:
+      "Na hipótese de internação hospitalar da segurada ou do recém-nascido que supere o prazo de 2 (duas) semanas, em decorrência de complicações médicas relacionadas ao parto, o salário-maternidade será devido durante o período de internação e por mais 120 (cento e vinte) dias após a alta, descontado o tempo de recebimento do benefício anterior ao parto.",
+    redacaoDadaPor: "Lei nº 15.222, de 2025",
+  },
+  {
+    caminho: "art. 71-A, caput",
+    texto:
+      "Ao segurado ou segurada da Previdência Social que adotar ou obtiver guarda judicial para fins de adoção de criança é devido salário-maternidade pelo período de 120 (cento e vinte) dias.",
+    redacaoDadaPor: "Lei nº 12.873, de 2013",
+  },
+  {
+    caminho: "art. 71-B, caput",
+    texto:
+      "No caso de falecimento da segurada ou segurado que fizer jus ao recebimento do salário-maternidade, o benefício será pago, por todo o período ou pelo tempo restante a que teria direito, ao cônjuge ou companheiro sobrevivente que tenha a qualidade de segurado, exceto no caso do falecimento do filho ou de seu abandono, observadas as normas aplicáveis ao salário-maternidade.",
+    redacaoDadaPor: "Lei nº 12.873, de 2013",
+  },
+  {
+    caminho: "art. 71-C",
+    texto:
+      "A percepção do salário-maternidade, inclusive o previsto no art. 71-B, está condicionada ao afastamento do segurado do trabalho ou da atividade desempenhada, sob pena de suspensão do benefício.",
+    redacaoDadaPor: "Lei nº 12.873, de 2013",
+  },
+  {
+    caminho: "art. 72, caput",
+    texto:
+      "O salário-maternidade para a segurada empregada ou trabalhadora avulsa consistirá numa renda mensal igual a sua remuneração integral.",
+    redacaoDadaPor: "Lei nº 9.876, de 26.11.99",
+  },
+  {
+    caminho: "art. 72, § 1º",
+    texto:
+      "Cabe à empresa pagar o salário-maternidade devido à respectiva empregada gestante, efetivando-se a compensação, observado o disposto no art. 248 da Constituição Federal, quando do recolhimento das contribuições incidentes sobre a folha de salários e demais rendimentos pagos ou creditados, a qualquer título, à pessoa física que lhe preste serviço.",
+    redacaoDadaPor: "Lei nº 10.710, de 2003",
+  },
+  {
+    caminho: "art. 73, caput",
+    texto:
+      "Assegurado o valor de um salário-mínimo, o salário-maternidade para as demais seguradas, pago diretamente pela Previdência Social, consistirá:",
+    redacaoDadaPor: "Lei nº 10.710, de 2003",
+  },
+  {
+    caminho: "art. 73, I",
+    texto:
+      "em um valor correspondente ao do seu último salário-de-contribuição, para a segurada empregada doméstica;",
+    redacaoDadaPor: "Lei nº 9.876, de 26.11.99",
+  },
+  {
+    caminho: "art. 73, II",
+    texto:
+      "em um doze avos do valor sobre o qual incidiu sua última contribuição anual, para a segurada especial;",
+    redacaoDadaPor: "Lei nº 9.876, de 26.11.99",
+  },
+  {
+    caminho: "art. 73, III",
+    texto:
+      "em um doze avos da soma dos doze últimos salários-de-contribuição, apurados em um período não superior a quinze meses, para as demais seguradas.",
+    redacaoDadaPor: "Lei nº 9.876, de 26.11.99",
+  },
+  {
+    caminho: "art. 73, parágrafo único",
+    texto:
+      "Aplica-se à segurada desempregada, desde que mantida a qualidade de segurada, na forma prevista no art. 15 desta Lei, o disposto no inciso III do caput deste artigo.",
+    redacaoDadaPor: "Lei nº 13.846, de 2019",
+  },
+  {
+    caminho: "art. 73-A",
+    texto:
+      "No caso de salário-maternidade pago diretamente pela Previdência Social, o benefício será concedido no prazo de até 30 (trinta) dias, a contar do requerimento administrativo.",
+    redacaoDadaPor: "Lei nº 15.415, de 2026",
+  },
+
   // ─── Aposentadoria especial / tempo especial (art. 57-58) ────────────
   {
     caminho: "art. 57, caput",

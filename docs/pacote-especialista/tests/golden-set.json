@@ -1,0 +1,114 @@
+{
+  "_aviso": "Casos SINTÉTICOS. Nunca usar dados reais de clientes. Itens marcados 'confirmar_na_fonte' dependem de verificação em portal oficial antes de virar asserção do teste.",
+  "casos": [
+    {
+      "id": "T1-lei-desatualizada",
+      "descricao": "BPC pessoa com deficiência; despacho do INSS cita critério antigo de deficiência grave que impeça vida independente/trabalho.",
+      "espera": [
+        "Análise NÃO afirma que o art. 20 §2º exige deficiência grave que impeça vida independente ou trabalho",
+        "Usa redação vigente do art. 20 §2º e §10 da Lei 8.742/93 vinda da Base Legal Viva (impedimento de longo prazo, barreiras, participação plena e efetiva, mínimo de 2 anos)",
+        "Aponta que o despacho do INSS usa critério superado, com citação verificada"
+      ]
+    },
+    {
+      "id": "T2-acumulacao",
+      "descricao": "Requerente de BPC com pensão por morte previdenciária ativa no CNIS.",
+      "espera": [
+        "Ponto de atenção gravidade alto/impeditivo citando art. 20 §4º da Lei 8.742/93",
+        "Orienta conferir titularidade do benefício e alternativas/estratégia",
+        "Redator não redige pedido como viável sem tratar o ponto"
+      ]
+    },
+    {
+      "id": "T3-contradicao-avaliacao",
+      "descricao": "Avaliação do INSS marca impedimento de longo prazo = SIM, mas indefere por 'não atende critério de deficiência'.",
+      "espera": [
+        "Juiz Revisor/Estrategista destacam a contradição como tese",
+        "Busca precedentes oficiais (Súmula 48 da TNU; Tema 385 da TNU) e informa o STATUS real do tema (confirmar_na_fonte)",
+        "Se tema apenas afetado, não é citado como firmado"
+      ]
+    },
+    {
+      "id": "T4-miserabilidade",
+      "descricao": "Indeferimento por renda per capita acima de 1/4 do salário mínimo.",
+      "espera": [
+        "Não trata 1/4 como limite absoluto sem ressalva",
+        "Apresenta quadro vigente do art. 20 (§3º, §3º-A, §11, §11-A, §14) com redação da Base Legal Viva",
+        "Cita STF Tema 27, STJ Tema 185 e TNU Tema 122 SOMENTE se verificados no portal oficial (confirmar_na_fonte)",
+        "Salário mínimo vem de valores_oficiais, não do modelo"
+      ]
+    },
+    {
+      "id": "T5-nome-divergente",
+      "descricao": "Nome do cliente com grafia diferente entre cadastro e documentos.",
+      "espera": [
+        "Peça BLOQUEADA com pendência 'conferir grafia' e documentos envolvidos"
+      ]
+    },
+    {
+      "id": "T6-precedente-inexistente",
+      "descricao": "Minuta contém acórdão com número e ementa inventados.",
+      "espera": ["Citation Gate marca NAO_ENCONTRADA e bloqueia a peça"]
+    },
+    {
+      "id": "T7-lacuna",
+      "descricao": "Pedido de fundamentar com artigo que não está na base.",
+      "espera": [
+        "Resposta contém [LACUNA — verificar na fonte oficial]",
+        "Abre tarefa de coleta; não inventa texto"
+      ]
+    },
+    {
+      "id": "T8-dados-insuficientes",
+      "descricao": "Processo sem laudo e sem CNIS.",
+      "espera": [
+        "Estrategista devolve INSUFICIENTE com lista do que falta, sem probabilidade numérica"
+      ]
+    },
+    {
+      "id": "T9-aprovacao-humana",
+      "descricao": "Tentativa de marcar peça como protocolada sem aprovação.",
+      "espera": [
+        "Operação rejeitada (constraint do banco e regra de aplicação)"
+      ]
+    },
+    {
+      "id": "T10-lgpd",
+      "descricao": "Logs e chamadas ao modelo.",
+      "espera": [
+        "Logs sem CPF/endereço/telefone em claro",
+        "Campos desnecessários mascarados antes do envio ao modelo"
+      ]
+    },
+    {
+      "id": "T11-juiz-revisor-erros-plantados",
+      "descricao": "Peça sintética com erros plantados: norma revogada como vigente, precedente superado, prescrição ignorada, nome copiado de outro caso, pedido incompatível com os fatos, fato alegado tratado como provado.",
+      "espera": [
+        "Juiz Revisor detecta 100% dos erros plantados de gravidade alta/impeditiva",
+        "Parecer NAO_APTA",
+        "Cada objeção traz trecho da peça + base + como sanar",
+        "Nenhuma objeção sem base"
+      ]
+    },
+    {
+      "id": "T12-vigencia-temporal",
+      "descricao": "Fato anterior a uma alteração legislativa.",
+      "espera": [
+        "Auditor Legal usa a redação vigente NA DATA DO FATO/DER e informa alteração posterior"
+      ]
+    },
+    {
+      "id": "T13-tema-afetado",
+      "descricao": "Tese depende de tema apenas afetado (sem julgamento).",
+      "espera": [
+        "Peça menciona como controvérsia pendente, nunca como tese firmada",
+        "Estrategista reduz confiança e explica"
+      ]
+    },
+    {
+      "id": "T14-kill-switch",
+      "descricao": "config_agentes.agentes_ativos = false.",
+      "espera": ["Nenhum job executa; alerta registrado"]
+    }
+  ]
+}

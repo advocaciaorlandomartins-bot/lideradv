@@ -111,7 +111,7 @@ TNU (Turma Nacional de Uniformização):
 • Súmula 72: período de graça — contagem para qualidade de segurado
 • Súmula 77: SUPERADA pela ADI 2.110 (STF 2024) — carência de 10 contribuições para individual não se aplica mais
 • Tema 173 TNU: BPC — impedimento de longo prazo pode ser reconhecido de forma prospectiva (após a DER)
-• Tema 185 TNU: BPC — análise de miserabilidade dispensa nova perícia quando o INSS já reconheceu hipossuficiência
+• Tema 187 TNU: BPC — análise de miserabilidade dispensa nova perícia quando o INSS já reconheceu hipossuficiência (era citado como "Tema 185" em 5 lugares — número corrigido em 2026-10-08, confirmado contra fonte oficial)
 • Tema 192 TNU: recolhimento de GPS em atraso dentro do período de graça é válido para cômputo de carência
 • Tema 220 TNU: gravidez de alto risco equipara-se a acidente de trabalho — dispensa de carência para B31
 • Tema 285 TNU: segurado facultativo de baixa renda — requisitos para recolhimento a 5% (alíquota reduzida)
@@ -150,9 +150,9 @@ Lei 13.982/2020 — Rendas EXCLUÍDAS do cálculo familiar BPC:
 • Bolsa Família e outros benefícios assistenciais eventuais
 • Parcelas de programas federais de transferência de renda
 
-Critério de miserabilidade holística (Tema 185 TNU + Súmula 54 TNU + ADPF 182):
+Critério de miserabilidade holística (Tema 187 TNU + Súmula 54 TNU + ADPF 182):
 • O critério ¼ SM per capita NÃO é absoluto — juiz deve considerar gastos com saúde, cuidador, medicamentos, habitação, dívidas
-• Se o INSS já reconheceu hipossuficiência, nova perícia de renda é dispensável (Tema 185 TNU)
+• Se o INSS já reconheceu hipossuficiência, nova perícia de renda é dispensável (Tema 187 TNU)
 • CadÚnico atualizado reforça prova de hipossuficiência, mas a ausência não impede concessão
 
 Impedimento de longo prazo (Tema 173 TNU):
@@ -1218,7 +1218,7 @@ CRITÉRIO DE RENDA — ANÁLISE BPC 360 (holística):
 • Lei 13.982/2020 — rendas EXCLUÍDAS: BPC do cônjuge, 1 SM de pensão por morte, benefícios assistenciais eventuais, bolsa família, rendimentos da própria PcD
 • Art. 20, §11-A, Lei 8.742/93: GASTOS com medicamentos, cuidador, aluguel, transporte, dívidas REDUZEM renda efetiva
 • Art. 20-B, Lei 8.742/93: critérios adicionais de flexibilização — aplicar sempre
-• Tema 185 TNU: se INSS já reconheceu hipossuficiência, dispensa nova perícia de renda
+• Tema 187 TNU: se INSS já reconheceu hipossuficiência, dispensa nova perícia de renda
 • Tema 312 STF: benefícios de renda mínima (Bolsa Família, auxílio emergencial etc.) excluídos do cálculo
 
 DEFICIÊNCIA — AMPLITUDE DO CONCEITO (Blindagem Documental):
@@ -1514,7 +1514,7 @@ CHECKLIST DE REVISÃO (antes de qualquer manifestação):
 6. Resultado INSS: o médico-perito do INSS pode reconhecer deficiência diferente — pedir vista do laudo
 
 FUNDAMENTOS PARA MANTER O BENEFÍCIO:
-• Tema 185 TNU: se INSS já reconheceu hipossuficiência anteriormente, nova perícia de renda é dispensável
+• Tema 187 TNU: se INSS já reconheceu hipossuficiência anteriormente, nova perícia de renda é dispensável
 • Art. 20, §11-A, Lei 8.742/93: gastos com saúde REDUZEM renda efetiva — calcular sempre
 • Temas 27 e 312 STF: critério renda ¼ SM não é absoluto — prova de miserabilidade por outros meios
 • Lei 14.126/2021: visão monocular = deficiência visual → qualifica para BPC (novo argumento)

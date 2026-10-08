@@ -123,7 +123,7 @@ TNU (Turma Nacional de Uniformização):
 
 STJ:
 • Tema 352: carência — cômputo de contribuições
-• Súmula 548: correção de benefícios anteriores a 1988
+• Súmula 456: inadmissível correção monetária dos salários de contribuição considerados no cálculo do salário de benefício de auxílio-doença, aposentadoria por invalidez, pensão ou auxílio-reclusão concedidos antes da CF/1988
 • Tema 862 STJ: DIB do auxílio-acidente é o dia seguinte à cessação do auxílio-doença (B31)
 • Tema 416 STJ: qualquer redução funcional permanente é suficiente para auxílio-acidente — irrelevante a extensão da sequela
 

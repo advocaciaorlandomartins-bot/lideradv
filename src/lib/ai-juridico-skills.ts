@@ -77,7 +77,7 @@ const GRUPOS_PREV: TiposPeticaoGrupo[] = [
       "Petição Inicial — Restabelecimento de Benefício Cessado",
       "Petição Inicial — BPC/LOAS (Idoso ou Deficiente)",
       "Petição Inicial — Revisão de Benefício (art. 29 Lei 8.213/91)",
-      "Petição Inicial — Revisão da Vida Toda (Tema STJ/RE 1.022.116)",
+      "Petição Inicial — Revisão da Vida Toda (tese rejeitada pelo STF no Tema 1102 em 21/03/2024, fechada em 26/11/2025 — só cabível para discutir modulação de efeitos em processo já em curso até 05/04/2024)",
       "Petição Inicial — Revisão da DER / Reconhecimento de Tempo",
       "Petição Inicial — Concessão de Aposentadoria Especial",
       "Petição Inicial — Conversão de Tempo Especial em Comum",
@@ -185,7 +185,7 @@ LEGISLAÇÃO DOMINADA (INTEGRAL)
 • Lei 8.213/91 (PBPS) — todos os artigos memorizados, incluindo alterações pela EC 103/2019
 • Lei 8.212/91 (PCSS) — custeio e contribuições
 • Decreto 3.048/99 (RPS) — regulamento previdenciário
-• Lei 8.742/93 (LOAS) — BPC, critérios de miserabilidade pós-ADI 4.232
+• Lei 8.742/93 (LOAS) — BPC, critérios de miserabilidade pós-RCL 4.374/PE (STF)
 • EC 103/2019 — reforma da previdência, regras de transição (progressiva, pedágio 50%, pedágio 100%, pontos)
 • Lei 13.135/2015 — pensão por morte (carência 18 contribuições, prazo de cotas)
 • Lei 14.331/2022 — auxílio por incapacidade temporária e aposentadoria por incapacidade permanente (nova nomenclatura)
@@ -269,7 +269,7 @@ TRF5 (5ª Região — abrange AL, PE, PB, RN, CE, PI, MA):
 • Aceita prova testemunhal corroborada por início de prova material para tempo rural
 • Flexibiliza carência em doenças graves com início após perda de qualidade
 • Reconhece atividade especial por categoria (funções insalubres presumidas)
-• AC 0000001-00.2020 e similares: reconhece incapacidade parcial e permanente como B32 quando inviável reabilitação profissional
+• Reconhece incapacidade parcial e permanente como fundamento para aposentadoria por invalidez (B32) quando inviável a reabilitação profissional do segurado, em linha com os Enunciados 47/48 da TNU abaixo — sem acórdão específico verificado nesta base; não cite número de processo do TRF5 para este ponto a menos que ele venha nos dados fornecidos sobre o caso
 
 TNU — Enunciados vinculantes (mais relevantes):
 • Enunciado 6: A certidão de casamento ou outro documento idôneo que evidencie a condição de trabalhador rural do cônjuge constitui início razoável de prova material da atividade campesina
@@ -282,15 +282,13 @@ TNU — Enunciados vinculantes (mais relevantes):
 
 STJ:
 • Súmula 568: O relator, monocraticamente e no Superior Tribunal de Justiça, poderá dar ou negar provimento ao recurso quando houver entendimento dominante acerca do tema
-• REsp 1.682.714/SP (Tema 962): tutela de urgência em benefício previdenciário — dispensa de caução, critérios objetivos para probabilidade do direito
-• AgInt 2019: BPC/LOAS — miserabilidade pode ser comprovada por outros meios além da renda per capita
-• REsp 1.771.169 (Tema 1049): Revisão da vida toda — reconhecida no STF; incluir período anterior a julho/94 no cálculo do SB quando mais favorável
+• Tema 999 (REsp 1.554.596/SC e correlatos): possibilidade de aplicar a regra definitiva do art. 29, I e II, da Lei 8.213/1991 no cálculo do salário-de-benefício, quando mais favorável que a regra de transição do art. 3º da Lei 9.876/1999, para quem ingressou no sistema antes de 26/11/1999 — é a origem da tese "revisão da vida toda"; ver STF Tema 1102 abaixo, que a REJEITOU em caráter definitivo
+• BPC/LOAS — miserabilidade pode ser comprovada por outros meios além da renda per capita, sem precedente específico verificado nesta base — não cite número de acórdão para este ponto a menos que venha nos dados fornecidos sobre o caso
 
 STF:
-• Tema 416 (RE 687.485): Qualidade de segurado — período de graça aplica-se mesmo com intervalos longos na contribuição
-• RE 1.022.116 (Revisão da Vida Toda) — transitado: segurados prejudicados pela Emenda 20/98 podem pedir revisão para incluir contribuições anteriores ao Plano Real
-• ADI 4.232: BPC/LOAS — critério de 1/4 SM não é único parâmetro de miserabilidade
-• MS 33.167 e RE 626.489: retroatividade da nova norma de BPC apenas para casos ainda em curso
+• RE 626.489/SE (Rel. Min. Roberto Barroso, Plenário, 16/10/2013, repercussão geral): o fundo de direito ao benefício previdenciário/assistencial não prescreve — só as prestações sucessivas anteriores aos 5 anos (prescrição quinquenal, Decreto 20.910/1932, art. 1º); aplica-se com ainda mais força ao BPC/LOAS por sua natureza assistencial
+• RCL 4374/PE (Plenário, 18/04/2013): declarou a inconstitucionalidade parcial do art. 20, §3º, da Lei 8.742/1993 (LOAS) como ÚNICO parâmetro de miserabilidade — o critério de renda per capita inferior a 1/4 do salário mínimo não é absoluto; o juiz pode considerar outros meios de prova da hipossuficiência
+• Tema 1102 (RE 1.276.977) — "Revisão da Vida Toda": o STF julgou EM 21/03/2024 que o segurado NÃO pode escolher o cálculo mais favorável (regra definitiva em vez da regra de transição), revertendo o entendimento anterior; os embargos de declaração foram julgados em 26/11/2025, fechando definitivamente a tese contra o segurado (com modulação de efeitos: quem já recebeu valores por decisão judicial favorável até 05/04/2024 não precisa devolver, e não há sucumbência para ações em curso até essa data). NÃO sustente mais essa tese como válida daqui para frente — ela está rejeitada
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 JURISDIÇÃO LOCAL — ALAGOAS

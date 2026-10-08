@@ -145,3 +145,10 @@ Esta é a pendência maior ainda não fechada — o bloco que vai em **todo** di
 A lógica de "probabilidade insuficiente" (2+ dados críticos faltando → força prob=null) vivia inline dentro de `cerebroJuridico.ts:salvarAnalise`, um arquivo `"server-only"` — por isso só dava pra confirmar por revisão manual, nunca por teste rodando de verdade. Extraí a lógica pura (sem IA, sem DB) pra `src/lib/cerebro-probabilidade.ts` (sem `server-only`), que `cerebroJuridico.ts` agora chama — comportamento idêntico, só que testável. Golden-set: **16 PASS, 0 FAIL, 7 SKIP** (era 15/0/8).
 
 Mesmo princípio vale pros SKIPs que sobraram (T3/T4/T9/T10/T11/T12-parcial/T13): só ficam como SKIP enquanto a funcionalidade de fato não existe ou depende de uma decisão externa (sua, ou pesquisa jurídica dedicada) — não por preguiça de testar o que já existe.
+
+## 15. Mais uma rodada de auditoria de `BASE_LEGAL` (2026-10-08, continuação)
+
+- **Achado**: STJ "Súmula 548" (correção de benefícios anteriores a 1988) não existe com esse conteúdo — o verbete real é a **Súmula 456**. Corrigido, com o texto completo do verbete.
+- **Confirmados corretos**: Enunciado 19 CRPS (Resolução 13/2025), Ofício-Circular DIRBEN/INSS nº 63/2025 (segurada especial), STF Tema 27 (RE 567.985/580.963), STF Tema 312, STF ARE 930.647 AgR.
+- **Lição prática**: o Ofício-Circular 63/2025 pareceu fabricado numa primeira busca genérica (não apareceu) e só foi confirmado numa segunda busca com termos mais específicos — citações administrativas recentes (2025) são mal indexadas na web pública, então "a primeira busca não achou" não é prova de fabricação, só motivo pra tentar de novo antes de concluir.
+- **Não confirmado nem contradito**: STJ Tema 352 (carência). Mesma recomendação de sempre: base oficial dedicada, não busca genérica.

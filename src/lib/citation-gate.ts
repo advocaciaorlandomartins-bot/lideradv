@@ -110,8 +110,12 @@ function candidatosCaminho(trecho: string, posicaoNorma: number): string[] {
     depoisDoArtigo
   );
   // § com ou sem número de sub-letra (ex.: "§ 2º-A")
+  // §§ (dois símbolos) cobre citação de vários parágrafos de uma vez, ex.:
+  // "art. 20, §§ 3º e 11" — só o primeiro número é usado (relatar os dois
+  // exigiria separar "3º e 11" em duas citações; melhor achar o primeiro
+  // certo do que não achar nenhum, igual já faz com "arts. X e Y").
   const paragMatch = depoisDoArtigo.match(
-    /^[,\s]*(?:§\s*(\d+)\s*[ºo°]?\s*(-[A-Z])?|par[áa]grafo\s*(\d+)\s*[ºo°]?)/i
+    /^[,\s]*(?:§§?\s*(\d+)\s*[ºo°]?\s*(-[A-Z])?|par[áa]grafos?\s*(\d+)\s*[ºo°]?)/i
   );
   // "art. 15, inciso II" OU a forma mais comum na prática, "art. 15, II"
   // (vírgula + numeral romano, sem a palavra "inciso")

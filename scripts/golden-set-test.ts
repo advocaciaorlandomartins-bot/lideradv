@@ -262,6 +262,34 @@ async function testarParagrafoUnico() {
   }
 }
 
+async function testarParagrafoDuploSimbolo() {
+  // 8º bug real: "§§ 3º e 11" (dois símbolos de parágrafo, citação de mais
+  // de um parágrafo de uma vez — forma comum: "art. 20, §§ 3º e 11, da
+  // LOAS") não batia com o regex de § único e a citação inteira ficava
+  // invisível, igual o bug do plural "arts." (mesma família de problema:
+  // regex não previa a forma plural da referência).
+  const { verificarCitacoesLegais } = await import("../src/lib/citation-gate");
+  const r = await verificarCitacoesLegais(
+    "O art. 20, §§ 3º e 11, da Lei 8.742/93 tratam da miserabilidade."
+  );
+  const achou = r.verificadas.some(
+    (c) => c.norma === "Lei 8.742/1993" && c.caminho === "art. 20, § 3º"
+  );
+  if (achou) {
+    registrar(
+      "citation-gate-paragrafo-duplo-simbolo (regressão)",
+      "PASS",
+      "'§§ 3º e 11' reconhecido (primeiro parágrafo verificado)"
+    );
+  } else {
+    registrar(
+      "citation-gate-paragrafo-duplo-simbolo (regressão)",
+      "FAIL",
+      `esperado 'art. 20, § 3º' verificado; veio verificadas=${JSON.stringify(r.verificadas.map((c) => c.caminho))}`
+    );
+  }
+}
+
 async function testarT6EquivalenteCitacaoFabricada() {
   // golden-set T6 descreve um ACÓRDÃO inventado (jurisprudência) — isso é
   // Fase 2 (Jurisprudência Viva), ainda não construída. O equivalente que
@@ -370,6 +398,7 @@ async function main() {
   await testarCitacaoComIncisoDentroDeParagrafo();
   await testarCitacaoPluralEArtigoComHifen();
   await testarParagrafoUnico();
+  await testarParagrafoDuploSimbolo();
   for (const [id, motivo] of NAO_IMPLEMENTADOS) {
     registrar(id, "SKIP", motivo);
   }

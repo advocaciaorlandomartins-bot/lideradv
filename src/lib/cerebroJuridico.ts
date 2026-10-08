@@ -8,6 +8,7 @@ import {
 } from "./cliente-documento-auto";
 import { adicionarCidsCliente } from "./clients-db";
 import { extractText } from "./anthropic-text";
+import { calcularProbabilidadeComFlag } from "./cerebro-probabilidade";
 import { registrarFatosEmLote } from "./fact-ledger-db";
 import { avaliarPontosAtencao } from "./pontos-atencao-db";
 import {
@@ -2102,12 +2103,13 @@ export async function salvarAnalise(
   // numérica é só um número arriscado por cima de base insuficiente — a IA
   // é instruída a não inventar, mas o parecer determinístico aqui sobrepõe
   // mesmo que o texto tenha arriscado um valor (defesa em profundidade,
-  // não depende só do modelo se autopoliciar).
-  const faltantesCriticos = faltantes.filter(
-    (f) => f.prioridade === "alta"
-  ).length;
-  const probabilidadeInsuficiente = faltantesCriticos >= 2;
-  const prob = probabilidadeInsuficiente ? null : probBruto;
+  // não depende só do modelo se autopoliciar). Lógica extraída pra
+  // cerebro-probabilidade.ts (esse arquivo é "server-only", aquele não é)
+  // só pra poder ser coberta por teste automatizado de verdade.
+  const { prob, probabilidadeInsuficiente } = calcularProbabilidadeComFlag(
+    faltantes,
+    probBruto
+  );
   const proximaAcao =
     acaoMatch?.[1]?.trim().split("\n")[0] ||
     "Verificar documentação com cliente";

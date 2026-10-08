@@ -326,6 +326,51 @@ async function testarPrescricaoQuinquenal() {
   }
 }
 
+async function testarT8DadosInsuficientes() {
+  // Até esta correção, essa regra só rodava dentro de cerebroJuridico.ts,
+  // que usa "server-only" e não resolve fora do Next — por isso ficava
+  // marcada como SKIP (revisão manual de código, não teste de verdade).
+  // Extraída a lógica pura pra cerebro-probabilidade.ts (sem "server-only")
+  // especificamente pra poder testar isso de verdade.
+  const { calcularProbabilidadeComFlag } =
+    await import("../src/lib/cerebro-probabilidade");
+  const faltante = (prioridade: "alta" | "media" | "baixa") => ({
+    campo: "x",
+    prioridade,
+    impacto: "",
+    destino: "processo" as const,
+  });
+
+  const com2Criticos = calcularProbabilidadeComFlag(
+    [faltante("alta"), faltante("alta"), faltante("baixa")],
+    85
+  );
+  const com1Critico = calcularProbabilidadeComFlag(
+    [faltante("alta"), faltante("media")],
+    85
+  );
+
+  const ok =
+    com2Criticos.prob === null &&
+    com2Criticos.probabilidadeInsuficiente === true &&
+    com1Critico.prob === 85 &&
+    com1Critico.probabilidadeInsuficiente === false;
+
+  if (ok) {
+    registrar(
+      "T8-dados-insuficientes",
+      "PASS",
+      "2+ dados críticos faltando força prob=null + flag; com só 1 crítico, probabilidade passa normal"
+    );
+  } else {
+    registrar(
+      "T8-dados-insuficientes",
+      "FAIL",
+      `com2Criticos=${JSON.stringify(com2Criticos)} com1Critico=${JSON.stringify(com1Critico)}`
+    );
+  }
+}
+
 async function testarTransicaoEC103() {
   // Regra nova (T12, parcial): aposentadoria (B41/B42/B46) com DER antes de
   // 13/11/2019 deve alertar pra conferir direito adquirido pela regra
@@ -625,10 +670,6 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
     "jurisprudência (STF/STJ/TNU) ainda não tem base própria (Fase 2)",
   ],
   [
-    "T8-dados-insuficientes",
-    'implementado em cerebroJuridico.ts:salvarAnalise (2+ dados críticos faltando → probabilidade forçada pra null + flag probabilidade_insuficiente), mas sem teste automatizado — a função só roda dentro de uma análise de IA completa (chamada real à Anthropic) e o arquivo usa "server-only", que não resolve fora do Next; revisão manual de código + typecheck/build/lint limpos, não verificação end-to-end',
-  ],
-  [
     "T9-aprovacao-humana",
     "não existe tabela 'pecas' com estado/aprovação ainda",
   ],
@@ -654,6 +695,7 @@ async function main() {
   await testarT5NomeDivergente();
   await testarCessacaoIndevida();
   await testarPrescricaoQuinquenal();
+  await testarT8DadosInsuficientes();
   await testarTransicaoEC103();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();

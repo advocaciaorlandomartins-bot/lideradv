@@ -70,6 +70,66 @@ export async function getDispositivo(
   return rows[0] ? mapRow(rows[0]) : null;
 }
 
+// Benefício (código extraído de tipo_acao/tipo_beneficio, ver
+// checklist-documentos.ts:codigoDoTipo) → normas relevantes na Base Legal
+// Viva. Período de graça/carência (Lei 8.213) vale pra quase todo
+// benefício contributivo, por isso entra em todos os códigos abaixo exceto
+// BPC (que é assistencial, não depende de carência/qualidade de segurado).
+const NORMAS_POR_BENEFICIO: Record<string, string[]> = {
+  B80: ["Lei 8.742/1993"],
+  B87: ["Lei 8.742/1993"],
+  B88: ["Lei 8.742/1993"],
+  B21: ["Lei 8.213/1991"], // pensão por morte
+  B31: ["Lei 8.213/1991"], // auxílio-doença / incapacidade temporária
+  B32: ["Lei 8.213/1991"], // aposentadoria por invalidez / incapacidade permanente
+  B91: ["Lei 8.213/1991"], // acidentário
+  B92: ["Lei 8.213/1991"],
+};
+
+/** Dispositivos da Base Legal Viva relevantes pro código de benefício
+ * detectado (ex.: "B87"). Retorna [] se o código não tem norma mapeada
+ * ainda ou se não há dispositivos cadastrados — quem chamar deve tratar
+ * isso como "sem grounding disponível", nunca como lacuna da lei em si. */
+export async function getBaseLegalParaBeneficio(
+  codigoBeneficio: string | null
+): Promise<Dispositivo[]> {
+  if (!codigoBeneficio) return [];
+  const normas = NORMAS_POR_BENEFICIO[codigoBeneficio];
+  if (!normas) return [];
+  const listas = await Promise.all(
+    normas.map((n) => listarDispositivosPorNorma(n))
+  );
+  return listas.flat();
+}
+
+/** Formata uma lista de dispositivos pro bloco "BASE LEGAL APLICÁVEL
+ * (VERIFICADA)" que entra no prompt — mesmo formato usado em Gerar Petição
+ * e no Cérebro Jurídico, centralizado aqui pra não divergir entre os dois. */
+export function formatarDispositivosParaPrompt(
+  dispositivos: Dispositivo[]
+): string {
+  if (dispositivos.length === 0) return "";
+  const porNorma = new Map<string, Dispositivo[]>();
+  for (const d of dispositivos) {
+    if (!porNorma.has(d.norma)) porNorma.set(d.norma, []);
+    porNorma.get(d.norma)!.push(d);
+  }
+  const blocos = [...porNorma.entries()].map(([norma, disps]) => {
+    const linhas = disps
+      .map(
+        (d) =>
+          `${d.caminho}${d.revogado ? " [REVOGADO]" : ""}: "${d.texto}"${
+            d.redacaoDadaPor ? ` (${d.redacaoDadaPor})` : ""
+          }`
+      )
+      .join("\n");
+    return `--- ${norma} ---\n${linhas}`;
+  });
+  return `=== BASE LEGAL APLICÁVEL (VERIFICADA — coletada de planalto.gov.br) ===\n${blocos.join(
+    "\n\n"
+  )}\n\nEsses são os dispositivos EXATOS. Cite SOMENTE estes números de artigo/parágrafo das normas listadas acima — não cite nenhum outro parágrafo delas além dos listados.`;
+}
+
 /** Lista as normas já cadastradas na Base Legal Viva (pra UI/diagnóstico). */
 export async function listarNormasCadastradas(): Promise<
   { norma: string; apelido: string | null; totalDispositivos: number }[]

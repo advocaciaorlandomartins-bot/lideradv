@@ -54,21 +54,46 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Normaliza "art. 20, §4º" / "artigo 20, parágrafo 4º" / "art. 20 § 4o" pro
- * mesmo formato usado em dispositivos.caminho ("art. 20, § 4º"). Retorna
- * null se não achar um padrão de artigo reconhecível. */
-function normalizarCaminho(trecho: string): string | null {
-  const artMatch = trecho.match(/art(?:igo)?\.?\s*(\d+)(-[A-Z])?/i);
-  if (!artMatch) return null;
+/** Normaliza "art. 20, §4º" / "artigo 20, parágrafo 4º" / "art. 15, II" /
+ * "art. 20 § 4o" pro mesmo formato usado em dispositivos.caminho. Recebe a
+ * posição da menção da norma dentro da janela e escolhe a ocorrência de
+ * "art." MAIS PRÓXIMA dela (podendo vir antes ou depois no texto) — uma
+ * janela com duas leis diferentes perto uma da outra (ex.: "art. 20 da
+ * LOAS... art. 15 da Lei 8.213") não pode pegar o artigo errado só porque
+ * apareceu primeiro na string. Retorna null se não achar nenhum artigo. */
+function normalizarCaminho(
+  trecho: string,
+  posicaoNorma: number
+): string | null {
+  const todosArtMatches = [
+    ...trecho.matchAll(/art(?:igo)?\.?\s*(\d+)(-[A-Z])?/gi),
+  ];
+  if (todosArtMatches.length === 0) return null;
+
+  const artMatch = todosArtMatches.reduce((maisPerto, atual) => {
+    const distAtual = Math.abs((atual.index ?? 0) - posicaoNorma);
+    const distMaisPerto = Math.abs((maisPerto.index ?? 0) - posicaoNorma);
+    return distAtual < distMaisPerto ? atual : maisPerto;
+  });
+
   const artigoNum = artMatch[1];
   const sufixoArtigo = artMatch[2] ? artMatch[2].toUpperCase() : "";
 
-  // § com ou sem número de sub-letra (ex.: "§ 2º-A")
-  const paragMatch = trecho.match(
-    /§\s*(\d+)\s*[ºo°]?\s*(-[A-Z])?|par[áa]grafo\s*(\d+)\s*[ºo°]?/i
+  const depoisDoArtigo = trecho.slice(
+    (artMatch.index ?? 0) + artMatch[0].length,
+    (artMatch.index ?? 0) + artMatch[0].length + 40
   );
-  const incisoMatch = trecho.match(/inciso\s+([IVX]+)\b/i);
-  const caputMatch = /\bcaput\b/i.test(trecho);
+
+  // § com ou sem número de sub-letra (ex.: "§ 2º-A")
+  const paragMatch = depoisDoArtigo.match(
+    /^[,\s]*(?:§\s*(\d+)\s*[ºo°]?\s*(-[A-Z])?|par[áa]grafo\s*(\d+)\s*[ºo°]?)/i
+  );
+  // "art. 15, inciso II" OU a forma mais comum na prática, "art. 15, II"
+  // (vírgula + numeral romano, sem a palavra "inciso")
+  const incisoMatch = depoisDoArtigo.match(
+    /^[,\s]*(?:inciso\s+)?([IVX]{1,4})\b/i
+  );
+  const caputMatch = /^[,\s]*caput\b/i.test(depoisDoArtigo);
 
   let caminho = `art. ${artigoNum}${sufixoArtigo}`;
   if (paragMatch) {
@@ -114,7 +139,8 @@ export async function verificarCitacoesLegais(
       const inicio = Math.max(0, match.index - 150);
       const fim = Math.min(texto.length, match.index + match[0].length + 150);
       const janela = texto.slice(inicio, fim);
-      const caminho = normalizarCaminho(janela);
+      const posicaoNormaNaJanela = match.index - inicio;
+      const caminho = normalizarCaminho(janela, posicaoNormaNaJanela);
       if (!caminho) continue; // menciona a norma mas sem artigo específico — nada a verificar
 
       const citacao: CitacaoDetectada = {
@@ -129,7 +155,18 @@ export async function verificarCitacoesLegais(
         continue;
       }
 
-      const dispositivo = await getDispositivo(norma, caminho);
+      // "art. N" sem sub-parte normalmente se refere ao caput, mas um
+      // artigo sem parágrafo nenhum às vezes é seedado sem o sufixo
+      // ", caput" (ver seed-base-legal*.ts) — tenta as duas formas nos dois
+      // sentidos antes de marcar como não encontrada.
+      const ehArtigoSemSubparte = /^art\. \d+[A-Z]?$/.test(caminho);
+      const dispositivo =
+        (await getDispositivo(norma, caminho)) ??
+        (ehArtigoSemSubparte
+          ? await getDispositivo(norma, `${caminho}, caput`)
+          : caminho.endsWith(", caput")
+            ? await getDispositivo(norma, caminho.replace(", caput", ""))
+            : null);
       if (dispositivo) {
         // Evita duplicar a mesma citação já verificada nesta mesma passada
         if (

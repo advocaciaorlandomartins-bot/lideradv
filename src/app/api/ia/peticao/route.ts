@@ -17,7 +17,10 @@ import {
   getAtualizacoesLegaisRecentes,
   formatarAtualizacoesLegaisTexto,
 } from "@/lib/atualizacoes-legais-db";
-import { listarDispositivosPorNorma } from "@/lib/base-legal-db";
+import {
+  getBaseLegalParaBeneficio,
+  formatarDispositivosParaPrompt,
+} from "@/lib/base-legal-db";
 import { codigoDoTipo } from "@/lib/checklist-documentos";
 
 export const dynamic = "force-dynamic";
@@ -104,34 +107,21 @@ export async function POST(req: Request) {
       ? `=== MUDANÇAS LEGAIS/NORMATIVAS RECENTES (últimos 6 meses) ===\n${formatarAtualizacoesLegaisTexto(atualizacoesLegais)}\n\nUse essas informações apenas se forem relevantes pro caso — não force a citação se não se aplicar.`
       : "";
 
-  // Base Legal Viva (migração 009) — injeta o texto oficial verificado
-  // (hash + redação dada por cada lei alteradora) quando o benefício é
-  // BPC/LOAS, pra Gerar Petição citar o dispositivo real em vez de depender
-  // da memória do modelo. Cobertura ainda só do art. 20 da LOAS — outros
-  // benefícios continuam sem essa camada até a base ser ampliada.
+  // Base Legal Viva (migrações 009/010) — injeta o texto oficial verificado
+  // (hash + redação dada por cada lei alteradora) quando o benefício tem
+  // norma mapeada, pra Gerar Petição citar o dispositivo real em vez de
+  // depender da memória do modelo. Cobertura ainda parcial (LOAS art. 20 +
+  // trechos de carência/invalidez/auxílio-doença/pensão da Lei 8.213) —
+  // benefícios fora do mapa continuam sem essa camada até a base crescer.
   const codigoBeneficio = processo?.tipo_acao
     ? codigoDoTipo(processo.tipo_acao)
     : null;
-  const ehBpc =
-    codigoBeneficio === "B80" ||
-    codigoBeneficio === "B87" ||
-    codigoBeneficio === "B88";
-  const baseLegalViva = ehBpc
-    ? await listarDispositivosPorNorma("Lei 8.742/1993").catch(() => [])
-    : [];
-  const baseLegalVivaTexto =
-    baseLegalViva.length > 0
-      ? `=== BASE LEGAL APLICÁVEL (VERIFICADA — Lei 8.742/1993, LOAS) ===\n${baseLegalViva
-          .map(
-            (d) =>
-              `${d.caminho}${d.revogado ? " [REVOGADO]" : ""}: "${d.texto}"${
-                d.redacaoDadaPor ? ` (${d.redacaoDadaPor})` : ""
-              }`
-          )
-          .join(
-            "\n"
-          )}\n\nEsses são os dispositivos EXATOS, coletados de planalto.gov.br — cite SOMENTE estes números de artigo/parágrafo quando se referir à LOAS. Não cite nenhum outro parágrafo da LOAS além dos listados acima.`
-      : "";
+  const dispositivosRelevantes = await getBaseLegalParaBeneficio(
+    codigoBeneficio
+  ).catch(() => []);
+  const baseLegalVivaTexto = formatarDispositivosParaPrompt(
+    dispositivosRelevantes
+  );
 
   const instrucaoFinal = [
     cerebroCtx,

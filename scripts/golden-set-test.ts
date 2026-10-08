@@ -147,6 +147,35 @@ async function testarT7Lacuna() {
   }
 }
 
+async function testarCitacaoGateMultiplasNormas() {
+  // Regressão de um bug real achado na prática: numa frase citando DUAS leis
+  // diferentes perto uma da outra, o parser pegava o artigo errado (o
+  // primeiro da janela, não o mais próximo da menção da norma em questão).
+  const { verificarCitacoesLegais } = await import("../src/lib/citation-gate");
+  const r = await verificarCitacoesLegais(
+    "O art. 20, §2º da LOAS trata de deficiência, e o art. 15, II, da Lei 8.213/91 trata de período de graça."
+  );
+  const okLoas = r.verificadas.some(
+    (c) => c.norma === "Lei 8.742/1993" && c.caminho === "art. 20, § 2º"
+  );
+  const ok8213 = r.verificadas.some(
+    (c) => c.norma === "Lei 8.213/1991" && c.caminho === "art. 15, II"
+  );
+  if (okLoas && ok8213 && r.naoEncontradas.length === 0) {
+    registrar(
+      "citation-gate-multi-norma (regressão)",
+      "PASS",
+      "as duas citações (LOAS e Lei 8.213) foram associadas ao artigo certo, sem mistura"
+    );
+  } else {
+    registrar(
+      "citation-gate-multi-norma (regressão)",
+      "FAIL",
+      `esperado 2 verificadas e 0 naoEncontradas; veio verificadas=${JSON.stringify(r.verificadas.map((c) => c.caminho))} naoEncontradas=${JSON.stringify(r.naoEncontradas.map((c) => c.caminho))}`
+    );
+  }
+}
+
 const NAO_IMPLEMENTADOS: [string, string][] = [
   ["T3-contradicao-avaliacao", "Juiz Revisor não existe ainda (Fase 2)"],
   [
@@ -180,6 +209,7 @@ async function main() {
   await testarT2Acumulacao();
   await testarT6EquivalenteCitacaoFabricada();
   await testarT7Lacuna();
+  await testarCitacaoGateMultiplasNormas();
   for (const [id, motivo] of NAO_IMPLEMENTADOS) {
     registrar(id, "SKIP", motivo);
   }

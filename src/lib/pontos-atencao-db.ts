@@ -129,12 +129,12 @@ async function avaliarRegrasBpc(
 const CINCO_ANOS_MS = 5 * 365.25 * 24 * 60 * 60 * 1000;
 
 /** Regra genérica (qualquer benefício, não só BPC): DER com mais de 5 anos
- * sinaliza risco de prescrição das parcelas mais antigas (prescrição
- * quinquenal das prestações, Decreto nº 20.910/1932, art. 1º — entendimento
- * pacífico de que não atinge o fundo de direito, só as parcelas vencidas há
- * mais de 5 anos da propositura/requerimento). Gravidade 'medio': é alerta
- * pro advogado conferir o cálculo dos atrasados, não motivo pra travar o
- * processo. */
+ * sinaliza risco de prescrição das parcelas mais antigas — prescrição
+ * quinquenal das prestações previdenciárias, com base específica no art.
+ * 103, parágrafo único, da Lei 8.213/91 (entendimento pacífico de que não
+ * atinge o fundo de direito, só as parcelas vencidas há mais de 5 anos da
+ * propositura/requerimento). Gravidade 'medio': é alerta pro advogado
+ * conferir o cálculo dos atrasados, não motivo pra travar o processo. */
 function avaliarPrescricaoQuinquenal(der: string | null): RegraResultado[] {
   if (!der) return [];
   const dataDer = new Date(der);
@@ -147,7 +147,7 @@ function avaliarPrescricaoQuinquenal(der: string | null): RegraResultado[] {
       gravidade: "medio",
       descricao: `A DER deste processo (${dataDer.toLocaleDateString("pt-BR")}) foi há mais de 5 anos. Parcelas vencidas há mais de 5 anos contados da propositura/requerimento podem estar prescritas (prescrição quinquenal das prestações) — confira o cálculo dos atrasados antes de pedir retroativo ao limite da DER.`,
       baseLegal:
-        "Decreto nº 20.910/1932, art. 1º (prescrição quinquenal das prestações periódicas)",
+        "Lei 8.213/1991, art. 103, parágrafo único (prescrição quinquenal das prestações)",
     },
   ];
 }

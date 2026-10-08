@@ -231,6 +231,37 @@ async function testarCitacaoPluralEArtigoComHifen() {
   }
 }
 
+async function testarParagrafoUnico() {
+  // 7º bug real: "parágrafo único" (forma sem número, usada quando o artigo
+  // só tem um parágrafo — ex.: art. 103 da Lei 8.213, prescrição
+  // quinquenal) não batia com o regex de parágrafo numerado (\d+) e virava
+  // invisível, caindo pro caput do artigo — risco real de "verificar" a
+  // citação errada (o caput de um artigo pode ser uma regra totalmente
+  // diferente do seu parágrafo único, como é o caso do próprio art. 103:
+  // caput = decadência de 10 anos, parágrafo único = prescrição de 5 anos).
+  const { verificarCitacoesLegais } = await import("../src/lib/citation-gate");
+  const r = await verificarCitacoesLegais(
+    "Nos termos do art. 103, parágrafo único, da Lei 8.213/91, prescreve em cinco anos a ação para haver prestações vencidas."
+  );
+  const achou = r.verificadas.some(
+    (c) =>
+      c.norma === "Lei 8.213/1991" && c.caminho === "art. 103, parágrafo único"
+  );
+  if (achou) {
+    registrar(
+      "citation-gate-paragrafo-unico (regressão)",
+      "PASS",
+      "'parágrafo único' distinguido corretamente do caput do artigo"
+    );
+  } else {
+    registrar(
+      "citation-gate-paragrafo-unico (regressão)",
+      "FAIL",
+      `esperado 'art. 103, parágrafo único'; veio verificadas=${JSON.stringify(r.verificadas.map((c) => c.caminho))}`
+    );
+  }
+}
+
 async function testarT6EquivalenteCitacaoFabricada() {
   // golden-set T6 descreve um ACÓRDÃO inventado (jurisprudência) — isso é
   // Fase 2 (Jurisprudência Viva), ainda não construída. O equivalente que
@@ -338,6 +369,7 @@ async function main() {
   await testarCitacaoGateMultiplasNormas();
   await testarCitacaoComIncisoDentroDeParagrafo();
   await testarCitacaoPluralEArtigoComHifen();
+  await testarParagrafoUnico();
   for (const [id, motivo] of NAO_IMPLEMENTADOS) {
     registrar(id, "SKIP", motivo);
   }

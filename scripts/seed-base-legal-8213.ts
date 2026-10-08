@@ -514,6 +514,51 @@ const LEI_8213: DispositivoSeed[] = [
       "Verificado o reaparecimento do segurado, o pagamento da pensão cessará imediatamente, desobrigados os dependentes da reposição dos valores recebidos, salvo má-fé.",
     redacaoDadaPor: null,
   },
+
+  // ─── Decadência e prescrição (art. 103, 103-A) ───────────────────────
+  {
+    caminho: "art. 103, caput",
+    texto:
+      "O prazo de decadência do direito ou da ação do segurado ou beneficiário para a revisão do ato de concessão, indeferimento, cancelamento ou cessação de benefício e do ato de deferimento, indeferimento ou não concessão de revisão de benefício é de 10 (dez) anos, contado:",
+    redacaoDadaPor: "Lei nº 13.846, de 2019",
+    observacao: "Vide ADIN 6096",
+  },
+  {
+    caminho: "art. 103, I",
+    texto:
+      "do dia primeiro do mês subsequente ao do recebimento da primeira prestação ou da data em que a prestação deveria ter sido paga com o valor revisto; ou",
+    redacaoDadaPor: "Lei nº 13.846, de 2019",
+  },
+  {
+    caminho: "art. 103, II",
+    texto:
+      "do dia em que o segurado tomar conhecimento da decisão de indeferimento, cancelamento ou cessação do seu pedido de benefício ou da decisão de deferimento ou indeferimento de revisão de benefício, no âmbito administrativo.",
+    redacaoDadaPor: "Lei nº 13.846, de 2019",
+  },
+  {
+    caminho: "art. 103, parágrafo único",
+    texto:
+      "Prescreve em cinco anos, a contar da data em que deveriam ter sido pagas, toda e qualquer ação para haver prestações vencidas ou quaisquer restituições ou diferenças devidas pela Previdência Social, salvo o direito dos menores, incapazes e ausentes, na forma do Código Civil.",
+    redacaoDadaPor: "Lei nº 9.528, de 1997",
+  },
+  {
+    caminho: "art. 103-A, caput",
+    texto:
+      "O direito da Previdência Social de anular os atos administrativos de que decorram efeitos favoráveis para os seus beneficiários decai em dez anos, contados da data em que foram praticados, salvo comprovada má-fé.",
+    redacaoDadaPor: "Lei nº 10.839, de 2004",
+  },
+  {
+    caminho: "art. 103-A, § 1º",
+    texto:
+      "No caso de efeitos patrimoniais contínuos, o prazo decadencial contar-se-á da percepção do primeiro pagamento.",
+    redacaoDadaPor: "Lei nº 10.839, de 2004",
+  },
+  {
+    caminho: "art. 103-A, § 2º",
+    texto:
+      "Considera-se exercício do direito de anular qualquer medida de autoridade administrativa que importe impugnação à validade do ato.",
+    redacaoDadaPor: "Lei nº 10.839, de 2004",
+  },
 ];
 
 async function seedFonte(

@@ -102,6 +102,13 @@ function candidatosCaminho(trecho: string, posicaoNorma: number): string[] {
     (artMatch.index ?? 0) + artMatch[0].length + 40
   );
 
+  // "parágrafo único" / "§ único" — forma sem número, usada quando o
+  // artigo só tem um parágrafo. Checado ANTES do § numerado porque
+  // "parágrafo" sem dígito nenhum não bate com a captura \d+ abaixo e
+  // ficava invisível (caminho nunca incluía ", parágrafo único").
+  const paragUnicoMatch = /^[,\s]*(?:§\s*|par[áa]grafo\s*)[úu]nico\b/i.test(
+    depoisDoArtigo
+  );
   // § com ou sem número de sub-letra (ex.: "§ 2º-A")
   const paragMatch = depoisDoArtigo.match(
     /^[,\s]*(?:§\s*(\d+)\s*[ºo°]?\s*(-[A-Z])?|par[áa]grafo\s*(\d+)\s*[ºo°]?)/i
@@ -113,7 +120,9 @@ function candidatosCaminho(trecho: string, posicaoNorma: number): string[] {
   const caputMatch = /^[,\s]*caput\b/i.test(depoisDoArtigo);
 
   const candidatos: string[] = [];
-  if (paragMatch) {
+  if (paragUnicoMatch) {
+    candidatos.push(`${base}, parágrafo único`);
+  } else if (paragMatch) {
     const num = paragMatch[1] ?? paragMatch[3];
     const sufixoParag = paragMatch[2] ? paragMatch[2].toUpperCase() : "";
     const paragStr = `, § ${num}º${sufixoParag}`;

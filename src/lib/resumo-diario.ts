@@ -137,6 +137,20 @@ export async function montarResumoDiario(): Promise<string | null> {
     }
   }
 
+  // "falhando" é diferente de "atrasado": o cron está rodando no horário,
+  // mas as últimas execuções deram erro — sem isso, uma rotina crítica (ex:
+  // captura de publicações/prazos) podia quebrar todo dia sem ninguém notar,
+  // já que o heartbeat continuava fresco. Achado em auditoria de 2026-10-09.
+  const cronsFalhando = cronsStatus.filter((c) => c.falhando && !c.atrasado);
+  if (cronsFalhando.length > 0) {
+    linhas.push(
+      "\n⚠️ *Rotinas automáticas rodando mas com erro nas últimas execuções:*"
+    );
+    for (const c of cronsFalhando) {
+      linhas.push(`• ${c.rota} — confira em Gerenciador > Auditoria`);
+    }
+  }
+
   if (loginsFalhos > 20) {
     linhas.push(
       `\n🔒 *Segurança:* ${loginsFalhos} tentativas de login falhas nas últimas 24h — volume acima do normal.`

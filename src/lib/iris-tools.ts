@@ -1026,16 +1026,25 @@ async function executarFerramentaIrisInterno(
       });
 
       const { getCronsAtrasados } = await import("./saude-sistema");
-      const cronsAtrasados = (await getCronsAtrasados()).filter(
-        (c) => c.atrasado
-      );
+      const todosCrons = await getCronsAtrasados();
+      const cronsAtrasados = todosCrons.filter((c) => c.atrasado);
+      const cronsFalhando = todosCrons.filter((c) => c.falhando && !c.atrasado);
       checks.push({
         componente: "Rotinas automáticas (crons)",
-        ok: cronsAtrasados.length === 0,
+        ok: cronsAtrasados.length === 0 && cronsFalhando.length === 0,
         detalhe:
-          cronsAtrasados.length === 0
-            ? "Todas rodando em dia"
-            : `Atrasadas: ${cronsAtrasados.map((c) => `${c.rota} (última: ${c.ultimaExecucao ?? "nunca"})`).join(", ")}`,
+          cronsAtrasados.length === 0 && cronsFalhando.length === 0
+            ? "Todas rodando em dia e sem erro"
+            : [
+                cronsAtrasados.length > 0
+                  ? `Atrasadas: ${cronsAtrasados.map((c) => `${c.rota} (última: ${c.ultimaExecucao ?? "nunca"})`).join(", ")}`
+                  : null,
+                cronsFalhando.length > 0
+                  ? `Rodando mas com erro nas últimas execuções: ${cronsFalhando.map((c) => c.rota).join(", ")}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" | "),
       });
 
       const { getAlertasSyncAtivos } = await import("./legislacao-sync");

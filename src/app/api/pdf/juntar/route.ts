@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, EncryptedPDFError } from "pdf-lib";
 import { getSession } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
@@ -26,7 +26,25 @@ export async function POST(req: NextRequest) {
 
     for (const file of files) {
       const buf = await file.arrayBuffer();
-      const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+      // Sem ignoreEncryption — ver comentário em remover-senha/route.ts.
+      // Achado em auditoria de 2026-10-09.
+      let doc: PDFDocument;
+      try {
+        doc = await PDFDocument.load(buf);
+      } catch (err) {
+        if (
+          err instanceof EncryptedPDFError ||
+          String(err).toLowerCase().includes("encrypt")
+        ) {
+          return NextResponse.json(
+            {
+              error: `O arquivo "${file.name}" está protegido por senha e não pode ser processado: nossa ferramenta não suporta PDFs criptografados no momento.`,
+            },
+            { status: 400 }
+          );
+        }
+        throw err;
+      }
       const pages = await merged.copyPages(doc, doc.getPageIndices());
       pages.forEach((p) => merged.addPage(p));
     }

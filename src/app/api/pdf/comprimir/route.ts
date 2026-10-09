@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFDocument, PDFRawStream, PDFName, PDFNumber } from "pdf-lib";
+import {
+  PDFDocument,
+  PDFRawStream,
+  PDFName,
+  PDFNumber,
+  EncryptedPDFError,
+} from "pdf-lib";
 import * as jpegjs from "jpeg-js";
 import zlib from "node:zlib";
 import { promisify } from "node:util";
@@ -89,7 +95,28 @@ export async function POST(req: NextRequest) {
       );
 
     const buf = await file.arrayBuffer();
-    const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+    // Sem ignoreEncryption — ver comentário em remover-senha/route.ts: com
+    // true, o load "funciona" sobre a estrutura ainda criptografada e o
+    // save completa sem erro, mas o PDF salvo continua corrompido/ilegível
+    // (pdf-lib não decripta). Achado em auditoria de 2026-10-09.
+    let doc: PDFDocument;
+    try {
+      doc = await PDFDocument.load(buf);
+    } catch (err) {
+      if (
+        err instanceof EncryptedPDFError ||
+        String(err).toLowerCase().includes("encrypt")
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Este PDF está protegido por senha e não pode ser processado: nossa ferramenta não suporta PDFs criptografados no momento.",
+          },
+          { status: 400 }
+        );
+      }
+      throw err;
+    }
     const context = doc.context;
 
     let imagesProcessed = 0;

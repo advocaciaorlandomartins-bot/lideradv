@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, EncryptedPDFError } from "pdf-lib";
 import { encryptPdf } from "@/lib/pdf-encrypt";
 import { getSession } from "@/lib/session";
 
@@ -27,8 +27,27 @@ export async function POST(req: NextRequest) {
       );
 
     const buf = await file.arrayBuffer();
+    // Sem ignoreEncryption — ver comentário em remover-senha/route.ts.
+    // Achado em auditoria de 2026-10-09.
+    let doc: PDFDocument;
+    try {
+      doc = await PDFDocument.load(buf);
+    } catch (err) {
+      if (
+        err instanceof EncryptedPDFError ||
+        String(err).toLowerCase().includes("encrypt")
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Este PDF já está protegido por senha e não pode ser processado: nossa ferramenta não suporta PDFs já criptografados no momento.",
+          },
+          { status: 400 }
+        );
+      }
+      throw err;
+    }
     // Re-serialize with pdf-lib (useObjectStreams: false = traditional xref, needed for post-processing)
-    const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
     const pdfBytes = await doc.save({ useObjectStreams: false });
 
     // Apply RC4 128-bit encryption via post-processing

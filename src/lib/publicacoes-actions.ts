@@ -2,6 +2,7 @@
 
 import sql from "./db";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import Anthropic from "@anthropic-ai/sdk";
@@ -55,16 +56,24 @@ export async function adicionarOabAction(data: {
           nome_advogado = EXCLUDED.nome_advogado
   `;
 
-  // Registra automaticamente no TramitaSign se credenciais configuradas
+  // Registra automaticamente no TramitaSign se credenciais configuradas.
+  // after() em vez de promise solta sem await — achado em auditoria de
+  // 2026-10-09, mesma classe de bug já corrigida uma vez no envio do
+  // TramitaSign (promise solta numa Server Action pode nunca completar
+  // em runtime serverless, já que a função encerra junto com a resposta).
   if (tramitaSyncAtivo()) {
-    adicionarOabTramitaSign(
-      numero.trim().toUpperCase(),
-      estado.trim().toUpperCase(),
-      nome_advogado.trim()
-    ).then((r) => {
+    const numeroFinal = numero.trim().toUpperCase();
+    const estadoFinal = estado.trim().toUpperCase();
+    const nomeFinal = nome_advogado.trim();
+    after(async () => {
+      const r = await adicionarOabTramitaSign(
+        numeroFinal,
+        estadoFinal,
+        nomeFinal
+      );
       if (!r.ok)
         console.warn(
-          `[TramitaSync] OAB ${numero}/${estado} não registrada automaticamente: ${r.erro}`
+          `[TramitaSync] OAB ${numeroFinal}/${estadoFinal} não registrada automaticamente: ${r.erro}`
         );
     });
   }

@@ -52,12 +52,19 @@ export default async function RelatoriosPage() {
     podeVerLancamentos ? getRelatorioLancamentos({}) : Promise.resolve([]),
     getRelatorioResumo({}),
     podeVerFolha ? getRelatorioRemuneracoes({}) : Promise.resolve([]),
+    // (resumo.total_remuneracoes é zerado abaixo quando !podeVerFolha — ver
+    // comentário acima: dado precisa ser filtrado na origem, não só na
+    // renderização. Achado em auditoria de 2026-10-09: o agregado do Painel
+    // vazava o total de folha de pagamento pra quem não tem relatorios_folha,
+    // diferente da lista detalhada em `remuneracoes`, que já era gated.)
     podeVerFluxo ? getFluxoMensal(12) : Promise.resolve([]),
     getColaboradoresParaRelatorio(),
     getEscritorioConfig(),
     podeVerClientes ? getClientesParaRecibo() : Promise.resolve([]),
     getRelatorioJuridico(),
   ]);
+
+  if (!podeVerFolha) resumo.total_remuneracoes = 0;
 
   return (
     <div className="space-y-6">

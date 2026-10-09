@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { logAction } from "./audit";
 import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
 import { podeEditarProcesso } from "./processo-ownership";
 import { parseChecklist } from "./checklist-types";
@@ -84,6 +85,12 @@ export async function moverParaProducaoAction(
       WHERE id = ${id}::uuid
     `;
     await concluirTarefasCerebroObsoletas(id);
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: id,
+      descricao: "Moveu processo para Produção",
+    });
     revalidate(id);
     return {};
   } catch {
@@ -106,6 +113,12 @@ export async function moverParaAdministrativoAction(
       WHERE id = ${id}::uuid
     `;
     await concluirTarefasCerebroObsoletas(id);
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: id,
+      descricao: "Moveu processo para Administrativo",
+    });
     revalidate(id);
     return {};
   } catch {
@@ -141,6 +154,12 @@ export async function registrarResultadoAdminAction(
     await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
   await marcarChecklistCompleto(id);
   await concluirTarefasCerebroObsoletas(id);
+  await logAction({
+    acao: "editar",
+    entidade: "processo",
+    entidadeId: id,
+    descricao: `Registrou resultado administrativo: ${resultado}`,
+  });
   revalidate(id);
   return {};
 }
@@ -167,6 +186,12 @@ export async function registrarResultadoJudicialAction(
   await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
   await marcarChecklistCompleto(id);
   await concluirTarefasCerebroObsoletas(id);
+  await logAction({
+    acao: "editar",
+    entidade: "processo",
+    entidadeId: id,
+    descricao: `Registrou resultado judicial: ${resultado}`,
+  });
   revalidate(id);
   return {};
 }
@@ -210,6 +235,12 @@ export async function registrarProtocoloAdminAction(
     "administrativo"
   );
   await marcarChecklistCompleto(id);
+  await logAction({
+    acao: "editar",
+    entidade: "processo",
+    entidadeId: id,
+    descricao: `Registrou protocolo administrativo: ${protocolo.trim() || "(sem número)"}`,
+  });
   revalidate(id);
   return {};
 }
@@ -247,6 +278,12 @@ export async function registrarDistribuicaoJudicialAction(
     "judicial"
   );
   await marcarChecklistCompleto(id);
+  await logAction({
+    acao: "editar",
+    entidade: "processo",
+    entidadeId: id,
+    descricao: `Registrou distribuição judicial: ${numero.trim() || "(sem número)"}`,
+  });
   revalidate(id);
   return {};
 }
@@ -282,6 +319,12 @@ export async function arquivarProcessoAction(
     await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
     await marcarChecklistCompleto(id);
     await concluirTarefasCerebroObsoletas(id);
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: id,
+      descricao: `Arquivou processo${resultado ? `: ${resultado}` : ""}`,
+    });
     revalidate(id);
     return {};
   } catch {
@@ -320,6 +363,12 @@ export async function voltarEstagioAction(
           data_estagio_at           = NOW()
       WHERE id = ${id}::uuid
     `;
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: id,
+      descricao: `Retrocedeu estágio: ${atual} → ${anterior}`,
+    });
     revalidate(id);
     return {};
   } catch {
@@ -350,6 +399,12 @@ export async function reabrirProcessoAction(
       WHERE id = ${id}::uuid
     `;
     await sincronizarStatusClienteAposMudarProcesso(id).catch(() => null);
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: id,
+      descricao: "Reabriu processo",
+    });
     revalidate(id);
     return {};
   } catch {

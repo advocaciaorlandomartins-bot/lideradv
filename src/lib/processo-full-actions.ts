@@ -11,6 +11,7 @@ import { interpretarAndamento } from "./cerebroJuridico";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
 import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
+import { logAction } from "./audit";
 
 // ── Fase / Status ──────────────────────────────────────────────
 
@@ -31,6 +32,12 @@ export async function avancarFaseAction(
         updated_at          = NOW()
       WHERE id = ${processoId}::uuid
     `;
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: processoId,
+      descricao: `Avançou fase: ${novaFase}`,
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -63,6 +70,12 @@ export async function arquivarProcessoAction(
     await sincronizarStatusClienteAposMudarProcesso(processoId).catch(
       () => null
     );
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: processoId,
+      descricao: `Arquivou processo${resultado ? `: ${resultado}` : ""}`,
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -86,6 +99,12 @@ export async function updateRelatoAction(
       UPDATE processos SET relato = ${relato || null}, updated_at = NOW()
       WHERE id = ${processoId}::uuid
     `;
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: processoId,
+      descricao: "Atualizou relato do processo",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -118,6 +137,14 @@ export async function updateResponsavelAction(
         WHERE id = ${processoId}::uuid
       `;
     }
+    await logAction({
+      acao: "editar",
+      entidade: "processo",
+      entidadeId: processoId,
+      descricao: responsavelId
+        ? `Reatribuiu responsável (novo colaborador id ${responsavelId})`
+        : "Removeu responsável do processo",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -156,6 +183,12 @@ export async function createHistoricoRegistroAction(data: {
          ${data.destaque})
       RETURNING id::text
     `;
+    await logAction({
+      acao: "criar",
+      entidade: "historico_registro",
+      entidadeId: data.processoId,
+      descricao: `Criou registro de histórico: ${data.tipo}`,
+    });
     revalidatePath(`/dashboard/processos/${data.processoId}`);
 
     // Interpretação automática pelo Cérebro Jurídico — roda depois da
@@ -252,6 +285,12 @@ export async function deleteHistoricoRegistroAction(
     // passar na checagem de permissão, mas o DELETE não conferia se o id
     // realmente pertencia a ele).
     await sql`DELETE FROM historico_registros WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
+    await logAction({
+      acao: "excluir",
+      entidade: "historico_registro",
+      entidadeId: id,
+      descricao: "Excluiu registro do histórico do processo",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -291,6 +330,12 @@ export async function createEventoControleAction(data: {
          ${data.linkVirtual || null},
          ${data.responsavelId ? data.responsavelId : null}::uuid)
     `;
+    await logAction({
+      acao: "criar",
+      entidade: "evento_controle",
+      entidadeId: data.processoId,
+      descricao: `Criou evento/controle: ${data.titulo.trim()}`,
+    });
     revalidatePath(`/dashboard/processos/${data.processoId}`);
     return {};
   } catch {
@@ -311,6 +356,12 @@ export async function deleteEventoControleAction(
     // AND processo_id trava ao processo já verificado — ver comentário em
     // deleteHistoricoRegistroAction.
     await sql`DELETE FROM eventos_controles WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
+    await logAction({
+      acao: "excluir",
+      entidade: "evento_controle",
+      entidadeId: id,
+      descricao: "Excluiu evento/controle do processo",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -343,6 +394,12 @@ export async function updateEventoControleAction(data: {
           local  = ${data.local || null}
       WHERE id = ${data.id}::uuid AND processo_id = ${data.processoId}::uuid
     `;
+    await logAction({
+      acao: "editar",
+      entidade: "evento_controle",
+      entidadeId: data.id,
+      descricao: `Editou evento/controle: ${data.titulo.trim()}`,
+    });
     revalidatePath(`/dashboard/processos/${data.processoId}`);
     return {};
   } catch {
@@ -361,6 +418,12 @@ export async function darBaixaEventoControleAction(
     return { error: "Sem permissão." };
   try {
     await sql`UPDATE eventos_controles SET status = 'concluido' WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
+    await logAction({
+      acao: "editar",
+      entidade: "evento_controle",
+      entidadeId: id,
+      descricao: "Deu baixa em evento/controle",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard");
     return {};
@@ -380,6 +443,12 @@ export async function reabrirEventoControleAction(
     return { error: "Sem permissão." };
   try {
     await sql`UPDATE eventos_controles SET status = NULL WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
+    await logAction({
+      acao: "editar",
+      entidade: "evento_controle",
+      entidadeId: id,
+      descricao: "Reabriu evento/controle",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard");
     return {};
@@ -442,6 +511,12 @@ export async function createTarefaProcessoAction(data: {
         ON CONFLICT (tarefa_id, colaborador_id) DO NOTHING
       `;
     }
+    await logAction({
+      acao: "criar",
+      entidade: "tarefa_processo",
+      entidadeId: tarefaId,
+      descricao: `Criou tarefa: ${data.titulo.trim()}`,
+    });
     revalidatePath(`/dashboard/processos/${data.processoId}`);
     return { id: tarefaId };
   } catch (e) {
@@ -472,6 +547,12 @@ export async function updateTarefaStatusAction(
     } else {
       await reverterPontosConclusao("tarefa_processo", id);
     }
+    await logAction({
+      acao: "editar",
+      entidade: "tarefa_processo",
+      entidadeId: id,
+      descricao: `Atualizou status da tarefa: ${status}`,
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard/minhas-tarefas");
     revalidatePath("/dashboard/producao");
@@ -510,6 +591,12 @@ export async function darBaixaTarefaProcessoAction(
       }
     }
 
+    await logAction({
+      acao: "editar",
+      entidade: "tarefa_processo",
+      entidadeId: id,
+      descricao: "Deu baixa na tarefa",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard/minhas-tarefas");
     revalidatePath("/dashboard/producao");
@@ -533,6 +620,12 @@ export async function reabrirTarefaProcessoAction(
   try {
     await sql`UPDATE tarefas_processo SET status = 'Pendente', updated_at = NOW() WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     await reverterPontosConclusao("tarefa_processo", id);
+    await logAction({
+      acao: "editar",
+      entidade: "tarefa_processo",
+      entidadeId: id,
+      descricao: "Reabriu tarefa",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     revalidatePath("/dashboard/minhas-tarefas");
     revalidatePath("/dashboard");
@@ -553,6 +646,12 @@ export async function deleteTarefaAction(
     return { error: "Sem permissão." };
   try {
     await sql`DELETE FROM tarefas_processo WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
+    await logAction({
+      acao: "excluir",
+      entidade: "tarefa_processo",
+      entidadeId: id,
+      descricao: "Excluiu tarefa do processo",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -578,6 +677,12 @@ export async function createPendenciaAction(data: {
       INSERT INTO pendencias_cliente (processo_id, client_id, descricao)
       VALUES (${data.processoId}::uuid, ${data.clientId}::uuid, ${data.descricao.trim()})
     `;
+    await logAction({
+      acao: "criar",
+      entidade: "pendencia_cliente",
+      entidadeId: data.processoId,
+      descricao: `Criou pendência: ${data.descricao.trim()}`,
+    });
     revalidatePath(`/dashboard/processos/${data.processoId}`);
     return {};
   } catch {
@@ -597,6 +702,12 @@ export async function updatePendenciaStatusAction(
     return { error: "Sem permissão." };
   try {
     await sql`UPDATE pendencias_cliente SET status = ${status} WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
+    await logAction({
+      acao: "editar",
+      entidade: "pendencia_cliente",
+      entidadeId: id,
+      descricao: `Atualizou status da pendência: ${status}`,
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {
@@ -615,6 +726,12 @@ export async function deletePendenciaAction(
     return { error: "Sem permissão." };
   try {
     await sql`DELETE FROM pendencias_cliente WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
+    await logAction({
+      acao: "excluir",
+      entidade: "pendencia_cliente",
+      entidadeId: id,
+      descricao: "Excluiu pendência do processo",
+    });
     revalidatePath(`/dashboard/processos/${processoId}`);
     return {};
   } catch {

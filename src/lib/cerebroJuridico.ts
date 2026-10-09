@@ -109,11 +109,10 @@ TNU (Turma Nacional de Uniformização):
 • Súmula 33: PPP + LTCAT para comprovação de especial
 • Súmula 44: auxílio-acidente — redução parcial permanente da capacidade
 • Súmula 47: trabalhador rural — comprovação por prova material + testemunhos
-• Súmula 54: BPC/LOAS — miserabilidade vai além do critério renda (⚠️ número NÃO confirmado contra fonte oficial em 2026-10-08 — busca achou conteúdo parecido na Súmula 11 TNU, mas sem confirmação forte o bastante pra trocar; conceito em si é real e já sustentado por Tema 27/312 STF nesta mesma lista)
+• Súmula 11 TNU: renda per capita familiar superior a ¼ do salário mínimo não impede a concessão do BPC, desde que comprovada por outros meios a miserabilidade do requerente (confirmado contra fonte oficial em 2026-10-09 — era citado como "Súmula 54" em 3 lugares deste arquivo, número corrigido; texto oficial, publicada em 14/04/2004)
 • Súmula 57: laudo pericial é relativo — juiz pode valorar outros elementos
-• Súmula 63: salário-maternidade — empregada demitida durante gestação mantém direito (⚠️ número NÃO confirmado em 2026-10-08 — busca só achou conteúdo parecido na Súmula 6 do CRPS, tribunal diferente; conceito em si é consistente com a regra de estabilidade gestante + período de graça)
 • Súmula 72: período de graça — contagem para qualidade de segurado
-• Súmula 77: SUPERADA pela ADI 2.110 (STF 2024) — carência de 10 contribuições para individual não se aplica mais (⚠️ número da súmula não confirmado em 2026-10-08; risco baixo pois o ponto real — carência inconstitucional — já está sustentado pela ADI 2.110/2.111, independente do número desta súmula estar certo)
+• ATENÇÃO (TNU, PEDILEF, sessão de 14/09/2017, ver notícia CJF): quando a empregada demitida sem justa causa recebeu indenização trabalhista correspondente a TODO o período de estabilidade gestante, isso exclui o fundamento do pagamento de salário-maternidade — achado novo em 2026-10-09, confirmar o caso concreto antes de alegar o contrário. (Removidas em 2026-10-09: "Súmula 63 TNU" — número fabricado, o verbete real da Súmula 63 trata de união estável para pensão por morte, assunto não relacionado — e "Súmula 77 TNU" pra carência do contribuinte individual — o verbete real da Súmula 77 trata de incapacidade/perícia, também não relacionado; em ambos os casos o ponto jurídico central já está sustentado sem precisar de um número de súmula: período de graça é regra do art. 15 da Lei 8.213/91, e a inconstitucionalidade da carência já está nas ADIs 2.110/2.111 citadas abaixo)
 • Tema 173 TNU: BPC — impedimento de longo prazo pode ser reconhecido de forma prospectiva (após a DER)
 • Tema 187 TNU: BPC — análise de miserabilidade dispensa nova perícia quando o INSS já reconheceu hipossuficiência (era citado como "Tema 185" em 5 lugares — número corrigido em 2026-10-08, confirmado contra fonte oficial)
 • Tema 192 TNU: recolhimento de GPS em atraso dentro do período de graça é válido para cômputo de carência
@@ -154,7 +153,7 @@ Lei 13.982/2020 — Rendas EXCLUÍDAS do cálculo familiar BPC:
 • Bolsa Família e outros benefícios assistenciais eventuais
 • Parcelas de programas federais de transferência de renda
 
-Critério de miserabilidade holística (Tema 187 TNU + Tema 27 STF + Súmula 54 TNU):
+Critério de miserabilidade holística (Tema 187 TNU + Tema 27 STF + Súmula 11 TNU):
 • O critério ¼ SM per capita NÃO é absoluto — juiz deve considerar gastos com saúde, cuidador, medicamentos, habitação, dívidas
 • Se o INSS já reconheceu hipossuficiência, nova perícia de renda é dispensável (Tema 187 TNU)
 • CadÚnico atualizado reforça prova de hipossuficiência, mas a ausência não impede concessão
@@ -1218,7 +1217,7 @@ function promptModoEspecializado(modo: string): string {
 • Deficiência: modelo biopsicossocial ICF (Lei 13.146/2015 — EPCD) — impedimento de longo prazo (≥2 anos) físico, mental, intelectual ou sensorial que restrinja participação social
 
 CRITÉRIO DE RENDA — ANÁLISE BPC 360 (holística):
-• Critério legal ¼ SM per capita NÃO é absoluto: Tema 27 STF (RE 567.985/580.963) + Súmula 54 TNU + Tema 312 STF
+• Critério legal ¼ SM per capita NÃO é absoluto: Tema 27 STF (RE 567.985/580.963) + Súmula 11 TNU + Tema 312 STF
 • Lei 13.982/2020 — rendas EXCLUÍDAS: BPC do cônjuge, 1 SM de pensão por morte, benefícios assistenciais eventuais, bolsa família, rendimentos da própria PcD
 • Art. 20, §11-A, Lei 8.742/93: GASTOS com medicamentos, cuidador, aluguel, transporte, dívidas REDUZEM renda efetiva
 • Art. 20-B, Lei 8.742/93: critérios adicionais de flexibilização — aplicar sempre
@@ -1291,11 +1290,11 @@ ESTRATÉGIA PAP:
 • EC 103/2019: novas regras para % de rateio (cotas percentuais por número de dependentes)`;
     case "Salário-Maternidade":
       return `\n═══ MODO ESPECIALIZADO: SALÁRIO-MATERNIDADE SEM CARÊNCIA ═══
-ATENÇÃO — MUDANÇA HISTÓRICA: A ADI 2.110 (STF, 21/03/2024) declarou INCONSTITUCIONAL a exigência de carência (art. 25, III, Lei 8.213/91). A TNU Súmula 77 está SUPERADA. O único requisito é ter QUALIDADE DE SEGURADO na data do parto/adoção.
+ATENÇÃO — MUDANÇA HISTÓRICA: A ADI 2.110 (STF, 21/03/2024) declarou INCONSTITUCIONAL a exigência de carência (art. 25, III, Lei 8.213/91). O único requisito é ter QUALIDADE DE SEGURADO na data do parto/adoção. (Correção 2026-10-09: a citação "TNU Súmula 77" foi removida — o verbete real da Súmula 77 trata de incapacidade/perícia, assunto não relacionado a carência; a inconstitucionalidade já está sustentada direto pela ADI 2.110 citada acima, sem precisar de outro número.)
 
 FLUXO DE DECISÃO POR TIPO DE SEGURADA:
 • Empregada CLT: qualidade de segurado automática — deferimento certo; valor até o teto do INSS
-• Desempregada/ex-empregada: mantém direito dentro do período de graça (TNU Súmula 63) — verificar se ainda está no prazo
+• Desempregada/ex-empregada: mantém direito dentro do período de graça (art. 15, Lei 8.213/91 — verificar se ainda está no prazo). ATENÇÃO (TNU, PEDILEF, sessão 14/09/2017): se a demitida sem justa causa recebeu indenização trabalhista correspondente a TODO o período de estabilidade gestante, isso exclui o fundamento do salário-maternidade — confirmar se houve essa indenização antes de orientar a cliente. (Correção 2026-10-09: a citação "TNU Súmula 63" foi removida — o verbete real da Súmula 63 trata de união estável para pensão por morte, assunto não relacionado.)
 • Contribuinte individual: 1 contribuição + comprovação de atividade remunerada (Enunciado 19 CRPS)
   - Se não comprovar atividade → ENQUADRAR COMO FACULTATIVA (inversão de ônus — não perde o direito)
 • Segurada facultativa: apenas 1 contribuição paga (GPS 1473 ou 1490 trimestral, 11%) — sem precisar provar atividade

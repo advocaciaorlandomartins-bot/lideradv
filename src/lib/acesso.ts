@@ -65,6 +65,33 @@ export async function podeAcessarCliente(
 }
 
 /**
+ * true se o usuário pode EDITAR/EXCLUIR este cliente — ou porque tem
+ * clientes_ver_todos, ou porque é responsável por algum processo desse
+ * cliente. Mesmo bug que existia em processos antes de podeEditarProcesso:
+ * as Server Actions de escrita (update/excluir/complementar/bloquear
+ * mensagens, etiquetas) só checavam a permissão genérica do módulo
+ * ("clientes":"editar"), nunca a ownership — quem soubesse/adivinhasse o
+ * UUID de um cliente de outro colega editava/excluía direto pela action,
+ * mesmo sem "clientes_ver_todos". Achado em auditoria de 2026-10-09.
+ */
+export async function podeEditarCliente(
+  session: SessionUser,
+  clienteId: string
+): Promise<boolean> {
+  if (hasPermission(session, "clientes_ver_todos", "ver")) return true;
+  const colaboradorId = await getColaboradorIdForUser(session.id);
+  if (!colaboradorId) return false;
+  const dono = await sql`
+    SELECT EXISTS (
+      SELECT 1 FROM processos
+      WHERE client_id = ${clienteId}::uuid AND deleted_at IS NULL
+        AND responsavel_id = ${colaboradorId}::uuid
+    ) AS pode
+  `;
+  return !!dono[0]?.pode;
+}
+
+/**
  * Acesso a uma perícia — herda o acesso do processo vinculado quando existe;
  * senão cai na permissão de controles.
  */

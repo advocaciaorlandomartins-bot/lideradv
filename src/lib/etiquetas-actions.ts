@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import { podeEditarProcesso } from "./processo-ownership";
+import { podeEditarCliente } from "./acesso";
 import { logAction } from "./audit";
 import {
   getEtiquetaPorCategoriaValor,
@@ -87,6 +88,8 @@ export async function aplicarEtiquetaClienteAction(
   if (!session || !hasPermission(session, "clientes", "editar"))
     return { error: "Sem permissão." };
   if (!UUID_RE.test(clienteId)) return { error: "Cliente inválido." };
+  if (!(await podeEditarCliente(session, clienteId)))
+    return { error: "Sem permissão." };
 
   const resolved = await resolverOuCriarEtiqueta({
     categoria,
@@ -118,6 +121,8 @@ export async function removerEtiquetaClienteAction(
     return { error: "Sem permissão." };
   if (!UUID_RE.test(clienteId) || !UUID_RE.test(etiquetaId))
     return { error: "ID inválido." };
+  if (!(await podeEditarCliente(session, clienteId)))
+    return { error: "Sem permissão." };
 
   await removerEtiquetaCliente(etiquetaId, clienteId);
   revalidatePath(`/dashboard/clientes/${clienteId}`);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { podeAcessarCliente, podeEditarCliente } from "@/lib/acesso";
 import {
   getAddressByClientId,
   createAddressForClient,
@@ -24,6 +25,8 @@ export async function GET(
   const { id } = await params;
   if (!UUID_RE.test(id))
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
+  if (!(await podeAcessarCliente(session, id)))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   const addr = await getAddressByClientId(id);
   return NextResponse.json({ address: addr });
 }
@@ -39,6 +42,8 @@ export async function POST(
   const { id } = await params;
   if (!UUID_RE.test(id))
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
+  if (!(await podeEditarCliente(session, id)))
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
 
   const clientRows = await sql`
     SELECT name FROM clients WHERE id = ${id}::uuid LIMIT 1

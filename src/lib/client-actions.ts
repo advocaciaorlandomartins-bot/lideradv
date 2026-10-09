@@ -5,6 +5,7 @@ import sql from "./db";
 import { logAction } from "./audit";
 import { getSession, type SessionUser } from "./session";
 import { hasPermission } from "./permissoes";
+import { podeEditarCliente } from "./acesso";
 import { notificarPrevBot } from "./prevbot-outbound";
 import { checklistPadrao } from "./checklist-documentos";
 
@@ -316,6 +317,8 @@ export async function updateClientAction(
 ): Promise<ClientFormState> {
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "editar"))
+    return { error: "Sem permissão." };
+  if (!(await podeEditarCliente(session, id)))
     return { error: "Sem permissão." };
   const podeDefinirIndicador =
     session.categoria === "Administrador(a)" ||
@@ -646,6 +649,9 @@ export async function complementarClienteAction(
   if (!session || !hasPermission(session, "clientes", "editar")) {
     return { error: "Sem permissão.", camposAtualizados: [] };
   }
+  if (!(await podeEditarCliente(session, clienteId))) {
+    return { error: "Sem permissão.", camposAtualizados: [] };
+  }
 
   const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -777,6 +783,8 @@ export async function toggleBloquearMensagensAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "editar"))
     return { error: "Sem permissão." };
+  if (!(await podeEditarCliente(session, clientId)))
+    return { error: "Sem permissão." };
 
   try {
     await sql`
@@ -816,6 +824,9 @@ export async function deleteClientAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "clientes", "excluir")) {
+    return { error: "Sem permissão para excluir clientes." };
+  }
+  if (!(await podeEditarCliente(session, id))) {
     return { error: "Sem permissão para excluir clientes." };
   }
 

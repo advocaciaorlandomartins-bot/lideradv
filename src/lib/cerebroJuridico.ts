@@ -58,7 +58,7 @@ Decreto 3.048/99 — RPS:
 
 Lei 8.742/93 — LOAS (BPC):
 • Art. 20: BPC ao idoso (65+) e pessoa com deficiência
-• § 3°: renda familiar per capita — STF ampliou critério (ADPF 182, RE 567.985)
+• § 3°: renda familiar per capita — STF ampliou critério (RE 567.985/RE 580.963, Tema 27)
 • Lei 13.146/2015 (EPCD): nova definição de deficiência (modelo biopsicossocial)
 
 EC 103/2019 — Reforma Previdenciária:
@@ -105,7 +105,7 @@ TNU (Turma Nacional de Uniformização):
 • Súmula 33: PPP + LTCAT para comprovação de especial
 • Súmula 44: auxílio-acidente — redução parcial permanente da capacidade
 • Súmula 47: trabalhador rural — comprovação por prova material + testemunhos
-• Súmula 54: BPC/LOAS — miserabilidade vai além do critério renda (⚠️ número NÃO confirmado contra fonte oficial em 2026-10-08 — busca achou conteúdo parecido na Súmula 11 TNU, mas sem confirmação forte o bastante pra trocar; conceito em si é real e já sustentado por Tema 27/312 STF + ADPF 182 nesta mesma lista)
+• Súmula 54: BPC/LOAS — miserabilidade vai além do critério renda (⚠️ número NÃO confirmado contra fonte oficial em 2026-10-08 — busca achou conteúdo parecido na Súmula 11 TNU, mas sem confirmação forte o bastante pra trocar; conceito em si é real e já sustentado por Tema 27/312 STF nesta mesma lista)
 • Súmula 57: laudo pericial é relativo — juiz pode valorar outros elementos
 • Súmula 63: salário-maternidade — empregada demitida durante gestação mantém direito (⚠️ número NÃO confirmado em 2026-10-08 — busca só achou conteúdo parecido na Súmula 6 do CRPS, tribunal diferente; conceito em si é consistente com a regra de estabilidade gestante + período de graça)
 • Súmula 72: período de graça — contagem para qualidade de segurado
@@ -132,7 +132,7 @@ STF:
 • RE 586.068 (Tema 100): coisa julgada de juizado especial revisável quando fundada em lei inconstitucional
 • Tema 27 STF (RE 567.985/RE 580.963): BPC — critério de renda não é absoluto (miserabilidade) — NÃO "Tema 995", que é sobre responsabilidade civil de imprensa, assunto completamente diferente (achado e corrigido em 2026-10-08)
 • RE 636.941: incapacidade — perícia biopsicossocial (ICF) — não confirmado contra fonte oficial nesta auditoria; conceito em si é real (perícia biopsicossocial é entendimento consolidado), mas não achei confirmação específica pra esse número de RE
-• ADPF 182: BPC — família de acolhimento
+• ADPF 182: BPC — família de acolhimento — ⚠️ número NÃO confirmado contra fonte oficial em 2026-10-08 (achado agravante: esse mesmo número era citado em outro ponto deste arquivo pra um assunto DIFERENTE — renda per capita — contradição interna que não resolve sozinha; já corrigida lá, mas aqui o conceito "criança/adolescente acolhido pode receber BPC" não tem confirmação de qual é o caso real por trás)
 • ARE 930.647 AgR: precedente STF vinculante aplicável imediatamente, independente de publicação do paradigma
 
 TRF5 / TJAL / TRT19 (Alagoas — sede do escritório):
@@ -150,7 +150,7 @@ Lei 13.982/2020 — Rendas EXCLUÍDAS do cálculo familiar BPC:
 • Bolsa Família e outros benefícios assistenciais eventuais
 • Parcelas de programas federais de transferência de renda
 
-Critério de miserabilidade holística (Tema 187 TNU + Súmula 54 TNU + ADPF 182):
+Critério de miserabilidade holística (Tema 187 TNU + Tema 27 STF + Súmula 54 TNU):
 • O critério ¼ SM per capita NÃO é absoluto — juiz deve considerar gastos com saúde, cuidador, medicamentos, habitação, dívidas
 • Se o INSS já reconheceu hipossuficiência, nova perícia de renda é dispensável (Tema 187 TNU)
 • CadÚnico atualizado reforça prova de hipossuficiência, mas a ausência não impede concessão
@@ -1214,7 +1214,7 @@ function promptModoEspecializado(modo: string): string {
 • Deficiência: modelo biopsicossocial ICF (Lei 13.146/2015 — EPCD) — impedimento de longo prazo (≥2 anos) físico, mental, intelectual ou sensorial que restrinja participação social
 
 CRITÉRIO DE RENDA — ANÁLISE BPC 360 (holística):
-• Critério legal ¼ SM per capita NÃO é absoluto: Tema 27 STF (RE 567.985/580.963) + Súmula 54 TNU + ADPF 182 + Tema 312 STF
+• Critério legal ¼ SM per capita NÃO é absoluto: Tema 27 STF (RE 567.985/580.963) + Súmula 54 TNU + Tema 312 STF
 • Lei 13.982/2020 — rendas EXCLUÍDAS: BPC do cônjuge, 1 SM de pensão por morte, benefícios assistenciais eventuais, bolsa família, rendimentos da própria PcD
 • Art. 20, §11-A, Lei 8.742/93: GASTOS com medicamentos, cuidador, aluguel, transporte, dívidas REDUZEM renda efetiva
 • Art. 20-B, Lei 8.742/93: critérios adicionais de flexibilização — aplicar sempre

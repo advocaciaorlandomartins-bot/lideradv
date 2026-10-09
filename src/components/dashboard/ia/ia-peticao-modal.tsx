@@ -729,86 +729,92 @@ export default function IaPeticaoModal({
 
             {/* ── Barra de ações ── */}
             {(texto || textoCorrigido) && aba !== "banco" && (
-              <div className="border-t border-border px-5 py-3 flex flex-wrap gap-2 justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {/* Copiar */}
-                  <button
-                    onClick={() => copiar(textoAtual)}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs font-semibold text-fg hover:border-primary hover:text-primary transition-colors"
-                  >
-                    {copiado ? "✓ Copiado!" : "📋 Copiar"}
-                  </button>
-
-                  {/* Baixar PDF */}
-                  <button
-                    onClick={() => baixarPdf(textoAtual)}
-                    disabled={baixandoPdf || !textoAtual.trim()}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 font-body text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
-                  >
-                    {baixandoPdf ? (
-                      <>
-                        <Spinner />
-                        &nbsp;Gerando PDF...
-                      </>
-                    ) : (
-                      "📄 Baixar PDF"
-                    )}
-                  </button>
-
-                  {/* Revisar (só na aba gerar) */}
-                  {aba === "gerar" && texto && (
+              <div className="border-t border-border px-5 py-3 flex flex-col gap-2">
+                <p className="font-body text-xs text-muted">
+                  ⚠️ Peça gerada por IA — revise todos os dados (nomes, CPF,
+                  datas, citações) antes de protocolar. A IA pode errar.
+                </p>
+                <div className="flex flex-wrap gap-2 justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {/* Copiar */}
                     <button
-                      onClick={revisar}
-                      disabled={revisando}
-                      className="flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 font-body text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      onClick={() => copiar(textoAtual)}
+                      className="flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs font-semibold text-fg hover:border-primary hover:text-primary transition-colors"
                     >
-                      {revisando ? "Revisando..." : "🔍 Revisar com IA"}
+                      {copiado ? "✓ Copiado!" : "📋 Copiar"}
                     </button>
-                  )}
 
-                  {/* Aplicar correções (só na aba revisao) */}
-                  {aba === "revisao" && revisao && (
+                    {/* Baixar PDF */}
                     <button
-                      onClick={aplicarCorrecoes}
-                      disabled={corrigindo}
-                      className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 font-body text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                      onClick={() => baixarPdf(textoAtual)}
+                      disabled={baixandoPdf || !textoAtual.trim()}
+                      className="flex h-8 items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 font-body text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
                     >
-                      {corrigindo ? (
+                      {baixandoPdf ? (
                         <>
                           <Spinner />
-                          &nbsp;Corrigindo...
+                          &nbsp;Gerando PDF...
                         </>
                       ) : (
-                        "✅ Aplicar correções"
+                        "📄 Baixar PDF"
                       )}
                     </button>
-                  )}
 
-                  {/* Salvar no banco / Aprovar */}
-                  {(aba === "gerar" || aba === "corrigido") &&
-                    textoAtual.trim() && (
+                    {/* Revisar (só na aba gerar) */}
+                    {aba === "gerar" && texto && (
                       <button
-                        onClick={() => salvarNoBanco(textoAtual)}
-                        disabled={salvando || !!salvou}
-                        className="flex h-8 items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 font-body text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50"
+                        onClick={revisar}
+                        disabled={revisando}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 font-body text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
                       >
-                        {salvou
-                          ? "✓ Salvo no banco"
-                          : salvando
-                            ? "Salvando..."
-                            : "💾 Salvar no banco"}
+                        {revisando ? "Revisando..." : "🔍 Revisar com IA"}
                       </button>
                     )}
-                </div>
 
-                {/* Regerar */}
-                <button
-                  onClick={gerar}
-                  disabled={gerando}
-                  className="flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs font-semibold text-muted hover:text-fg transition-colors disabled:opacity-50"
-                >
-                  🔄 Regerar
-                </button>
+                    {/* Aplicar correções (só na aba revisao) */}
+                    {aba === "revisao" && revisao && (
+                      <button
+                        onClick={aplicarCorrecoes}
+                        disabled={corrigindo}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 font-body text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                      >
+                        {corrigindo ? (
+                          <>
+                            <Spinner />
+                            &nbsp;Corrigindo...
+                          </>
+                        ) : (
+                          "✅ Aplicar correções"
+                        )}
+                      </button>
+                    )}
+
+                    {/* Salvar no banco / Aprovar */}
+                    {(aba === "gerar" || aba === "corrigido") &&
+                      textoAtual.trim() && (
+                        <button
+                          onClick={() => salvarNoBanco(textoAtual)}
+                          disabled={salvando || !!salvou}
+                          className="flex h-8 items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 font-body text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors disabled:opacity-50"
+                        >
+                          {salvou
+                            ? "✓ Salvo no banco"
+                            : salvando
+                              ? "Salvando..."
+                              : "💾 Salvar no banco"}
+                        </button>
+                      )}
+                  </div>
+
+                  {/* Regerar */}
+                  <button
+                    onClick={gerar}
+                    disabled={gerando}
+                    className="flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs font-semibold text-muted hover:text-fg transition-colors disabled:opacity-50"
+                  >
+                    🔄 Regerar
+                  </button>
+                </div>
               </div>
             )}
           </div>

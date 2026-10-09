@@ -105,9 +105,9 @@ TNU (Turma Nacional de Uniformização):
 • Súmula 33: PPP + LTCAT para comprovação de especial
 • Súmula 44: auxílio-acidente — redução parcial permanente da capacidade
 • Súmula 47: trabalhador rural — comprovação por prova material + testemunhos
-• Súmula 54: BPC/LOAS — miserabilidade vai além do critério renda
+• Súmula 54: BPC/LOAS — miserabilidade vai além do critério renda (⚠️ número NÃO confirmado contra fonte oficial em 2026-10-08 — busca achou conteúdo parecido na Súmula 11 TNU, mas sem confirmação forte o bastante pra trocar; conceito em si é real e já sustentado por Tema 27/312 STF + ADPF 182 nesta mesma lista)
 • Súmula 57: laudo pericial é relativo — juiz pode valorar outros elementos
-• Súmula 63: salário-maternidade — empregada demitida durante gestação mantém direito
+• Súmula 63: salário-maternidade — empregada demitida durante gestação mantém direito (⚠️ número NÃO confirmado em 2026-10-08 — busca só achou conteúdo parecido na Súmula 6 do CRPS, tribunal diferente; conceito em si é consistente com a regra de estabilidade gestante + período de graça)
 • Súmula 72: período de graça — contagem para qualidade de segurado
 • Súmula 77: SUPERADA pela ADI 2.110 (STF 2024) — carência de 10 contribuições para individual não se aplica mais
 • Tema 173 TNU: BPC — impedimento de longo prazo pode ser reconhecido de forma prospectiva (após a DER)

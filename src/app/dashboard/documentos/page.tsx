@@ -17,19 +17,34 @@ export default async function DocumentosPage() {
   )
     notFound();
 
-  // Documentos de cliente não são restritos (a própria listagem de Clientes
-  // também não restringe). Documentos de processo seguem a mesma regra de
-  // "processos_ver_todos" já usada em /dashboard/processos e /andamentos —
-  // senão esta tela agregada acabaria mostrando pra qualquer colaborador
-  // arquivos de processo de gente que não é dele, coisa que a listagem
-  // normal de Processos já esconde.
-  const verTodos = hasPermission(session, "processos_ver_todos", "ver");
-  const colaboradorId = verTodos
-    ? null
-    : ((await getColaboradorIdForUser(session.id)) ??
-      "00000000-0000-0000-0000-000000000000");
+  // Documentos de processo seguem "processos_ver_todos" (já usado em
+  // /dashboard/processos e /andamentos); documentos de cliente seguem
+  // "clientes_ver_todos" (mesma regra de podeAcessarCliente) — achado em
+  // auditoria de 2026-10-09: o ramo de cliente nunca tinha sido restringido
+  // nesta tela agregada, diferente da listagem normal de Clientes (já
+  // corrigida antes). Sem isso, qualquer um com acesso a Arquivos via
+  // "processos:ver" via "clientes:ver" via esta página.
+  const restringirProcessos = !hasPermission(
+    session,
+    "processos_ver_todos",
+    "ver"
+  );
+  const restringirClientes = !hasPermission(
+    session,
+    "clientes_ver_todos",
+    "ver"
+  );
+  const colaboradorId =
+    restringirProcessos || restringirClientes
+      ? ((await getColaboradorIdForUser(session.id)) ??
+        "00000000-0000-0000-0000-000000000000")
+      : null;
 
-  const documentos = await getAllDocumentos(colaboradorId);
+  const documentos = await getAllDocumentos(
+    colaboradorId,
+    restringirProcessos,
+    restringirClientes
+  );
 
   return (
     <div className="space-y-6">

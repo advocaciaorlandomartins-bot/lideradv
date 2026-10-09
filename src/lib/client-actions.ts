@@ -269,8 +269,14 @@ async function criarClienteCore(
   await logAction({
     acao: "criar",
     entidade: "cliente",
+    entidadeId: novoId,
     descricao: `Cadastrou cliente: ${name}`,
-    detalhes: { type, doc },
+    // "doc" (CPF) não entra aqui — boa prática LGPD: log de auditoria não
+    // precisa guardar o CPF em texto puro pra sempre, só precisa saber
+    // QUE o cliente foi cadastrado. entidadeId (que faltava antes desta
+    // correção) já dá rastreabilidade real pro registro, que tem o CPF
+    // de verdade se precisar consultar.
+    detalhes: { type },
   });
 
   return { id: novoId };

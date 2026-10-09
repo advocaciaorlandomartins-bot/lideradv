@@ -123,6 +123,86 @@ export async function getAuditLogs(f: AuditFilters = {}): Promise<{
   }
 }
 
+export interface StatusEquipeRow {
+  id: string;
+  nome: string;
+  login: string;
+  categoria: string;
+  online: boolean;
+  ultimoLogin: string | null;
+  ultimoLogout: string | null;
+  ultimaAtividade: string | null;
+}
+
+// "Online" é sempre aproximado — não existe evento de "fechei a aba sem
+// clicar em Sair" pra avisar o servidor. Define-se por: teve login mais
+// recente que qualquer logout registrado, E teve atividade (ultimo_acesso,
+// atualizado a cada requisição via session.ts) dentro desta janela.
+const JANELA_ONLINE_MS = 5 * 60_000;
+
+/** Status de presença de cada usuário ativo — pra tela de Auditoria. Usa
+ * login/logout já registrados em audit_logs (nenhuma tabela nova) +
+ * usuarios.ultimo_acesso (agora atualizado a cada requisição, não só no
+ * login — ver session.ts). */
+export async function getStatusEquipe(): Promise<StatusEquipeRow[]> {
+  try {
+    const rows = await sql`
+      SELECT
+        u.id::text, u.nome, u.login, u.categoria,
+        u.ultimo_acesso::text AS ultima_atividade,
+        (
+          SELECT created_at FROM audit_logs
+          WHERE acao = 'login' AND user_login = u.login
+          ORDER BY created_at DESC LIMIT 1
+        ) AS ultimo_login,
+        (
+          SELECT created_at FROM audit_logs
+          WHERE acao = 'logout' AND user_login = u.login
+          ORDER BY created_at DESC LIMIT 1
+        ) AS ultimo_logout
+      FROM usuarios u
+      WHERE u.ativo = true
+      ORDER BY u.nome
+    `;
+
+    const agora = Date.now();
+    return rows.map((r) => {
+      const ultimoLogin = r.ultimo_login ? new Date(r.ultimo_login) : null;
+      const ultimoLogout = r.ultimo_logout ? new Date(r.ultimo_logout) : null;
+      const ultimaAtividade = r.ultima_atividade
+        ? new Date(r.ultima_atividade)
+        : null;
+
+      // deslogou depois do último login = sessão fechada de propósito
+      const deslogouDepois =
+        ultimoLogin && ultimoLogout && ultimoLogout > ultimoLogin;
+
+      const online =
+        !!ultimoLogin &&
+        !deslogouDepois &&
+        !!ultimaAtividade &&
+        agora - ultimaAtividade.getTime() < JANELA_ONLINE_MS;
+
+      return {
+        id: r.id,
+        nome: r.nome,
+        login: r.login,
+        categoria: r.categoria,
+        online,
+        ultimoLogin: ultimoLogin?.toISOString() ?? null,
+        // só mostra "saiu" quando o logout registrado é mesmo depois do
+        // login mais recente — senão seria o logout de uma sessão anterior
+        ultimoLogout: deslogouDepois ? ultimoLogout!.toISOString() : null,
+        ultimaAtividade: ultimaAtividade?.toISOString() ?? null,
+      };
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("audit_logs")) return [];
+    throw err;
+  }
+}
+
 // Action labels used across UI
 export const ACAO_META: Record<string, { label: string; color: string }> = {
   login: { label: "Login", color: "blue" },

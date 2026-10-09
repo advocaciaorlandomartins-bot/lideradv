@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
-import { getAuditLogs, ACAO_META, ENTIDADE_META } from "@/lib/audit-db";
+import {
+  getAuditLogs,
+  getStatusEquipe,
+  ACAO_META,
+  ENTIDADE_META,
+} from "@/lib/audit-db";
 
 export const dynamic = "force-dynamic";
 
@@ -78,8 +83,8 @@ export default async function AuditoriaPage({
     pageSize: sp.pageSize ? parseInt(sp.pageSize) : undefined,
   };
 
-  const { logs, total, totalPages, distinctUsers, pageSize } =
-    await getAuditLogs(filters);
+  const [{ logs, total, totalPages, distinctUsers, pageSize }, statusEquipe] =
+    await Promise.all([getAuditLogs(filters), getStatusEquipe()]);
 
   const searchFilters: Record<string, string> = {};
   if (filters.userLogin) searchFilters.userLogin = filters.userLogin;
@@ -112,6 +117,76 @@ export default async function AuditoriaPage({
               {hasFilters && " filtrados"}.
             </span>
           )}
+        </p>
+      </div>
+
+      {/* ── Equipe agora ── */}
+      <div className="mb-6 rounded-xl border border-border bg-white p-4 shadow-sm">
+        <h2 className="mb-3 font-heading text-sm font-bold text-fg">
+          Equipe agora
+        </h2>
+        {statusEquipe.length === 0 ? (
+          <p className="font-body text-sm text-muted">
+            Nenhum colaborador ativo cadastrado.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {statusEquipe.map((s) => {
+              const fmt = (iso: string | null) =>
+                iso
+                  ? new Date(iso).toLocaleString("pt-BR", {
+                      timeZone: "America/Sao_Paulo",
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : null;
+              const entrou = fmt(s.ultimoLogin);
+              const saiu = fmt(s.ultimoLogout);
+              const atividade = fmt(s.ultimaAtividade);
+
+              return (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="font-body text-sm font-semibold text-fg leading-tight">
+                      {s.nome}
+                    </p>
+                    <p className="font-body text-xs text-muted leading-tight">
+                      {s.online
+                        ? `Online desde ${entrou ?? "—"}`
+                        : saiu
+                          ? `Saiu em ${saiu}`
+                          : entrou
+                            ? `Inativo desde ${atividade ?? entrou}`
+                            : "Nunca acessou"}
+                    </p>
+                  </div>
+                  <span
+                    className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-body text-xs font-semibold ${
+                      s.online
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        s.online ? "bg-emerald-500" : "bg-slate-400"
+                      }`}
+                    />
+                    {s.online ? "Online" : "Offline"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-3 font-body text-xs text-muted">
+          &quot;Online&quot; é aproximado (atividade nos últimos 5 min) — não há
+          como saber na hora quando alguém fecha a aba sem clicar em Sair.
         </p>
       </div>
 

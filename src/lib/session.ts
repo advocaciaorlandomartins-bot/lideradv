@@ -1,7 +1,18 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import sql from "./db";
 import { resolvePermissoes, type Permissoes } from "./permissoes";
+
+// Antes, usuarios.ultimo_acesso só era atualizado no momento do login
+// (auth-actions.ts) — então "última atividade" na prática só mostrava
+// "última vez que entrou", não "ainda está usando o sistema agora".
+// Atualizar aqui, em toda chamada de getSession() (que roda em toda
+// página/rota autenticada), dá uma noção real de presença — jogado pra
+// depois da resposta com after() (ver controles-actions.ts pro mesmo
+// padrão) pra não adicionar latência, e throttled pra não escrever no
+// banco a cada requisição.
+const THROTTLE_ULTIMO_ACESSO_MS = 60_000;
 
 const COOKIE = "adv_session";
 const MAX_AGE = 60 * 60 * 8; // 8 h
@@ -79,7 +90,7 @@ export async function getSession(): Promise<SessionUser | null> {
   // tinha sido emitido antes da permissão ser corrigida. De quebra, também
   // derruba na hora quem for desativado (usuarios.ativo = false).
   const rows = await sql`
-    SELECT nome, categoria, permissoes, ativo FROM usuarios WHERE id = ${data.id}::uuid
+    SELECT nome, categoria, permissoes, ativo, ultimo_acesso FROM usuarios WHERE id = ${data.id}::uuid
   `.catch(() => []);
   const row = rows[0] as
     | {
@@ -87,9 +98,21 @@ export async function getSession(): Promise<SessionUser | null> {
         categoria: string;
         permissoes: Permissoes;
         ativo: boolean;
+        ultimo_acesso: string | null;
       }
     | undefined;
   if (!row || row.ativo === false) return null;
+
+  const ultimoAcessoMs = row.ultimo_acesso
+    ? new Date(row.ultimo_acesso).getTime()
+    : 0;
+  if (Date.now() - ultimoAcessoMs > THROTTLE_ULTIMO_ACESSO_MS) {
+    after(async () => {
+      await sql`UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ${data.id}::uuid`.catch(
+        () => {}
+      );
+    });
+  }
 
   return {
     id: data.id,

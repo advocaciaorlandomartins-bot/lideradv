@@ -206,5 +206,11 @@ export async function deletePericiaAction(
     console.error("deletePericiaAction DB error:", err);
     return { error: "Erro ao excluir perícia. Tente novamente." };
   }
+  await logAction({
+    acao: "excluir",
+    entidade: "pericia",
+    entidadeId: id,
+    descricao: "Excluiu perícia",
+  });
   redirect("/dashboard/pericias");
 }

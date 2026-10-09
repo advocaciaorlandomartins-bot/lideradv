@@ -144,6 +144,32 @@ export async function updateUsuarioAction(
   const editandoProprioUsuario = id === session.id;
   let categoriaFinal = categoria;
 
+  // Mesma proteção que já existia em deleteUsuarioAction, nunca portada pra
+  // cá — achado em auditoria de 2026-10-09: nada impedia rebaixar a
+  // categoria do outro admin ou desativá-lo até restar só um Administrador(a)
+  // ativo no sistema (a exclusão já tinha o freio, a edição não).
+  if (!editandoProprioUsuario) {
+    const [alvo] = await sql`
+      SELECT categoria, ativo FROM usuarios WHERE id = ${id}::uuid
+    `;
+    const alvoEraAdminAtivo =
+      alvo?.categoria === "Administrador(a)" && alvo?.ativo === true;
+    const vaiDeixarDeSerAdminAtivo =
+      categoriaFinal !== "Administrador(a)" || !ativo;
+    if (alvoEraAdminAtivo && vaiDeixarDeSerAdminAtivo) {
+      const [{ total }] = await sql`
+        SELECT COUNT(*)::int AS total FROM usuarios
+        WHERE categoria = 'Administrador(a)' AND ativo = true
+      `;
+      if (Number(total) <= 1) {
+        return {
+          error:
+            "Não é possível rebaixar ou desativar o único administrador ativo do sistema.",
+        };
+      }
+    }
+  }
+
   try {
     let senhaHash: string;
     if (senha) {

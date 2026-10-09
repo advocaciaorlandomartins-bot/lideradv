@@ -109,7 +109,7 @@ TNU (Turma Nacional de Uniformização):
 • Súmula 57: laudo pericial é relativo — juiz pode valorar outros elementos
 • Súmula 63: salário-maternidade — empregada demitida durante gestação mantém direito (⚠️ número NÃO confirmado em 2026-10-08 — busca só achou conteúdo parecido na Súmula 6 do CRPS, tribunal diferente; conceito em si é consistente com a regra de estabilidade gestante + período de graça)
 • Súmula 72: período de graça — contagem para qualidade de segurado
-• Súmula 77: SUPERADA pela ADI 2.110 (STF 2024) — carência de 10 contribuições para individual não se aplica mais
+• Súmula 77: SUPERADA pela ADI 2.110 (STF 2024) — carência de 10 contribuições para individual não se aplica mais (⚠️ número da súmula não confirmado em 2026-10-08; risco baixo pois o ponto real — carência inconstitucional — já está sustentado pela ADI 2.110/2.111, independente do número desta súmula estar certo)
 • Tema 173 TNU: BPC — impedimento de longo prazo pode ser reconhecido de forma prospectiva (após a DER)
 • Tema 187 TNU: BPC — análise de miserabilidade dispensa nova perícia quando o INSS já reconheceu hipossuficiência (era citado como "Tema 185" em 5 lugares — número corrigido em 2026-10-08, confirmado contra fonte oficial)
 • Tema 192 TNU: recolhimento de GPS em atraso dentro do período de graça é válido para cômputo de carência

@@ -422,7 +422,13 @@ export async function analisarDocumentoCliente(
     neighborhood: strOrNull(extracted.neighborhood),
     city: strOrNull(extracted.city),
     state: strOrNull(extracted.state),
-    nis: strOrNull(extracted.nis),
+    // Coluna nis é varchar(11) — some documentos imprimem o NIS formatado
+    // (ex: "122.34369.63-2", 14 chars) e o prompt só pede "só dígitos" sem
+    // garantia de que o modelo sempre siga; sem isso, o UPDATE desse campo
+    // falhava silenciosamente (capturado pelo catch por-campo acima).
+    // Achado em produção 2026-10-09 (mesmo bug, mais grave, em
+    // complementarClienteAction — ver client-actions.ts).
+    nis: strOrNull(extracted.nis)?.replace(/\D/g, "").slice(0, 11) || null,
     num_beneficio: strOrNull(extracted.num_beneficio),
     status_beneficio: strOrNull(extracted.status_beneficio),
     tipo_beneficio: strOrNull(extracted.tipo_beneficio),

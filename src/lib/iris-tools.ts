@@ -2187,7 +2187,12 @@ async function executarFerramentaIrisInterno(
       const filiacaoPai = strOrNullCC(input.filiacao_pai);
       const naturalidadeCidade = strOrNullCC(input.naturalidade_cidade);
       const naturalidadeEstado = strOrNullCC(input.naturalidade_estado);
-      const nis = strOrNullCC(input.nis);
+      // Coluna nis é varchar(11) — mesma correção aplicada em
+      // complementarClienteAction/cliente-documento-auto.ts (achado em
+      // produção 2026-10-09): some documentos trazem o NIS formatado com
+      // pontuação, o que derrubava o INSERT inteiro.
+      const nis =
+        strOrNullCC(input.nis)?.replace(/\D/g, "").slice(0, 11) || null;
       const numBeneficio = strOrNullCC(input.num_beneficio);
       const tipoBeneficio = strOrNullCC(input.tipo_beneficio);
       const statusBeneficio = strOrNullCC(input.status_beneficio);

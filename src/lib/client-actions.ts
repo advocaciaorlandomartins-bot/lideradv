@@ -711,9 +711,40 @@ export async function complementarClienteAction(
     status_beneficio: ["ativo", "suspenso", "cessado", "nao_recebe"],
   };
 
+  // Limite real das colunas varchar — mesma classe de bug do tipo_incapacidade
+  // acima (um valor comprido demais derruba o UPDATE inteiro, inclusive os
+  // outros campos válidos junto). Achado em produção 2026-10-09: "nis" veio
+  // formatado com pontuação (ex: "122.34369.63-2", 14 chars) pra uma coluna
+  // varchar(11) — NIS é limpo pra só dígitos antes de truncar; os demais só
+  // truncam, pois são texto livre (nome, atividade) sem formatação a remover.
+  const MAX_LEN: Partial<
+    Record<keyof DadosPrevidenciariosComplemento, number>
+  > = {
+    cid_principal: 10,
+    nis: 11,
+    num_beneficio: 20,
+    status_beneficio: 20,
+    tipo_beneficio: 60,
+    tipo_incapacidade: 20,
+    atividade_anterior: 200,
+    filiacao_mae: 200,
+    filiacao_pai: 200,
+  };
+
   for (const campo of candidatos) {
-    const novoValor = dados[campo];
+    let novoValor = dados[campo];
     if (novoValor !== null && novoValor !== undefined && novoValor !== "") {
+      if (campo === "nis" && typeof novoValor === "string") {
+        novoValor = novoValor.replace(/\D/g, "");
+      }
+      const maxLen = MAX_LEN[campo];
+      if (
+        maxLen &&
+        typeof novoValor === "string" &&
+        novoValor.length > maxLen
+      ) {
+        novoValor = novoValor.slice(0, maxLen);
+      }
       const enumValido = ENUMS[campo];
       if (enumValido && !enumValido.includes(String(novoValor))) continue;
       if (

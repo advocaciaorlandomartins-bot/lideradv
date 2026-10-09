@@ -183,6 +183,13 @@ QUALIDADE TÉCNICA:
 
   return new ReadableStream({
     async start(controller) {
+      // Achado em auditoria de 2026-10-09: sem catch aqui, um erro no meio
+      // do stream (rate limit, sobrecarga, queda de conexão com a Anthropic)
+      // subia por cima do finally — que já tinha fechado o controller — e
+      // o cliente via o stream terminar normalmente (done:true) com o texto
+      // parcial, sem nenhum sinal de erro. Também sem checagem de
+      // stop_reason, uma peça cortada por limite de tamanho (max_tokens)
+      // era exibida como se estivesse completa.
       try {
         for await (const chunk of stream) {
           if (
@@ -192,20 +199,25 @@ QUALIDADE TÉCNICA:
             controller.enqueue(encoder.encode(chunk.delta.text));
           }
         }
-      } finally {
-        controller.close();
-        stream
-          .finalMessage()
-          .then((msg) =>
-            registrarUsoIA(
-              "/api/ia/peticao",
-              "claude-sonnet-5",
-              msg.usage.input_tokens,
-              msg.usage.output_tokens,
-              params.usuarioId ?? null
+        const finalMsg = await stream.finalMessage();
+        if (finalMsg.stop_reason === "max_tokens") {
+          controller.enqueue(
+            encoder.encode(
+              "\n\n⚠️ [AVISO DO SISTEMA: esta petição foi cortada por limite de tamanho da resposta da IA — o texto acima está INCOMPLETO. Não protocole sem completar manualmente ou regerar.]"
             )
-          )
-          .catch(() => {});
+          );
+        }
+        registrarUsoIA(
+          "/api/ia/peticao",
+          "claude-sonnet-5",
+          finalMsg.usage.input_tokens,
+          finalMsg.usage.output_tokens,
+          params.usuarioId ?? null
+        ).catch(() => {});
+        controller.close();
+      } catch (err) {
+        console.error("[gerarPeticaoStream]", err);
+        controller.error(err);
       }
     },
     cancel() {
@@ -670,7 +682,14 @@ Seja objetivo e cirúrgico — o advogado precisa saber exatamente o que melhora
     params.usuarioId ?? null
   ).catch(() => {});
 
-  return extractText(res) || "Não foi possível revisar a petição.";
+  const texto = extractText(res) || "Não foi possível revisar a petição.";
+  // stop_reason === "max_tokens" significa que o modelo foi cortado no meio
+  // da resposta — sem isso, uma revisão incompleta era exibida como se
+  // estivesse completa, sem nenhum aviso. Achado em auditoria de 2026-10-09.
+  if (res.stop_reason === "max_tokens") {
+    return `${texto}\n\n⚠️ [AVISO DO SISTEMA: esta revisão foi cortada por limite de tamanho da resposta da IA — pode estar incompleta. Considere regerar ou revisar a petição em partes menores.]`;
+  }
+  return texto;
 }
 
 // ─── Correção de petição ────────────────────────────────────────────────────────
@@ -728,7 +747,13 @@ Responda APENAS com a petição corrigida completa, sem comentários ou explica�
     params.usuarioId ?? null
   ).catch(() => {});
 
-  return extractText(res) || params.textoPeticao;
+  const texto = extractText(res) || params.textoPeticao;
+  // Mesmo risco de truncamento silencioso do revisarPeticao, mas aqui é
+  // mais grave: o texto cortado É a petição que pode ir pro protocolo.
+  if (res.stop_reason === "max_tokens") {
+    return `${texto}\n\n⚠️ [AVISO DO SISTEMA: esta petição foi cortada por limite de tamanho da resposta da IA — o texto acima está INCOMPLETO. Não protocole sem completar manualmente ou regerar.]`;
+  }
+  return texto;
 }
 
 // ─── Estratégia processual ──────────────────────────────────────────────────────

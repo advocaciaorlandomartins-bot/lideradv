@@ -95,17 +95,24 @@ export async function POST(req: Request) {
     processoId ? getProcessoById(processoId).catch(() => null) : null,
   ]);
 
-  const resultado = await revisarPeticao({
-    textoPeticao,
-    tipoPeticao,
-    skill: skill as SkillId,
-    contexto: {
-      escritorio,
-      cliente: cliente ?? undefined,
-      processo: processo ?? undefined,
-    },
-    usuarioId: session.id,
-  });
-
-  return NextResponse.json({ resultado });
+  try {
+    const resultado = await revisarPeticao({
+      textoPeticao,
+      tipoPeticao,
+      skill: skill as SkillId,
+      contexto: {
+        escritorio,
+        cliente: cliente ?? undefined,
+        processo: processo ?? undefined,
+      },
+      usuarioId: session.id,
+    });
+    return NextResponse.json({ resultado });
+  } catch (err) {
+    console.error(
+      "[/api/ia/revisar]",
+      err instanceof Error ? err.message : String(err)
+    );
+    return NextResponse.json({ error: "Erro ao revisar." }, { status: 500 });
+  }
 }

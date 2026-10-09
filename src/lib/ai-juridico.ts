@@ -621,6 +621,7 @@ export interface RevisarPeticaoParams {
   tipoPeticao: string;
   skill: SkillId;
   contexto: ContextoJuridico;
+  usuarioId?: string | null;
 }
 
 export async function revisarPeticao(
@@ -661,6 +662,14 @@ Seja objetivo e cirúrgico — o advogado precisa saber exatamente o que melhora
     ],
   });
 
+  registrarUsoIA(
+    "/api/ia/revisar",
+    "claude-sonnet-5",
+    res.usage.input_tokens,
+    res.usage.output_tokens,
+    params.usuarioId ?? null
+  ).catch(() => {});
+
   return extractText(res) || "Não foi possível revisar a petição.";
 }
 
@@ -672,6 +681,7 @@ export interface CorrigirPeticaoParams {
   tipoPeticao: string;
   skill: SkillId;
   contexto?: ContextoJuridico;
+  usuarioId?: string | null;
 }
 
 export async function corrigirPeticao(
@@ -709,6 +719,14 @@ Responda APENAS com a petição corrigida completa, sem comentários ou explica�
       },
     ],
   });
+
+  registrarUsoIA(
+    "/api/ia/corrigir",
+    "claude-sonnet-5",
+    res.usage.input_tokens,
+    res.usage.output_tokens,
+    params.usuarioId ?? null
+  ).catch(() => {});
 
   return extractText(res) || params.textoPeticao;
 }

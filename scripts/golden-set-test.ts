@@ -891,7 +891,7 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
   ],
   [
     "T11-juiz-revisor-erros-plantados",
-    "Juiz Revisor não existe ainda (Fase 2)",
+    'Existe uma versão (revisarPeticao/corrigirPeticao em ai-juridico.ts, rotas /api/ia/revisar e /api/ia/corrigir — botão "Revisar" manual na tela de Gerar Petição): aponta pontos fortes, fragilidades jurídicas, jurisprudência ausente, dados faltantes e nota 0-10. Diferente do Citation Gate (mecânico, sem IA), é uma crítica em texto livre gerada por IA — sem teste automatizado determinístico possível sem chamar a API de verdade (mesma limitação do T8 antes de eu extrair a lógica pura, só que aqui a lógica em si É a chamada de IA, não tem parte determinística pra isolar). Revisão manual de código + typecheck/build/lint limpos; não é "não existe" (Fase 2), é "existe mas não dá pra testar com script".',
   ],
   [
     "T12-vigencia-temporal",

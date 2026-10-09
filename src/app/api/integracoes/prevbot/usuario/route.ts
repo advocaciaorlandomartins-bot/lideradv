@@ -12,6 +12,8 @@ import {
 } from "@/lib/compromissos-db";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { extractText } from "@/lib/anthropic-text";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
+import { registrarUsoIA } from "@/lib/ia-uso-db";
 
 export const dynamic = "force-dynamic";
 
@@ -344,6 +346,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (!(await agentesEstaoAtivos())) {
+      return NextResponse.json({
+        ok: false,
+        acao: "agentes_pausados",
+        resposta:
+          "⚠️ Os agentes de IA estão pausados temporariamente. Fale com um administrador.",
+      });
+    }
+
     // Retrato atual da agenda e do financeiro — dá à IA dados reais pra
     // responder perguntas, em vez de só reconhecer frases específicas.
     const [proximosCompromissos, lancamentosRows] = await Promise.all([
@@ -400,6 +411,14 @@ export async function POST(req: NextRequest) {
       system: buildSystemPrompt(contextoAtual),
       messages: [{ role: "user", content: userContent }],
     });
+
+    registrarUsoIA(
+      "/api/integracoes/prevbot/usuario",
+      "claude-haiku-4-5-20251001",
+      aiResp.usage.input_tokens,
+      aiResp.usage.output_tokens,
+      usuarioId
+    ).catch(() => {});
 
     const rawText = extractText(aiResp).trim() || "{}";
 

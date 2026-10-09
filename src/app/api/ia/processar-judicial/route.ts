@@ -4,6 +4,8 @@ import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
 import { extractText } from "@/lib/anthropic-text";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
+import { registrarUsoIA } from "@/lib/ia-uso-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -69,6 +71,16 @@ export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       { error: "API de IA não configurada." },
+      { status: 503 }
+    );
+  }
+
+  if (!(await agentesEstaoAtivos())) {
+    return NextResponse.json(
+      {
+        error:
+          "Os agentes de IA estão pausados temporariamente (kill switch ativo). Fale com um administrador.",
+      },
       { status: 503 }
     );
   }
@@ -210,6 +222,14 @@ Retorne APENAS um JSON válido com esta estrutura (sem markdown, sem explicaçõ
           },
         ],
       });
+
+      registrarUsoIA(
+        "/api/ia/processar-judicial",
+        "claude-haiku-4-5-20251001",
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        session.id
+      ).catch(() => {});
 
       const text = extractText(response).trim();
       const jsonStr = text

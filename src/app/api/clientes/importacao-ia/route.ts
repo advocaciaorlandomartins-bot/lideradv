@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
+import { registrarUsoIA } from "@/lib/ia-uso-db";
 import {
   extractPdfContent,
   isSupportedImage,
@@ -125,6 +127,16 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!(await agentesEstaoAtivos())) {
+    return NextResponse.json(
+      {
+        error:
+          "Os agentes de IA estão pausados temporariamente (kill switch ativo). Fale com um administrador.",
+      },
+      { status: 503 }
+    );
+  }
+
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -183,6 +195,13 @@ export async function POST(request: Request) {
           },
         ],
       });
+      registrarUsoIA(
+        "/api/clientes/importacao-ia",
+        "claude-sonnet-5",
+        res.usage.input_tokens,
+        res.usage.output_tokens,
+        session.id
+      ).catch(() => {});
       const block = res.content[0];
       rawText = block?.type === "text" ? block.text : "";
     } else if (fileType === "application/pdf") {
@@ -205,6 +224,13 @@ export async function POST(request: Request) {
         max_tokens: 1536,
         messages: [{ role: "user", content: pdfContent }],
       });
+      registrarUsoIA(
+        "/api/clientes/importacao-ia",
+        "claude-sonnet-5",
+        res.usage.input_tokens,
+        res.usage.output_tokens,
+        session.id
+      ).catch(() => {});
       const block = res.content[0];
       rawText = block?.type === "text" ? block.text : "";
     } else {

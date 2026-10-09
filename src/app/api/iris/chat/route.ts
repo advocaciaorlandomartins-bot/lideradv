@@ -4,6 +4,8 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade } from "@/lib/acesso";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
+import { registrarUsoIA } from "@/lib/ia-uso-db";
 import { buildIrisContextText } from "@/lib/iris-context";
 import sql from "@/lib/db";
 import {
@@ -86,6 +88,15 @@ export async function POST(req: NextRequest) {
           "Limite de requisições de IA excedido. Tente novamente em 1 hora.",
       },
       { status: 429 }
+    );
+
+  if (!(await agentesEstaoAtivos()))
+    return NextResponse.json(
+      {
+        error:
+          "Os agentes de IA estão pausados temporariamente (kill switch ativo). Fale com um administrador.",
+      },
+      { status: 503 }
     );
 
   const body = await req.json().catch(() => null);
@@ -299,6 +310,14 @@ ${LIDERADV_DOCS}`;
           ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } }
           : undefined
       );
+
+      registrarUsoIA(
+        "/api/iris/chat",
+        "claude-haiku-4-5-20251001",
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        session.id
+      ).catch(() => {});
 
       if (response.stop_reason === "tool_use") {
         currentMessages.push({ role: "assistant", content: response.content });

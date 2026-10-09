@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
+import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
+import { registrarUsoIA } from "@/lib/ia-uso-db";
 import {
   extractPdfContent,
   isSupportedImage,
@@ -106,6 +108,16 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!(await agentesEstaoAtivos())) {
+    return NextResponse.json(
+      {
+        error:
+          "Os agentes de IA estão pausados temporariamente (kill switch ativo). Fale com um administrador.",
+      },
+      { status: 503 }
+    );
+  }
+
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -193,6 +205,13 @@ export async function POST(request: Request) {
       max_tokens: 8192,
       messages: [{ role: "user", content }],
     });
+    registrarUsoIA(
+      "/api/modelos/gerar-com-ia",
+      "claude-haiku-4-5-20251001",
+      res.usage.input_tokens,
+      res.usage.output_tokens,
+      session.id
+    ).catch(() => {});
     const block = res.content[0];
     const rawText = block?.type === "text" ? block.text : "";
 

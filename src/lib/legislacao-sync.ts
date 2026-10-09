@@ -9,11 +9,15 @@ import { listarDispositivosPorNorma } from "./base-legal-db";
  * incapacidade, pensão por morte etc.) ficam de fora do sync automático
  * por ora. Lei 8.213/1991 cobre MUITOS benefícios diferentes — por isso
  * tem filtro de caminho (só arts. 71 a 73, a seção de salário-maternidade);
- * LOAS e a Lei do autismo são 100% sobre BPC/deficiência, sem filtro.
+ * LOAS, a Lei do autismo e o art. 2º do Estatuto da PcD (definição de
+ * deficiência, citada direto pela LOAS pro B87) são 100% sobre BPC/
+ * deficiência, sem filtro — Lei 13.146/2015 adicionada em 2026-10-08
+ * (testada contra o Planalto antes: 16/16 dispositivos bateram).
  */
 const NORMAS_EM_ESCOPO: { norma: string; filtroCaminho?: RegExp }[] = [
   { norma: "Lei 8.742/1993" },
   { norma: "Lei 12.764/2012" },
+  { norma: "Lei 13.146/2015" },
   { norma: "Lei 8.213/1991", filtroCaminho: /^art\. 7[1-3]/ },
 ];
 

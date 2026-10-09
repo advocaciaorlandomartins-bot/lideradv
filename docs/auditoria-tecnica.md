@@ -144,7 +144,23 @@ A pedido do Orlando, investiguei o que dava pra fazer das Fases 2/4 sem construi
 
 **Mas achei um bug ativo real nessa mesma investigação**: a ÚNICA tese em `cerebro_teses` (área BPC/LOAS, criada 06/09/2026) cita **"Tema 995 STF, Súmula 54 TNU"** — as mesmas citações que já encontrei erradas/incertas nesta sessão — E essa tabela é **lida de verdade** por `obterContextoCerebro()`, que alimenta `gerarContextoPeticao()`, que alimenta toda petição nova de BPC/LOAS. Ou seja: sem essa investigação, uma petição futura real podia repetir o erro que já corrigi em todo o resto do sistema, só que por um caminho que os prompts estáticos não cobrem (dado aprendido, não texto fixo). A tese também estava truncada no meio da frase (limite de coluna) e tinha taxa de sucesso 0% (aplicada 1x, nunca venceu) — por isso não tentei "remendar" o texto, só desativei (`ativa = false`) direto no banco. Os outros 6 casos de `cerebro_juridico` foram conferidos contra a mesma lista de citações já sabidamente erradas — todos limpos.
 
-**Curador MVP construído**: painel de revisão (não aprendizado automático) pra Orlando ver e desativar teses manualmente, em vez de precisar de mim rodando script — ver próxima seção/commit.
+**Curador MVP construído**: painel de revisão (não aprendizado automático) pra Orlando ver e desativar teses manualmente, em vez de precisar de mim rodando script — nova aba "Curador do Cérebro" no Gerenciador.
+
+## 20. Jurisprudência Viva construída (Fase 2, escopo BPC idoso/deficiência + salário-maternidade)
+
+Última peça pedida pelo Orlando: estruturei os 10 precedentes já verificados nesta sessão (seções 11-19) numa tabela nova (`precedentes`, migração 014), com a mesma arquitetura da Base Legal Viva — `jurisprudencia-db.ts` injeta no prompt de Gerar Petição e do Cérebro, `jurisprudencia-gate.ts` confere automaticamente depois de gerar a petição (banner amarelo, não vermelho — "não confirmado" é mais cauteloso que o "não encontrado" do Citation Gate de lei, porque a cobertura aqui é bem mais estreita). T13 do golden-set sai de SKIP pra PASS real.
+
+**O que ISSO não resolve**: não existe um "jurisprudência-radar" que vigia STF/STJ/TNU automaticamente (igual o legislação-sync faz pra lei) — não tem uma página única com texto fixo pra comparar hash, cada súmula/tema teria que ser checado individualmente contra uma base de pesquisa jurisprudencial dedicada. Fica como o mesmo tipo de pendência já registrada antes.
+
+## 21. Status consolidado depois de "veja o que dá pra fazer da Fase 2/Curador sem demorar"
+
+- **Juiz Revisor**: já existia (`revisarPeticao`/`corrigirPeticao`), só faltava kill switch + custo — corrigido.
+- **Auditor Legal**: parcial desde a seção 16 (EC 103/2019 + regra de direito adquirido).
+- **Jurisprudência Viva**: construída nesta rodada (seção 20), escopo BPC/salário-maternidade.
+- **Curador do Cérebro**: painel de curadoria manual construído (seção 19) — aprendizado automático de verdade continua inviável por volume de dados (6 casos).
+- **Kill switch**: cobertura completa agora (12 rotas de IA, incluindo a Íris).
+- **Painel "Equipe agora"**: quem está online, entrou e saiu — tela de Auditoria.
+- **O que fica de fora, de propósito, por ser infraestrutura grande** (scraper contínuo, não cabe em "sem demorar"): legislação-sync/jurisprudência-radar pros benefícios fora do escopo pedido; jurisprudência-radar automático (mesmo dentro do escopo); T9 (aprovação humana) e T10 (LGPD), que dependem de decisão de produto do Orlando, não de tempo de construção.
 
 ## 13. Auditoria de `BASE_LEGAL` em `cerebroJuridico.ts` (2026-10-08, continuação)
 

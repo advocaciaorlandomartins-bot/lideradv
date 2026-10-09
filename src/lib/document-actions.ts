@@ -87,24 +87,28 @@ export async function createDocumentoAction(
 }
 
 export async function deleteDocumentoAction(
-  id: string,
-  url?: string
+  id: string
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session) return { error: "Sem permissão." };
 
-  // O entityType do documento vem SEMPRE do banco agora, nunca do argumento
-  // da action — antes era o chamador quem informava, e como o módulo de
-  // permissão verificado dependia desse valor, um usuário com processos:excluir
-  // (mas sem clientes:excluir) podia apagar um documento de cliente só
-  // chamando a action com entityType:"processo", já que nada conferia se o
-  // documento realmente era de um processo.
+  // entityType E url vêm SEMPRE do banco, nunca de argumento da action —
+  // Server Actions podem ser chamadas com qualquer argumento, não só os que
+  // a UI manda. entityType já era revalidado (ver comentário original
+  // abaixo); url foi corrigido junto em 2026-10-09: antes vinha como
+  // argumento do chamador e era passada direto pra del() sem checar se
+  // batia com o documento real — alguém com permissão de excluir QUALQUER
+  // documento seu podia chamar a action passando o id de um documento
+  // próprio (passa a checagem) mas a url de um documento de outro
+  // cliente/processo, apagando o arquivo físico alheio do Vercel Blob sem
+  // nunca ter pedido a exclusão daquele registro.
   const [doc] = await sql`
-    SELECT entity_type, entity_id::text FROM documentos WHERE id = ${id}::uuid
+    SELECT entity_type, entity_id::text, url FROM documentos WHERE id = ${id}::uuid
   `;
   if (!doc) return { error: "Documento não encontrado." };
   const entityType = doc.entity_type as EntityType;
   const entityId = doc.entity_id as string;
+  const url = doc.url as string | null;
 
   if (!(await podeMexerNaEntidade(session, entityType, entityId, "excluir")))
     return { error: "Sem permissão." };

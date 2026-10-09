@@ -21,6 +21,10 @@ import {
   getBaseLegalParaBeneficio,
   formatarDispositivosParaPrompt,
 } from "@/lib/base-legal-db";
+import {
+  getPrecedentesParaBeneficio,
+  formatarPrecedentesParaPrompt,
+} from "@/lib/jurisprudencia-db";
 import { codigoDoTipo } from "@/lib/checklist-documentos";
 import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
 
@@ -134,9 +138,20 @@ export async function POST(req: Request) {
     dispositivosRelevantes
   );
 
+  // Jurisprudência Viva (migração 014) — mesmo espírito da Base Legal Viva,
+  // mas pra Tema/Súmula/RE/ADI. Cobertura ainda parcial (só BPC idoso/
+  // deficiência e salário-maternidade, 10 precedentes verificados).
+  const precedentesRelevantes = await getPrecedentesParaBeneficio(
+    codigoBeneficio
+  ).catch(() => []);
+  const jurisprudenciaVivaTexto = formatarPrecedentesParaPrompt(
+    precedentesRelevantes
+  );
+
   const instrucaoFinal = [
     cerebroCtx,
     baseLegalVivaTexto,
+    jurisprudenciaVivaTexto,
     atualizacoesTexto,
     instrucaoExtra,
   ]

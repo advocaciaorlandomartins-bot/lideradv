@@ -846,6 +846,45 @@ async function testarRegrasBpcNaoDisparamEmB88() {
   }
 }
 
+async function testarT13TemaAfetadoJurisprudenciaViva() {
+  // T13 do golden-set original: citar o tema/súmula certo (não um número
+  // fabricado) — agora testável de verdade com a Jurisprudência Viva
+  // (migração 014, escopo: BPC idoso/deficiência + salário-maternidade).
+  const { verificarJurisprudencia } =
+    await import("../src/lib/jurisprudencia-gate");
+  const { getPrecedentesParaBeneficio } =
+    await import("../src/lib/jurisprudencia-db");
+
+  const r = await verificarJurisprudencia(
+    "Conforme o Tema 27 do STF, o critério de renda não é absoluto. Também se aplicaria o Tema 995, que não está cadastrado."
+  );
+  const temaRealOk = r.verificados.some(
+    (v) => v.identificacao === "Tema 27 (RE 567.985 e RE 580.963)"
+  );
+  const temaFabricadoFlagueado = r.naoEncontrados.some(
+    (n) => n.trechoDetectado === "Tema 995"
+  );
+
+  const precedentesB87 = await getPrecedentesParaBeneficio("B87");
+  const mapeamentoOk = precedentesB87.some((p) =>
+    p.identificacao.includes("Tema 27")
+  );
+
+  if (temaRealOk && temaFabricadoFlagueado && mapeamentoOk) {
+    registrar(
+      "T13-tema-afetado (Jurisprudência Viva)",
+      "PASS",
+      "Tema 27 verificado contra precedente real; Tema 995 (fabricado/fora da base) flagueado; mapeamento B87 confirma Tema 27 na lista"
+    );
+  } else {
+    registrar(
+      "T13-tema-afetado (Jurisprudência Viva)",
+      "FAIL",
+      `temaRealOk=${temaRealOk} temaFabricadoFlagueado=${temaFabricadoFlagueado} mapeamentoOk=${mapeamentoOk}`
+    );
+  }
+}
+
 async function testarT14KillSwitch() {
   const { agentesEstaoAtivos, definirAgentesAtivos } =
     await import("../src/lib/config-agentes-db");
@@ -879,7 +918,7 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
   ["T3-contradicao-avaliacao", "Juiz Revisor não existe ainda (Fase 2)"],
   [
     "T4-miserabilidade",
-    "jurisprudência (STF/STJ/TNU) ainda não tem base própria (Fase 2)",
+    "Jurisprudência Viva agora existe (parcial: 10 precedentes de BPC idoso/deficiência e salário-maternidade, ver T13 abaixo), mas detectar uma CONTRADIÇÃO entre a avaliação do Cérebro e um precedente específico (o que T4 realmente pede) exigiria uma lógica de confronto que ainda não existe — diferente de só confirmar se um número citado bate com a base.",
   ],
   [
     "T9-aprovacao-humana",
@@ -897,7 +936,6 @@ const NAO_IMPLEMENTADOS: [string, string][] = [
     "T12-vigencia-temporal",
     "Parcial: EC 103/2019 tem vigente_de verificado e uma regra própria de Pontos de Atenção (ver teste 'transicao-ec103' acima, PASS) alertando direito adquirido quando DER é anterior à reforma. Auditor Legal genérico por data do fato pra QUALQUER dispositivo da Base Legal Viva não foi implementado — exigiria vigência verificada uma por uma pras ~35 leis que alteraram os outros 3 textos cadastrados (LOAS, Lei 8.213, Lei 13.146), o que é pesquisa jurídica dedicada, não preenchimento de coluna",
   ],
-  ["T13-tema-afetado", "Jurisprudência Viva não existe ainda (Fase 2)"],
 ];
 
 async function main() {
@@ -920,6 +958,7 @@ async function main() {
   await testarCitacaoPluralEArtigoComHifen();
   await testarParagrafoUnico();
   await testarParagrafoDuploSimbolo();
+  await testarT13TemaAfetadoJurisprudenciaViva();
   await testarT14KillSwitch();
   for (const [id, motivo] of NAO_IMPLEMENTADOS) {
     registrar(id, "SKIP", motivo);

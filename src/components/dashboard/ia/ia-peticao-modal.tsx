@@ -64,6 +64,9 @@ export default function IaPeticaoModal({
   const [citacoesNaoEncontradas, setCitacoesNaoEncontradas] = useState<
     { caminho: string; norma: string }[]
   >([]);
+  const [jurisNaoEncontrada, setJurisNaoEncontrada] = useState<
+    { trechoDetectado: string }[]
+  >([]);
   const abortRef = useRef<AbortController | null>(null);
 
   const skillAtual = SKILLS[skill];
@@ -114,6 +117,7 @@ export default function IaPeticaoModal({
     setAba("gerar");
     setSalvou(null);
     setCitacoesNaoEncontradas([]);
+    setJurisNaoEncontrada([]);
     abortRef.current = new AbortController();
 
     try {
@@ -164,6 +168,22 @@ export default function IaPeticaoModal({
           .then((relatorio) => {
             if (relatorio?.naoEncontradas?.length > 0) {
               setCitacoesNaoEncontradas(relatorio.naoEncontradas);
+            }
+          })
+          .catch(() => {});
+
+        // Jurisprudência Viva — mesmo espírito, cobertura ainda parcial (só
+        // BPC idoso/deficiência e salário-maternidade) — "não encontrado"
+        // aqui é "não confirmado ainda", não necessariamente errado.
+        fetch("/api/ia/peticao/verificar-jurisprudencia", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texto: acc }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((relatorio) => {
+            if (relatorio?.naoEncontrados?.length > 0) {
+              setJurisNaoEncontrada(relatorio.naoEncontrados);
             }
           })
           .catch(() => {});
@@ -567,6 +587,26 @@ export default function IaPeticaoModal({
                           <li key={i}>
                             {c.norma}, {c.caminho} — não encontrado no texto
                             oficial cadastrado. Confira antes de usar.
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {jurisNaoEncontrada.length > 0 && (
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                      <p className="font-body text-sm font-semibold text-amber-700">
+                        ⚠ {jurisNaoEncontrada.length}{" "}
+                        {jurisNaoEncontrada.length === 1
+                          ? "citação de jurisprudência não confirmada"
+                          : "citações de jurisprudência não confirmadas"}
+                      </p>
+                      <ul className="mt-1 font-body text-xs text-amber-700 space-y-0.5">
+                        {jurisNaoEncontrada.map((c, i) => (
+                          <li key={i}>
+                            {c.trechoDetectado} — fora da Jurisprudência Viva
+                            (cobertura ainda parcial). Pode ser real e correto,
+                            só não dá pra confirmar ainda — confira manualmente
+                            antes de usar.
                           </li>
                         ))}
                       </ul>

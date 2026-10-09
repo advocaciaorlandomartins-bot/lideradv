@@ -15,6 +15,10 @@ import {
   getBaseLegalParaBeneficio,
   formatarDispositivosParaPrompt,
 } from "./base-legal-db";
+import {
+  getPrecedentesParaBeneficio,
+  formatarPrecedentesParaPrompt,
+} from "./jurisprudencia-db";
 import { codigoDoTipo } from "./checklist-documentos";
 
 function getClaudeClient(): Anthropic {
@@ -1982,9 +1986,20 @@ Data da análise: ${new Date().toLocaleDateString("pt-BR")}
     dispositivosRelevantes
   );
 
+  // Jurisprudência Viva (migração 014) — mesmo espírito, pra Tema/Súmula/
+  // RE/ADI; cobertura ainda parcial (só BPC idoso/deficiência e
+  // salário-maternidade).
+  const precedentesRelevantes = await getPrecedentesParaBeneficio(
+    codigoBeneficio
+  ).catch(() => []);
+  const jurisprudenciaVivaTexto = formatarPrecedentesParaPrompt(
+    precedentesRelevantes
+  );
+
   // Parte ESTÁTICA (cacheável) — BASE_LEGAL + base viva + modo + contexto + formato de resposta
   const systemPrompt = `${BASE_LEGAL}
 ${baseLegalVivaTexto}
+${jurisprudenciaVivaTexto}
 ${promptModoEspecializado(modo)}
 ${contexto}
 

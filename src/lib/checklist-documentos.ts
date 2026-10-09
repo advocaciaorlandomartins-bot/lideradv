@@ -53,6 +53,7 @@ const POR_CODIGO: Record<string, string[]> = {
     "Comprovante de renda de todos os moradores da residência",
     "Laudo médico atualizado com CID, assinatura e carimbo",
     "Exames/receitas que comprovem o impedimento de longo prazo (mín. 2 anos)",
+    "CIPTEA (Carteira de Identificação da Pessoa com TEA), se o diagnóstico for do espectro autista — não é exigência legal, mas reforça a prova (Lei 12.764/2012)",
     "Formulário LOAS preenchido (gerar em Modelos)",
   ],
   B88: [

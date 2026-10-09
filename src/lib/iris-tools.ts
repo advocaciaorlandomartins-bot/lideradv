@@ -810,6 +810,41 @@ const FERRAMENTAS_DIAGNOSTICO = new Set([
   "listar_oabs",
 ]);
 
+/**
+ * Busca cliente por nome já restrita a quem o usuário pode acessar (mesma
+ * regra de podeAcessarCliente/clientes_ver_todos). Achado em auditoria de
+ * 2026-10-09: várias tools da Íris resolviam o nome com uma busca sem
+ * ownership nenhum e só checavam acesso DEPOIS de sobrar um único
+ * candidato — quando havia mais de um resultado ambíguo, a lista de nomes
+ * (e, em alguns casos, dado ligado ao nome) era devolvida sem checar se o
+ * usuário tinha acesso a cada um deles.
+ */
+async function buscarClientesPorNome(
+  session: SessionUser,
+  busca: string,
+  limit = 5
+): Promise<{ id: string; name: string }[]> {
+  const verTodos = hasPermission(session, "clientes_ver_todos", "ver");
+  const colaboradorId = verTodos
+    ? null
+    : await getColaboradorIdForUser(session.id);
+  const rows = await sql`
+    SELECT id::text, name FROM clients
+    WHERE deleted_at IS NULL AND name ILIKE ${"%" + busca + "%"}
+      AND (
+        ${verTodos}
+        OR EXISTS (
+          SELECT 1 FROM processos p
+          WHERE p.client_id = clients.id AND p.deleted_at IS NULL
+            AND p.responsavel_id = ${colaboradorId}::uuid
+        )
+      )
+    ORDER BY name
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => ({ id: String(r.id), name: String(r.name) }));
+}
+
 export async function executarFerramentaIris(
   session: SessionUser,
   name: string,
@@ -1640,11 +1675,7 @@ async function executarFerramentaIrisInterno(
             ok: false,
             erro: "Este usuário não tem permissão pra editar clientes.",
           });
-        const clientes = await sql`
-          SELECT id::text, name FROM clients
-          WHERE deleted_at IS NULL AND name ILIKE ${"%" + entidadeBusca + "%"}
-          LIMIT 5
-        `;
+        const clientes = await buscarClientesPorNome(session, entidadeBusca);
         if (clientes.length === 0)
           return JSON.stringify({
             ok: false,
@@ -1747,6 +1778,16 @@ async function executarFerramentaIrisInterno(
         social: "avaliacao_social_administrativa",
       };
 
+      // NOTA (2026-10-09): diferente de clientes/processos, o módulo
+      // Controles/Perícias não tem um sub-permissão "_ver_todos" — a tela
+      // normal de Controles também não restringe por responsável (achado
+      // em auditoria de segurança separada nesta sessão). Por isso a busca
+      // aqui NÃO filtra por ownership: seria inconsistente introduzir um
+      // filtro só na Íris pra um módulo que hoje é office-wide por design
+      // em todo o resto do sistema. Se o Orlando decidir que perícia deve
+      // ser restrita por responsável, isso precisa de um submódulo
+      // controles_ver_todos novo, aplicado na tela normal TAMBÉM, não só
+      // aqui — fica como pendência, não como fix isolado da Íris.
       const candidatas = await sql`
         SELECT p.id::text, p.tipo, p.data_pericia::text, cl.id::text AS cliente_id, cl.name AS cliente_nome
         FROM pericias p
@@ -1861,11 +1902,10 @@ async function executarFerramentaIrisInterno(
           ? input.descricao_servico.trim().slice(0, 200)
           : descricaoLabel[tipoHint];
 
-      const candidatosCliente = await sql`
-        SELECT id::text, name FROM clients
-        WHERE deleted_at IS NULL AND name ILIKE ${"%" + clienteBusca + "%"}
-        LIMIT 5
-      `;
+      const candidatosCliente = await buscarClientesPorNome(
+        session,
+        clienteBusca
+      );
       if (candidatosCliente.length === 0) {
         return JSON.stringify({
           ok: false,
@@ -1954,11 +1994,10 @@ async function executarFerramentaIrisInterno(
         });
       }
 
-      const candidatosCliente2 = await sql`
-        SELECT id::text, name FROM clients
-        WHERE deleted_at IS NULL AND name ILIKE ${"%" + clienteBusca + "%"}
-        LIMIT 5
-      `;
+      const candidatosCliente2 = await buscarClientesPorNome(
+        session,
+        clienteBusca
+      );
       if (candidatosCliente2.length === 0) {
         return JSON.stringify({
           ok: false,
@@ -2290,11 +2329,7 @@ async function executarFerramentaIrisInterno(
         return JSON.stringify({ ok: false, erro: "Informe cliente_busca." });
       }
 
-      const candidatos = await sql`
-        SELECT id::text, name FROM clients
-        WHERE deleted_at IS NULL AND name ILIKE ${"%" + clienteBusca + "%"}
-        LIMIT 5
-      `;
+      const candidatos = await buscarClientesPorNome(session, clienteBusca);
       if (candidatos.length === 0) {
         return JSON.stringify({
           ok: false,
@@ -2421,11 +2456,10 @@ async function executarFerramentaIrisInterno(
         });
       }
 
-      const candidatosCliente3 = await sql`
-        SELECT id::text, name FROM clients
-        WHERE deleted_at IS NULL AND name ILIKE ${"%" + clienteBusca + "%"}
-        LIMIT 5
-      `;
+      const candidatosCliente3 = await buscarClientesPorNome(
+        session,
+        clienteBusca
+      );
       if (candidatosCliente3.length === 0) {
         return JSON.stringify({
           ok: false,

@@ -205,7 +205,13 @@ export async function PATCH(request: Request) {
   const assinado = contratoStatusValido === "assinado";
 
   try {
-    await sql`
+    // AND origem = 'prevbot' — achado em auditoria de 2026-10-09: sem isso,
+    // um lead_id arbitrário (inclusive de lead criado manualmente no CRM,
+    // nunca vindo do PrevBot) podia ter contrato_status/contrato_url
+    // definidos por essa rota, disparando converterLeadAssinado com uma
+    // contrato_url não validada. Diferente das outras rotas prevbot/*, que
+    // sempre resolvem o registro por CPF/telefone antes de escrever.
+    const rows = await sql`
       UPDATE crm_leads SET
         contrato_id          = COALESCE(${contratoId}, contrato_id),
         contrato_status      = COALESCE(${contratoStatusValido}, contrato_status),
@@ -215,8 +221,15 @@ export async function PATCH(request: Request) {
           ELSE contrato_assinado_em
         END,
         updated_at = now()
-      WHERE id = ${leadId}::uuid
+      WHERE id = ${leadId}::uuid AND origem = 'prevbot'
+      RETURNING id
     `;
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { error: "Lead não encontrado ou não pertence ao PrevBot." },
+        { status: 404 }
+      );
+    }
 
     // Converte em cliente + processo se contrato assinado
     let clientId: string | null = null;

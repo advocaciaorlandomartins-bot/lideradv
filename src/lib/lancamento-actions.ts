@@ -887,7 +887,12 @@ export async function updateLancamentoAction(
         }
         // Valor ou data podem ter mudado — atualiza os lembretes de cobrança
         // já agendados pra não ficarem com informação desatualizada/errada.
-        if (tipo === "entrada") {
+        // Guard "status !== cancelado" (achado em auditoria de 2026-10-09):
+        // este branch também é alcançado quando o lançamento já estava
+        // cancelado e continua cancelado (só edição de descrição/valor
+        // exibido) — sem o guard, reagendava cobrança por WhatsApp pra um
+        // lançamento que o cliente não deve mais.
+        if (tipo === "entrada" && status !== "cancelado") {
           await reagendarLembretesHonorarioLancamento(
             id,
             clientId,

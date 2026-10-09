@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartBarIcon, ClipboardListIcon } from "@/components/icons";
+import {
+  ChartBarIcon,
+  ClipboardListIcon,
+  SparklesIcon,
+} from "@/components/icons";
 
 const TABS = [
   {
@@ -15,6 +19,12 @@ const TABS = [
     href: "/dashboard/gerenciador/auditoria",
     label: "Log de Auditoria",
     icon: ClipboardListIcon,
+    exact: false,
+  },
+  {
+    href: "/dashboard/gerenciador/curador",
+    label: "Curador do Cérebro",
+    icon: SparklesIcon,
     exact: false,
   },
 ] as const;

@@ -132,6 +132,20 @@ Pendência que a seção 0 já tinha marcado como "priorizada, não auditada". R
 
 Lembrete de arquitetura que vale manter daqui pra frente: **não existe e não deve existir um segundo agente de IA** no sistema — qualquer coisa parecida com "Juiz Revisor" deveria ser uma tool nova pra Íris chamar (como as ~25 que ela já tem), não um agente separado.
 
+## 19. Juiz Revisor já existia; cobertura de kill switch/custo em 8 rotas esquecidas; bug ativo no "aprendizado" do Cérebro (2026-10-08)
+
+A pedido do Orlando, investiguei o que dava pra fazer das Fases 2/4 sem construir do zero.
+
+**Juiz Revisor**: já existe (`revisarPeticao`/`corrigirPeticao` em `ai-juridico.ts`, botão "Revisar" manual na tela de Gerar Petição) — crítica em texto livre: pontos fortes, fragilidades jurídicas, jurisprudência ausente, dados faltantes, nota 0-10. Só faltava o kill switch e o log de custo.
+
+**Achado maior ao investigar isso**: quando construí o kill switch, só peguei rotas que chamam a Anthropic DIRETO no arquivo — qualquer rota que delega pra uma função de lib (grep simples não pega) escapou. Resultado: **8 rotas** que gastam IA de verdade não respeitavam o kill switch nem tinham custo registrado, incluindo a **Íris** (o assistente mais usado do sistema). Corrigidas todas: `/api/iris/chat`, `/api/ia/processar-inss`, `/api/ia/processar-judicial`, `/api/clientes/importacao-ia`, `/api/modelos/gerar-com-ia`, `/api/integracoes/prevbot/usuario`, `/api/ia/revisar`, `/api/ia/corrigir`.
+
+**Curador do Cérebro (Fase 4) — checado, confirmado inviável como aprendizado automático por agora**: só 6 processos encerrados têm `cerebro_juridico` registrado (o bug do aprendizado, já corrigido antes desta sessão, está funcionando — 0 pendentes), volume baixo demais pra qualquer padrão estatístico de verdade.
+
+**Mas achei um bug ativo real nessa mesma investigação**: a ÚNICA tese em `cerebro_teses` (área BPC/LOAS, criada 06/09/2026) cita **"Tema 995 STF, Súmula 54 TNU"** — as mesmas citações que já encontrei erradas/incertas nesta sessão — E essa tabela é **lida de verdade** por `obterContextoCerebro()`, que alimenta `gerarContextoPeticao()`, que alimenta toda petição nova de BPC/LOAS. Ou seja: sem essa investigação, uma petição futura real podia repetir o erro que já corrigi em todo o resto do sistema, só que por um caminho que os prompts estáticos não cobrem (dado aprendido, não texto fixo). A tese também estava truncada no meio da frase (limite de coluna) e tinha taxa de sucesso 0% (aplicada 1x, nunca venceu) — por isso não tentei "remendar" o texto, só desativei (`ativa = false`) direto no banco. Os outros 6 casos de `cerebro_juridico` foram conferidos contra a mesma lista de citações já sabidamente erradas — todos limpos.
+
+**Curador MVP construído**: painel de revisão (não aprendizado automático) pra Orlando ver e desativar teses manualmente, em vez de precisar de mim rodando script — ver próxima seção/commit.
+
 ## 13. Auditoria de `BASE_LEGAL` em `cerebroJuridico.ts` (2026-10-08, continuação)
 
 Esta é a pendência maior ainda não fechada — o bloco que vai em **todo** diagnóstico do Cérebro (não só petição), ~260 linhas, dezenas de citações. Resultado desta rodada:

@@ -70,6 +70,7 @@ export async function POST() {
       c.cliente_id::text,
       cl.name                   AS cliente_nome,
       cl.phone                  AS cliente_telefone,
+      cl.menor_incapaz           AS guardian_menor_incapaz,
       cl.responsavel_nome       AS guardian_nome,
       cl.responsavel_telefone   AS guardian_telefone,
       col.nome                  AS responsavel_nome,
@@ -131,8 +132,12 @@ export async function POST() {
                 telefone: String(r.cliente_telefone),
               }
             : null,
+        // Só redireciona quando o cliente é efetivamente menor/incapaz —
+        // contato de emergência cadastrado não deve desviar mensagens de
+        // cliente adulto (mesma regra de compromissos-actions.ts; faltava
+        // aqui — achado em auditoria de 2026-10-09).
         clienteResponsavel:
-          r.guardian_nome && r.guardian_telefone
+          r.guardian_menor_incapaz && r.guardian_nome && r.guardian_telefone
             ? {
                 nome: String(r.guardian_nome),
                 telefone: String(r.guardian_telefone),

@@ -324,6 +324,36 @@ function avaliarNomeDivergente(
   return [];
 }
 
+/** `resultado_admin` ('deferido'/'indeferido') é escrito pela extração
+ * automática do Cérebro Jurídico ao analisar um documento; `resultado_
+ * administrativo` ('concedido'/'negado') é escrito manualmente na Linha de
+ * Produção e é o campo que de fato alimenta cálculo de comissão e o
+ * relatório jurídico de taxa de êxito (ver comissao-colaborador.ts e
+ * relatorios-db.ts — nenhum dos dois lê resultado_admin). São dois campos
+ * reais e paralelos: achado em auditoria de 2026-10-09/10, decidido NÃO
+ * unificar automaticamente (risco de disparar comissão a partir de uma
+ * extração de IA não confirmada por humano) — em vez disso, alerta quando
+ * o Cérebro já identificou um resultado mas ninguém registrou isso na
+ * Produção ainda, pra não ficar uma lacuna silenciosa (comissão nunca
+ * gerada sem ninguém perceber).
+ */
+function avaliarReconciliacaoResultado(
+  resultadoAdmin: string | null,
+  resultadoAdministrativo: string | null
+): RegraResultado[] {
+  if (!resultadoAdmin || resultadoAdministrativo) return [];
+  if (resultadoAdmin !== "deferido" && resultadoAdmin !== "indeferido")
+    return [];
+  return [
+    {
+      codigo: "resultado_nao_registrado_producao",
+      gravidade: "medio",
+      descricao: `O Cérebro Jurídico identificou "${resultadoAdmin}" a partir de um documento analisado, mas esse resultado ainda não foi registrado na Linha de Produção (resultado administrativo). Enquanto isso não for feito manualmente lá, a comissão correspondente não é calculada e o relatório jurídico não conta este caso — confira e registre o resultado em Produção se estiver correto.`,
+      baseLegal: null,
+    },
+  ];
+}
+
 /** Roda as regras determinísticas aplicáveis ao processo e grava em
  * pontos_atencao. As regras de BPC só rodam pra B87/B88; a de prescrição
  * roda pra qualquer processo com DER preenchida. Idempotente:
@@ -332,6 +362,7 @@ function avaliarNomeDivergente(
 export async function avaliarPontosAtencao(processoId: string): Promise<void> {
   const [processo] = await sql`
     SELECT p.tipo_acao, p.der::text, p.motivo_indeferimento, p.resultado_admin,
+           p.resultado_administrativo,
            c.name, c.status_beneficio, c.tipo_beneficio,
            c.tipo_incapacidade, c.doc, c.renda_familiar_per_capita,
            c.membros_familia, c.cid_principal
@@ -377,6 +408,10 @@ export async function avaliarPontosAtencao(processoId: string): Promise<void> {
       processo.name ?? null,
       processo.doc ?? null,
       processo.membros_familia
+    ),
+    ...avaliarReconciliacaoResultado(
+      processo.resultado_admin ?? null,
+      processo.resultado_administrativo ?? null
     ),
   ];
 

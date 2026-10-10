@@ -23,6 +23,12 @@ const BASE: string[] = [
   "CNIS atualizado",
 ];
 
+// Benefícios cuja prova central é o histórico de trabalho (tempo de
+// contribuição/atividade rural) — pra esses a CTPS não é "se houver", é
+// documento obrigatório; a linha específica em POR_CODIGO substitui a
+// genérica da BASE em vez de duplicar.
+const CODIGOS_CTPS_OBRIGATORIA = new Set(["B41", "B42", "B46"]);
+
 const POR_CODIGO: Record<string, string[]> = {
   B21: [
     "Certidão de óbito do(a) instituidor(a)",
@@ -122,12 +128,19 @@ export function checklistPadrao(
   tipoBeneficioOuAcao: string | null
 ): ChecklistItem[] {
   const extras: string[] = [];
+  let codigo: string | null = null;
   if (tipoBeneficioOuAcao) {
-    const codigo = codigoDoTipo(tipoBeneficioOuAcao);
+    codigo = codigoDoTipo(tipoBeneficioOuAcao);
     if (codigo && POR_CODIGO[codigo]) extras.push(...POR_CODIGO[codigo]);
     for (const [re, itens] of POR_PALAVRA_CHAVE) {
       if (re.test(tipoBeneficioOuAcao)) extras.push(...itens);
     }
   }
-  return [...BASE, ...extras].map((texto) => ({ texto, feito: false }));
+  const base =
+    codigo && CODIGOS_CTPS_OBRIGATORIA.has(codigo)
+      ? BASE.filter(
+          (item) => !item.startsWith("Carteira de Trabalho (CTPS), se houver")
+        )
+      : BASE;
+  return [...base, ...extras].map((texto) => ({ texto, feito: false }));
 }

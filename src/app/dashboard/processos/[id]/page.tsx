@@ -14,6 +14,7 @@ import {
   getColaboradoresAtivos,
 } from "@/lib/processo-full-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
+import { getCidsByCliente } from "@/lib/clients-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import {
@@ -26,7 +27,6 @@ import {
   getCatalogoEtiquetas,
 } from "@/lib/etiquetas-db";
 import DeleteProcessoButton from "@/components/dashboard/processos/delete-processo-button";
-import DocumentsSection from "@/components/dashboard/documents/documents-section";
 import ProcessoDetailClient from "@/components/dashboard/processos/processo-detail-client";
 import PontosAtencaoPanel from "@/components/dashboard/processos/pontos-atencao-panel";
 import { ChevronRightIcon } from "@/components/icons";
@@ -86,10 +86,13 @@ export default async function ProcessoDetailPage({
   ]);
 
   // Carrega documentos do processo + documentos do cliente (enviados pela ficha do cliente)
-  const [docsProcesso, docsCliente] = await Promise.all([
+  const [docsProcesso, docsCliente, cids] = await Promise.all([
     getDocumentosByEntityId("processo", id),
     processo.client_id
       ? getDocumentosByEntityId("cliente", processo.client_id)
+      : Promise.resolve([]),
+    processo.client_id
+      ? getCidsByCliente(processo.client_id)
       : Promise.resolve([]),
   ]);
   const documentos = [...docsProcesso, ...docsCliente];
@@ -135,6 +138,8 @@ export default async function ProcessoDetailPage({
         colaboradores={colaboradores}
         carga={cargaFiltrada}
         modelos={modelos}
+        documentos={documentos}
+        cids={cids}
         sessionNome={session.nome}
         podeAlterarResponsavel={hasPermission(
           session,
@@ -151,13 +156,6 @@ export default async function ProcessoDetailPage({
           "configuracoes",
           "editar"
         )}
-      />
-
-      {/* Arquivos (server, static) */}
-      <DocumentsSection
-        entityType="processo"
-        entityId={processo.id}
-        documents={documentos}
       />
 
       {/* Perigo */}

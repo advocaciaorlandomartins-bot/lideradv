@@ -14,8 +14,19 @@ import { getSession } from "@/lib/session";
 const inflate = promisify(zlib.inflate);
 const inflateRaw = promisify(zlib.inflateRaw);
 
-// JPEG quality for re-encoding (0-100). 75 gives ~50-70% savings with minimal visible loss.
+// JPEG quality for re-encoding (0-100). 75 gives ~50-70% savings com imagem
+// JÁ comprimida em JPEG de baixa qualidade. O achado real (Orlando,
+// 2026-10-10, comparando contra a compressão do TramitaSign: "8MB vira
+// 1MB, a nossa é tudo errado") é que isso sozinho não chega perto — a
+// maior parte do peso de um PDF escaneado é RESOLUÇÃO, não qualidade de
+// JPEG. Um scanner/celular comum salva a 200-300 DPI (ex: carta a 300
+// DPI = ~2550×3300px), muito além do que precisa pra ler texto na tela
+// ou imprimir — por isso agora também reduz a resolução antes de
+// reencodar, não só a qualidade.
 const JPEG_QUALITY = 75;
+// ~150 DPI numa página carta/A4 — nitidamente legível (inclusive
+// assinatura), mas uma fração dos pixels de um scan a 300 DPI.
+const MAX_DIMENSAO_PX = 1700;
 
 // Decode FlateDecode (zlib-compressed) stream data
 async function flateDecode(data: Buffer, _predictor = 1): Promise<Buffer> {
@@ -26,30 +37,116 @@ async function flateDecode(data: Buffer, _predictor = 1): Promise<Buffer> {
   }
 }
 
-// Re-compress a single JPEG image XObject at lower quality
-function recompressJpeg(rawJpeg: Buffer): Buffer | null {
+/** Box filter (média de blocos) — mais simples que reamostragem bicúbica,
+ * mas sem o serrilhado de nearest-neighbor; suficiente pra foto de
+ * documento, que não tem detalhe fino crítico pra preservar. */
+function downsampleRGBA(
+  src: Uint8Array,
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number
+): Uint8Array {
+  const dst = new Uint8Array(dstW * dstH * 4);
+  const xRatio = srcW / dstW;
+  const yRatio = srcH / dstH;
+  for (let dy = 0; dy < dstH; dy++) {
+    const sy0 = Math.floor(dy * yRatio);
+    const sy1 = Math.max(
+      sy0 + 1,
+      Math.min(srcH, Math.floor((dy + 1) * yRatio))
+    );
+    for (let dx = 0; dx < dstW; dx++) {
+      const sx0 = Math.floor(dx * xRatio);
+      const sx1 = Math.max(
+        sx0 + 1,
+        Math.min(srcW, Math.floor((dx + 1) * xRatio))
+      );
+      let r = 0,
+        g = 0,
+        b = 0,
+        a = 0,
+        count = 0;
+      for (let sy = sy0; sy < sy1; sy++) {
+        for (let sx = sx0; sx < sx1; sx++) {
+          const idx = (sy * srcW + sx) * 4;
+          r += src[idx];
+          g += src[idx + 1];
+          b += src[idx + 2];
+          a += src[idx + 3];
+          count++;
+        }
+      }
+      const didx = (dy * dstW + dx) * 4;
+      dst[didx] = r / count;
+      dst[didx + 1] = g / count;
+      dst[didx + 2] = b / count;
+      dst[didx + 3] = a / count;
+    }
+  }
+  return dst;
+}
+
+function reduzirSeNecessario(
+  data: Uint8Array,
+  width: number,
+  height: number
+): { data: Uint8Array; width: number; height: number } {
+  const maiorLado = Math.max(width, height);
+  if (maiorLado <= MAX_DIMENSAO_PX) return { data, width, height };
+  const escala = MAX_DIMENSAO_PX / maiorLado;
+  const novaW = Math.max(1, Math.round(width * escala));
+  const novaH = Math.max(1, Math.round(height * escala));
+  return {
+    data: downsampleRGBA(data, width, height, novaW, novaH),
+    width: novaW,
+    height: novaH,
+  };
+}
+
+// Re-compress a single JPEG image XObject at lower quality (e, se a
+// resolução original exceder MAX_DIMENSAO_PX, também reduz o tamanho —
+// devolve a nova largura/altura pro chamador atualizar o dicionário do
+// PDF, já que a posição/tamanho exibido na página vem da matriz de
+// transformação do conteúdo, não da resolução da imagem — só muda o
+// "DPI" efetivo, não o tamanho visível).
+function recompressJpeg(
+  rawJpeg: Buffer
+): { data: Buffer; width: number; height: number } | null {
   try {
     const decoded = jpegjs.decode(rawJpeg, { useTArray: true });
     if (!decoded || !decoded.data) return null;
+    const reduzido = reduzirSeNecessario(
+      decoded.data,
+      decoded.width,
+      decoded.height
+    );
     const encoded = jpegjs.encode(
-      { data: decoded.data, width: decoded.width, height: decoded.height },
+      {
+        data: reduzido.data,
+        width: reduzido.width,
+        height: reduzido.height,
+      },
       JPEG_QUALITY
     );
-    return Buffer.from(encoded.data);
+    return {
+      data: Buffer.from(encoded.data),
+      width: reduzido.width,
+      height: reduzido.height,
+    };
   } catch {
     return null;
   }
 }
 
-// Try to re-compress a FlateDecode RGB image as JPEG
+// Try to re-compress a FlateDecode RGB image as JPEG (com a mesma redução
+// de resolução de recompressJpeg quando aplicável)
 async function flatToJpeg(
   data: Buffer,
   width: number,
   height: number,
-  components: number,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dict: any
-): Promise<{ jpeg: Buffer; newDict: typeof dict } | null> {
+  components: number
+): Promise<{ jpeg: Buffer; width: number; height: number } | null> {
   if (components !== 3) return null; // only RGB → JPEG
   try {
     const decoded = await flateDecode(data);
@@ -68,8 +165,16 @@ async function flatToJpeg(
       rgba[i * 4 + 2] = decoded[i * 3 + 2];
       rgba[i * 4 + 3] = 255;
     }
-    const encoded = jpegjs.encode({ data: rgba, width, height }, JPEG_QUALITY);
-    return { jpeg: Buffer.from(encoded.data), newDict: dict };
+    const reduzido = reduzirSeNecessario(rgba, width, height);
+    const encoded = jpegjs.encode(
+      { data: reduzido.data, width: reduzido.width, height: reduzido.height },
+      JPEG_QUALITY
+    );
+    return {
+      jpeg: Buffer.from(encoded.data),
+      width: reduzido.width,
+      height: reduzido.height,
+    };
   } catch {
     return null;
   }
@@ -139,12 +244,17 @@ export async function POST(req: NextRequest) {
       const originalData = Buffer.from(obj.asUint8Array());
 
       if (filterStr === "/DCTDecode") {
-        // Already JPEG — re-encode at lower quality
-        const compressed = recompressJpeg(originalData);
-        if (compressed && compressed.length < originalData.length) {
+        // Already JPEG — re-encode at lower quality (e possivelmente
+        // menor resolução, ver recompressJpeg)
+        const resultado = recompressJpeg(originalData);
+        if (resultado && resultado.data.length < originalData.length) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (obj as any).contents = new Uint8Array(compressed);
-          dict.set(PDFName.of("Length"), PDFNumber.of(compressed.length));
+          (obj as any).contents = new Uint8Array(resultado.data);
+          dict.set(PDFName.of("Length"), PDFNumber.of(resultado.data.length));
+          if (resultado.width !== width || resultado.height !== height) {
+            dict.set(PDFName.of("Width"), PDFNumber.of(resultado.width));
+            dict.set(PDFName.of("Height"), PDFNumber.of(resultado.height));
+          }
           imagesProcessed++;
         }
       } else if (
@@ -160,13 +270,17 @@ export async function POST(req: NextRequest) {
         const bpc = bpcRaw instanceof PDFNumber ? bpcRaw.asNumber() : 8;
 
         if (cs === "/DeviceRGB" && bpc === 8) {
-          const result = await flatToJpeg(originalData, width, height, 3, dict);
+          const result = await flatToJpeg(originalData, width, height, 3);
           if (result && result.jpeg.length < originalData.length) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (obj as any).contents = new Uint8Array(result.jpeg);
             dict.set(PDFName.of("Length"), PDFNumber.of(result.jpeg.length));
             dict.set(PDFName.of("Filter"), PDFName.of("DCTDecode"));
             dict.delete(PDFName.of("DecodeParms"));
+            if (result.width !== width || result.height !== height) {
+              dict.set(PDFName.of("Width"), PDFNumber.of(result.width));
+              dict.set(PDFName.of("Height"), PDFNumber.of(result.height));
+            }
             imagesProcessed++;
           }
         }

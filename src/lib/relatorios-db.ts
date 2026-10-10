@@ -324,18 +324,35 @@ export async function getFluxoMensal(meses = 12): Promise<FluxoMensal[]> {
   // limite superior retornava dados de 2026 até 2030 mais um "mês"
   // 9999-12, quando o rótulo na tela promete "Últimos N meses". Limitado
   // ao fim do mês corrente.
+  //
+  // Mês de referência: pago usa a data em que o dinheiro realmente
+  // entrou/saiu (COALESCE data_pagamento, mesmo padrão de recebido_mes/
+  // pago_mes em gerenciador-db.ts); pendente usa vencimento, que é a
+  // única data que existe pra quem ainda não foi pago. Antes, tudo
+  // agrupava por vencimento mesmo pro que já estava pago — um
+  // recebimento com atraso aparecia no mês errado (o do vencimento, não
+  // o do recebimento), divergindo dos KPIs de Financeiro/Dashboard.
   const rows = await sql`
+    WITH base AS (
+      SELECT
+        valor, tipo, status,
+        CASE
+          WHEN status = 'pago' THEN COALESCE(data_pagamento, data_vencimento)
+          ELSE data_vencimento
+        END AS mes_ref
+      FROM lancamentos
+      WHERE status != 'cancelado'
+    )
     SELECT
-      to_char(data_vencimento, 'YYYY-MM')   AS mes_iso,
-      to_char(data_vencimento, 'MM/YYYY')   AS mes_label,
+      to_char(mes_ref, 'YYYY-MM')   AS mes_iso,
+      to_char(mes_ref, 'MM/YYYY')   AS mes_label,
       COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada' AND status = 'pago'),     0) AS receitas,
       COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'   AND status = 'pago'),     0) AS despesas,
       COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada' AND status = 'pendente'), 0) AS a_receber,
       COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'   AND status = 'pendente'), 0) AS a_pagar
-    FROM lancamentos
-    WHERE status != 'cancelado'
-      AND data_vencimento >= (NOW() - (${meses} || ' months')::interval)::date
-      AND data_vencimento <  (date_trunc('month', NOW()) + INTERVAL '1 month')
+    FROM base
+    WHERE mes_ref >= (NOW() - (${meses} || ' months')::interval)::date
+      AND mes_ref <  (date_trunc('month', NOW()) + INTERVAL '1 month')
     GROUP BY mes_iso, mes_label
     ORDER BY mes_iso ASC
   `;

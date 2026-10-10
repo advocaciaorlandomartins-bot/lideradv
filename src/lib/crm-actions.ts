@@ -417,6 +417,9 @@ export async function deleteTarefaAction(
   if (!UUID_RE.test(id) || !UUID_RE.test(leadId)) return;
   if (!(await podeGerenciarLead(session, leadId))) return;
 
+  // Antes de excluir: reverte pontos se a tarefa já tinha sido concluída —
+  // mesmo achado do deleteControleAction, auditoria de 2026-10-10.
+  await reverterPontosConclusao("crm_tarefa", id);
   await sql`DELETE FROM crm_tarefas WHERE id = ${id}::uuid AND lead_id = ${leadId}::uuid`;
   revalidatePath(`/dashboard/crm/leads/${leadId}`);
 }

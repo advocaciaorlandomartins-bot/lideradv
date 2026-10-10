@@ -585,6 +585,10 @@ export async function deleteControleAction(id: string): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "excluir")) return;
 
+  // Antes de excluir: reverte pontos se o controle já tinha sido concluído
+  // — sem isso, o ponto "zumbi" (sem controle de origem) continuava sendo
+  // somado no ranking pra sempre. Achado em auditoria de 2026-10-10.
+  await reverterPontosConclusao("controle", id);
   await sql`DELETE FROM controles WHERE id = ${id}::uuid`;
   await logAction({
     acao: "excluir",

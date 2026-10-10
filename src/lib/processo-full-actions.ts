@@ -645,6 +645,10 @@ export async function deleteTarefaAction(
   if (!(await podeEditarProcesso(session, processoId)))
     return { error: "Sem permissão." };
   try {
+    // Antes de excluir: reverte pontos se a tarefa já tinha sido concluída
+    // — mesmo achado do deleteControleAction (ver controles-actions.ts),
+    // auditoria de 2026-10-10.
+    await reverterPontosConclusao("tarefa_processo", id);
     await sql`DELETE FROM tarefas_processo WHERE id = ${id}::uuid AND processo_id = ${processoId}::uuid`;
     await logAction({
       acao: "excluir",

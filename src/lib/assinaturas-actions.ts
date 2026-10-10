@@ -2,6 +2,7 @@
 
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { podeAcessarCliente } from "./acesso";
 import {
   criarEnvelope,
   atualizarAssinanteTramitaSign,
@@ -72,6 +73,15 @@ export async function salvarEnvelopeAction(
   if (!nome?.trim()) throw new Error("Informe o nome do envelope.");
   if (!clienteId || !UUID_RE.test(clienteId))
     throw new Error("Selecione o cliente do envelope.");
+  // Sem isto, qualquer usuário com "assinaturas:criar" (ex: Advogado(a) sem
+  // clientes_ver_todos) conseguia passar o clienteId de OUTRO colaborador e
+  // gerar/enviar um documento de procuração/contrato com CPF, endereço,
+  // membros da família e dados do responsável legal dele — mesma checagem
+  // que documentos/*, ia/* e gerar-modelo/* já fazem. Achado em auditoria
+  // de 2026-10-10 — o módulo "assinaturas" não tem sub-permissão
+  // "_ver_todos", então essa é a única barreira possível.
+  if (!(await podeAcessarCliente(session, clienteId)))
+    throw new Error("Sem permissão.");
 
   const assinantesJson = formData.get("assinantes") as string;
   const modelosJson = formData.get("modelos") as string;

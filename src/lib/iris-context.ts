@@ -34,7 +34,11 @@ interface AgendaItem {
  * "nada agendado" quando na verdade havia uma consulta marcada — corrigido
  * aqui juntando as duas tabelas.
  */
-async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
+async function getAgendaProxima(
+  dias: number,
+  verTodosControles = true,
+  usuarioId: string | null = null
+): Promise<AgendaItem[]> {
   const [controles, compromissos] = await Promise.all([
     sql`
       SELECT c.tipo, c.descricao, c.data_evento::text AS data, c.prioridade,
@@ -45,6 +49,7 @@ async function getAgendaProxima(dias: number): Promise<AgendaItem[]> {
       WHERE c.status IS NULL
         AND c.data_evento IS NOT NULL
         AND c.data_evento BETWEEN (NOW() AT TIME ZONE 'America/Sao_Paulo')::date AND (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + (${dias} || ' days')::interval
+        AND (${verTodosControles} OR c.responsavel_id = ${usuarioId}::uuid)
       ORDER BY c.data_evento ASC
       LIMIT 80
     `,
@@ -131,7 +136,13 @@ export async function buildIrisContextText(
       getRanking(30),
       getCargaColaboradores(podeVerDetalhesDeTodos ? null : meuColaboradorId),
       getCapacidadeProdutiva(4),
-      podeVerControles ? getAgendaProxima(30) : Promise.resolve(null),
+      podeVerControles
+        ? getAgendaProxima(
+            30,
+            hasPermission(session, "controles_ver_todos", "ver"),
+            session.id
+          )
+        : Promise.resolve(null),
       podeVerColaboradores ? getAllColaboradores() : Promise.resolve(null),
     ]);
   const ranking30 = podeVerDetalhesDeTodos

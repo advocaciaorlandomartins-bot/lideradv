@@ -58,6 +58,11 @@ export interface GetControlesOptions {
   ordem?: "asc" | "desc";
   pagina?: number;
   rpp?: number;
+  /** Sem controles_ver_todos, restringe a c.responsavel_id = usuarioId —
+   * decisão do Orlando em 2026-10-10 (antes, Controles era visível ao
+   * escritório inteiro independente de quem era o responsável). */
+  verTodos?: boolean;
+  usuarioId?: string | null;
 }
 
 export async function getControles(
@@ -71,6 +76,8 @@ export async function getControles(
     ordem = "desc",
     pagina = 1,
     rpp = 20,
+    verTodos = true,
+    usuarioId = null,
   } = options;
 
   const statusParam: string | null =
@@ -101,6 +108,7 @@ export async function getControles(
           END
       AND (${inicioParam}::date IS NULL OR c.data_evento >= ${inicioParam}::date)
       AND (${fimParam}::date   IS NULL OR c.data_evento <= ${fimParam}::date)
+      AND (${verTodos} OR c.responsavel_id = ${usuarioId}::uuid)
     ORDER BY c.data_evento ${ordem === "asc" ? sql`ASC` : sql`DESC`} NULLS LAST,
              c.created_at DESC
     LIMIT ${rpp} OFFSET ${(pagina - 1) * rpp}
@@ -118,6 +126,7 @@ export async function getControles(
           END
       AND (${inicioParam}::date IS NULL OR c.data_evento >= ${inicioParam}::date)
       AND (${fimParam}::date   IS NULL OR c.data_evento <= ${fimParam}::date)
+      AND (${verTodos} OR c.responsavel_id = ${usuarioId}::uuid)
   `;
 
   return {

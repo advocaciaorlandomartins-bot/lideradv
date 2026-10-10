@@ -1787,22 +1787,39 @@ async function executarFerramentaIrisInterno(
         social: "avaliacao_social_administrativa",
       };
 
-      // NOTA (2026-10-09): diferente de clientes/processos, o módulo
-      // Controles/Perícias não tem um sub-permissão "_ver_todos" — a tela
-      // normal de Controles também não restringe por responsável (achado
-      // em auditoria de segurança separada nesta sessão). Por isso a busca
-      // aqui NÃO filtra por ownership: seria inconsistente introduzir um
-      // filtro só na Íris pra um módulo que hoje é office-wide por design
-      // em todo o resto do sistema. Se o Orlando decidir que perícia deve
-      // ser restrita por responsável, isso precisa de um submódulo
-      // controles_ver_todos novo, aplicado na tela normal TAMBÉM, não só
-      // aqui — fica como pendência, não como fix isolado da Íris.
+      // Controles/Perícias ganhou o submódulo controles_ver_todos em
+      // 2026-10-10 (decisão do Orlando) — a desambiguação aqui ("opcoes")
+      // agora segue a mesma regra de ownership já aplicada na tela normal
+      // de Perícias (getAllPericias): herda do processo vinculado quando
+      // existe, senão do processo do cliente.
+      const verTodosRem = hasPermission(session, "controles_ver_todos", "ver");
+      const colaboradorIdRem = verTodosRem
+        ? null
+        : await getColaboradorIdForUser(session.id);
       const candidatas = await sql`
         SELECT p.id::text, p.tipo, p.data_pericia::text, cl.id::text AS cliente_id, cl.name AS cliente_nome
         FROM pericias p
         JOIN clients cl ON cl.id = p.client_id
         WHERE cl.name ILIKE ${"%" + clienteBusca + "%"}
           AND p.status = 'agendado'
+          AND (
+            ${verTodosRem}
+            OR (
+              p.processo_id IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM processos px
+                WHERE px.id = p.processo_id AND px.responsavel_id = ${colaboradorIdRem}::uuid
+              )
+            )
+            OR (
+              p.processo_id IS NULL
+              AND EXISTS (
+                SELECT 1 FROM processos px
+                WHERE px.client_id = p.client_id AND px.deleted_at IS NULL
+                  AND px.responsavel_id = ${colaboradorIdRem}::uuid
+              )
+            )
+          )
         ORDER BY p.data_pericia ASC
       `;
       const filtradas = tipoMap[tipoPericiaHint]

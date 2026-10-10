@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
+import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import { getAllPericias } from "@/lib/pericias-db";
 import PericiasContent from "@/components/dashboard/pericias/pericias-content";
 import ControlesSectionNav from "@/components/dashboard/controles/section-nav";
@@ -15,7 +16,12 @@ export default async function PericiasPage() {
   const user = await getSession();
   if (!user || !hasPermission(user, "controles", "ver")) notFound();
 
-  const pericias = await getAllPericias();
+  const verTodos = hasPermission(user, "controles_ver_todos", "ver");
+  const colaboradorId = verTodos
+    ? null
+    : ((await getColaboradorIdForUser(user.id)) ??
+      "00000000-0000-0000-0000-000000000000");
+  const pericias = await getAllPericias(verTodos, colaboradorId);
   const agendadas = pericias.filter((p) => p.status === "agendado").length;
   const total = pericias.length;
 

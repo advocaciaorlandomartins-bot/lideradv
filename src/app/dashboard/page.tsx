@@ -267,7 +267,9 @@ export default async function DashboardPage() {
       ? getDashboardData(
           session.login,
           hasPermission(session, "clientes_ver_todos", "ver"),
-          (await getColaboradorIdForUser(session.id)) ?? null
+          (await getColaboradorIdForUser(session.id)) ?? null,
+          hasPermission(session, "controles_ver_todos", "ver"),
+          session.id
         )
       : Promise.resolve(null),
     perm.clientes

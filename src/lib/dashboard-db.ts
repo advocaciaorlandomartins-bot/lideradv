@@ -60,7 +60,9 @@ const TIPO_LABELS: Record<string, string> = {
 async function _getDashboardData(
   login?: string,
   verTodosClientes = true,
-  colaboradorId: string | null = null
+  colaboradorId: string | null = null,
+  verTodosControles = true,
+  usuarioId: string | null = null
 ) {
   const [
     clientesDevedoresResult,
@@ -106,6 +108,9 @@ async function _getDashboardData(
       `,
 
     // Próximos controles + eventos de processos (UNION) para o mini-calendário
+    // — filtro de ownership (controles_ver_todos / processos_ver_todos via
+    // colaboradorId) adicionado em 2026-10-10, decisão do Orlando de
+    // restringir Controles/Perícias por responsável.
     sql`
         SELECT
           'ctrl-' || c.id::text                             AS id,
@@ -125,6 +130,7 @@ async function _getDashboardData(
           AND c.data_evento <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '14 days'
           AND (cl.deleted_at IS NULL OR cl.id IS NULL)
           AND (p.deleted_at IS NULL OR p.id IS NULL)
+          AND (${verTodosControles} OR c.responsavel_id = ${usuarioId}::uuid)
 
         UNION ALL
 
@@ -143,6 +149,7 @@ async function _getDashboardData(
         LEFT JOIN clients cl ON cl.id = p.client_id AND cl.deleted_at IS NULL
         WHERE ec.data >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date
           AND ec.data <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '14 days'
+          AND (${verTodosControles} OR p.responsavel_id = ${colaboradorId}::uuid)
 
         ORDER BY data_evento ASC
         LIMIT 20

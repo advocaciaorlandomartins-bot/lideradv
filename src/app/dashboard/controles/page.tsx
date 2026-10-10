@@ -44,6 +44,8 @@ export default async function ControlesPage({
     rpp,
     inicio: inicio || null,
     fim: fim || null,
+    verTodos: hasPermission(session, "controles_ver_todos", "ver"),
+    usuarioId: session.id,
   });
 
   const tipoConfig = getTipoConfig(tipo);

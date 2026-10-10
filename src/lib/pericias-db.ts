@@ -51,7 +51,18 @@ function mapRow(r: any): Pericia {
   };
 }
 
-export async function getAllPericias(): Promise<Pericia[]> {
+/**
+ * verTodos/colaboradorId: achado em auditoria de 2026-10-09, decisão do
+ * Orlando em 2026-10-10 — Perícias era visível ao escritório inteiro
+ * independente de responsável (igual Controles era antes desta mesma
+ * correção). Herda ownership do processo vinculado quando existe, senão
+ * do processo do cliente — mesma regra já usada em podeAcessarPericia
+ * (acesso.ts) pra acesso individual, agora aplicada também na listagem.
+ */
+export async function getAllPericias(
+  verTodos = true,
+  colaboradorId: string | null = null
+): Promise<Pericia[]> {
   const rows = await sql`
     SELECT
       pe.id::text,
@@ -71,6 +82,24 @@ export async function getAllPericias(): Promise<Pericia[]> {
     FROM pericias pe
     JOIN clients   c ON c.id = pe.client_id
     LEFT JOIN processos p ON p.id = pe.processo_id
+    WHERE (
+      ${verTodos}
+      OR (
+        pe.processo_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM processos px
+          WHERE px.id = pe.processo_id AND px.responsavel_id = ${colaboradorId}::uuid
+        )
+      )
+      OR (
+        pe.processo_id IS NULL
+        AND EXISTS (
+          SELECT 1 FROM processos px
+          WHERE px.client_id = pe.client_id AND px.deleted_at IS NULL
+            AND px.responsavel_id = ${colaboradorId}::uuid
+        )
+      )
+    )
     ORDER BY pe.data_pericia ASC, pe.hora_pericia ASC NULLS LAST
   `;
   return rows.map(mapRow);

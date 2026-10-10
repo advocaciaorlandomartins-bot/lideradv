@@ -11,10 +11,15 @@ import type { ChecklistItem } from "./checklist-types";
  * de tipo_beneficio/tipo_acao (ex: "B31 - Auxílio por Incapacidade
  * Temporária").
  */
+// Ordem e itens seguem o "ROL DE DOCUMENTOS PARA INICIAL" de referência do
+// Orlando (2026-10-10) — mesma sequência em que ele confere os documentos
+// antes de protocolar, pra não faltar nada.
 const BASE: string[] = [
-  "RG e CPF do(a) cliente",
-  "Comprovante de residência atualizado",
   "Procuração e contrato assinados",
+  "RG e CPF do(a) cliente",
+  "Certidão de nascimento do(a) cliente",
+  "Carteira de Trabalho (CTPS), se houver",
+  "Comprovante de residência atualizado (até 3 meses)",
   "CNIS atualizado",
 ];
 
@@ -27,8 +32,22 @@ const POR_CODIGO: Record<string, string[]> = {
     "Certidão/atestado de recolhimento à prisão",
     "Comprovante de baixa renda do(a) instituidor(a)",
   ],
-  B31: ["Atestado/laudo médico detalhado", "Exames complementares"],
-  B32: ["Atestado/laudo médico detalhado", "Exames complementares"],
+  B31: [
+    "Ato impugnado (carta de indeferimento/cessação do INSS)",
+    "Cópia do processo administrativo",
+    "Planilha de cálculo",
+    "Laudo SABI (Sistema de Administração de Benefícios por Incapacidade), se o segurado já passou por perícia médica do INSS",
+    "Atestado/laudo médico detalhado",
+    "Exames complementares, do mais recente ao mais antigo",
+  ],
+  B32: [
+    "Ato impugnado (carta de indeferimento/cessação do INSS)",
+    "Cópia do processo administrativo",
+    "Planilha de cálculo",
+    "Laudo SABI (Sistema de Administração de Benefícios por Incapacidade), se o segurado já passou por perícia médica do INSS",
+    "Atestado/laudo médico detalhado",
+    "Exames complementares, do mais recente ao mais antigo",
+  ],
   B41: ["Carteira de Trabalho (CTPS) completa"],
   B42: [
     "Carteira de Trabalho (CTPS) completa",
@@ -48,19 +67,30 @@ const POR_CODIGO: Record<string, string[]> = {
     "Certidão de nascimento da criança (ou laudo de pré-natal, se ainda não nascida)",
   ],
   B87: [
-    "RG e CPF de todos os moradores da residência (inclusive crianças)",
     "Inscrição atualizada no CadÚnico (CRAS, menos de 2 anos)",
-    "Comprovante de renda de todos os moradores da residência",
-    "Laudo médico atualizado com CID, assinatura e carimbo",
-    "Exames/receitas que comprovem o impedimento de longo prazo (mín. 2 anos)",
-    "CIPTEA (Carteira de Identificação da Pessoa com TEA), se o diagnóstico for do espectro autista — não é exigência legal, mas reforça a prova (Lei 12.764/2012)",
     "Formulário LOAS preenchido (gerar em Modelos)",
+    "RG, CPF, certidão de nascimento e Carteira de Trabalho (se houver) de todos os moradores da residência (inclusive crianças)",
+    "Comprovante de renda de todos os moradores da residência",
+    "Ato impugnado (carta de indeferimento/cessação do INSS)",
+    "Cópia do processo administrativo",
+    "Planilha de cálculo",
+    "Levantamento fotográfico de corpo inteiro e do imóvel",
+    "Laudo médico atualizado com CID, assinatura e carimbo",
+    "Exames médicos, do mais recente ao mais antigo (inclui os que comprovem o impedimento de longo prazo, mín. 2 anos)",
+    "Atestados médicos, do mais recente ao mais antigo",
+    "Comprovantes de despesas com saúde, cuidador, medicamentos ou aluguel (reduzem a renda efetiva pra fins de miserabilidade — art. 20, §11-A, Lei 8.742/93)",
+    "CIPTEA (Carteira de Identificação da Pessoa com TEA), se o diagnóstico for do espectro autista — não é exigência legal, mas reforça a prova (Lei 12.764/2012)",
   ],
   B88: [
-    "RG e CPF de todos os moradores da residência (inclusive crianças)",
     "Inscrição atualizada no CadÚnico (CRAS, menos de 2 anos)",
-    "Comprovante de renda de todos os moradores da residência",
     "Formulário LOAS preenchido (gerar em Modelos)",
+    "RG, CPF, certidão de nascimento e Carteira de Trabalho (se houver) de todos os moradores da residência (inclusive crianças)",
+    "Comprovante de renda de todos os moradores da residência",
+    "Ato impugnado (carta de indeferimento/cessação do INSS)",
+    "Cópia do processo administrativo",
+    "Planilha de cálculo",
+    "Levantamento fotográfico de corpo inteiro e do imóvel",
+    "Comprovantes de despesas com saúde, cuidador, medicamentos ou aluguel (reduzem a renda efetiva pra fins de miserabilidade — art. 20, §11-A, Lei 8.742/93)",
   ],
   B91: [
     "Comunicação de Acidente de Trabalho (CAT)",

@@ -116,6 +116,29 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Sem proteção contra chamada sobreposta (ex: reexecução manual em cima do
+  // disparo agendado do orquestrador, ou um timeout do lado de quem chama
+  // fazendo retry) — essa rota reenvia o digest completo de prazos por
+  // e-mail a cada chamada, sem nenhum "já enviado" por janela de tempo.
+  // Diferente de lembretes/prevbot-retries (lock atômico) ou do resumo
+  // diário (marcador por dia) — aqui um intervalo curto já basta, porque o
+  // conteúdo (prazos dos próximos 7 dias) não muda chamada a chamada.
+  // Achado em auditoria de 2026-10-09.
+  const [ultimaExecucao] = await sql`
+    SELECT executado_em FROM cron_execucoes
+    WHERE rota = '/api/cron/prazos'
+      AND executado_em >= NOW() - INTERVAL '10 minutes'
+    ORDER BY executado_em DESC
+    LIMIT 1
+  `.catch(() => [] as { executado_em: string }[]);
+  if (ultimaExecucao) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      motivo: "já rodou nos últimos 10 minutos",
+    });
+  }
+
   try {
     // Get office email
     const configRows = await sql`SELECT email FROM escritorio_config LIMIT 1`;

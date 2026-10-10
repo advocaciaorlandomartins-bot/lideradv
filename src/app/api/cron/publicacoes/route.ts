@@ -24,11 +24,37 @@ export async function GET(request: Request) {
 
   // Permite busca histórica via ?dias=N (padrão: 3 para o cron diário)
   const url = new URL(request.url);
+  const chamadaExplicita = url.searchParams.has("dias");
   const diasParam = parseInt(url.searchParams.get("dias") ?? "3", 10);
   const diasAtras =
     Number.isFinite(diasParam) && diasParam > 0 && diasParam <= 180
       ? diasParam
       : 3;
+
+  // Sem proteção contra chamada sobreposta no modo automático (ex: retry de
+  // quem chama, ou reexecução em cima do disparo agendado) — a notificação
+  // de "publicações novas" é baseada em "tudo inserido na última hora", sem
+  // marcador de "já notificado"; duas chamadas na mesma janela reenviam
+  // WhatsApp/e-mail duplicado do mesmo lote. Só se aplica à chamada
+  // automática (sem ?dias=N) — uma busca histórica explícita (ex: backfill
+  // manual depois de um período offline) sempre deve rodar, mesmo que o
+  // automático tenha acabado de rodar. Achado em auditoria de 2026-10-09.
+  if (!chamadaExplicita) {
+    const [ultimaExecucao] = await sql`
+      SELECT executado_em FROM cron_execucoes
+      WHERE rota = '/api/cron/publicacoes'
+        AND executado_em >= NOW() - INTERVAL '10 minutes'
+      ORDER BY executado_em DESC
+      LIMIT 1
+    `.catch(() => [] as { executado_em: string }[]);
+    if (ultimaExecucao) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        motivo: "já rodou nos últimos 10 minutos",
+      });
+    }
+  }
 
   // DataJud é opcional — sem a chave, só DJe e TramitaSign rodam
   const apiKey = process.env.DATAJUD_API_KEY ?? null;

@@ -577,7 +577,7 @@ export default async function DashboardPage() {
                 <BanknotesIcon className="h-5 w-5 text-emerald-600" />
               </div>
               <span className="font-body text-xs font-semibold text-muted group-hover:underline">
-                Financeiro →
+                Financeiro — mês atual →
               </span>
             </div>
             <div className="mt-3 space-y-1.5">
@@ -598,9 +598,9 @@ export default async function DashboardPage() {
                 </span>
                 <span
                   className="font-heading text-sm font-bold text-amber-600 sm:text-base whitespace-nowrap"
-                  title={fmt(kpis.aReceber)}
+                  title={fmt(kpis.aReceberMes)}
                 >
-                  {fmt(kpis.aReceber)}
+                  {fmt(kpis.aReceberMes)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2 border-t border-border pt-1.5">

@@ -9,6 +9,7 @@ export interface FinanceiroKpis {
   pagoMes: number;
   saldoMes: number;
   aReceber: number;
+  aReceberMes: number;
   aPagar: number;
   recebidoAno: number;
   pagoAno: number;
@@ -262,6 +263,10 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
           AND date_trunc('month', COALESCE(data_pagamento, data_vencimento)) = date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
         ), 0) AS pago_mes,
         COALESCE(SUM(valor) FILTER (WHERE tipo = 'entrada' AND status = 'pendente'), 0) AS a_receber,
+        COALESCE(SUM(valor) FILTER (
+          WHERE tipo = 'entrada' AND status = 'pendente'
+          AND date_trunc('month', data_vencimento) = date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)
+        ), 0) AS a_receber_mes,
         COALESCE(SUM(valor) FILTER (WHERE tipo = 'saida'   AND status = 'pendente'), 0) AS a_pagar,
         COALESCE(SUM(valor) FILTER (
           WHERE tipo = 'entrada' AND status = 'pago'
@@ -542,6 +547,7 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
     pagoMes: Number(kr.pago_mes),
     saldoMes: Number(kr.recebido_mes) - Number(kr.pago_mes),
     aReceber: Number(kr.a_receber),
+    aReceberMes: Number(kr.a_receber_mes),
     aPagar: Number(kr.a_pagar),
     recebidoAno: Number(kr.recebido_ano),
     pagoAno: Number(kr.pago_ano),

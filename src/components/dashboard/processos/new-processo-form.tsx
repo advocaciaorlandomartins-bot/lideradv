@@ -6,6 +6,7 @@ import {
   createProcessoAction,
   type ProcessoFormState,
 } from "@/lib/processo-actions";
+import { useProcessosSettings } from "./processos-settings-modal";
 import { SpinnerIcon } from "@/components/icons";
 
 const TIPOS_ACAO = [
@@ -113,6 +114,11 @@ export default function NewProcessoForm({
   const [tipoAcaoSel, setTipoAcaoSel] = useState("");
   const [tipoAcaoManual, setTipoAcaoManual] = useState("");
   const [cnpjWarning, setCnpjWarning] = useState("");
+  // "Campo Carteira obrigatório" (Configurações de Processos, aba
+  // Segmentação) — achado em auditoria de 2026-10-09: o toggle existia mas
+  // o campo "carteira" nunca tinha sido construído, então nada era exigido
+  // de verdade. Construído em 2026-10-10 a pedido do Orlando.
+  const { settings } = useProcessosSettings();
 
   const CNJ_REGEX = /^\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}$/;
   const todayISO = new Date().toISOString().split("T")[0];
@@ -258,6 +264,17 @@ export default function NewProcessoForm({
               name="data_distribuicao"
               type="date"
               max={todayISO}
+              disabled={isPending}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Carteira" required={settings.carteiraObrigatoria}>
+            <input
+              name="carteira"
+              type="text"
+              placeholder="Ex: Carteira A, Campanha INSS…"
+              required={settings.carteiraObrigatoria}
               disabled={isPending}
               className={inputClass}
             />

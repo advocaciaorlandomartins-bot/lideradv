@@ -135,6 +135,7 @@ export async function getProcessoExtended(
       to_char(p.der, 'YYYY-MM-DD')                         AS der,
       to_char(p.dib, 'YYYY-MM-DD')                         AS dib,
       to_char(p.dcb, 'YYYY-MM-DD')                         AS dcb,
+      p.carteira,
       c.cid_principal, c.tipo_incapacidade,
       p.checklist
     FROM processos p
@@ -161,6 +162,7 @@ export async function getProcessoExtended(
     data_distribuicao: r.data_distribuicao ?? null,
     data_distribuicao_iso: r.data_distribuicao_iso ?? null,
     notas: r.notas ?? null,
+    carteira: r.carteira ?? null,
     created_at_formatted: new Date(r.created_at).toLocaleDateString("pt-BR"),
     tipo_demanda: r.tipo_demanda ?? "Judicial",
     prioridade: r.prioridade ?? "Média",

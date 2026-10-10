@@ -75,6 +75,9 @@ export async function createProcessoAction(
   const der = (formData.get("der") as string | null) || null;
   const dib = (formData.get("dib") as string | null) || null;
   const dcb = (formData.get("dcb") as string | null) || null;
+  const carteira =
+    ((formData.get("carteira") as string | null) ?? "").trim().slice(0, 100) ||
+    null;
 
   if (!clientId) return { error: "Selecione um cliente." };
   if (!tipoAcao) return { error: "Informe o tipo de ação." };
@@ -87,7 +90,7 @@ export async function createProcessoAction(
       INSERT INTO processos
         (client_id, numero, tipo_acao, area, fase, vara, comarca,
          parte_contraria, parte_contraria_doc, valor_causa,
-         data_distribuicao, notas,
+         data_distribuicao, notas, carteira,
          data_protocolo_inss, protocolo_inss, agencia_inss,
          resultado_admin, data_resultado_admin, motivo_indeferimento,
          modelo_honorario, valor_honorario, percentual_honorario,
@@ -97,7 +100,7 @@ export async function createProcessoAction(
          ${vara}, ${comarca}, ${parteContraria}, ${parteContrariaDoc},
          ${valorCausa},
          ${dataDistribuicao ? dataDistribuicao : null}::date,
-         ${notas},
+         ${notas}, ${carteira},
          ${dataProtocoloInss}::date, ${protocoloInss}, ${agenciaInss},
          ${resultadoAdmin}, ${dataResultadoAdmin}::date, ${motivoIndeferimento},
          ${modeloHonorario}, ${valorHonorario}, ${percentualHonorario},
@@ -194,6 +197,9 @@ export async function updateProcessoAction(
   const der = (formData.get("der") as string | null) || null;
   const dib = (formData.get("dib") as string | null) || null;
   const dcb = (formData.get("dcb") as string | null) || null;
+  const carteira =
+    ((formData.get("carteira") as string | null) ?? "").trim().slice(0, 100) ||
+    null;
 
   if (!clientId) return { error: "Selecione um cliente." };
   if (!tipoAcao) return { error: "Informe o tipo de ação." };
@@ -223,6 +229,7 @@ export async function updateProcessoAction(
         valor_causa             = ${valorCausa},
         data_distribuicao       = ${dataDistribuicao ? dataDistribuicao : null}::date,
         notas                   = ${notas},
+        carteira                = ${carteira},
         status                  = ${status},
         data_protocolo_inss     = ${dataProtocoloInss}::date,
         protocolo_inss          = ${protocoloInss},

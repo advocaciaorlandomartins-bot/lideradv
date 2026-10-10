@@ -37,6 +37,10 @@ export interface Processo {
   der: string | null;
   dib: string | null;
   dcb: string | null;
+  /** Categoria/portfólio pra segmentar processos (ex: "Carteira A",
+   * "Campanha INSS") — texto livre, nunca obrigatório no banco; a
+   * obrigatoriedade na tela é controlada por um ajuste do usuário. */
+  carteira: string | null;
   /** Etiquetas no formato "CATEGORIA:VALOR" — próprias do processo + herdadas do cliente vinculado. */
   etiquetas: string[];
   // Diagnóstico herdado do cadastro do cliente, pra priorizar visualmente
@@ -99,6 +103,7 @@ function mapRow(r: any): Processo {
     der: r.der ? String(r.der).slice(0, 10) : null,
     dib: r.dib ? String(r.dib).slice(0, 10) : null,
     dcb: r.dcb ? String(r.dcb).slice(0, 10) : null,
+    carteira: r.carteira ?? null,
     etiquetas: Array.isArray(r.etiquetas) ? r.etiquetas.map(String) : [],
     cid_principal: r.cid_principal ?? null,
     checklist: parseChecklist(r.checklist),
@@ -163,6 +168,7 @@ export async function getAllProcessos(
           to_char(p.der, 'YYYY-MM-DD') AS der,
           to_char(p.dib, 'YYYY-MM-DD') AS dib,
           to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+          p.carteira,
           c.cid_principal,
           p.checklist,
           (
@@ -209,6 +215,7 @@ export async function getAllProcessos(
           to_char(p.der, 'YYYY-MM-DD') AS der,
           to_char(p.dib, 'YYYY-MM-DD') AS dib,
           to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+          p.carteira,
           c.cid_principal,
           p.checklist,
           (
@@ -257,6 +264,7 @@ export async function getProcessoById(id: string): Promise<Processo | null> {
       to_char(p.der, 'YYYY-MM-DD') AS der,
       to_char(p.dib, 'YYYY-MM-DD') AS dib,
       to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+      p.carteira,
       p.checklist
     FROM processos p
     JOIN clients c ON c.id = p.client_id
@@ -297,6 +305,7 @@ export async function getProcessoFull(
       to_char(p.der, 'YYYY-MM-DD') AS der,
       to_char(p.dib, 'YYYY-MM-DD') AS dib,
       to_char(p.dcb, 'YYYY-MM-DD') AS dcb,
+      p.carteira,
       p.checklist
     FROM processos p
     JOIN clients c ON c.id = p.client_id

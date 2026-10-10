@@ -7,6 +7,7 @@ import {
   type ProcessoFormState,
 } from "@/lib/processo-actions";
 import type { ProcessoFull } from "@/lib/processos-db";
+import { useProcessosSettings } from "./processos-settings-modal";
 import { SpinnerIcon } from "@/components/icons";
 
 const TIPOS_ACAO = [
@@ -104,6 +105,7 @@ export default function EditProcessoForm({ processo, clients }: Props) {
     ProcessoFormState,
     FormData
   >(boundAction, null);
+  const { settings } = useProcessosSettings();
 
   const inList = TIPOS_ACAO.includes(processo.tipo_acao ?? "");
   const [tipoAcaoSel, setTipoAcaoSel] = useState(
@@ -228,6 +230,18 @@ export default function EditProcessoForm({ processo, clients }: Props) {
                 </option>
               ))}
             </select>
+          </Field>
+
+          <Field label="Carteira" required={settings.carteiraObrigatoria}>
+            <input
+              name="carteira"
+              type="text"
+              placeholder="Ex: Carteira A, Campanha INSS…"
+              defaultValue={processo.carteira ?? ""}
+              required={settings.carteiraObrigatoria}
+              disabled={isPending}
+              className={inputClass}
+            />
           </Field>
         </div>
       </div>

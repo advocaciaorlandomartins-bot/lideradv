@@ -419,6 +419,11 @@ export default function ProcessosContent({
           return false;
         if (af.cpfCnpj && !(p.parte_contraria_doc ?? "").includes(af.cpfCnpj))
           return false;
+        if (
+          af.carteira &&
+          !(p.carteira ?? "").toLowerCase().includes(af.carteira.toLowerCase())
+        )
+          return false;
         if (af.valorAcaoMin) {
           const min = parseFloat(af.valorAcaoMin);
           if (!isNaN(min) && (p.valor_causa ?? 0) < min) return false;

@@ -1,9 +1,10 @@
 # Changelog jurídico — pra atualizar o prompt do PrevBot
 
-Lista de tudo que mudou no conhecimento jurídico do LiderAdv nesta sessão
-(2026-10-08), pra quem for atualizar o prompt/base de conhecimento do
-PrevBot (repositório separado, não acessado nesta sessão). O PrevBot não
-foi tocado — isto é só o material de referência pra fazer isso manualmente.
+Lista de tudo que mudou no conhecimento jurídico do LiderAdv entre
+2026-10-08 e 2026-10-10, pra quem for atualizar o prompt/base de
+conhecimento do PrevBot (repositório separado, não acessado nesta
+sessão). O PrevBot não foi tocado — isto é só o material de referência
+pra fazer isso manualmente, ou pra outra sessão de Claude aplicar.
 
 ## Conteúdo NOVO adicionado
 
@@ -50,13 +51,40 @@ foi tocado — isto é só o material de referência pra fazer isso manualmente.
 - Correção de benefícios anteriores a 1988: **Súmula 456 STJ** — não
   "Súmula 548".
 
-## Jurisprudência marcada como incerta (não usar número específico até confirmar)
+## Mais jurisprudência corrigida (confirmado depois, 2026-10-10)
 
-Súmula 54, 63 e 77 da TNU, e RE 636.941 STF — o conceito jurídico geral
-atrás de cada um é real, mas o número exato não foi confirmado contra
-fonte oficial nesta sessão. Se o PrevBot cita esses números
-especificamente, considere usar linguagem sem apontar o número até
-confirmar.
+- BPC renda per capita (miserabilidade além do critério ¼ SM): citar
+  **Súmula 11 TNU** — não "Súmula 54" (número errado; o verbete real da
+  Súmula 54 é sobre aposentadoria rural por idade, assunto diferente).
+  Texto oficial: "A renda mensal, per capita, familiar, superior a ¼
+  do salário mínimo não impede a concessão do benefício assistencial
+  (...), desde que comprovada, por outros meios, a miserabilidade do
+  postulante." Publicada 14/04/2004.
+- **"Súmula 63 TNU" NÃO existe pra "empregada demitida mantém direito ao
+  salário-maternidade"** — o verbete real da Súmula 63 é sobre união
+  estável pra pensão por morte, assunto não relacionado. Se o PrevBot
+  cita esse número pra esse contexto, remover (o ponto em si —
+  período de graça mantém qualidade de segurada — é regra do art. 15
+  da Lei 8.213/91, não precisa de súmula pra sustentar).
+  - Achado novo nesse mesmo assunto: TNU firmou em PEDILEF (sessão de
+    14/09/2017) que, se a empregada demitida sem justa causa recebeu
+    indenização trabalhista correspondente a TODO o período de
+    estabilidade gestante, isso EXCLUI o fundamento do salário-
+    maternidade. Vale o PrevBot checar isso antes de orientar que o
+    direito está automaticamente mantido.
+- **"Súmula 77 TNU" NÃO existe pra "carência extinta pro contribuinte
+  individual"** — o verbete real da Súmula 77 é sobre incapacidade/
+  perícia, assunto não relacionado. Se o PrevBot cita esse número
+  nesse contexto, remover (o ponto — carência inconstitucional — já
+  está sustentado pelas ADIs 2.110/2.111, Tema do changelog acima).
+
+## Jurisprudência ainda marcada como incerta (não usar número específico até confirmar)
+
+RE 636.941 STF e Tema 352 STJ — o conceito jurídico geral atrás de cada
+um é real (perícia biopsicossocial; carência/cômputo de contribuições,
+respectivamente), mas o número exato não foi confirmado contra fonte
+oficial. Se o PrevBot cita esses números especificamente, considere usar
+linguagem sem apontar o número até confirmar.
 
 ## Onde ver o detalhe técnico completo
 

@@ -589,8 +589,11 @@ export default async function DashboardPage() {
             <p className="mt-0.5 font-body text-xs font-semibold text-muted">
               Receita do mês
             </p>
+            <p className="mt-2 font-body text-xs font-semibold text-amber-600">
+              A receber: {fmt(kpis.aReceber)}
+            </p>
             <p
-              className={`mt-2 font-body text-xs font-semibold group-hover:underline ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
+              className={`mt-1 font-body text-xs font-semibold group-hover:underline ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
             >
               Saldo: {fmt(kpis.saldoMes)} →
             </p>

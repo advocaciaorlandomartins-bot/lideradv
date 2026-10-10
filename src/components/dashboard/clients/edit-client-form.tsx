@@ -1014,13 +1014,12 @@ export default function EditClientForm({
         <EtapaTitle num={type === "PF" ? 4 : 2}>Endereço</EtapaTitle>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
           <div className="sm:col-span-2">
-            <Field label="CEP" required>
+            <Field label="CEP">
               <div className="relative">
                 <input
                   name="cep"
                   type="text"
                   inputMode="numeric"
-                  required
                   maxLength={9}
                   value={cepValue}
                   onChange={(e) => setCepValue(maskCEP(e.target.value))}
@@ -1036,11 +1035,10 @@ export default function EditClientForm({
           </div>
 
           <div className="sm:col-span-4">
-            <Field label="Logradouro" required>
+            <Field label="Logradouro">
               <input
                 name="street"
                 type="text"
-                required
                 value={street}
                 onChange={(e) => setStreet(e.target.value)}
                 disabled={disabled}
@@ -1050,11 +1048,10 @@ export default function EditClientForm({
           </div>
 
           <div className="sm:col-span-2">
-            <Field label="Número" required>
+            <Field label="Número">
               <input
                 name="number"
                 type="text"
-                required
                 value={numberValue}
                 onChange={(e) => setNumberValue(e.target.value)}
                 disabled={disabled}
@@ -1078,11 +1075,10 @@ export default function EditClientForm({
           </div>
 
           <div className="sm:col-span-3">
-            <Field label="Bairro" required>
+            <Field label="Bairro">
               <input
                 name="neighborhood"
                 type="text"
-                required
                 value={neighborhood}
                 onChange={(e) => setNeighborhood(e.target.value)}
                 disabled={disabled}
@@ -1092,11 +1088,10 @@ export default function EditClientForm({
           </div>
 
           <div className="sm:col-span-2">
-            <Field label="Cidade" required>
+            <Field label="Cidade">
               <input
                 name="city"
                 type="text"
-                required
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 disabled={disabled}
@@ -1106,10 +1101,9 @@ export default function EditClientForm({
           </div>
 
           <div className="sm:col-span-1">
-            <Field label="Estado" required>
+            <Field label="Estado">
               <select
                 name="state"
-                required
                 value={uf}
                 onChange={(e) => setUf(e.target.value)}
                 disabled={disabled}

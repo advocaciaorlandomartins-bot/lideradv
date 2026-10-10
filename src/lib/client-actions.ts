@@ -168,21 +168,6 @@ async function criarClienteCore(
       return { error: "Este e-mail já está cadastrado em outro cliente." };
   }
 
-  {
-    const missingAddr: string[] = [];
-    if (!cep) missingAddr.push("CEP");
-    if (!street) missingAddr.push("logradouro");
-    if (!addrNumber) missingAddr.push("número");
-    if (!neighborhood) missingAddr.push("bairro");
-    if (!city) missingAddr.push("cidade");
-    if (!state) missingAddr.push("estado");
-    if (missingAddr.length > 0) {
-      return {
-        error: `Preencha os campos de endereço: ${missingAddr.join(", ")}.`,
-      };
-    }
-  }
-
   const checklistInicial = JSON.stringify(checklistPadrao(tipoBeneficio));
 
   let novoId: string;
@@ -471,21 +456,6 @@ export async function updateClientAction(
       await sql`SELECT id FROM clients WHERE email = ${email} AND id != ${id}::uuid AND deleted_at IS NULL LIMIT 1`;
     if (dup.length > 0)
       return { error: "Este e-mail já está cadastrado em outro cliente." };
-  }
-
-  {
-    const missingAddr: string[] = [];
-    if (!cep) missingAddr.push("CEP");
-    if (!street) missingAddr.push("logradouro");
-    if (!addrNumber) missingAddr.push("número");
-    if (!neighborhood) missingAddr.push("bairro");
-    if (!city) missingAddr.push("cidade");
-    if (!state) missingAddr.push("estado");
-    if (missingAddr.length > 0) {
-      return {
-        error: `Preencha os campos de endereço: ${missingAddr.join(", ")}.`,
-      };
-    }
   }
 
   const prevClient =

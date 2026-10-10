@@ -603,17 +603,6 @@ export default async function DashboardPage() {
                   {fmt(kpis.aReceberMes)}
                 </span>
               </div>
-              <div className="flex items-baseline justify-between gap-2 border-t border-border pt-1.5">
-                <span className="font-body text-xs font-semibold text-muted">
-                  Saldo do mês
-                </span>
-                <span
-                  className={`font-heading text-sm font-bold sm:text-base whitespace-nowrap ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
-                  title={fmt(kpis.saldoMes)}
-                >
-                  {kpis.saldoMes >= 0 ? "▲" : "▼"} {fmt(kpis.saldoMes)}
-                </span>
-              </div>
             </div>
           </Link>
         )}

@@ -576,29 +576,45 @@ export default async function DashboardPage() {
               <div className="rounded-lg bg-emerald-50 p-2.5 transition-colors group-hover:bg-emerald-100">
                 <BanknotesIcon className="h-5 w-5 text-emerald-600" />
               </div>
-              <span
-                className={`font-body text-xs font-semibold ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
-              >
-                {kpis.saldoMes >= 0 ? "▲" : "▼"} Saldo
+              <span className="font-body text-xs font-semibold text-muted group-hover:underline">
+                Financeiro →
               </span>
             </div>
-            <p
-              className="mt-3 font-heading text-sm font-bold text-fg sm:text-xl whitespace-nowrap overflow-hidden text-ellipsis leading-tight"
-              title={fmt(kpis.recebidoMes)}
-            >
-              {fmt(kpis.recebidoMes)}
-            </p>
-            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
-              Receita do mês
-            </p>
-            <p className="mt-2 font-body text-xs font-semibold text-amber-600">
-              A receber: {fmt(kpis.aReceber)}
-            </p>
-            <p
-              className={`mt-1 font-body text-xs font-semibold group-hover:underline ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
-            >
-              Saldo: {fmt(kpis.saldoMes)} →
-            </p>
+            <div className="mt-3 space-y-1.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-body text-xs font-semibold text-muted">
+                  Recebido
+                </span>
+                <span
+                  className="font-heading text-sm font-bold text-fg sm:text-base whitespace-nowrap"
+                  title={fmt(kpis.recebidoMes)}
+                >
+                  {fmt(kpis.recebidoMes)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-body text-xs font-semibold text-muted">
+                  A receber
+                </span>
+                <span
+                  className="font-heading text-sm font-bold text-amber-600 sm:text-base whitespace-nowrap"
+                  title={fmt(kpis.aReceber)}
+                >
+                  {fmt(kpis.aReceber)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2 border-t border-border pt-1.5">
+                <span className="font-body text-xs font-semibold text-muted">
+                  Saldo do mês
+                </span>
+                <span
+                  className={`font-heading text-sm font-bold sm:text-base whitespace-nowrap ${kpis.saldoMes >= 0 ? "text-emerald-600" : "text-red-500"}`}
+                  title={fmt(kpis.saldoMes)}
+                >
+                  {kpis.saldoMes >= 0 ? "▲" : "▼"} {fmt(kpis.saldoMes)}
+                </span>
+              </div>
+            </div>
           </Link>
         )}
 

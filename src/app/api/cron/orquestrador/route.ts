@@ -18,6 +18,24 @@ const CRONS = [
   "/api/cerebro/scheduler",
 ];
 
+// Timeout do fetch pra cada sub-rota — precisa acompanhar o maxDuration que
+// cada uma declara no próprio arquivo, senão o abort aqui corta a rota antes
+// dela terminar. Achado em produção 2026-10-09: /api/cron/publicacoes
+// declara maxDuration=120 mas o abort aqui era fixo em 55s pra TODAS as
+// rotas — como publicações (DataJud + DJe-ESAJ por OAB + TramitaSign + DJEN,
+// tudo sequencial) genuinamente passa de 55s, ela vinha sendo abortada
+// TODO DIA havia pelo menos 15 dias seguidos, sempre com "TimeoutError" —
+// zero publicação nova do TramitaSign chegava no sistema nesse intervalo
+// inteiro, sem nenhum alerta (até o fix de "cron falhando" desta mesma
+// sessão). Mantém 55s como default conservador pras rotas rápidas (falha
+// cedo se alguma travar de verdade), e dá a folga real só pra quem declara
+// precisar.
+const TIMEOUT_MS_POR_ROTA: Record<string, number> = {
+  "/api/cron/publicacoes": 110_000,
+  "/api/cron/atualizacoes-legais": 110_000,
+};
+const TIMEOUT_MS_DEFAULT = 55_000;
+
 /**
  * Base URL das chamadas internas.
  *
@@ -78,7 +96,9 @@ export async function GET(req: Request) {
     try {
       const res = await fetch(`${base}${path}`, {
         headers: authHeader,
-        signal: AbortSignal.timeout(55_000),
+        signal: AbortSignal.timeout(
+          TIMEOUT_MS_POR_ROTA[path] ?? TIMEOUT_MS_DEFAULT
+        ),
       });
       const body = await res.json().catch(() => ({ status: res.status }));
       ok = res.ok;

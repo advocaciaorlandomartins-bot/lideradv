@@ -3389,44 +3389,42 @@ export default function ProcessoDetailClient({
         </div>
       )}
 
-      {/* Bottom grid — Eventos/Tarefas/Pendências ficam por último, logo
-          antes da Zona de risco (no fim da página), já que costumam
-          estar vazios recém o processo é criado. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <EventosSection
-            eventos={eventos}
-            processo={processo}
-            onNovo={() => setNovoEventoOpen(true)}
-          />
-        </div>
-
-        {/* Sidebar — 1 col */}
-        <div className="flex flex-col gap-4">
-          <ResponsavelSection
-            processo={processo}
-            colaboradores={colaboradores}
-            carga={carga}
-            podeAlterar={podeAlterarResponsavel ?? false}
-          />
-          <TarefasSection
-            tarefas={tarefas}
-            processo={processo}
-            colaboradores={colaboradores}
-            onNova={() => setNovaTarefaOpen(true)}
-            sessionNome={sessionNome}
-          />
-          <DocumentosNecessariosSection processo={processo} />
-          <PendenciasSection
-            pendencias={pendencias}
-            processo={processo}
-            onNova={() => setNovaPendenciaOpen(true)}
-          />
-          <DocsAutomatizadosSection
-            clientId={processo.client_id}
-            modelos={modelos}
-          />
-        </div>
+      {/* Eventos/Tarefas/Pendências ficam por último, logo antes da Zona
+          de risco (no fim da página), já que costumam estar vazios
+          recém o processo é criado. Eventos em linha própria (largura
+          cheia — é uma lista, não um card compacto); os cards pequenos
+          abaixo ficam numa grade que se ajusta sozinha (evita o vão em
+          branco de antes, quando Eventos vazio ficava ao lado de uma
+          coluna mais alta). */}
+      <EventosSection
+        eventos={eventos}
+        processo={processo}
+        onNovo={() => setNovoEventoOpen(true)}
+      />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ResponsavelSection
+          processo={processo}
+          colaboradores={colaboradores}
+          carga={carga}
+          podeAlterar={podeAlterarResponsavel ?? false}
+        />
+        <TarefasSection
+          tarefas={tarefas}
+          processo={processo}
+          colaboradores={colaboradores}
+          onNova={() => setNovaTarefaOpen(true)}
+          sessionNome={sessionNome}
+        />
+        <DocumentosNecessariosSection processo={processo} />
+        <PendenciasSection
+          pendencias={pendencias}
+          processo={processo}
+          onNova={() => setNovaPendenciaOpen(true)}
+        />
+        <DocsAutomatizadosSection
+          clientId={processo.client_id}
+          modelos={modelos}
+        />
       </div>
 
       {/* Modals */}

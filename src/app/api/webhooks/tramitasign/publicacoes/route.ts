@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import sql from "@/lib/db";
 import { enviarEmailNovaPublicacao } from "@/lib/email";
+import { logAction } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -172,6 +173,23 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const sig = request.headers.get("x-webhook-signature") ?? "";
   if (!verificarAssinatura(rawBody, sig, secret)) {
+    // Achado em produção 2026-10-09: esse 401 nunca era registrado em
+    // lugar nenhum — se o TramitaSign passasse a assinar com um secret
+    // diferente do configurado aqui (ex: secret da assinatura de
+    // publicações reconfigurado do lado deles, sem avisar), toda entrega
+    // falhava silenciosamente e só se descobria quando o advogado notava
+    // "sumiu" uma publicação, dias ou semanas depois. Loga em audit_logs
+    // (visível em Gerenciador > Auditoria) e no console (Vercel logs).
+    console.error(
+      "[webhook/tramitasign/publicacoes] assinatura inválida — secret pode estar dessincronizado com o TramitaSign"
+    );
+    await logAction({
+      acao: "erro",
+      entidade: "webhook_tramitasign_publicacoes",
+      descricao:
+        "Assinatura inválida recebida — possível secret dessincronizado com o TramitaSign.",
+      _login: "sistema (webhook)",
+    }).catch(() => null);
     return NextResponse.json({ error: "Assinatura inválida" }, { status: 401 });
   }
 

@@ -125,7 +125,6 @@ TNU (Turma Nacional de Uniformização):
 • Tema 348 TNU: desemprego involuntário amplia período de graça de 12 para 24 meses (art. 15, §2°, Lei 8.213/91)
 
 STJ:
-• Tema 352: carência — cômputo de contribuições
 • Súmula 456: inadmissível correção monetária dos salários de contribuição considerados no cálculo do salário de benefício de auxílio-doença, aposentadoria por invalidez, pensão ou auxílio-reclusão concedidos antes da CF/1988
 • Tema 862 STJ: DIB do auxílio-acidente é o dia seguinte à cessação do auxílio-doença (B31)
 • Tema 416 STJ: qualquer redução funcional permanente é suficiente para auxílio-acidente — irrelevante a extensão da sequela
@@ -134,7 +133,6 @@ STF:
 • ADIs 2.110/2.111 (21/03/2024): carência para salário-maternidade inconstitucional
 • RE 586.068 (Tema 100): coisa julgada de juizado especial revisável quando fundada em lei inconstitucional
 • Tema 27 STF (RE 567.985/RE 580.963): BPC — critério de renda não é absoluto (miserabilidade) — NÃO "Tema 995", que é sobre responsabilidade civil de imprensa, assunto completamente diferente (achado e corrigido em 2026-10-08)
-• RE 636.941: incapacidade — perícia biopsicossocial (ICF) — não confirmado contra fonte oficial nesta auditoria; conceito em si é real (perícia biopsicossocial é entendimento consolidado), mas não achei confirmação específica pra esse número de RE
 • ADPF 182: BPC — família de acolhimento — ⚠️ número NÃO confirmado contra fonte oficial em 2026-10-08 (achado agravante: esse mesmo número era citado em outro ponto deste arquivo pra um assunto DIFERENTE — renda per capita — contradição interna que não resolve sozinha; já corrigida lá, mas aqui o conceito "criança/adolescente acolhido pode receber BPC" não tem confirmação de qual é o caso real por trás)
 • ARE 930.647 AgR: precedente STF vinculante aplicável imediatamente, independente de publicação do paradigma
 

@@ -730,10 +730,16 @@ export default function IaPeticaoModal({
             {/* ── Barra de ações ── */}
             {(texto || textoCorrigido) && aba !== "banco" && (
               <div className="border-t border-border px-5 py-3 flex flex-col gap-2">
-                <p className="font-body text-xs text-muted">
-                  ⚠️ Peça gerada por IA — revise todos os dados (nomes, CPF,
-                  datas, citações) antes de protocolar. A IA pode errar.
-                </p>
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+                  <p className="font-body text-xs font-semibold text-amber-800">
+                    ⚠ Minuta — não protocole sem revisar
+                  </p>
+                  <p className="font-body text-xs text-amber-700 mt-0.5">
+                    A IA pode errar nomes, CPF, datas e citações. Confira cada
+                    um contra os documentos antes de protocolar — a
+                    responsabilidade pela peça é sua.
+                  </p>
+                </div>
                 <div className="flex flex-wrap gap-2 justify-between">
                   <div className="flex flex-wrap gap-2">
                     {/* Copiar */}

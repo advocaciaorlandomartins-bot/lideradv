@@ -9,27 +9,49 @@ function fmtBytes(b: number) {
   return `${(b / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-// Re-encode JPEG in the browser using Canvas API (no jpeg-js needed)
+// ~150 DPI numa página carta/A4 — nitidamente legível (inclusive
+// assinatura), mas uma fração dos pixels de um scan a 300 DPI. Achado
+// real (Orlando, 2026-10-10, testando esta tela): reduzir só a
+// qualidade JPEG (como era antes) dava ~5% — a maior parte do peso de
+// um PDF escaneado é RESOLUÇÃO, não qualidade.
+const MAX_DIMENSAO_PX = 1700;
+
+// Re-encode JPEG in the browser using Canvas API (no jpeg-js needed) —
+// desenha no canvas já no tamanho reduzido quando a imagem excede
+// MAX_DIMENSAO_PX, deixando o navegador fazer o reamostragem.
 async function recompressJpeg(
   data: Uint8Array,
   quality: number
-): Promise<Uint8Array | null> {
+): Promise<{ data: Uint8Array; width: number; height: number } | null> {
   try {
     const blob = new Blob([data.buffer as ArrayBuffer], { type: "image/jpeg" });
     const url = URL.createObjectURL(blob);
-    return await new Promise<Uint8Array | null>((resolve) => {
+    return await new Promise<{
+      data: Uint8Array;
+      width: number;
+      height: number;
+    } | null>((resolve) => {
       const img = new Image();
       img.onload = () => {
+        const { naturalWidth: w, naturalHeight: h } = img;
+        const maiorLado = Math.max(w, h);
+        const escala =
+          maiorLado > MAX_DIMENSAO_PX ? MAX_DIMENSAO_PX / maiorLado : 1;
+        const destW = Math.max(1, Math.round(w * escala));
+        const destH = Math.max(1, Math.round(h * escala));
+
         const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+        canvas.width = destW;
+        canvas.height = destH;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           URL.revokeObjectURL(url);
           resolve(null);
           return;
         }
-        ctx.drawImage(img, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, destW, destH);
         canvas.toBlob(
           (resultBlob) => {
             URL.revokeObjectURL(url);
@@ -39,7 +61,13 @@ async function recompressJpeg(
             }
             resultBlob
               .arrayBuffer()
-              .then((buf) => resolve(new Uint8Array(buf)));
+              .then((buf) =>
+                resolve({
+                  data: new Uint8Array(buf),
+                  width: destW,
+                  height: destH,
+                })
+              );
           },
           "image/jpeg",
           quality
@@ -80,12 +108,24 @@ async function comprimirPdf(
     const filterRaw = dict.get(PDFName.of("Filter"));
     if (filterRaw?.toString() !== "/DCTDecode") continue;
 
+    const wRaw = dict.get(PDFName.of("Width"));
+    const hRaw = dict.get(PDFName.of("Height"));
+    const width = wRaw instanceof PDFNumber ? wRaw.asNumber() : 0;
+    const height = hRaw instanceof PDFNumber ? hRaw.asNumber() : 0;
+
     const originalData = obj.asUint8Array();
     const compressed = await recompressJpeg(originalData, QUALITY);
-    if (compressed && compressed.length < originalData.length) {
+    if (compressed && compressed.data.length < originalData.length) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (obj as any).contents = compressed;
-      dict.set(PDFName.of("Length"), PDFNumber.of(compressed.length));
+      (obj as any).contents = compressed.data;
+      dict.set(PDFName.of("Length"), PDFNumber.of(compressed.data.length));
+      // Tamanho exibido na página vem da matriz de transformação do
+      // conteúdo, não da resolução da imagem — atualizar Width/Height só
+      // muda o "DPI" efetivo, não o tamanho visível.
+      if (compressed.width !== width || compressed.height !== height) {
+        dict.set(PDFName.of("Width"), PDFNumber.of(compressed.width));
+        dict.set(PDFName.of("Height"), PDFNumber.of(compressed.height));
+      }
       imagens++;
     }
   }

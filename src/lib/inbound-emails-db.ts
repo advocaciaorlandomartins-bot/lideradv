@@ -243,8 +243,17 @@ export interface RecentEmailWithClient extends InboundEmail {
   client_name: string;
 }
 
+// verTodos/colaboradorId: achado em auditoria de 2026-10-10 — sem esse
+// filtro, a "Caixa de Entrada" do dashboard mostrava remetente, assunto e um
+// trecho real do corpo de e-mails de CLIENTES DE OUTROS COLABORADORES pra
+// qualquer um com "clientes:ver", mesmo sem "clientes_ver_todos" — exatamente
+// o dado que a própria ficha do cliente (podeAcessarCliente) bloqueia. Em um
+// escritório previdenciário isso pode incluir dado médico/financeiro
+// sensível do cliente.
 export async function getAllRecentEmails(
-  limit = 30
+  limit = 30,
+  verTodos = true,
+  colaboradorId: string | null = null
 ): Promise<RecentEmailWithClient[]> {
   const rows = await sql`
     SELECT
@@ -264,6 +273,15 @@ export async function getAllRecentEmails(
       c.name AS client_name
     FROM inbound_emails ie
     LEFT JOIN clients c ON c.id = ie.client_id
+    WHERE (
+      ${verTodos}
+      OR ie.client_id IS NULL
+      OR EXISTS (
+        SELECT 1 FROM processos p
+        WHERE p.client_id = ie.client_id AND p.deleted_at IS NULL
+          AND p.responsavel_id = ${colaboradorId}::uuid
+      )
+    )
     ORDER BY ie.received_at DESC
     LIMIT ${limit}
   `;
@@ -273,9 +291,22 @@ export async function getAllRecentEmails(
   })) as RecentEmailWithClient[];
 }
 
-export async function countUnreadEmails(): Promise<number> {
+export async function countUnreadEmails(
+  verTodos = true,
+  colaboradorId: string | null = null
+): Promise<number> {
   const rows = await sql`
-    SELECT COUNT(*) AS total FROM inbound_emails WHERE lida = false
+    SELECT COUNT(*) AS total FROM inbound_emails ie
+    WHERE ie.lida = false
+      AND (
+        ${verTodos}
+        OR ie.client_id IS NULL
+        OR EXISTS (
+          SELECT 1 FROM processos p
+          WHERE p.client_id = ie.client_id AND p.deleted_at IS NULL
+            AND p.responsavel_id = ${colaboradorId}::uuid
+        )
+      )
   `;
   return Number(rows[0]?.total ?? 0);
 }

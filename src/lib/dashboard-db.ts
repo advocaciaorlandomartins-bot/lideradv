@@ -57,7 +57,11 @@ const TIPO_LABELS: Record<string, string> = {
   alvaras: "Alvará",
 };
 
-async function _getDashboardData(login?: string) {
+async function _getDashboardData(
+  login?: string,
+  verTodosClientes = true,
+  colaboradorId: string | null = null
+) {
   const [
     clientesDevedoresResult,
     lancamentosVencidosResult,
@@ -144,17 +148,28 @@ async function _getDashboardData(login?: string) {
         LIMIT 20
       `,
 
-    // Todos os clientes PF com data de aniversário (para filtro por mês no dashboard)
+    // Todos os clientes PF com data de aniversário (para filtro por mês no
+    // dashboard) — achado em auditoria de 2026-10-10: sem o filtro de
+    // ownership, mostrava nome/telefone/aniversário de clientes de QUALQUER
+    // colaborador pra quem tem "clientes:ver" sem "clientes_ver_todos".
     sql`
         SELECT
           id::text,
           name,
           phone,
           TO_CHAR(birth_date, 'YYYY-MM-DD') AS birth_date
-        FROM clients
+        FROM clients cl
         WHERE type = 'PF'
           AND birth_date IS NOT NULL
           AND deleted_at IS NULL
+          AND (
+            ${verTodosClientes}
+            OR EXISTS (
+              SELECT 1 FROM processos p
+              WHERE p.client_id = cl.id AND p.deleted_at IS NULL
+                AND p.responsavel_id = ${colaboradorId}::uuid
+            )
+          )
         ORDER BY
           EXTRACT(MONTH FROM birth_date),
           EXTRACT(DAY FROM birth_date),
@@ -282,7 +297,10 @@ export interface AlertaPrevidenciario {
   dias: number;
 }
 
-async function _getAlertasPrevidenciarios(): Promise<AlertaPrevidenciario[]> {
+async function _getAlertasPrevidenciarios(
+  verTodos: boolean,
+  colaboradorId: string | null
+): Promise<AlertaPrevidenciario[]> {
   const rows = await sql`
     SELECT
       p.id::text           AS processo_id,
@@ -298,6 +316,7 @@ async function _getAlertasPrevidenciarios(): Promise<AlertaPrevidenciario[]> {
       AND p.dcb BETWEEN (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - INTERVAL '7 days' AND (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + INTERVAL '60 days'
       AND p.status = 'ativo'
       AND p.deleted_at IS NULL
+      AND (${verTodos} OR p.responsavel_id = ${colaboradorId}::uuid)
 
     UNION ALL
 
@@ -315,6 +334,7 @@ async function _getAlertasPrevidenciarios(): Promise<AlertaPrevidenciario[]> {
       AND p.status = 'ativo'
       AND p.deleted_at IS NULL
       AND (p.fase IS NULL OR p.fase NOT IN ('Conhecimento','Instrução','Julgamento','Recurso','Execução','Cumprimento de Sentença'))
+      AND (${verTodos} OR p.responsavel_id = ${colaboradorId}::uuid)
 
     ORDER BY dias ASC
     LIMIT 15
@@ -332,6 +352,13 @@ async function _getAlertasPrevidenciarios(): Promise<AlertaPrevidenciario[]> {
   }));
 }
 
+// Achado em auditoria de 2026-10-10: sem os parâmetros verTodos/colaboradorId
+// (e o filtro de ownership correspondente acima), este card mostrava nome do
+// cliente + tipo de ação + DCB/indeferimento de processos de QUALQUER
+// colaborador — exatamente o dado que a própria tela do processo esconde de
+// quem não é responsável e não tem processos_ver_todos. unstable_cache varia
+// a chave pelos argumentos passados à função, então isso já cacheia
+// corretamente por combinação de (verTodos, colaboradorId).
 export const getAlertasPrevidenciarios = unstable_cache(
   _getAlertasPrevidenciarios,
   ["alertas-previdenciarios"],

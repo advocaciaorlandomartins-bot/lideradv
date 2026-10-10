@@ -263,14 +263,32 @@ export default async function DashboardPage() {
     meuFinanceiro,
   ] = await Promise.all([
     needsGerData ? getGerenciadorData() : Promise.resolve(null),
-    needsDashData ? getDashboardData(session.login) : Promise.resolve(null),
+    needsDashData
+      ? getDashboardData(
+          session.login,
+          hasPermission(session, "clientes_ver_todos", "ver"),
+          (await getColaboradorIdForUser(session.id)) ?? null
+        )
+      : Promise.resolve(null),
     perm.clientes
-      ? getAllRecentEmails(20).catch(() => [])
+      ? getAllRecentEmails(
+          20,
+          hasPermission(session, "clientes_ver_todos", "ver"),
+          (await getColaboradorIdForUser(session.id)) ?? null
+        ).catch(() => [])
       : Promise.resolve([]),
-    perm.clientes ? countUnreadEmails().catch(() => 0) : Promise.resolve(0),
+    perm.clientes
+      ? countUnreadEmails(
+          hasPermission(session, "clientes_ver_todos", "ver"),
+          (await getColaboradorIdForUser(session.id)) ?? null
+        ).catch(() => 0)
+      : Promise.resolve(0),
     countMinhasPendentes(session.login, session.nome).catch(() => 0),
     perm.processos
-      ? getAlertasPrevidenciarios().catch(() => [])
+      ? getAlertasPrevidenciarios(
+          hasPermission(session, "processos_ver_todos", "ver"),
+          (await getColaboradorIdForUser(session.id)) ?? null
+        ).catch(() => [])
       : Promise.resolve([]),
     showFinanceiroPessoal
       ? getMeuFinanceiroInitial(session.id).catch(() => null)

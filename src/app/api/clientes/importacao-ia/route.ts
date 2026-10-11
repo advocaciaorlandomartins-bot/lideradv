@@ -7,13 +7,14 @@ import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
 import { registrarUsoIA } from "@/lib/ia-uso-db";
 import {
   extractPdfContent,
+  extractPdfAsImages,
   isSupportedImage,
   type ContentPart,
 } from "@/lib/pdf-extract";
 
 export const dynamic = "force-dynamic";
 
-const EXTRACTION_PROMPT = `Extraia todos os dados deste documento brasileiro e retorne SOMENTE o JSON abaixo. Pode ser um documento de identificação, um comprovante de residência (conta de água/luz/telefone, contrato de aluguel) ou um documento médico/previdenciário (carta de concessão/indeferimento do INSS, extrato do CNIS, laudo médico, atestado). Preencha só os campos que existirem nesse tipo de documento — campos ausentes, ilegíveis ou que não se aplicam ao documento devem ter valor null.
+const EXTRACTION_PROMPT = `Extraia todos os dados deste documento brasileiro e retorne SOMENTE o JSON abaixo. Pode ser um documento de identificação, um comprovante de residência (conta de água/luz/telefone, contrato de aluguel), um documento médico/previdenciário (carta de concessão/indeferimento do INSS, extrato do CNIS, laudo médico, atestado) ou outro documento que traga nome/CPF/data de nascimento (ex: carteira de trabalho). Preencha só os campos que existirem nesse tipo de documento — campos ausentes, ilegíveis ou que não se aplicam ao documento devem ter valor null. Se o texto vier desorganizado (rótulo e valor fora de ordem, comum em PDF de formulário em colunas), use o contexto pra mapear corretamente. Responda SEMPRE só com o JSON, mesmo que vários campos fiquem null — nunca com texto explicativo antes ou depois.
 
 {
   "name": "Nome completo",
@@ -233,6 +234,41 @@ export async function POST(request: Request) {
       ).catch(() => {});
       const block = res.content[0];
       rawText = block?.type === "text" ? block.text : "";
+
+      // Texto digital extraído de PDF em layout de colunas/tabela (ex:
+      // carteira de trabalho digital, formulários do governo) pode sair
+      // com rótulo e valor fora de ordem — o modelo às vezes não
+      // consegue estruturar e não retorna JSON. Antes de desistir,
+      // tenta de novo com a página renderizada como imagem: o modelo vê
+      // o layout como está desenhado, sem depender da ordem de extração
+      // do texto.
+      const foiExtracaoDeTexto =
+        pdfContent.length === 1 && pdfContent[0].type === "text";
+      if (foiExtracaoDeTexto && !parseJson(rawText)) {
+        try {
+          const imgContent = await extractPdfAsImages(
+            buffer,
+            EXTRACTION_PROMPT
+          );
+          const res2 = await client.messages.create({
+            model: "claude-sonnet-5",
+            max_tokens: 1536,
+            messages: [{ role: "user", content: imgContent }],
+          });
+          registrarUsoIA(
+            "/api/clientes/importacao-ia",
+            "claude-sonnet-5",
+            res2.usage.input_tokens,
+            res2.usage.output_tokens,
+            session.id
+          ).catch(() => {});
+          const block2 = res2.content[0];
+          const rawText2 = block2?.type === "text" ? block2.text : "";
+          if (parseJson(rawText2)) rawText = rawText2;
+        } catch (e) {
+          console.error("PDF fallback-para-imagem falhou:", e);
+        }
+      }
     } else {
       return NextResponse.json(
         {
@@ -244,6 +280,10 @@ export async function POST(request: Request) {
 
     const extracted = parseJson(rawText);
     if (!extracted) {
+      console.error(
+        "Importação IA: resposta do modelo não é JSON válido:",
+        rawText.slice(0, 500)
+      );
       return NextResponse.json(
         {
           error:

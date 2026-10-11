@@ -87,7 +87,7 @@ export function buildModeloVars(
     "{{endereco}}": addrParts.join(", "),
     "{{endereco_completo}}": enderecoCompleto,
     "{{bairro}}": client.neighborhood ?? "",
-    "{{cidade}}": client.city,
+    "{{cidade}}": client.state ? `${client.city}-${client.state}` : client.city,
     "{{estado}}": client.state,
     // birth_date é "YYYY-MM-DD" (sem hora) — Date parseia como UTC meia-noite;
     // timeZone: "UTC" explícito evita retroceder um dia em qualquer ambiente

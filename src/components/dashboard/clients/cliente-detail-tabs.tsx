@@ -298,10 +298,14 @@ function InfoRow({
   icon: Icon,
   label,
   value,
+  suffix,
 }: {
   icon?: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
+  /** Texto curto exibido ao lado do valor (ex: idade) — não entra no
+      que o botão de copiar copia, só o valor principal copia limpo. */
+  suffix?: string;
 }) {
   return (
     <div className="flex items-start gap-3">
@@ -313,12 +317,32 @@ function InfoRow({
         <div className="mt-0.5 flex items-center gap-1">
           <p className="font-body text-sm text-fg break-words flex-1">
             {value || "—"}
+            {suffix && (
+              <span className="ml-1.5 font-body text-xs font-semibold text-muted">
+                ({suffix})
+              </span>
+            )}
           </p>
           <CopyButton value={value} />
         </div>
       </div>
     </div>
   );
+}
+
+/** Idade em anos completos na data de hoje — usada pra sinalizar quando
+    o cliente está perto de virar maior de idade ou de completar 65
+    (marcos relevantes pra BPC/representação legal). */
+function calcularIdade(birthDate: string): number {
+  const nascimento = new Date(birthDate + "T12:00:00");
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const aindaNaoFezAniversarioEsteAno =
+    hoje.getMonth() < nascimento.getMonth() ||
+    (hoje.getMonth() === nascimento.getMonth() &&
+      hoje.getDate() < nascimento.getDate());
+  if (aindaNaoFezAniversarioEsteAno) idade--;
+  return idade;
 }
 
 // ── SectionCard ───────────────────────────────────────────────
@@ -576,6 +600,7 @@ export default function ClienteDetailTabs({
                   value={new Date(
                     client.birth_date + "T12:00:00"
                   ).toLocaleDateString("pt-BR")}
+                  suffix={`${calcularIdade(client.birth_date)} anos`}
                 />
               )}
               {client.estado_civil && (

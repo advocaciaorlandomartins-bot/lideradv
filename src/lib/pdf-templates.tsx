@@ -182,8 +182,7 @@ export function ProcuracaoDoc({
         </View>
 
         <Text style={[s.indent, { marginTop: 8 }]}>
-          {client.city}
-          {client.state ? `-${client.state}` : ""}, {date}.
+          {`${client.city}${client.state ? `-${client.state}` : ""}, ${date}.`}
         </Text>
 
         <View
@@ -314,8 +313,7 @@ export function ContratoHonorariosDoc({
         </View>
 
         <Text style={[s.indent, { marginTop: 8 }]}>
-          {client.city}
-          {client.state ? `-${client.state}` : ""}, {date}.
+          {`${client.city}${client.state ? `-${client.state}` : ""}, ${date}.`}
         </Text>
 
         <View
@@ -401,8 +399,7 @@ export function DeclaracaoHipossuficienciaDoc({
         </View>
 
         <Text style={[s.body, { marginTop: 8 }]}>
-          {client.city}
-          {client.state ? `-${client.state}` : ""}, {date}.
+          {`${client.city}${client.state ? `-${client.state}` : ""}, ${date}.`}
         </Text>
 
         <View
@@ -680,8 +677,7 @@ export function ComunicadoHonorariosDoc({
         </View>
 
         <Text style={[s.body, { marginTop: 8 }]}>
-          {client.city}
-          {client.state ? `-${client.state}` : ""}, {date}.
+          {`${client.city}${client.state ? `-${client.state}` : ""}, ${date}.`}
         </Text>
 
         <View
@@ -800,8 +796,7 @@ export function NotificacaoExtrajudicialDoc({
         </View>
 
         <Text style={[s.body, { marginTop: 8 }]}>
-          {client.city}
-          {client.state ? `-${client.state}` : ""}, {date}.
+          {`${client.city}${client.state ? `-${client.state}` : ""}, ${date}.`}
         </Text>
 
         <View

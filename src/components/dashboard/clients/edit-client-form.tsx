@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { updateClientAction, type ClientFormState } from "@/lib/client-actions";
 import type { ClientFull } from "@/lib/clients-db";
 import type { Colaborador } from "@/lib/colaboradores-db";
-import { SpinnerIcon } from "@/components/icons";
+import { SpinnerIcon, XMarkIcon } from "@/components/icons";
 
 function formatMoneyInput(raw: string): string {
   const commaIdx = raw.lastIndexOf(",");
@@ -160,18 +160,36 @@ const labelClass = "block font-body text-sm font-semibold text-fg mb-1.5";
 function Field({
   label,
   required,
+  onClear,
   children,
 }: {
   label: string;
   required?: boolean;
+  /** Quando informado, mostra um botão "limpar" ao lado do rótulo —
+      pra apagar rápido um campo preenchido pela IA que o advogado não
+      quer manter. */
+  onClear?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className={labelClass}>
-        {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
-      </label>
+      <div className="flex items-center justify-between">
+        <label className={labelClass}>
+          {label}
+          {required && <span className="ml-0.5 text-red-500">*</span>}
+        </label>
+        {onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            title="Limpar campo"
+            className="mb-1.5 flex items-center gap-0.5 font-body text-xs text-muted transition-colors hover:text-red-600"
+          >
+            <XMarkIcon className="h-3 w-3" />
+            Limpar
+          </button>
+        )}
+      </div>
       {children}
     </div>
   );
@@ -269,6 +287,28 @@ export default function EditClientForm({
   const [respPhoneValue, setRespPhoneValue] = useState(() =>
     maskPhone(client.responsavel_telefone ?? "")
   );
+
+  // Etapa Previdenciária — campos não controlados (defaultValue), então
+  // "limpar" mexe direto no DOM via ref em vez de um useState por campo.
+  // Existe porque o Cadastro por IA às vezes preenche um campo que o
+  // advogado não quer manter.
+  const previdenciarioRef = useRef<HTMLDivElement>(null);
+  function limparCampoPrevidenciario(name: string) {
+    const el = previdenciarioRef.current?.querySelector<
+      HTMLInputElement | HTMLSelectElement
+    >(`[name="${name}"]`);
+    if (el) {
+      el.value = "";
+      el.focus();
+    }
+  }
+  function limparTudoPrevidenciario() {
+    previdenciarioRef.current
+      ?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")
+      .forEach((el) => {
+        el.value = "";
+      });
+  }
 
   // Etapa 3 — Origem
   const [origemTipo, setOrigemTipo] = useState(client.origem_tipo ?? "");
@@ -722,13 +762,28 @@ export default function EditClientForm({
 
       {/* ── Etapa Previdenciária (PF only) ── */}
       {type === "PF" && (
-        <div className="space-y-4">
-          <EtapaTitle num={3}>Dados Previdenciários (INSS)</EtapaTitle>
+        <div ref={previdenciarioRef} className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1">
+              <EtapaTitle num={3}>Dados Previdenciários (INSS)</EtapaTitle>
+            </div>
+            <button
+              type="button"
+              onClick={limparTudoPrevidenciario}
+              disabled={isPending}
+              className="flex-shrink-0 rounded-lg border border-border px-3 h-8 font-body text-xs font-semibold text-muted transition-colors hover:border-red-300 hover:text-red-600 disabled:opacity-50"
+            >
+              Limpar tudo
+            </button>
+          </div>
           <p className="font-body text-xs text-muted -mt-2">
             Preencha apenas os campos aplicáveis ao caso do cliente.
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="NIS / PIS / PASEP">
+            <Field
+              label="NIS / PIS / PASEP"
+              onClear={() => limparCampoPrevidenciario("nis")}
+            >
               <input
                 name="nis"
                 type="text"
@@ -741,7 +796,10 @@ export default function EditClientForm({
               />
             </Field>
 
-            <Field label="Número do Benefício INSS">
+            <Field
+              label="Número do Benefício INSS"
+              onClear={() => limparCampoPrevidenciario("num_beneficio")}
+            >
               <input
                 name="num_beneficio"
                 type="text"
@@ -753,7 +811,10 @@ export default function EditClientForm({
               />
             </Field>
 
-            <Field label="Status do Benefício">
+            <Field
+              label="Status do Benefício"
+              onClear={() => limparCampoPrevidenciario("status_beneficio")}
+            >
               <select
                 name="status_beneficio"
                 defaultValue={client.status_beneficio ?? ""}
@@ -768,7 +829,10 @@ export default function EditClientForm({
               </select>
             </Field>
 
-            <Field label="Tipo de Benefício">
+            <Field
+              label="Tipo de Benefício"
+              onClear={() => limparCampoPrevidenciario("tipo_beneficio")}
+            >
               <select
                 name="tipo_beneficio"
                 defaultValue={client.tipo_beneficio ?? ""}
@@ -810,7 +874,10 @@ export default function EditClientForm({
               </select>
             </Field>
 
-            <Field label="Data de início do benefício">
+            <Field
+              label="Data de início do benefício"
+              onClear={() => limparCampoPrevidenciario("data_inicio_beneficio")}
+            >
               <input
                 name="data_inicio_beneficio"
                 type="date"
@@ -821,7 +888,10 @@ export default function EditClientForm({
               />
             </Field>
 
-            <Field label="Valor do benefício (R$)">
+            <Field
+              label="Valor do benefício (R$)"
+              onClear={() => limparCampoPrevidenciario("valor_beneficio")}
+            >
               <input
                 name="valor_beneficio"
                 type="text"
@@ -840,7 +910,12 @@ export default function EditClientForm({
               />
             </Field>
 
-            <Field label="Categoria contribuinte">
+            <Field
+              label="Categoria contribuinte"
+              onClear={() =>
+                limparCampoPrevidenciario("categoria_contribuinte")
+              }
+            >
               <select
                 name="categoria_contribuinte"
                 defaultValue={client.categoria_contribuinte ?? ""}
@@ -856,7 +931,10 @@ export default function EditClientForm({
               </select>
             </Field>
 
-            <Field label="Qtd. de contribuições (meses)">
+            <Field
+              label="Qtd. de contribuições (meses)"
+              onClear={() => limparCampoPrevidenciario("num_contribuicoes")}
+            >
               <input
                 name="num_contribuicoes"
                 type="number"
@@ -869,7 +947,10 @@ export default function EditClientForm({
               />
             </Field>
 
-            <Field label="Carência atingida?">
+            <Field
+              label="Carência atingida?"
+              onClear={() => limparCampoPrevidenciario("carencia_atingida")}
+            >
               <select
                 name="carencia_atingida"
                 defaultValue={
@@ -888,7 +969,10 @@ export default function EditClientForm({
               </select>
             </Field>
 
-            <Field label="Naturalidade (cidade)">
+            <Field
+              label="Naturalidade (cidade)"
+              onClear={() => limparCampoPrevidenciario("naturalidade_cidade")}
+            >
               <input
                 name="naturalidade_cidade"
                 type="text"
@@ -899,7 +983,10 @@ export default function EditClientForm({
               />
             </Field>
 
-            <Field label="Estado de naturalidade">
+            <Field
+              label="Estado de naturalidade"
+              onClear={() => limparCampoPrevidenciario("naturalidade_estado")}
+            >
               <select
                 name="naturalidade_estado"
                 defaultValue={client.naturalidade_estado ?? ""}
@@ -915,7 +1002,10 @@ export default function EditClientForm({
               </select>
             </Field>
 
-            <Field label="Nome da mãe">
+            <Field
+              label="Nome da mãe"
+              onClear={() => limparCampoPrevidenciario("filiacao_mae")}
+            >
               <input
                 name="filiacao_mae"
                 type="text"
@@ -926,7 +1016,10 @@ export default function EditClientForm({
               />
             </Field>
 
-            <Field label="Nome do pai">
+            <Field
+              label="Nome do pai"
+              onClear={() => limparCampoPrevidenciario("filiacao_pai")}
+            >
               <input
                 name="filiacao_pai"
                 type="text"
@@ -944,7 +1037,10 @@ export default function EditClientForm({
               Dados de saúde e incapacidade
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="CID principal">
+              <Field
+                label="CID principal"
+                onClear={() => limparCampoPrevidenciario("cid_principal")}
+              >
                 <input
                   name="cid_principal"
                   type="text"
@@ -956,7 +1052,10 @@ export default function EditClientForm({
                 />
               </Field>
 
-              <Field label="Tipo de incapacidade">
+              <Field
+                label="Tipo de incapacidade"
+                onClear={() => limparCampoPrevidenciario("tipo_incapacidade")}
+              >
                 <select
                   name="tipo_incapacidade"
                   defaultValue={client.tipo_incapacidade ?? ""}
@@ -970,7 +1069,10 @@ export default function EditClientForm({
                 </select>
               </Field>
 
-              <Field label="Data do diagnóstico">
+              <Field
+                label="Data do diagnóstico"
+                onClear={() => limparCampoPrevidenciario("data_diagnostico")}
+              >
                 <input
                   name="data_diagnostico"
                   type="date"
@@ -981,7 +1083,10 @@ export default function EditClientForm({
                 />
               </Field>
 
-              <Field label="Data de afastamento do trabalho">
+              <Field
+                label="Data de afastamento do trabalho"
+                onClear={() => limparCampoPrevidenciario("data_afastamento")}
+              >
                 <input
                   name="data_afastamento"
                   type="date"
@@ -993,7 +1098,12 @@ export default function EditClientForm({
               </Field>
 
               <div className="sm:col-span-2">
-                <Field label="Atividade laboral anterior">
+                <Field
+                  label="Atividade laboral anterior"
+                  onClear={() =>
+                    limparCampoPrevidenciario("atividade_anterior")
+                  }
+                >
                   <input
                     name="atividade_anterior"
                     type="text"

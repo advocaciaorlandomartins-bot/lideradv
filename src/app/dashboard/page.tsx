@@ -587,28 +587,28 @@ export default async function DashboardPage() {
                 Financeiro — mês atual →
               </span>
             </div>
-            <div className="mt-3 space-y-1.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-body text-xs font-semibold text-muted">
+            <div className="mt-3 space-y-2">
+              <div>
+                <p className="font-body text-xs font-semibold text-muted">
                   Recebido
-                </span>
-                <span
-                  className="font-heading text-sm font-bold text-fg sm:text-base whitespace-nowrap"
+                </p>
+                <p
+                  className="font-heading text-sm font-bold text-fg sm:text-base"
                   title={fmt(kpis.recebidoMes)}
                 >
                   {fmt(kpis.recebidoMes)}
-                </span>
+                </p>
               </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-body text-xs font-semibold text-muted">
+              <div>
+                <p className="font-body text-xs font-semibold text-muted">
                   A receber
-                </span>
-                <span
-                  className="font-heading text-sm font-bold text-amber-600 sm:text-base whitespace-nowrap"
+                </p>
+                <p
+                  className="font-heading text-sm font-bold text-amber-600 sm:text-base"
                   title={fmt(kpis.aReceberMes)}
                 >
                   {fmt(kpis.aReceberMes)}
-                </span>
+                </p>
               </div>
             </div>
           </Link>

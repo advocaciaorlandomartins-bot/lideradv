@@ -59,6 +59,23 @@ export async function listarEnvelopes(
   }));
 }
 
+/** Pro card de aviso do Dashboard — mesmo filtro por criado_por de
+    listarEnvelopes, pra bater exatamente com o que o usuário vê ao
+    clicar e ir pra tela de Assinaturas (achado real: contar todos os
+    envelopes do escritório incluía envelope de teste de outras
+    sessões, sob criado_por = "sistema", nunca enviado a cliente de
+    verdade — número no card maior que a lista de verdade). */
+export async function countEnvelopesAguardando(
+  criadoPor: string
+): Promise<number> {
+  const [row] = await sql`
+    SELECT COUNT(*)::int AS total
+    FROM envelopes
+    WHERE criado_por = ${criadoPor} AND status = 'aguardando'
+  `;
+  return row?.total ?? 0;
+}
+
 export interface EnvelopeDetalhe {
   id: string;
   nome: string;

@@ -19,6 +19,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { getProcessosCount } from "@/lib/processos-db";
 import { getClientesCount } from "@/lib/clients-db";
+import { countEnvelopesAguardando } from "@/lib/assinaturas-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import MiniCalendar from "@/components/dashboard/mini-calendar";
 import DashboardAniversariosCard from "@/components/dashboard/dashboard-aniversarios-card";
@@ -263,6 +264,7 @@ export default async function DashboardPage() {
     minhasPendentes,
     alertasPrevidenciarios,
     meuFinanceiro,
+    assinaturasAguardando,
   ] = await Promise.all([
     needsGerData ? getGerenciadorData() : Promise.resolve(null),
     needsDashData
@@ -297,6 +299,9 @@ export default async function DashboardPage() {
     showFinanceiroPessoal
       ? getMeuFinanceiroInitial(session.id).catch(() => null)
       : Promise.resolve(null),
+    perm.assinaturas
+      ? countEnvelopesAguardando(session.login).catch(() => 0)
+      : Promise.resolve(0),
   ]);
 
   // "totalProcessos" do gerenciador é a contagem do escritório inteiro — sem
@@ -514,7 +519,7 @@ export default async function DashboardPage() {
       )}
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
         {perm.clientes && counts && (
           <Link
             href="/dashboard/clientes"
@@ -709,7 +714,7 @@ export default async function DashboardPage() {
           </Link>
         )}
 
-        {perm.assinaturas && counts && counts.assinaturasAguardando > 0 && (
+        {perm.assinaturas && assinaturasAguardando > 0 && (
           <Link
             href="/dashboard/assinaturas"
             className="group rounded-xl border border-amber-200 bg-white p-4 shadow-sm transition-all hover:border-amber-300 hover:shadow-md"
@@ -720,11 +725,10 @@ export default async function DashboardPage() {
               </div>
             </div>
             <p className="mt-3 font-heading text-3xl font-bold text-amber-600">
-              {counts.assinaturasAguardando}
+              {assinaturasAguardando}
             </p>
             <p className="mt-0.5 font-body text-xs font-semibold text-muted">
-              Assinatura{counts.assinaturasAguardando !== 1 ? "s" : ""}{" "}
-              aguardando
+              Assinatura{assinaturasAguardando !== 1 ? "s" : ""} aguardando
             </p>
             <p className="mt-2 font-body text-xs text-amber-600 group-hover:underline">
               Cobrar quem falta assinar →

@@ -198,7 +198,14 @@ Retorne APENAS um JSON válido com esta estrutura (sem markdown, sem explicaçõ
 
     try {
       const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
+        // Sonnet, não Haiku — mesmo achado de clientes/importacao-ia/route.ts:
+        // Haiku falha em ler documento real (letterhead, QR code, assinatura
+        // digitalizada) com confiabilidade, mesmo o texto sendo claro.
+        // Reproduzido aqui pelo Orlando (2026-10-12): Comunicação de Decisão
+        // do INSS sempre voltava "Outro documento / Não foi possível extrair
+        // os dados" com Haiku, de forma consistente (não era falha
+        // transitória) — essa rota nunca tinha recebido a mesma correção.
+        model: "claude-sonnet-5",
         max_tokens: 1024,
         messages: [
           {
@@ -232,7 +239,7 @@ Retorne APENAS um JSON válido com esta estrutura (sem markdown, sem explicaçõ
 
       registrarUsoIA(
         "/api/ia/processar-inss",
-        "claude-haiku-4-5-20251001",
+        "claude-sonnet-5",
         response.usage.input_tokens,
         response.usage.output_tokens,
         session.id

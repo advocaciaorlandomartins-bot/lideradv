@@ -3260,11 +3260,24 @@ export default function ProcessoDetailClient({
         </div>
       </div>
 
-      {/* Linha de Produção */}
-      <ProducaoBar
-        processo={processo}
-        onArquivar={() => setArquivarOpen(true)}
-      />
+      {/* Linha de Produção + Responsável — Responsável fica ao lado (não
+          mais lá embaixo com Tarefas/Pendências) porque a Linha de
+          Produção tem altura estável independente do processo, então
+          serve de âncora pra não ficar escondido no fim da página. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <ProducaoBar
+            processo={processo}
+            onArquivar={() => setArquivarOpen(true)}
+          />
+        </div>
+        <ResponsavelSection
+          processo={processo}
+          colaboradores={colaboradores}
+          carga={carga}
+          podeAlterar={podeAlterarResponsavel ?? false}
+        />
+      </div>
 
       {/* IA Jurídica — Analisar Documento | Diagnóstico Estratégico | Gerar Petição */}
       <IaJuridicaSection
@@ -3402,12 +3415,6 @@ export default function ProcessoDetailClient({
         onNovo={() => setNovoEventoOpen(true)}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ResponsavelSection
-          processo={processo}
-          colaboradores={colaboradores}
-          carga={carga}
-          podeAlterar={podeAlterarResponsavel ?? false}
-        />
         <TarefasSection
           tarefas={tarefas}
           processo={processo}

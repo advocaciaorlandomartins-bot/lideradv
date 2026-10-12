@@ -172,6 +172,7 @@ export default function InssProcessarModal({
           processoId: doc.processoId ?? null,
           valor: doc.valor ?? null,
           nomeRequerente: doc.nome_requerente ?? null,
+          dataCessacaoBeneficio: doc.data_cessacao_beneficio ?? null,
         };
         const res = await fetch("/api/inss/confirmar", {
           method: "POST",
@@ -519,7 +520,9 @@ export default function InssProcessarModal({
                             {doc.tipo_documento === "comprovante_pagamento" &&
                               "Será registrado em Controles → Implantados"}
                             {doc.tipo_documento === "resultado_pericia" &&
-                              "Será registrado em Controles → Perícias"}
+                              (doc.data_cessacao_beneficio
+                                ? "Será registrado em Controles → Perícias, e a Prorrogação (DCB) já entra agendada abaixo"
+                                : "Será registrado em Controles → Perícias")}
                           </div>
 
                           {doc.valor && (
@@ -528,6 +531,32 @@ export default function InssProcessarModal({
                               <span className="font-medium text-slate-900">
                                 R$ {doc.valor}
                               </span>
+                            </div>
+                          )}
+
+                          {doc.tipo_documento === "resultado_pericia" && (
+                            <div>
+                              <label className="mb-1 block font-body text-xs text-muted">
+                                Data de cessação do benefício (DCB) — confira
+                                antes de salvar
+                              </label>
+                              <input
+                                type="date"
+                                value={doc.data_cessacao_beneficio ?? ""}
+                                onChange={(e) =>
+                                  updateDoc(i, {
+                                    data_cessacao_beneficio:
+                                      e.target.value || null,
+                                  })
+                                }
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-body text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              />
+                              {doc.data_cessacao_beneficio && (
+                                <p className="mt-1 font-body text-xs text-muted">
+                                  A Prorrogação (DCB) fica agendada pra 15 dias
+                                  antes dessa data.
+                                </p>
+                              )}
                             </div>
                           )}
 

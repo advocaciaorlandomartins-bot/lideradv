@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
     processoId?: string | null;
     valor?: string | null;
     nomeRequerente?: string | null;
+    dataCessacaoBeneficio?: string | null;
   };
 
   try {
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
     processoId,
     valor,
     nomeRequerente,
+    dataCessacaoBeneficio,
   } = body;
 
   if (!clienteId || !tipoServico) {
@@ -330,6 +332,40 @@ export async function POST(req: NextRequest) {
         );
         return null;
       });
+
+      // Resultado de perícia com data de cessação do benefício (DCB) →
+      // agenda Prorrogação (DCB) 15 dias antes, mesmo padrão já usado no
+      // preenchimento manual de "Data de cessação" em Controles →
+      // Benefícios (ver buildDadosImplantadosData em controles-actions.ts).
+      // Achado do Orlando (2026-10-12): a Comunicação de Decisão do INSS
+      // já traz essa data pronta — processar o documento sem agendar a
+      // prorrogação deixava a cobrança desse prazo só na memória do
+      // advogado.
+      if (dataCessacaoBeneficio && DATA_RE.test(dataCessacaoBeneficio)) {
+        const dcbData = (() => {
+          const d = new Date(dataCessacaoBeneficio + "T12:00:00");
+          d.setDate(d.getDate() - 15);
+          return d.toISOString().slice(0, 10);
+        })();
+        await sql`
+          INSERT INTO controles
+            (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, prioridade)
+          VALUES
+            ('dcb',
+             ${dcbData}::date,
+             ${`Prorrogação — DCB ${dataCessacaoBeneficio.split("-").reverse().join("/")}`},
+             ${clienteId}::uuid,
+             ${processoId ?? null}::uuid,
+             ${session.id}::uuid,
+             'alta')
+        `.catch((e) => {
+          console.error(
+            "[inss/confirmar] falha ao inserir controle de DCB/prorrogação:",
+            e
+          );
+          return null;
+        });
+      }
     }
 
     // Salva protocolo no processo se informado

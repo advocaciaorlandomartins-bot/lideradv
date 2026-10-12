@@ -45,6 +45,13 @@ export interface DocumentoInssExtraido {
   nome_mae: string | null;
   valor: number | null; // para pagamentos/RPV
   data_pagamento: string | null; // ISO date YYYY-MM-DD
+  // Só pra resultado_pericia — ver achado do Orlando (2026-10-12):
+  // "Comunicação de Decisão" de prorrogação já traz a data de cessação
+  // do benefício (DCB) no próprio documento, mas isso nunca era extraído
+  // nem usado pra agendar o controle de Prorrogação (DCB), que até aqui
+  // só nascia de preenchimento manual em Controles → Benefícios.
+  decisao: "deferido" | "indeferido" | null;
+  data_cessacao_beneficio: string | null; // ISO date YYYY-MM-DD (DCB)
   confianca: "alta" | "media" | "baixa";
   resumo: string;
 }
@@ -118,6 +125,8 @@ export async function POST(req: Request) {
         nome_mae: null,
         valor: null,
         data_pagamento: null,
+        decisao: null,
+        data_cessacao_beneficio: null,
         confianca: "baixa",
         resumo: `Tipo de arquivo não suportado: ${arquivo.type}`,
       });
@@ -138,6 +147,8 @@ export async function POST(req: Request) {
         nome_mae: null,
         valor: null,
         data_pagamento: null,
+        decisao: null,
+        data_cessacao_beneficio: null,
         confianca: "baixa",
         resumo: `Arquivo muito grande (máx ${MAX_MB}MB).`,
       });
@@ -173,6 +184,8 @@ Retorne APENAS um JSON válido com esta estrutura (sem markdown, sem explicaçõ
   "nome_mae": "<nome da mãe ou null>",
   "valor": <número decimal ou null>,
   "data_pagamento": "<YYYY-MM-DD ou null>",
+  "decisao": "<deferido|indeferido|null — só pra resultado_pericia>",
+  "data_cessacao_beneficio": "<YYYY-MM-DD ou null — só pra resultado_pericia: data de cessação/fim do benefício (DCB), geralmente aparece como 'Data da cessação do benefício' num deferimento de prorrogação>",
   "confianca": "<alta|media|baixa>",
   "resumo": "<uma frase descrevendo o documento>"
 }`;
@@ -247,6 +260,8 @@ Retorne APENAS um JSON válido com esta estrutura (sem markdown, sem explicaçõ
         nome_mae: null,
         valor: null,
         data_pagamento: null,
+        decisao: null,
+        data_cessacao_beneficio: null,
         confianca: "baixa",
         resumo: "Não foi possível extrair os dados deste documento.",
       });

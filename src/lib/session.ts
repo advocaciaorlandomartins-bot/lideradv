@@ -89,9 +89,31 @@ export async function getSession(): Promise<SessionUser | null> {
   // continuava vendo a aba Financeiro do cliente, porque o cookie dela já
   // tinha sido emitido antes da permissão ser corrigida. De quebra, também
   // derruba na hora quem for desativado (usuarios.ativo = false).
-  const rows = await sql`
-    SELECT nome, categoria, permissoes, ativo, ultimo_acesso FROM usuarios WHERE id = ${data.id}::uuid
-  `.catch(() => []);
+  // Antes, uma falha transitória de conexão com o banco (Neon serverless
+  // tem cold-start/soluço ocasional — mesma classe de instabilidade vista
+  // nos deploys da Vercel hoje) virava `rows = []` silenciosamente, sem
+  // log nenhum, e o chamador via isso IDÊNTICO a "sessão inválida" — o
+  // usuário levava "Não autorizado" num clique no meio de uma sessão
+  // válida, sem rastro nenhum pra diagnosticar depois. Uma retentativa
+  // cobre o caso comum (soluço de um request isolado); se a segunda
+  // também falhar, loga o erro de verdade antes de cair em null (mantém
+  // o mesmo contrato de retorno pros ~200 lugares que chamam getSession).
+  async function buscarUsuario() {
+    return sql`
+      SELECT nome, categoria, permissoes, ativo, ultimo_acesso FROM usuarios WHERE id = ${data.id}::uuid
+    `;
+  }
+  let rows: Awaited<ReturnType<typeof buscarUsuario>>;
+  try {
+    rows = await buscarUsuario();
+  } catch {
+    try {
+      rows = await buscarUsuario();
+    } catch (err) {
+      console.error("[getSession] Falha ao buscar usuário no banco:", err);
+      rows = [];
+    }
+  }
   const row = rows[0] as
     | {
         nome: string;

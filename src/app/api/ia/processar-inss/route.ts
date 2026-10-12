@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
 import { extractText } from "@/lib/anthropic-text";
+import { extractPdfContent, type ContentPart } from "@/lib/pdf-extract";
 import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
 import { registrarUsoIA } from "@/lib/ia-uso-db";
 
@@ -155,8 +156,7 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const buffer = await arquivo.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
+    const buffer = Buffer.from(await arquivo.arrayBuffer());
     const isPdf = arquivo.type === "application/pdf";
 
     const prompt = `Você é um assistente especializado em documentos do INSS brasileiro. Analise este documento e extraia as informações estruturadas em JSON.
@@ -197,44 +197,41 @@ Retorne APENAS um JSON válido com esta estrutura (sem markdown, sem explicaçõ
       | "image/gif";
 
     try {
+      // PDF: extrai texto (pdf-parse) ou, se escaneado, renderiza as
+      // páginas como imagem — em vez de mandar o PDF bruto como bloco
+      // "document" direto pra API. Achado real (Orlando, 2026-10-12):
+      // uma Comunicação de Decisão do INSS (PDF digital, texto limpo)
+      // falhava de forma 100% consistente ("Outro documento / não foi
+      // possível extrair"), repetindo IDÊNTICO com Haiku e com Sonnet —
+      // ou seja, a falha não era de compreensão do modelo, era na
+      // ingestão do PDF em si pela API. clientes/importacao-ia/route.ts
+      // já usava extractPdfContent (texto/imagem) em vez do bloco
+      // "document" nativo, e nunca teve esse problema — portado aqui.
+      let content: ContentPart[];
+      if (isPdf) {
+        content = await extractPdfContent(buffer, prompt);
+      } else {
+        const base64 = buffer.toString("base64");
+        content = [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: arquivo.type as ImageMediaType,
+              data: base64,
+            },
+          },
+          { type: "text", text: prompt },
+        ];
+      }
+
       const response = await client.messages.create({
         // Sonnet, não Haiku — mesmo achado de clientes/importacao-ia/route.ts:
         // Haiku falha em ler documento real (letterhead, QR code, assinatura
         // digitalizada) com confiabilidade, mesmo o texto sendo claro.
-        // Reproduzido aqui pelo Orlando (2026-10-12): Comunicação de Decisão
-        // do INSS sempre voltava "Outro documento / Não foi possível extrair
-        // os dados" com Haiku, de forma consistente (não era falha
-        // transitória) — essa rota nunca tinha recebido a mesma correção.
         model: "claude-sonnet-5",
         max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: isPdf
-              ? [
-                  {
-                    type: "document" as const,
-                    source: {
-                      type: "base64" as const,
-                      media_type: "application/pdf" as const,
-                      data: base64,
-                    },
-                  },
-                  { type: "text" as const, text: prompt },
-                ]
-              : [
-                  {
-                    type: "image" as const,
-                    source: {
-                      type: "base64" as const,
-                      media_type: arquivo.type as ImageMediaType,
-                      data: base64,
-                    },
-                  },
-                  { type: "text" as const, text: prompt },
-                ],
-          },
-        ],
+        messages: [{ role: "user", content }],
       });
 
       registrarUsoIA(

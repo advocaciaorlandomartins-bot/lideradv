@@ -36,6 +36,7 @@ import {
   InboxArrowDownIcon,
   CheckCircleIcon,
   ArrowRightIcon,
+  PenSignIcon,
 } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -237,6 +238,7 @@ export default async function DashboardPage() {
     dashboard_crm: hasPermission(session, "dashboard_crm", "ver"),
     dashboard_controles: hasPermission(session, "dashboard_controles", "ver"),
     dashboard_financeiro: hasPermission(session, "dashboard_financeiro", "ver"),
+    assinaturas: hasPermission(session, "assinaturas", "ver"),
   };
 
   // ── Busca condicional de dados ────────────────────────────────────────────
@@ -703,6 +705,29 @@ export default async function DashboardPage() {
             <p className="mt-2 font-body text-xs text-indigo-600 group-hover:underline">
               {crm.leadsFechados} convertido{crm.leadsFechados !== 1 ? "s" : ""}{" "}
               · {crm.taxaConversao.toFixed(0)}% conversão →
+            </p>
+          </Link>
+        )}
+
+        {perm.assinaturas && counts && counts.assinaturasAguardando > 0 && (
+          <Link
+            href="/dashboard/assinaturas"
+            className="group rounded-xl border border-amber-200 bg-white p-4 shadow-sm transition-all hover:border-amber-300 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between">
+              <div className="rounded-lg bg-amber-50 p-2.5 transition-colors group-hover:bg-amber-100">
+                <PenSignIcon className="h-5 w-5 text-amber-600" />
+              </div>
+            </div>
+            <p className="mt-3 font-heading text-3xl font-bold text-amber-600">
+              {counts.assinaturasAguardando}
+            </p>
+            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+              Assinatura{counts.assinaturasAguardando !== 1 ? "s" : ""}{" "}
+              aguardando
+            </p>
+            <p className="mt-2 font-body text-xs text-amber-600 group-hover:underline">
+              Cobrar quem falta assinar →
             </p>
           </Link>
         )}

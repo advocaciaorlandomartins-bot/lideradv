@@ -54,6 +54,10 @@ export interface Counts {
   totalColaboradores: number;
   controlesProximos: number;
   vencidosCount: number;
+  /** Envelopes de assinatura com status "aguardando" (enviados, ninguém
+      assinou ainda) — fácil de esquecer de cobrar quando a aba
+      Assinaturas não é aberta todo dia. */
+  assinaturasAguardando: number;
 }
 
 export interface TopCliente {
@@ -350,7 +354,8 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
            AND data_evento <= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date + 7)  AS controles_proximos,
         (SELECT COUNT(*)::int FROM lancamentos
          WHERE status = 'pendente'
-           AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)   AS vencidos_count
+           AND data_vencimento < (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)   AS vencidos_count,
+        (SELECT COUNT(*)::int FROM envelopes WHERE status = 'aguardando')          AS assinaturas_aguardando
     `,
 
     // 6. Top 5 clientes por receita recebida
@@ -562,6 +567,7 @@ async function _getGerenciadorData(): Promise<GerenciadorData> {
     totalColaboradores: Number(cr.total_colaboradores),
     controlesProximos: Number(cr.controles_proximos),
     vencidosCount: Number(cr.vencidos_count),
+    assinaturasAguardando: Number(cr.assinaturas_aguardando),
   };
 
   const ESTAGIO_LABELS: Record<string, string> = {

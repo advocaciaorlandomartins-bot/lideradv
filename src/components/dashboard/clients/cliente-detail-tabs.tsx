@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { ClientFull, ClienteCid } from "@/lib/clients-db";
 import type { Processo } from "@/lib/processos-db";
-import type { ClientDebito } from "@/lib/lancamentos-db";
+import type { ClientDebito, ClientAguardandoItem } from "@/lib/lancamentos-db";
 import type { Documento } from "@/lib/documents-db";
 import type { ModeloDocumento } from "@/lib/modelos-db";
 import { checklistStatus, type ChecklistItem } from "@/lib/checklist-types";
@@ -33,6 +33,7 @@ import {
   InboxArrowDownIcon,
 } from "@/components/icons";
 import ClientDebitsSection from "./client-debits-section";
+import ClientAguardandoSection from "./client-aguardando-section";
 import DocumentsSection from "../documents/documents-section";
 import GerarDocumentoButton from "./gerar-documento-button";
 import InboundEmailTab from "./inbound-email-tab";
@@ -372,6 +373,7 @@ interface Props {
   client: ClientFull;
   processes: Processo[];
   debito: ClientDebito;
+  aguardando: ClientAguardandoItem[];
   documentos: Documento[];
   inboundAddress: InboundEmailAddress | null;
   inboundEmails: InboundEmail[];
@@ -387,6 +389,7 @@ export default function ClienteDetailTabs({
   client,
   processes,
   debito,
+  aguardando,
   documentos,
   inboundAddress,
   inboundEmails,
@@ -1211,6 +1214,7 @@ export default function ClienteDetailTabs({
             debito={debito}
             processoId={processoIdFiltro}
           />
+          <ClientAguardandoSection clientId={client.id} items={aguardando} />
           <BloquearMensagensToggle
             clientId={client.id}
             inicial={client.bloquear_mensagens ?? false}

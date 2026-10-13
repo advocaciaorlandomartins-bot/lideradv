@@ -274,6 +274,43 @@ export async function getClientDebito(clientId: string): Promise<ClientDebito> {
   return { totalPendente, totalPago, items };
 }
 
+export interface ClientAguardandoItem {
+  id: string;
+  tipo: "entrada" | "saida";
+  descricao: string;
+  categoria: string | null;
+  valor: number;
+  processo_id: string | null;
+}
+
+// Lançamentos "aguardando resultado" (sem data prevista de pagamento —
+// ex: honorários de êxito) ficam fora de getClientDebito de propósito
+// (não contam como pendente/total da ficha, commit 0476b92), mas isso
+// os deixava completamente invisíveis na aba Financeiro do cliente —
+// achado real do Orlando: criou o mesmo lançamento duas vezes pro mesmo
+// cliente sem perceber, porque a tela mostrava "Nenhum débito
+// registrado" nas duas vezes. Esta busca separada alimenta uma seção
+// própria (fora dos totais), só pra visibilidade.
+export async function getClientAguardandoResultado(
+  clientId: string
+): Promise<ClientAguardandoItem[]> {
+  const rows = await sql`
+    SELECT id::text, tipo, descricao, categoria, valor, processo_id::text
+    FROM lancamentos
+    WHERE client_id = ${clientId}::uuid
+      AND status = 'aguardando_resultado'
+    ORDER BY created_at DESC
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    tipo: r.tipo as "entrada" | "saida",
+    descricao: r.descricao,
+    categoria: r.categoria ?? null,
+    valor: Number(r.valor),
+    processo_id: r.processo_id ?? null,
+  }));
+}
+
 export interface LancamentoEntradaPendente {
   id: string;
   descricao: string;

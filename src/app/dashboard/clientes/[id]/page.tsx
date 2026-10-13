@@ -9,7 +9,10 @@ import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarCliente } from "@/lib/acesso";
 import { getProcessosByClientId } from "@/lib/processos-db";
 import { getDocumentosAllByClientId } from "@/lib/documents-db";
-import { getClientDebito } from "@/lib/lancamentos-db";
+import {
+  getClientDebito,
+  getClientAguardandoResultado,
+} from "@/lib/lancamentos-db";
 import {
   getAddressByClientId,
   getEmailsByClientId,
@@ -86,6 +89,7 @@ export default async function ClienteDetailPage({
     processes,
     documentos,
     debito,
+    aguardando,
     inboundAddress,
     etiquetas,
     catalogoEtiquetas,
@@ -100,6 +104,7 @@ export default async function ClienteDetailPage({
     podeVerFinanceiro
       ? getClientDebito(id)
       : Promise.resolve({ totalPendente: 0, totalPago: 0, items: [] }),
+    podeVerFinanceiro ? getClientAguardandoResultado(id) : Promise.resolve([]),
     getAddressByClientId(id).catch(() => null),
     getEtiquetasDeCliente(id),
     getCatalogoEtiquetas(),
@@ -213,6 +218,7 @@ export default async function ClienteDetailPage({
         client={client}
         processes={processes}
         debito={debito}
+        aguardando={aguardando}
         documentos={documentos}
         inboundAddress={inboundAddress}
         inboundEmails={inboundEmails}

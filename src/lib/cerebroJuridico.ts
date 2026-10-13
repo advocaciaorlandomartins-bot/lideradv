@@ -20,6 +20,8 @@ import {
   formatarPrecedentesParaPrompt,
 } from "./jurisprudencia-db";
 import { codigoDoTipo } from "./checklist-documentos";
+import { agentesEstaoAtivos } from "./config-agentes-db";
+import { registrarUsoIA } from "./ia-uso-db";
 
 function getClaudeClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -2318,6 +2320,16 @@ export async function analisarDocumento(
   documentoId: string,
   processoId: string
 ): Promise<string> {
+  // Dispara sozinho em segundo plano a cada upload de documento (ver
+  // after() em api/documentos/confirmar/route.ts) — sem essa checagem,
+  // o botão de pausar agentes de IA não tinha efeito nenhum sobre essa
+  // chamada específica (achado real, 2026-10-12: mesma classe do que já
+  // tinha sido corrigido em "8 rotas esquecidas" antes, mas essa função
+  // ficou de fora por não ser uma rota de API chamada direto).
+  if (!(await agentesEstaoAtivos())) {
+    return "Análise automática pausada (agentes de IA desligados em Configurações).";
+  }
+
   const [[doc], [processo]] = await Promise.all([
     sql`SELECT * FROM documentos WHERE id = ${documentoId}::uuid`,
     sql`SELECT tipo_acao, area, client_id FROM processos WHERE id = ${processoId}::uuid`,
@@ -2431,6 +2443,14 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
   );
+
+  registrarUsoIA(
+    "documentos/confirmar:analisarDocumento",
+    "claude-haiku-4-5-20251001",
+    aiResp.usage.input_tokens,
+    aiResp.usage.output_tokens,
+    null
+  ).catch(() => {});
 
   const rawAnalise =
     extractText(aiResp) || "Não foi possível analisar o documento.";

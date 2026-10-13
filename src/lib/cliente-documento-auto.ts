@@ -5,6 +5,8 @@ import { logAction } from "./audit";
 import { extractText } from "./anthropic-text";
 import type { MembroFamilia } from "./clients-db";
 import { adicionarCidsCliente } from "./clients-db";
+import { agentesEstaoAtivos } from "./config-agentes-db";
+import { registrarUsoIA } from "./ia-uso-db";
 
 /**
  * Preenchimento automático do cadastro do cliente a partir de dado
@@ -339,6 +341,12 @@ export async function analisarDocumentoCliente(
   documentoId: string,
   clienteId: string
 ): Promise<{ camposPreenchidos: string[] }> {
+  // Mesmo achado de analisarDocumento em cerebroJuridico.ts (2026-10-12):
+  // dispara sozinho a cada upload de documento de cliente, sem checar o
+  // kill switch nem registrar custo — ficava fora do alcance do botão de
+  // pausar agentes e invisível no painel de uso.
+  if (!(await agentesEstaoAtivos())) return { camposPreenchidos: [] };
+
   const [doc] =
     await sql`SELECT * FROM documentos WHERE id = ${documentoId}::uuid`;
   if (!doc) return { camposPreenchidos: [] };
@@ -394,6 +402,15 @@ export async function analisarDocumentoCliente(
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
   );
+
+  registrarUsoIA(
+    "documentos/confirmar:analisarDocumentoCliente",
+    "claude-haiku-4-5-20251001",
+    aiResp.usage.input_tokens,
+    aiResp.usage.output_tokens,
+    null
+  ).catch(() => {});
+
   const rawText = extractText(aiResp);
   const match = rawText.match(/\{[\s\S]*\}/);
   if (!match) return { camposPreenchidos: [] };

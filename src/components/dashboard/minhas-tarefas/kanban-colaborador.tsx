@@ -98,6 +98,27 @@ function formatDeadlineDisplay(deadline: string | null): string | null {
   return `${d}/${m}/${y}`;
 }
 
+// Faixa colorida na borda esquerda do card — o sinal de urgência fica
+// reconhecível batendo o olho, sem precisar ler mais um selinho. Antes,
+// "Controle"/"Tarefa" + tipo + prioridade + PRAZO FATAL competiam todos
+// pela mesma atenção no topo do card, cada um com uma cor diferente —
+// achado real do Orlando: "muito bagunçada, tudo como se fosse
+// misturado". Isso aqui vira o único sinal visual dominante; o resto dos
+// selinhos fica deliberadamente mais discreto.
+function urgencyBorderClass(deadline: string | null, fatal?: boolean): string {
+  const date = parseDeadline(deadline);
+  if (!date) return "border-l-4 border-l-slate-200";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  const diff = Math.round((date.getTime() - today.getTime()) / 86400000);
+  if (fatal || diff < 0) return "border-l-4 border-l-red-600";
+  if (diff === 0) return "border-l-4 border-l-red-400";
+  if (diff <= 3) return "border-l-4 border-l-amber-400";
+  if (diff <= 7) return "border-l-4 border-l-blue-300";
+  return "border-l-4 border-l-slate-200";
+}
+
 interface ItemCardProps {
   item: MinhaItem;
   isConcluida?: boolean;
@@ -200,10 +221,10 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
 
   return (
     <div
-      className={`rounded-xl border bg-white shadow-sm ${
+      className={`rounded-xl border shadow-sm ${
         item.urgente
-          ? "border-red-200"
-          : "border-border hover:border-primary/30 hover:shadow-md"
+          ? "border-red-200 border-l-4 border-l-red-500 bg-white"
+          : "border-border border-l-4 border-l-slate-200 bg-slate-50/60 hover:border-primary/30 hover:shadow-md"
       }`}
     >
       <div className="p-4">
@@ -324,7 +345,11 @@ function CrmTarefaCard({
     <div
       className={`rounded-xl border bg-white shadow-sm transition-opacity ${
         pending ? "opacity-50 pointer-events-none" : ""
-      } ${isConcluida ? "border-border opacity-70" : "border-border hover:border-primary/30 hover:shadow-md"}`}
+      } ${
+        isConcluida
+          ? "border-border border-l-4 border-l-slate-200 opacity-70"
+          : `border-border hover:border-primary/30 hover:shadow-md ${urgencyBorderClass(item.prazo)}`
+      }`}
     >
       <div className="p-4">
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -505,21 +530,29 @@ function ItemCard({
     <div
       className={`rounded-xl border bg-white shadow-sm transition-opacity ${
         pending ? "opacity-50 pointer-events-none" : ""
-      } ${isConcluida ? "border-border opacity-70" : "border-border hover:border-primary/30 hover:shadow-md"}`}
+      } ${
+        isConcluida
+          ? "border-border border-l-4 border-l-slate-200 opacity-70"
+          : `border-border hover:border-primary/30 hover:shadow-md ${urgencyBorderClass(deadline, ctrl?.fatal)}`
+      }`}
     >
       {/* Card body */}
       <div className="p-4">
-        {/* Badges row */}
+        {/* Badges row — só mostra o selinho genérico "Controle" quando não
+            tem um tipo mais específico (Perícia/DCB/...) pra mostrar no
+            lugar; ter os dois juntos era informação repetida competindo
+            por atenção. */}
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <span
-            className={`rounded px-1.5 py-0.5 font-body text-[10px] font-semibold ${
-              isControle
-                ? "bg-violet-100 text-violet-700"
-                : "bg-teal-100 text-teal-700"
-            }`}
-          >
-            {isControle ? "Controle" : "Tarefa"}
-          </span>
+          {isControle && !tipoLabel && (
+            <span className="rounded bg-violet-100 px-1.5 py-0.5 font-body text-[10px] font-semibold text-violet-700">
+              Controle
+            </span>
+          )}
+          {!isControle && (
+            <span className="rounded bg-teal-100 px-1.5 py-0.5 font-body text-[10px] font-semibold text-teal-700">
+              Tarefa
+            </span>
+          )}
           {tipoLabel && tipoCls && (
             <span
               className={`rounded px-1.5 py-0.5 font-body text-[10px] font-semibold ${tipoCls}`}
@@ -718,8 +751,10 @@ interface ColumnProps {
 // Duas naturezas bem diferentes de card ficavam misturadas na mesma lista,
 // só diferenciadas por um selinho pequeno: a "situação do processo" (sem
 // data, sem "Dar baixa" — é só o estágio atual do caso) e tarefa/controle
-// real (com prazo, cronômetro, "Dar baixa"). Separa em dois grupos com
-// título, sem criar coluna/aba nova.
+// real (com prazo, cronômetro, "Dar baixa"). Separa em duas zonas visuais
+// distintas — tarefas/prazos primeiro (o que exige ação), situação dos
+// processos depois, num bloco mais discreto (borda tracejada, fundo
+// neutro) — sem criar coluna/aba nova.
 function GroupedItems({
   items,
   timesheetAtivo,
@@ -733,14 +768,14 @@ function GroupedItems({
   const tarefasReais = items.filter((i) => i.source !== "processo");
 
   return (
-    <div className="flex flex-col gap-3">
-      {situacaoProcessos.length > 0 && (
+    <div className="flex flex-col gap-4">
+      {tarefasReais.length > 0 && (
         <div className="flex flex-col gap-2.5">
-          <p className="flex items-center gap-1.5 px-1 font-body text-[10px] font-bold uppercase tracking-wide text-muted">
-            <FolderOpenIcon className="h-3 w-3" />
-            Situação dos processos ({situacaoProcessos.length})
+          <p className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 font-body text-[11px] font-bold uppercase tracking-wide text-slate-600">
+            <ClockIcon className="h-3.5 w-3.5" />
+            Tarefas e prazos ({tarefasReais.length})
           </p>
-          {situacaoProcessos.map((item) => (
+          {tarefasReais.map((item) => (
             <ItemCard
               key={`${item.source}-${item.id}`}
               item={item}
@@ -750,13 +785,14 @@ function GroupedItems({
           ))}
         </div>
       )}
-      {tarefasReais.length > 0 && (
-        <div className="flex flex-col gap-2.5">
-          <p className="flex items-center gap-1.5 px-1 font-body text-[10px] font-bold uppercase tracking-wide text-muted">
-            <ClockIcon className="h-3 w-3" />
-            Tarefas e prazos ({tarefasReais.length})
+      {situacaoProcessos.length > 0 && (
+        <div className="flex flex-col gap-2.5 rounded-xl border border-dashed border-border bg-slate-50/40 p-2.5">
+          <p className="flex items-center gap-1.5 px-0.5 font-body text-[10px] font-bold uppercase tracking-wide text-muted">
+            <FolderOpenIcon className="h-3 w-3" />
+            Situação dos processos ({situacaoProcessos.length}) — sem prazo, só
+            acompanhamento
           </p>
-          {tarefasReais.map((item) => (
+          {situacaoProcessos.map((item) => (
             <ItemCard
               key={`${item.source}-${item.id}`}
               item={item}

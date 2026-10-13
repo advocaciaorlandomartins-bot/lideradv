@@ -299,7 +299,32 @@ export async function getMinhasTarefas(
     source: "crm" as const,
   }));
 
-  const all: MinhaItem[] = [...controles, ...tarefas, ...crmTarefas];
+  // Antes disso, controles e tarefas vinham em blocos separados e
+  // concatenados (todos os controles primeiro, depois todas as tarefas) —
+  // mesmo já ordenados dentro de cada bloco, misturar os dois tipos sem
+  // comparar a urgência real entre eles fazia um prazo distante de um
+  // controle aparecer antes de uma tarefa pra amanhã. Achado real do
+  // Orlando: tela "bagunçada, tudo misturado". Um único sort por data,
+  // cruzando os dois tipos, resolve a ordem de leitura.
+  function deadlineTime(i: MinhaItem): number {
+    if (i.source === "processo") return Infinity; // não tem prazo, vai ao fim
+    const raw =
+      i.source === "controle"
+        ? (i as MinhaControle).data_evento
+        : i.source === "tarefa"
+          ? (i as MinhaTarefa).prazo
+          : (i as MinhaCrmTarefa).prazo;
+    if (!raw) return Infinity;
+    if (raw.includes("/")) {
+      const [d, m, y] = raw.split("/").map(Number);
+      return new Date(y, m - 1, d).getTime();
+    }
+    return new Date(raw).getTime();
+  }
+
+  const all: MinhaItem[] = [...controles, ...tarefas, ...crmTarefas].sort(
+    (a, b) => deadlineTime(a) - deadlineTime(b)
+  );
 
   // crm_tarefas só tem 2 estados (pendente/concluída, sem "em andamento") —
   // por isso não entra na coluna do meio, só em Pendente ou Arquivados.

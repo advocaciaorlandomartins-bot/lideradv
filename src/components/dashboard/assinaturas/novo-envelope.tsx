@@ -51,6 +51,7 @@ interface Props {
     nome: string;
     email: string;
     menorIncapaz: boolean;
+    responsavelNome: string;
     responsavelEmail: string;
   }[];
   modelos: ModeloOpt[];
@@ -319,15 +320,19 @@ export default function NovoEnvelope({
     if (tipo === "cliente") {
       const c = clientes.find((x) => x.id === refId);
       if (c) {
-        setNewNome(c.nome);
         // Menor/incapaz não tem e-mail próprio pra receber/assinar — usa o
         // do responsável legal cadastrado, quando existir. Evita o usuário
         // ter que digitar isso toda vez manualmente (achado real: campo
         // ficava em branco mesmo com o responsável já tendo e-mail no
-        // cadastro do cliente).
-        setNewEmail(
-          c.menorIncapaz && c.responsavelEmail ? c.responsavelEmail : c.email
-        );
+        // cadastro do cliente). O nome tem que acompanhar: quem assina de
+        // fato é o responsável (verifica identidade e CPF dele ao vivo no
+        // TramitaSign) — deixar o nome do cliente aqui gerava um
+        // certificado de assinatura com o nome de uma pessoa e o CPF de
+        // outra (achado real: 3 documentos de um cliente menor saíram
+        // assinados como "[nome do menor]" mas com o CPF da mãe).
+        const usaResponsavel = c.menorIncapaz && c.responsavelEmail;
+        setNewNome(usaResponsavel ? c.responsavelNome || c.nome : c.nome);
+        setNewEmail(usaResponsavel ? c.responsavelEmail : c.email);
       }
       return;
     }

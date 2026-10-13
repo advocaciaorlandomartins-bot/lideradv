@@ -395,6 +395,18 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
   }
   function handleStatus(s: StatusFilter) {
     setStatusFilter(s);
+    // Sincroniza com o filtro avançado — sem isso, um "status" deixado lá
+    // de uma busca anterior (ex: "ativo") conflitava com a aba clicada
+    // agora (ex: "Inativos"), e os dois filtros juntos (AND) nunca batiam
+    // em nenhum cliente: o card mostrava a contagem certa (vem direto de
+    // `clients`, sem olhar o filtro avançado), mas a lista vinha vazia.
+    setFiltrosAtivos((prev) =>
+      prev ? { ...prev, status: s === "todos" ? "" : s } : prev
+    );
+    setFiltroLocal((prev) => ({
+      ...prev,
+      status: s === "todos" ? "" : s,
+    }));
     setPage(1);
   }
   function handleSort(k: SortKey, d: SortDir) {
@@ -405,6 +417,14 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
   function handleBuscarFiltro(f: FiltroCliente) {
     setFiltrosAtivos(f);
     setFiltroLocal(f);
+    // Mesma sincronização do outro lado (ver handleStatus) — escolher um
+    // status no filtro avançado também reflete na aba, pra não voltar a
+    // conflitar se o usuário clicar numa aba depois.
+    if (f.status === "ativo" || f.status === "inativo") {
+      setStatusFilter(f.status);
+    } else {
+      setStatusFilter("todos");
+    }
     setPage(1);
   }
   function handleLimparFiltro() {

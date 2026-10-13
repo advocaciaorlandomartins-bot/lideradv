@@ -931,6 +931,8 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [pageSizeAtrasados, setPageSizeAtrasados] = useState(10);
   const [pageConcluidas, setPageConcluidas] = useState(1);
   const [pageSizeConcluidas, setPageSizeConcluidas] = useState(10);
+  const [pageFluxo, setPageFluxo] = useState(1);
+  const [pageSizeFluxo, setPageSizeFluxo] = useState(20);
   const [categoryFilter, setCategoryFilter] = useState<string>("todas");
   const [saldoAtualStr, setSaldoAtualStr] = useState("");
   const [fluxoCaixaOpen, setFluxoCaixaOpen] = useState(true);
@@ -1170,6 +1172,12 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const paginatedConcluidas = concluidas.slice(
     (pageConcluidas - 1) * pageSizeConcluidas,
     pageConcluidas * pageSizeConcluidas
+  );
+  // Saldo acumulado é calculado sobre a lista inteira (acima, em
+  // fluxoCaixa) — paginar só corta o que é exibido, não refaz a conta.
+  const paginatedFluxo = fluxoCaixa.slice(
+    (pageFluxo - 1) * pageSizeFluxo,
+    pageFluxo * pageSizeFluxo
   );
 
   function handleDatePreset(p: DatePreset) {
@@ -1456,7 +1464,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {fluxoCaixa.map((l) => (
+                    {paginatedFluxo.map((l) => (
                       <tr
                         key={l.id}
                         className={`${l.atrasado ? "bg-red-50/30" : "bg-white"} hover:bg-slate-50/40`}
@@ -1499,6 +1507,13 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
                 </table>
               </div>
             )}
+            <PaginationBar
+              page={pageFluxo}
+              pageSize={pageSizeFluxo}
+              total={fluxoCaixa.length}
+              onPage={setPageFluxo}
+              onPageSize={setPageSizeFluxo}
+            />
           </div>
         )}
       </div>

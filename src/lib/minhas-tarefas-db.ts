@@ -102,7 +102,17 @@ async function nomesResponsavel(
 
 export async function getMinhasTarefas(
   login: string,
-  nome: string
+  nome: string,
+  // Controle sem responsavel_id (ex: perícia criada sem ninguém atribuído)
+  // caía num fallback que mostrava pra QUALQUER colaborador logado, como se
+  // fosse tarefa dele — achado real do Orlando: prazo fatal de um cliente
+  // de outro advogado aparecendo em "Minhas Tarefas" de uma colaboradora
+  // sem nenhuma relação com o caso. Contraria a decisão de 2026-10-10 (ver
+  // controles-db.ts) de que Controles não é mais visível ao escritório
+  // inteiro por padrão. Agora só quem tem controles_ver_todos (em geral,
+  // administrador) vê os órfãos — pra não sumirem de vista de quem pode
+  // triá-los/atribuí-los — e os outros só veem o que é realmente deles.
+  verTodosControles: boolean
 ): Promise<{
   pendentes: MinhaItem[];
   emAndamento: MinhaItem[];
@@ -122,7 +132,7 @@ export async function getMinhasTarefas(
       LEFT JOIN usuarios u ON u.id = c.responsavel_id
       LEFT JOIN clients cl ON cl.id = c.cliente_id
       LEFT JOIN processos p ON p.id = c.processo_id
-      WHERE (u.login = ${login} OR c.responsavel_id IS NULL)
+      WHERE (u.login = ${login} OR (${verTodosControles} AND c.responsavel_id IS NULL))
         AND (c.status IS NULL OR c.status IN ('pendente', 'em_andamento', 'concluido'))
       ORDER BY c.data_evento ASC NULLS LAST
     `,
@@ -325,8 +335,9 @@ export async function getMinhasTarefas(
 
 export async function countMinhasPendentes(
   login: string,
-  nome: string
+  nome: string,
+  verTodosControles: boolean
 ): Promise<number> {
-  const { pendentes } = await getMinhasTarefas(login, nome);
+  const { pendentes } = await getMinhasTarefas(login, nome, verTodosControles);
   return pendentes.length;
 }

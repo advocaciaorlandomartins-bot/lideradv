@@ -289,7 +289,11 @@ export default async function DashboardPage() {
           (await getColaboradorIdForUser(session.id)) ?? null
         ).catch(() => 0)
       : Promise.resolve(0),
-    countMinhasPendentes(session.login, session.nome).catch(() => 0),
+    countMinhasPendentes(
+      session.login,
+      session.nome,
+      hasPermission(session, "controles_ver_todos", "ver")
+    ).catch(() => 0),
     perm.processos
       ? getAlertasPrevidenciarios(
           hasPermission(session, "processos_ver_todos", "ver"),

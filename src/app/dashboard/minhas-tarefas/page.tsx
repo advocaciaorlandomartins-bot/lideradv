@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissoes";
 import { getMinhasTarefas } from "@/lib/minhas-tarefas-db";
 import KanbanColaborador from "@/components/dashboard/minhas-tarefas/kanban-colaborador";
 
@@ -12,7 +13,8 @@ export default async function MinhasTarefasPage() {
 
   const { pendentes, emAndamento, concluidas } = await getMinhasTarefas(
     session.login,
-    session.nome
+    session.nome,
+    hasPermission(session, "controles_ver_todos", "ver")
   );
 
   return (

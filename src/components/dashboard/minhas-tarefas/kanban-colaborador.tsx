@@ -98,6 +98,36 @@ function formatDeadlineDisplay(deadline: string | null): string | null {
   return `${d}/${m}/${y}`;
 }
 
+// Ação de processo com checklist incompleto não pode ser "resolvida
+// agora" de verdade (ex: dar entrada sem o documento que falta) — usado
+// tanto pra escolher o card certo quanto pra agrupar numa lista própria.
+function faltaDocumentoChecklist(checklist: ChecklistItem[]): boolean {
+  return checklist.length > 0 && !checklist.every((c) => c.feito);
+}
+
+type AcaoKind = "urgente" | "proxima" | "falta_doc" | "aviso";
+
+// Quatro estados possíveis pra uma ação de processo, por ordem de
+// prioridade visual:
+// - "urgente": sistema já marca como urgente E tem tudo pra agir agora.
+// - "proxima": não marcada "urgente" pelo sistema (ex: "Preparar
+//   requerimento/petição inicial" é sempre urgente:false no código —
+//   ver processo-fases.ts), mas o checklist está completo — nada
+//   travando, só falta fazer. Achado do Orlando: "ele também é
+//   urgente... pede atenção" — merece destaque próprio (laranja), não
+//   devia ficar junto dos avisos passivos só porque o sistema não bateu
+//   o carimbo "urgente".
+// - "falta_doc": falta item no checklist — não dá pra agir de verdade
+//   ainda (ex: dar entrada sem o documento que falta), seja a ação
+//   nominalmente urgente ou não.
+// - "aviso": aguardando resultado de terceiro (INSS, justiça) — nada a
+//   fazer por enquanto.
+function acaoKind(item: MinhaAcaoProcesso): AcaoKind {
+  if (item.aguardando) return "aviso";
+  if (faltaDocumentoChecklist(item.checklist)) return "falta_doc";
+  return item.urgente ? "urgente" : "proxima";
+}
+
 // Faixa colorida na borda esquerda do card — o sinal de urgência fica
 // reconhecível batendo o olho, sem precisar ler mais um selinho. Antes,
 // "Controle"/"Tarefa" + tipo + prioridade + PRAZO FATAL competiam todos
@@ -219,36 +249,57 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
         ]
       : null;
 
+  const kind = acaoKind(item);
+
   return (
     <div
       className={`rounded-xl shadow-sm ${
-        item.urgente
+        kind === "urgente"
           ? "border-2 border-red-300 border-l-8 border-l-red-600 bg-red-50/70 shadow-md"
-          : "border border-border border-l-4 border-l-slate-200 bg-slate-50/60 hover:border-primary/30 hover:shadow-md"
+          : kind === "proxima"
+            ? "border-2 border-orange-300 border-l-8 border-l-orange-500 bg-orange-50/70 shadow-md"
+            : kind === "falta_doc"
+              ? "border-2 border-amber-300 border-l-8 border-l-amber-500 bg-amber-50/70 shadow-md"
+              : "border border-border border-l-4 border-l-slate-200 bg-slate-50/60 hover:border-primary/30 hover:shadow-md"
       }`}
     >
       <div className="p-4">
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          {item.urgente ? (
+          {kind === "urgente" && (
             <span className="inline-flex items-center gap-1.5 rounded bg-red-600 px-2 py-1 font-body text-[11px] font-bold uppercase tracking-wide text-white">
               <AlertIcon className="h-3.5 w-3.5" />
               Ação urgente — dar entrada
             </span>
-          ) : (
-            <span
-              className={`rounded px-1.5 py-0.5 font-body text-[10px] font-semibold ${
-                item.aguardando
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              {item.aguardando ? "Aguardando" : "Próxima ação"}
+          )}
+          {kind === "proxima" && (
+            <span className="inline-flex items-center gap-1.5 rounded bg-orange-500 px-2 py-1 font-body text-[11px] font-bold uppercase tracking-wide text-white">
+              <AlertIcon className="h-3.5 w-3.5" />
+              Próxima ação — pronta, falta fazer
+            </span>
+          )}
+          {kind === "falta_doc" && (
+            <span className="inline-flex items-center gap-1.5 rounded bg-amber-500 px-2 py-1 font-body text-[11px] font-bold uppercase tracking-wide text-white">
+              <AlertIcon className="h-3.5 w-3.5" />
+              Falta documento do cliente
+            </span>
+          )}
+          {kind === "aviso" && (
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 font-body text-[10px] font-semibold text-blue-700">
+              Aguardando
             </span>
           )}
         </div>
 
         <p
-          className={`font-body leading-snug ${item.urgente ? "text-base font-bold text-red-950" : "text-sm font-semibold text-fg"}`}
+          className={`font-body leading-snug ${
+            kind === "urgente"
+              ? "text-base font-bold text-red-950"
+              : kind === "proxima"
+                ? "text-base font-bold text-orange-950"
+                : kind === "falta_doc"
+                  ? "text-base font-bold text-amber-900"
+                  : "text-sm font-semibold text-fg"
+          }`}
         >
           {item.titulo}
         </p>
@@ -280,28 +331,52 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
       </div>
 
       <div
-        className={`border-t px-3 pb-3 pt-3 ${item.urgente ? "border-red-200" : "border-border"}`}
+        className={`border-t px-3 pb-3 pt-3 ${
+          kind === "urgente"
+            ? "border-red-200"
+            : kind === "proxima"
+              ? "border-orange-200"
+              : kind === "falta_doc"
+                ? "border-amber-200"
+                : "border-border"
+        }`}
       >
         {/* Um único botão — esta ação é derivada automaticamente do estado
             do processo (não tem um "concluir" próprio como controles/tarefas
             manuais): ela só some daqui quando o processo for atualizado lá
             dentro. Um segundo botão verde com CheckCircleIcon ao lado deste
             passaria a falsa impressão de que a pendência foi resolvida com
-            um clique, sem exigir a atualização real no processo. Quando
-            urgente, o botão vira vermelho sólido — a pedido do Orlando:
-            "forçar os trabalhos e dar entrada logo", não deixar esperar. */}
+            um clique, sem exigir a atualização real no processo. Urgente e
+            "próxima ação pronta" ganham botão sólido (vermelho/laranja) —
+            a pedido do Orlando: "forçar os trabalhos", não deixar esperar.
+            Falta documento não promete "resolver agora" — não dá pra agir
+            sem o documento. */}
         <Link
           href={`/dashboard/processos/${item.processo_id}`}
           style={{ touchAction: "manipulation" }}
-          title="Abra o processo para atualizar o andamento e resolver esta pendência"
+          title={
+            kind === "falta_doc"
+              ? "Falta documento do checklist — cobre o cliente antes de dar entrada"
+              : "Abra o processo para atualizar o andamento e resolver esta pendência"
+          }
           className={
-            item.urgente
+            kind === "urgente"
               ? "flex w-full items-center justify-center gap-1.5 rounded-lg bg-red-600 py-2.5 font-body text-[12px] font-bold text-white transition-colors hover:bg-red-700 active:bg-red-800"
-              : "flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
+              : kind === "proxima"
+                ? "flex w-full items-center justify-center gap-1.5 rounded-lg bg-orange-500 py-2.5 font-body text-[12px] font-bold text-white transition-colors hover:bg-orange-600 active:bg-orange-700"
+                : kind === "falta_doc"
+                  ? "flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-500 py-2.5 font-body text-[12px] font-bold text-white transition-colors hover:bg-amber-600 active:bg-amber-700"
+                  : "flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
           }
         >
           <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />
-          {item.urgente ? "Resolver agora" : "Ver processo e resolver"}
+          {kind === "urgente"
+            ? "Resolver agora"
+            : kind === "proxima"
+              ? "Fazer agora"
+              : kind === "falta_doc"
+                ? "Ver documento pendente"
+                : "Ver processo e resolver"}
         </Link>
       </div>
     </div>
@@ -753,15 +828,22 @@ interface ColumnProps {
   onTimesheetChange: (ativo: TimesheetAtivo | null) => void;
 }
 
-// Três naturezas diferentes de card ficavam misturadas: ação urgente de
-// processo (precisa agir AGORA — dar entrada, protocolar — é o próximo
-// passo do fluxo administrativo→judicial), tarefa/controle real (com
-// prazo, cronômetro, "Dar baixa") e aviso passivo (aguardando resultado
-// de terceiro — INSS, justiça — nada a fazer por enquanto). Achado do
-// Orlando: a 1ª versão agrupava TODO item de processo (urgente ou não)
-// junto, num bloco apagado — escondendo exatamente a ação mais urgente,
-// que é o que o colaborador mais precisa ver primeiro. Ordem agora:
-// ações urgentes (destaque) → tarefas/prazos → avisos passivos (por
+// Naturezas diferentes de card ficavam misturadas: ação urgente pronta
+// pra agir AGORA (dar entrada, protocolar), "próxima ação" que o sistema
+// não carimba como urgente mas está pronta (checklist completo, só
+// falta fazer — ex: preparar a petição), ação travada por documento
+// faltando do cliente (mesma prioridade de fundo, mas não dá pra
+// resolver com um clique ainda), tarefa/controle real (com prazo,
+// cronômetro, "Dar baixa") e aviso passivo (aguardando resultado de
+// terceiro — INSS, justiça — nada a fazer por enquanto). Achados do
+// Orlando: 1) a 1ª versão agrupava TODO item de processo junto, num
+// bloco apagado — escondendo a ação mais urgente; 2) "se falta um
+// documento ele não pode ser dado entrada, tem que ficar em outra
+// lista"; 3) uma "próxima ação" pronta (ex: preparar petição pra depois
+// ir pro INSS) "também é urgente... pede atenção" mesmo sem o sistema
+// marcar urgente:true — merece destaque próprio (laranja), não devia
+// cair junto dos avisos passivos. Ordem: urgente → próxima ação pronta
+// → aguardando documento → tarefas/prazos → avisos passivos (por
 // último, discreto).
 function GroupedItems({
   items,
@@ -772,23 +854,59 @@ function GroupedItems({
   timesheetAtivo: TimesheetAtivo | null;
   onTimesheetChange: (ativo: TimesheetAtivo | null) => void;
 }) {
-  const acoesUrgentes = items.filter(
-    (i) => i.source === "processo" && (i as MinhaAcaoProcesso).urgente
+  const acoesProcesso = items.filter(
+    (i) => i.source === "processo"
+  ) as MinhaAcaoProcesso[];
+  const urgentes = acoesProcesso.filter((i) => acaoKind(i) === "urgente");
+  const proximasAcoes = acoesProcesso.filter((i) => acaoKind(i) === "proxima");
+  const aguardandoDocumento = acoesProcesso.filter(
+    (i) => acaoKind(i) === "falta_doc"
   );
-  const avisos = items.filter(
-    (i) => i.source === "processo" && !(i as MinhaAcaoProcesso).urgente
-  );
+  const avisos = acoesProcesso.filter((i) => acaoKind(i) === "aviso");
   const tarefasReais = items.filter((i) => i.source !== "processo");
 
   return (
     <div className="flex flex-col gap-4">
-      {acoesUrgentes.length > 0 && (
+      {urgentes.length > 0 && (
         <div className="flex flex-col gap-2.5">
           <p className="flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 font-body text-[11px] font-bold uppercase tracking-wide text-red-700">
             <AlertIcon className="h-3.5 w-3.5" />
-            Ação urgente — precisa agir ({acoesUrgentes.length})
+            Ação urgente — precisa agir ({urgentes.length})
           </p>
-          {acoesUrgentes.map((item) => (
+          {urgentes.map((item) => (
+            <ItemCard
+              key={`${item.source}-${item.id}`}
+              item={item}
+              timesheetAtivo={timesheetAtivo}
+              onTimesheetChange={onTimesheetChange}
+            />
+          ))}
+        </div>
+      )}
+      {proximasAcoes.length > 0 && (
+        <div className="flex flex-col gap-2.5">
+          <p className="flex items-center gap-1.5 rounded-lg bg-orange-50 px-2.5 py-1.5 font-body text-[11px] font-bold uppercase tracking-wide text-orange-700">
+            <AlertIcon className="h-3.5 w-3.5" />
+            Próxima ação — pronta, falta fazer ({proximasAcoes.length})
+          </p>
+          {proximasAcoes.map((item) => (
+            <ItemCard
+              key={`${item.source}-${item.id}`}
+              item={item}
+              timesheetAtivo={timesheetAtivo}
+              onTimesheetChange={onTimesheetChange}
+            />
+          ))}
+        </div>
+      )}
+      {aguardandoDocumento.length > 0 && (
+        <div className="flex flex-col gap-2.5">
+          <p className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 font-body text-[11px] font-bold uppercase tracking-wide text-amber-700">
+            <AlertIcon className="h-3.5 w-3.5" />
+            Aguardando documento do cliente ({aguardandoDocumento.length}) — não
+            dá pra dar entrada ainda
+          </p>
+          {aguardandoDocumento.map((item) => (
             <ItemCard
               key={`${item.source}-${item.id}`}
               item={item}

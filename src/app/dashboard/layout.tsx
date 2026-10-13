@@ -8,9 +8,15 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getSession();
+  // getSession() e getBrandingSrcs() são buscas independentes no banco —
+  // rodar em paralelo em vez de uma depois da outra corta uma viagem de
+  // ida-e-volta inteira do tempo de carregamento de TODA página do
+  // dashboard (esse layout roda em todas elas).
+  const [user, { iconSrc }] = await Promise.all([
+    getSession(),
+    getBrandingSrcs(),
+  ]);
   if (!user) redirect("/login");
-  const { iconSrc } = await getBrandingSrcs();
 
   return (
     <DashboardShell user={user} iconSrc={iconSrc}>

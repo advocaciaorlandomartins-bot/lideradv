@@ -88,46 +88,50 @@ export async function getControles(
   const inicioParam = inicio || null;
   const fimParam = fim || null;
 
-  const rows = await sql`
-    SELECT
-      c.id::text, c.tipo, c.data_evento::text, c.descricao, c.status::text,
-      c.cliente_id::text,   cl.name AS cliente_nome,
-      c.processo_id::text,  p.numero AS processo_numero,
-      c.responsavel_id::text, u.login AS responsavel_login,
-      c.prioridade, c.fatal, c.pontos, c.publicacao_id, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.checklist, c.created_at::text
-    FROM controles c
-    LEFT JOIN clients cl ON cl.id = c.cliente_id
-    LEFT JOIN processos p  ON p.id  = c.processo_id
-    LEFT JOIN usuarios u   ON u.id  = c.responsavel_id
-    WHERE c.tipo = ${tipo}
-      AND CASE
-            WHEN ${statusParam}::text IS NULL          THEN TRUE
-            WHEN ${statusParam}  = 'pendente'  THEN c.status IS NULL
-            WHEN ${statusParam} != 'pendente'  THEN c.status = ${statusParam}
-            ELSE TRUE
-          END
-      AND (${inicioParam}::date IS NULL OR c.data_evento >= ${inicioParam}::date)
-      AND (${fimParam}::date   IS NULL OR c.data_evento <= ${fimParam}::date)
-      AND (${verTodos} OR c.responsavel_id = ${usuarioId}::uuid)
-    ORDER BY c.data_evento ${ordem === "asc" ? sql`ASC` : sql`DESC`} NULLS LAST,
-             c.created_at DESC
-    LIMIT ${rpp} OFFSET ${(pagina - 1) * rpp}
-  `;
-
-  const countRows = await sql`
-    SELECT COUNT(*)::int AS n
-    FROM controles c
-    WHERE c.tipo = ${tipo}
-      AND CASE
-            WHEN ${statusParam}::text IS NULL          THEN TRUE
-            WHEN ${statusParam}  = 'pendente'  THEN c.status IS NULL
-            WHEN ${statusParam} != 'pendente'  THEN c.status = ${statusParam}
-            ELSE TRUE
-          END
-      AND (${inicioParam}::date IS NULL OR c.data_evento >= ${inicioParam}::date)
-      AND (${fimParam}::date   IS NULL OR c.data_evento <= ${fimParam}::date)
-      AND (${verTodos} OR c.responsavel_id = ${usuarioId}::uuid)
-  `;
+  // Lista e contagem são independentes — rodar em paralelo em vez de uma
+  // depois da outra corta uma viagem de ida-e-volta inteira do tempo de
+  // carregamento da página toda vez que ela abre.
+  const [rows, countRows] = await Promise.all([
+    sql`
+      SELECT
+        c.id::text, c.tipo, c.data_evento::text, c.descricao, c.status::text,
+        c.cliente_id::text,   cl.name AS cliente_nome,
+        c.processo_id::text,  p.numero AS processo_numero,
+        c.responsavel_id::text, u.login AS responsavel_login,
+        c.prioridade, c.fatal, c.pontos, c.publicacao_id, c.tipo_demanda, c.observacoes, c.prazo_interno::text, c.dados, c.checklist, c.created_at::text
+      FROM controles c
+      LEFT JOIN clients cl ON cl.id = c.cliente_id
+      LEFT JOIN processos p  ON p.id  = c.processo_id
+      LEFT JOIN usuarios u   ON u.id  = c.responsavel_id
+      WHERE c.tipo = ${tipo}
+        AND CASE
+              WHEN ${statusParam}::text IS NULL          THEN TRUE
+              WHEN ${statusParam}  = 'pendente'  THEN c.status IS NULL
+              WHEN ${statusParam} != 'pendente'  THEN c.status = ${statusParam}
+              ELSE TRUE
+            END
+        AND (${inicioParam}::date IS NULL OR c.data_evento >= ${inicioParam}::date)
+        AND (${fimParam}::date   IS NULL OR c.data_evento <= ${fimParam}::date)
+        AND (${verTodos} OR c.responsavel_id = ${usuarioId}::uuid)
+      ORDER BY c.data_evento ${ordem === "asc" ? sql`ASC` : sql`DESC`} NULLS LAST,
+               c.created_at DESC
+      LIMIT ${rpp} OFFSET ${(pagina - 1) * rpp}
+    `,
+    sql`
+      SELECT COUNT(*)::int AS n
+      FROM controles c
+      WHERE c.tipo = ${tipo}
+        AND CASE
+              WHEN ${statusParam}::text IS NULL          THEN TRUE
+              WHEN ${statusParam}  = 'pendente'  THEN c.status IS NULL
+              WHEN ${statusParam} != 'pendente'  THEN c.status = ${statusParam}
+              ELSE TRUE
+            END
+        AND (${inicioParam}::date IS NULL OR c.data_evento >= ${inicioParam}::date)
+        AND (${fimParam}::date   IS NULL OR c.data_evento <= ${fimParam}::date)
+        AND (${verTodos} OR c.responsavel_id = ${usuarioId}::uuid)
+    `,
+  ]);
 
   return {
     controles: rows.map(mapRow),

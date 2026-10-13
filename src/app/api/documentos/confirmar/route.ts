@@ -1,10 +1,7 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade, podeAcessarColaborador } from "@/lib/acesso";
-import { analisarDocumento } from "@/lib/cerebroJuridico";
-import { analisarDocumentoCliente } from "@/lib/cliente-documento-auto";
-import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -40,12 +37,13 @@ interface Body {
 }
 
 // Chamada pelo navegador logo depois que o upload direto pro Vercel Blob
-// (POST /api/documentos/upload, que só gera o token) termina — grava o
-// registro em `documentos` e dispara a análise automática do Cérebro
-// Jurídico. Nunca confia no entityType/entityId/permissão que vieram do
-// cliente sem checar de novo aqui (mesma regra de todo o resto do sistema:
-// o token de upload já era escopado pra essa entidade, mas re-valida por
-// segurança em profundidade).
+// (POST /api/documentos/upload, que só gera o token) termina — só grava o
+// registro em `documentos` (análise por IA agora é sempre manual, via
+// "Reanalisar" — ver comentário mais abaixo). Nunca confia no
+// entityType/entityId/permissão que vieram do cliente sem checar de novo
+// aqui (mesma regra de todo o resto do sistema: o token de upload já era
+// escopado pra essa entidade, mas re-valida por segurança em
+// profundidade).
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
@@ -115,50 +113,15 @@ export async function POST(request: Request) {
     `;
     const documentoId = rows[0].id as string;
 
-    // Análise automática — roda em segundo plano depois da resposta já ter
-    // sido enviada. Só PDF/imagem (os únicos formatos que a extração sabe
-    // ler). Em processo, o Cérebro Jurídico gera a análise completa e
-    // preenche campos vazios do processo/cliente; em cliente (sem processo
-    // ainda, ou documento avulso tipo RG/comprovante), preenche direto o
-    // cadastro do cliente a partir do que o documento trouxer — mesma regra
-    // de nunca sobrescrever campo que já tem valor real.
-    const isPdfOrImage =
-      (tipo ?? "").includes("pdf") || (tipo ?? "").startsWith("image/");
-    const vaiChamarIa =
-      isPdfOrImage && (entityType === "processo" || entityType === "cliente");
-    // Sem isso, subir vários arquivos em sequência disparava uma chamada de
-    // IA por arquivo sem nenhum limite — cada confirmação aciona análise
-    // automática sozinha, diferente das rotas /api/ia/* (que já checam
-    // isso antes de qualquer chamada). Só checa quando de fato vai chamar a
-    // IA (senão consumiria cota do usuário à toa em upload de .docx/pericia
-    // que nunca dispara análise). Só pula a análise, não o upload — o
-    // documento já foi salvo normalmente acima.
-    const dentroDoLimite =
-      vaiChamarIa &&
-      !(await iaRateLimitExcedido(session.login).catch(() => false));
-    if (isPdfOrImage && dentroDoLimite && entityType === "processo") {
-      after(async () => {
-        try {
-          await analisarDocumento(documentoId, entityId);
-        } catch (e) {
-          console.error(
-            "[documentos/confirmar] falha na análise automática:",
-            e
-          );
-        }
-      });
-    } else if (isPdfOrImage && dentroDoLimite && entityType === "cliente") {
-      after(async () => {
-        try {
-          await analisarDocumentoCliente(documentoId, entityId);
-        } catch (e) {
-          console.error(
-            "[documentos/confirmar] falha no preenchimento automático do cliente:",
-            e
-          );
-        }
-      });
-    }
+    // Análise automática por upload foi desligada a pedido do Orlando
+    // (2026-10-12): gastava crédito de IA sozinha em todo PDF/imagem
+    // enviado, sem confirmação — um upload em lote (ex: 15 documentos de
+    // um cliente) virava 15 chamadas de IA sem ninguém escolher isso.
+    // Pra analisar um documento, agora é sempre pelo botão "Reanalisar"
+    // (Documentos, processo ou cliente) — controle explícito de quando
+    // gasta, mesma IA por trás (analisarDocumento/analisarDocumentoCliente
+    // em cerebroJuridico.ts/cliente-documento-auto.ts, chamadas via
+    // /api/cerebro/documento e /api/cerebro/documento-cliente).
 
     return NextResponse.json({ id: documentoId, url });
   } catch (err) {

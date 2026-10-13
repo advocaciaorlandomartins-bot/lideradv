@@ -82,13 +82,24 @@ export default function DocumentsSection({
     setReanaliseErro(null);
     setReanalisandoId(doc.id);
     try {
-      const res = await fetch("/api/cerebro/documento-cliente", {
+      // Processo usa a análise completa do Dr. Lex (CID, dados extraídos,
+      // write-back no processo); cliente usa o preenchimento de cadastro.
+      // A rota de processo já sabe lidar com documento salvo como
+      // entity_type 'cliente' mas vinculado a este processo (lista
+      // mesclada — ver processos/[id]/page.tsx), então processo_id
+      // sempre basta.
+      const endpoint =
+        entityType === "processo"
+          ? "/api/cerebro/documento"
+          : "/api/cerebro/documento-cliente";
+      const body =
+        entityType === "processo"
+          ? { documento_id: doc.id, processo_id: entityId }
+          : { documento_id: doc.id, cliente_id: entityId };
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          documento_id: doc.id,
-          cliente_id: entityId,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -469,7 +480,7 @@ export default function DocumentsSection({
                   >
                     Abrir
                   </button>
-                  {entityType === "cliente" &&
+                  {(entityType === "cliente" || entityType === "processo") &&
                     (doc.tipo?.includes("pdf") ||
                       doc.tipo?.startsWith("image/")) && (
                       <>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   updateMeusDadosAction,
   type MeusDadosFormState,
@@ -32,6 +32,11 @@ function Field({
   );
 }
 
+function maskCEP(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 8);
+  return d.replace(/(\d{5})(\d{1,3})$/, "$1-$2");
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-4">
@@ -55,6 +60,35 @@ export default function MeusDadosContent({
     FormData
   >(updateMeusDadosAction, null);
   const [showSaved, setShowSaved] = useState(false);
+
+  const [cepValue, setCepValue] = useState(colaborador.cep ?? "");
+  const [street, setStreet] = useState(colaborador.street ?? "");
+  const [neighborhood, setNeighborhood] = useState(
+    colaborador.neighborhood ?? ""
+  );
+  const [city, setCity] = useState(colaborador.city ?? "");
+  const [uf, setUf] = useState(colaborador.state ?? "");
+  const [cepLoading, setCepLoading] = useState(false);
+  const lastFetchedCep = useRef("");
+
+  async function fetchCepByDigits(digits: string) {
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        if (data.logradouro) setStreet(data.logradouro);
+        if (data.bairro) setNeighborhood(data.bairro);
+        if (data.localidade) setCity(data.localidade);
+        if (data.uf) setUf(data.uf);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setCepLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (state?.success) {
@@ -161,18 +195,33 @@ export default function MeusDadosContent({
             <input
               name="cep"
               type="text"
-              defaultValue={colaborador.cep ?? ""}
+              value={cepValue}
+              onChange={(e) => {
+                const masked = maskCEP(e.target.value);
+                setCepValue(masked);
+                const digits = masked.replace(/\D/g, "");
+                if (digits.length === 8 && digits !== lastFetchedCep.current) {
+                  lastFetchedCep.current = digits;
+                  fetchCepByDigits(digits);
+                }
+              }}
               placeholder="00000-000"
               disabled={isPending}
               className={inputClass}
             />
+            {cepLoading && (
+              <p className="mt-1 font-body text-xs text-muted">
+                Buscando endereço…
+              </p>
+            )}
           </Field>
           <div className="sm:col-span-2">
             <Field label="Rua/Logradouro">
               <input
                 name="street"
                 type="text"
-                defaultValue={colaborador.street ?? ""}
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
                 disabled={isPending}
                 className={inputClass}
               />
@@ -203,7 +252,8 @@ export default function MeusDadosContent({
             <input
               name="neighborhood"
               type="text"
-              defaultValue={colaborador.neighborhood ?? ""}
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
               disabled={isPending}
               className={inputClass}
             />
@@ -216,7 +266,8 @@ export default function MeusDadosContent({
               <input
                 name="city"
                 type="text"
-                defaultValue={colaborador.city ?? ""}
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
                 disabled={isPending}
                 className={inputClass}
               />
@@ -227,7 +278,8 @@ export default function MeusDadosContent({
               name="state"
               type="text"
               maxLength={2}
-              defaultValue={colaborador.state ?? ""}
+              value={uf}
+              onChange={(e) => setUf(e.target.value.toUpperCase())}
               disabled={isPending}
               className={`${inputClass} uppercase`}
               style={{ textTransform: "uppercase" }}

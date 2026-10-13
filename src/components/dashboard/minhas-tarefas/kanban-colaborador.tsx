@@ -221,38 +221,35 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
 
   return (
     <div
-      className={`rounded-xl border shadow-sm ${
+      className={`rounded-xl shadow-sm ${
         item.urgente
-          ? "border-red-200 border-l-4 border-l-red-500 bg-white"
-          : "border-border border-l-4 border-l-slate-200 bg-slate-50/60 hover:border-primary/30 hover:shadow-md"
+          ? "border-2 border-red-300 border-l-8 border-l-red-600 bg-red-50/70 shadow-md"
+          : "border border-border border-l-4 border-l-slate-200 bg-slate-50/60 hover:border-primary/30 hover:shadow-md"
       }`}
     >
       <div className="p-4">
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <span
-            className={`rounded px-1.5 py-0.5 font-body text-[10px] font-semibold ${
-              item.urgente
-                ? "bg-red-100 text-red-700"
-                : item.aguardando
+          {item.urgente ? (
+            <span className="inline-flex items-center gap-1.5 rounded bg-red-600 px-2 py-1 font-body text-[11px] font-bold uppercase tracking-wide text-white">
+              <AlertIcon className="h-3.5 w-3.5" />
+              Ação urgente — dar entrada
+            </span>
+          ) : (
+            <span
+              className={`rounded px-1.5 py-0.5 font-body text-[10px] font-semibold ${
+                item.aguardando
                   ? "bg-blue-100 text-blue-700"
                   : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            {item.urgente
-              ? "Ação urgente"
-              : item.aguardando
-                ? "Aguardando"
-                : "Próxima ação"}
-          </span>
-          {item.urgente && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 font-body text-[10px] font-semibold text-red-700">
-              <span className="h-2 w-2 rounded-full bg-red-600" />
-              Requerida
+              }`}
+            >
+              {item.aguardando ? "Aguardando" : "Próxima ação"}
             </span>
           )}
         </div>
 
-        <p className="font-body text-sm font-semibold leading-snug text-fg">
+        <p
+          className={`font-body leading-snug ${item.urgente ? "text-base font-bold text-red-950" : "text-sm font-semibold text-fg"}`}
+        >
           {item.titulo}
         </p>
 
@@ -282,21 +279,29 @@ function AcaoProcessoCard({ item }: { item: MinhaAcaoProcesso }) {
         </div>
       </div>
 
-      <div className="border-t border-border px-3 pb-3 pt-3">
+      <div
+        className={`border-t px-3 pb-3 pt-3 ${item.urgente ? "border-red-200" : "border-border"}`}
+      >
         {/* Um único botão — esta ação é derivada automaticamente do estado
             do processo (não tem um "concluir" próprio como controles/tarefas
             manuais): ela só some daqui quando o processo for atualizado lá
             dentro. Um segundo botão verde com CheckCircleIcon ao lado deste
             passaria a falsa impressão de que a pendência foi resolvida com
-            um clique, sem exigir a atualização real no processo. */}
+            um clique, sem exigir a atualização real no processo. Quando
+            urgente, o botão vira vermelho sólido — a pedido do Orlando:
+            "forçar os trabalhos e dar entrada logo", não deixar esperar. */}
         <Link
           href={`/dashboard/processos/${item.processo_id}`}
           style={{ touchAction: "manipulation" }}
           title="Abra o processo para atualizar o andamento e resolver esta pendência"
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
+          className={
+            item.urgente
+              ? "flex w-full items-center justify-center gap-1.5 rounded-lg bg-red-600 py-2.5 font-body text-[12px] font-bold text-white transition-colors hover:bg-red-700 active:bg-red-800"
+              : "flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 font-body text-[12px] font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary active:bg-slate-50"
+          }
         >
           <FolderOpenIcon className="h-4 w-4 flex-shrink-0" />
-          Ver processo e resolver
+          {item.urgente ? "Resolver agora" : "Ver processo e resolver"}
         </Link>
       </div>
     </div>
@@ -748,13 +753,16 @@ interface ColumnProps {
   onTimesheetChange: (ativo: TimesheetAtivo | null) => void;
 }
 
-// Duas naturezas bem diferentes de card ficavam misturadas na mesma lista,
-// só diferenciadas por um selinho pequeno: a "situação do processo" (sem
-// data, sem "Dar baixa" — é só o estágio atual do caso) e tarefa/controle
-// real (com prazo, cronômetro, "Dar baixa"). Separa em duas zonas visuais
-// distintas — tarefas/prazos primeiro (o que exige ação), situação dos
-// processos depois, num bloco mais discreto (borda tracejada, fundo
-// neutro) — sem criar coluna/aba nova.
+// Três naturezas diferentes de card ficavam misturadas: ação urgente de
+// processo (precisa agir AGORA — dar entrada, protocolar — é o próximo
+// passo do fluxo administrativo→judicial), tarefa/controle real (com
+// prazo, cronômetro, "Dar baixa") e aviso passivo (aguardando resultado
+// de terceiro — INSS, justiça — nada a fazer por enquanto). Achado do
+// Orlando: a 1ª versão agrupava TODO item de processo (urgente ou não)
+// junto, num bloco apagado — escondendo exatamente a ação mais urgente,
+// que é o que o colaborador mais precisa ver primeiro. Ordem agora:
+// ações urgentes (destaque) → tarefas/prazos → avisos passivos (por
+// último, discreto).
 function GroupedItems({
   items,
   timesheetAtivo,
@@ -764,11 +772,32 @@ function GroupedItems({
   timesheetAtivo: TimesheetAtivo | null;
   onTimesheetChange: (ativo: TimesheetAtivo | null) => void;
 }) {
-  const situacaoProcessos = items.filter((i) => i.source === "processo");
+  const acoesUrgentes = items.filter(
+    (i) => i.source === "processo" && (i as MinhaAcaoProcesso).urgente
+  );
+  const avisos = items.filter(
+    (i) => i.source === "processo" && !(i as MinhaAcaoProcesso).urgente
+  );
   const tarefasReais = items.filter((i) => i.source !== "processo");
 
   return (
     <div className="flex flex-col gap-4">
+      {acoesUrgentes.length > 0 && (
+        <div className="flex flex-col gap-2.5">
+          <p className="flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 font-body text-[11px] font-bold uppercase tracking-wide text-red-700">
+            <AlertIcon className="h-3.5 w-3.5" />
+            Ação urgente — precisa agir ({acoesUrgentes.length})
+          </p>
+          {acoesUrgentes.map((item) => (
+            <ItemCard
+              key={`${item.source}-${item.id}`}
+              item={item}
+              timesheetAtivo={timesheetAtivo}
+              onTimesheetChange={onTimesheetChange}
+            />
+          ))}
+        </div>
+      )}
       {tarefasReais.length > 0 && (
         <div className="flex flex-col gap-2.5">
           <p className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 font-body text-[11px] font-bold uppercase tracking-wide text-slate-600">
@@ -785,14 +814,14 @@ function GroupedItems({
           ))}
         </div>
       )}
-      {situacaoProcessos.length > 0 && (
+      {avisos.length > 0 && (
         <div className="flex flex-col gap-2.5 rounded-xl border border-dashed border-border bg-slate-50/40 p-2.5">
           <p className="flex items-center gap-1.5 px-0.5 font-body text-[10px] font-bold uppercase tracking-wide text-muted">
             <FolderOpenIcon className="h-3 w-3" />
-            Situação dos processos ({situacaoProcessos.length}) — sem prazo, só
-            acompanhamento
+            Avisos ({avisos.length}) — aguardando resultado, nada a fazer por
+            enquanto
           </p>
-          {situacaoProcessos.map((item) => (
+          {avisos.map((item) => (
             <ItemCard
               key={`${item.source}-${item.id}`}
               item={item}

@@ -23,7 +23,10 @@ export type TipoLembrete =
   | "compromisso_1d"
   | "compromisso_dia"
   | "conta_1d"
-  | "conta_vence_hoje";
+  | "conta_vence_hoje"
+  | "dcb_30d"
+  | "dcb_15d"
+  | "dcb_5d";
 
 // ── Helpers de data ───────────────────────────────────────────
 //
@@ -1017,6 +1020,57 @@ export async function agendarLembretesContaPendente(opts: {
          NULL, ${opts.colaboradorNome},
          'colaborador', ${opts.colaboradorTelefone}, ${opts.colaboradorNome},
          ${lembrete.mensagem}, ${lembrete.enviarEm.toISOString()})
+    `;
+  }
+}
+
+// Pedido do Orlando (2026-10-12): prorrogação de benefício por incapacidade
+// precisa de tempo pra reunir atestado/receitas/exames atualizados antes da
+// data de cessação — um único aviso perto do prazo não dá margem. Três
+// avisos escalonados pro escritório (30/15/5 dias antes da CESSAÇÃO real,
+// não da data do controle "-15 dias" que só marca o prazo administrativo).
+export async function agendarLembretesDcb(opts: {
+  controleId: string;
+  clienteId: string;
+  clienteNome: string;
+  dataCessacao: Date;
+  colaboradorTelefone: string;
+  colaboradorNome: string;
+}): Promise<void> {
+  const dataFormatada = formatarData(opts.dataCessacao);
+
+  const lembretes: Array<{ tipo: TipoLembrete; enviarEm: Date; dias: number }> =
+    [
+      {
+        tipo: "dcb_30d",
+        enviarEm: diasAntes(opts.dataCessacao, 30, 8),
+        dias: 30,
+      },
+      {
+        tipo: "dcb_15d",
+        enviarEm: diasAntes(opts.dataCessacao, 15, 8),
+        dias: 15,
+      },
+      { tipo: "dcb_5d", enviarEm: diasAntes(opts.dataCessacao, 5, 8), dias: 5 },
+    ];
+
+  const agora = new Date();
+  for (const lembrete of lembretes) {
+    if (lembrete.enviarEm <= agora) continue;
+    const mensagem =
+      `⏰ *Prorrogação — ${opts.clienteNome}*\n\n` +
+      `Faltam ${lembrete.dias} dias para a cessação do benefício (${dataFormatada}).\n\n` +
+      `_Hora de providenciar atestado, receitas e exames atualizados para dar entrada no pedido de prorrogação._`;
+    await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+         destinatario_tipo, destinatario_telefone, destinatario_nome,
+         mensagem, enviar_em)
+      VALUES
+        (${lembrete.tipo}, 'controle', ${opts.controleId}::uuid,
+         ${opts.clienteId}::uuid, ${opts.clienteNome},
+         'colaborador', ${opts.colaboradorTelefone}, ${opts.colaboradorNome},
+         ${mensagem}, ${lembrete.enviarEm.toISOString()})
     `;
   }
 }

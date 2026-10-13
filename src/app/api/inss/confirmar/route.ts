@@ -3,7 +3,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarCliente } from "@/lib/acesso";
 import sql from "@/lib/db";
-import { agendarLembretesInss } from "@/lib/lembretes";
+import { agendarLembretesInss, agendarLembretesDcb } from "@/lib/lembretes";
 import { getEscritorioConfig } from "@/lib/escritorio-db";
 import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
 
@@ -347,7 +347,7 @@ export async function POST(req: NextRequest) {
           d.setDate(d.getDate() - 15);
           return d.toISOString().slice(0, 10);
         })();
-        await sql`
+        const dcbRow = await sql`
           INSERT INTO controles
             (tipo, data_evento, descricao, cliente_id, processo_id, responsavel_id, prioridade)
           VALUES
@@ -358,6 +358,7 @@ export async function POST(req: NextRequest) {
              ${processoId ?? null}::uuid,
              ${session.id}::uuid,
              'alta')
+          RETURNING id::text
         `.catch((e) => {
           console.error(
             "[inss/confirmar] falha ao inserir controle de DCB/prorrogação:",
@@ -365,6 +366,25 @@ export async function POST(req: NextRequest) {
           );
           return null;
         });
+
+        // Avisos escalonados (30/15/5 dias antes da cessação real) pro
+        // escritório — pedido do Orlando, dá tempo de reunir atestado/
+        // receitas/exames antes do prazo apertar.
+        if (dcbRow && dcbRow[0] && escritorio?.telefone) {
+          await agendarLembretesDcb({
+            controleId: String(dcbRow[0].id),
+            clienteId,
+            clienteNome: clienteNomeSeguro,
+            dataCessacao: new Date(dataCessacaoBeneficio + "T12:00:00"),
+            colaboradorTelefone: escritorio.telefone,
+            colaboradorNome: nomeEscritorio,
+          }).catch((e) => {
+            console.error(
+              "[inss/confirmar] falha ao agendar lembretes escalonados de DCB:",
+              e
+            );
+          });
+        }
       }
     }
 

@@ -935,6 +935,13 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
   const [pageSizeFluxo, setPageSizeFluxo] = useState(20);
   const [categoryFilter, setCategoryFilter] = useState<string>("todas");
   const [saldoAtualStr, setSaldoAtualStr] = useState("");
+  // Clicar num card de KPI (A Receber/Recebido/A Pagar/Pago) filtra a
+  // tabela lá embaixo, mas nada mudava visível no topo da tela — com
+  // Projeção 12 meses + Fluxo de Caixa no meio, a tabela filtrada fica
+  // fora da tela sem rolagem nenhuma. Achado real do Orlando: "esses
+  // botões não estão abrindo" (o clique funcionava, só não dava pra ver
+  // o resultado sem rolar manualmente bem longe).
+  const tabelaRef = useRef<HTMLDivElement>(null);
   const [fluxoCaixaOpen, setFluxoCaixaOpen] = useState(true);
 
   const categorias = useMemo(() => {
@@ -1207,6 +1214,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     setPageConcluidas(1);
     setPagePendentes(1);
     setPageAtrasados(1);
+    tabelaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function handleCategoryFilter(cat: string) {
@@ -1519,7 +1527,10 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
       </div>
 
       {/* ── Barra de controles unificada ────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div
+        ref={tabelaRef}
+        className="flex flex-wrap items-center justify-between gap-3 scroll-mt-4"
+      >
         {/* Abas de situação + filtro de tipo */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Tab situação */}

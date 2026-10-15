@@ -55,6 +55,19 @@ export interface Client {
   responsavel_nome: string | null;
   responsavel_email: string | null;
   checklist: ChecklistItem[];
+  cid_principal: string | null;
+  /** Estágio/resultado do processo mais relevante do cliente (o ativo mais
+   * recente, ou o mais recente qualquer se não tiver nenhum ativo) — pedido
+   * do Orlando: a lista de Clientes já mostra "1 processo" mas não dizia se
+   * já tinha dado entrada ou em que fase estava, precisava abrir o
+   * processo pra saber. Mesmo padrão de exibição já usado na lista de
+   * Processos (ver processos-content.tsx). null quando o cliente não tem
+   * processo nenhum. */
+  estagio_producao: string | null;
+  resultado_judicial: string | null;
+  resultado_administrativo: string | null;
+  data_distribuicao: string | null;
+  data_protocolo_inss: string | null;
 }
 
 /**
@@ -121,6 +134,12 @@ export async function getAllClients(
       c.responsavel_nome,
       c.responsavel_email,
       c.checklist,
+      c.cid_principal,
+      proc.estagio_producao,
+      proc.resultado_judicial,
+      proc.resultado_administrativo,
+      to_char(proc.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
+      to_char(proc.data_protocolo_inss, 'DD/MM/YYYY') AS data_protocolo_inss,
       col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
       (
@@ -135,6 +154,14 @@ export async function getAllClients(
       ) AS etiquetas
     FROM clients c
     LEFT JOIN colaboradores col ON col.id = c.indicador_id
+    LEFT JOIN LATERAL (
+      SELECT estagio_producao, resultado_judicial, resultado_administrativo,
+             data_distribuicao, data_protocolo_inss
+      FROM processos p
+      WHERE p.client_id = c.id AND p.deleted_at IS NULL
+      ORDER BY (status = 'ativo') DESC, created_at DESC
+      LIMIT 1
+    ) proc ON true
     WHERE c.deleted_at IS NULL
       AND (
         ${podeVerTodos}
@@ -171,6 +198,12 @@ export async function getAllClients(
       r.checklist,
       r.processos_checklists
     ),
+    cid_principal: r.cid_principal ?? null,
+    estagio_producao: r.estagio_producao ?? null,
+    resultado_judicial: r.resultado_judicial ?? null,
+    resultado_administrativo: r.resultado_administrativo ?? null,
+    data_distribuicao: r.data_distribuicao ?? null,
+    data_protocolo_inss: r.data_protocolo_inss ?? null,
   }));
 }
 
@@ -657,6 +690,12 @@ export async function getClientById(id: string): Promise<Client | null> {
       c.responsavel_nome,
       c.responsavel_email,
       c.checklist,
+      c.cid_principal,
+      proc.estagio_producao,
+      proc.resultado_judicial,
+      proc.resultado_administrativo,
+      to_char(proc.data_distribuicao, 'DD/MM/YYYY') AS data_distribuicao,
+      to_char(proc.data_protocolo_inss, 'DD/MM/YYYY') AS data_protocolo_inss,
       col.nome AS indicador_nome,
       (SELECT COUNT(*)::int FROM processos WHERE client_id = c.id AND deleted_at IS NULL) AS process_count,
       (
@@ -671,6 +710,14 @@ export async function getClientById(id: string): Promise<Client | null> {
       ) AS etiquetas
     FROM clients c
     LEFT JOIN colaboradores col ON col.id = c.indicador_id
+    LEFT JOIN LATERAL (
+      SELECT estagio_producao, resultado_judicial, resultado_administrativo,
+             data_distribuicao, data_protocolo_inss
+      FROM processos p
+      WHERE p.client_id = c.id AND p.deleted_at IS NULL
+      ORDER BY (status = 'ativo') DESC, created_at DESC
+      LIMIT 1
+    ) proc ON true
     WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
   `;
 
@@ -700,6 +747,12 @@ export async function getClientById(id: string): Promise<Client | null> {
       r.checklist,
       r.processos_checklists
     ),
+    cid_principal: r.cid_principal ?? null,
+    estagio_producao: r.estagio_producao ?? null,
+    resultado_judicial: r.resultado_judicial ?? null,
+    resultado_administrativo: r.resultado_administrativo ?? null,
+    data_distribuicao: r.data_distribuicao ?? null,
+    data_protocolo_inss: r.data_protocolo_inss ?? null,
   };
 }
 

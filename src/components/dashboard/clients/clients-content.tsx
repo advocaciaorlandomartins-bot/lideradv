@@ -32,8 +32,45 @@ import ClientesFiltroModal, {
 import ChecklistBadge, { ChecklistInlineIcon } from "../checklist-badge";
 import { checklistStatus } from "@/lib/checklist-types";
 import AiDocumentImport from "./ai-document-import";
+import {
+  ESTAGIO_PRODUCAO_META,
+  type EstagioProducao,
+} from "@/lib/producao-types";
+import { descreverCid } from "@/lib/cid-map";
 
 // ── Helpers ────────────────────────────────────────────────────
+
+/**
+ * Estágio/sub-status do processo mais relevante do cliente, pra mostrar
+ * direto na lista — pedido do Orlando: a lista de Clientes mostrava "1
+ * processo" mas não dizia se já tinha dado entrada ou em que fase estava,
+ * precisava abrir pra saber. Mesmo critério de "aguardando" já usado em
+ * processo-fases.ts (getProximaAcaoProcesso): administrativo sem protocolo
+ * = ainda não deu entrada; com protocolo mas sem resultado = aguardando o
+ * INSS; judicial sem distribuição = ainda não deu entrada; com distribuição
+ * mas sem resultado = aguardando a justiça.
+ */
+function estagioInfo(c: Client): {
+  label: string;
+  cls: string;
+  sub: { label: string; cls: string } | null;
+} | null {
+  if (!c.estagio_producao) return null;
+  const meta =
+    ESTAGIO_PRODUCAO_META[c.estagio_producao as EstagioProducao] ??
+    ESTAGIO_PRODUCAO_META.analise;
+  let sub: { label: string; cls: string } | null = null;
+  if (c.estagio_producao === "administrativo" && !c.resultado_administrativo) {
+    sub = c.data_protocolo_inss
+      ? { label: "Aguardando resultado do INSS", cls: "text-blue-600" }
+      : { label: "Aguardando entrada", cls: "text-red-600" };
+  } else if (c.estagio_producao === "judicial" && !c.resultado_judicial) {
+    sub = c.data_distribuicao
+      ? { label: "Aguardando resultado", cls: "text-blue-600" }
+      : { label: "Aguardando entrada", cls: "text-red-600" };
+  }
+  return { label: meta.label, cls: `${meta.bg} ${meta.color}`, sub };
+}
 
 const AVATAR_COLORS = [
   "bg-blue-100 text-blue-700",
@@ -946,6 +983,36 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                                 Indicado por {c.indicador_nome}
                               </p>
                             )}
+                            {c.cid_principal && (
+                              <p
+                                className="mt-0.5 truncate font-body text-[11px] font-semibold text-violet-700"
+                                title={`CID ${c.cid_principal}${descreverCid(c.cid_principal) ? ` — ${descreverCid(c.cid_principal)}` : ""}`}
+                              >
+                                CID {c.cid_principal}
+                                {descreverCid(c.cid_principal) &&
+                                  ` — ${descreverCid(c.cid_principal)}`}
+                              </p>
+                            )}
+                            {(() => {
+                              const est = estagioInfo(c);
+                              if (!est) return null;
+                              return (
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <span
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${est.cls}`}
+                                  >
+                                    {est.label}
+                                  </span>
+                                  {est.sub && (
+                                    <span
+                                      className={`font-body text-[10px] font-semibold ${est.sub.cls}`}
+                                    >
+                                      {est.sub.label}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       </td>
@@ -1030,6 +1097,16 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                           Indicado por {c.indicador_nome}
                         </p>
                       )}
+                      {c.cid_principal && (
+                        <p
+                          className="mt-0.5 truncate font-body text-[11px] font-semibold text-violet-700"
+                          title={`CID ${c.cid_principal}${descreverCid(c.cid_principal) ? ` — ${descreverCid(c.cid_principal)}` : ""}`}
+                        >
+                          CID {c.cid_principal}
+                          {descreverCid(c.cid_principal) &&
+                            ` — ${descreverCid(c.cid_principal)}`}
+                        </p>
+                      )}
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <StatusBadge status={c.status} />
                         <span className="font-body text-xs text-muted">
@@ -1037,6 +1114,26 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
                         </span>
                         <ChecklistBadge checklist={c.checklist} />
                       </div>
+                      {(() => {
+                        const est = estagioInfo(c);
+                        if (!est) return null;
+                        return (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${est.cls}`}
+                            >
+                              {est.label}
+                            </span>
+                            {est.sub && (
+                              <span
+                                className={`font-body text-[10px] font-semibold ${est.sub.cls}`}
+                              >
+                                {est.sub.label}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <ChevronRightIcon className="h-4 w-4 flex-shrink-0 text-muted" />
                   </Link>

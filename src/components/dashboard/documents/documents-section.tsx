@@ -444,36 +444,41 @@ export default function DocumentsSection({
             {documents.map((doc) => (
               <li
                 key={doc.id}
-                className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 transition-colors duration-150 hover:bg-slate-50"
+                className="flex flex-col gap-2 rounded-lg border border-border px-4 py-3 transition-colors duration-150 hover:bg-slate-50 sm:flex-row sm:items-center sm:gap-3"
               >
-                {/* Seleção */}
-                <input
-                  type="checkbox"
-                  checked={selected.has(doc.id)}
-                  onChange={() => toggleSelected(doc.id)}
-                  className="h-4 w-4 flex-shrink-0 cursor-pointer rounded border-border accent-primary"
-                />
+                {/* Seleção + badge + nome — no mobile, os botões de ação
+                    (largura fixa) espremiam essa parte até sobrar só 1
+                    letra do nome do arquivo; empilha em telas estreitas
+                    pra o nome ter a largura toda disponível. */}
+                <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(doc.id)}
+                    onChange={() => toggleSelected(doc.id)}
+                    className="h-4 w-4 flex-shrink-0 cursor-pointer rounded border-border accent-primary"
+                  />
 
-                {/* File type badge */}
-                <div
-                  className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg font-body text-[11px] font-bold ${fileColor(doc.tipo)}`}
-                >
-                  {fileLabel(doc.tipo)}
-                </div>
+                  {/* File type badge */}
+                  <div
+                    className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg font-body text-[11px] font-bold ${fileColor(doc.tipo)}`}
+                  >
+                    {fileLabel(doc.tipo)}
+                  </div>
 
-                {/* Info */}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-body text-sm font-semibold text-fg">
-                    {doc.nome}
-                  </p>
-                  <p className="font-body text-xs text-muted">
-                    {doc.tamanho ? formatBytes(doc.tamanho) : "—"} ·{" "}
-                    {doc.created_at_formatted}
-                  </p>
+                  {/* Info */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-body text-sm font-semibold text-fg">
+                      {doc.nome}
+                    </p>
+                    <p className="font-body text-xs text-muted">
+                      {doc.tamanho ? formatBytes(doc.tamanho) : "—"} ·{" "}
+                      {doc.created_at_formatted}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-shrink-0 items-center gap-3">
+                <div className="flex flex-shrink-0 items-center gap-3 pl-7 sm:pl-0">
                   <button
                     onClick={() => handleAbrir(doc)}
                     className="font-body text-xs font-semibold text-primary transition-colors duration-150 hover:text-primary-dark cursor-pointer"

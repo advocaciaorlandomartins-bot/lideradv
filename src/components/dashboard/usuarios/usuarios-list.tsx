@@ -7,6 +7,7 @@ import {
   ShieldCheckIcon,
   PlusIcon,
   MagnifyingGlassIcon,
+  ChevronRightIcon,
 } from "@/components/icons";
 import DeleteUsuarioButton from "@/components/dashboard/usuarios/delete-usuario-button";
 import type { Usuario } from "@/lib/usuarios-types";
@@ -214,144 +215,207 @@ export default function UsuariosList({ usuarios }: Props) {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-slate-50/50">
-                  <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                    Usuário
-                  </th>
-                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                    Categoria
-                  </th>
-                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                    Validade
-                  </th>
-                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                    Pendências
-                  </th>
-                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                    Último acesso
-                  </th>
-                  <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                    Status
-                  </th>
-                  <th className="px-5 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered.map((u) => (
-                  <tr
-                    key={u.id}
-                    onClick={() => router.push(`/dashboard/usuarios/${u.id}`)}
-                    className="group cursor-pointer transition-colors duration-100 hover:bg-primary/5"
-                  >
-                    {/* Usuário */}
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full font-body text-sm font-bold ${avatarColor(u.login)} ${!u.ativo ? "opacity-50" : ""}`}
-                        >
-                          {u.login.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p
-                            className={`font-body text-sm font-semibold ${u.ativo ? "text-fg" : "text-muted"}`}
-                          >
-                            {u.login}
-                          </p>
-                          <p className="truncate font-body text-xs text-muted">
-                            {u.nome}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Categoria */}
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-body text-xs font-semibold ${CATEGORIA_COLORS[u.categoria] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}
-                      >
-                        {u.categoria}
-                      </span>
-                    </td>
-
-                    {/* Validade */}
-                    <td className="px-4 py-3.5 font-body text-sm text-muted">
-                      {u.validade ? (
-                        new Date(u.validade).toLocaleDateString("pt-BR")
-                      ) : (
-                        <span className="text-slate-300">Sem prazo</span>
-                      )}
-                    </td>
-
-                    {/* Pendências */}
-                    <td className="px-4 py-3.5">
-                      {u.tarefas_pendentes + u.controles_pendentes === 0 ? (
-                        <span className="font-body text-xs text-slate-300">
-                          —
-                        </span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {u.tarefas_pendentes > 0 && (
-                            <span className="rounded-full bg-teal-50 px-2 py-0.5 font-body text-[11px] font-semibold text-teal-700">
-                              {u.tarefas_pendentes}T
-                            </span>
-                          )}
-                          {u.controles_pendentes > 0 && (
-                            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-body text-[11px] font-semibold text-amber-700">
-                              {u.controles_pendentes}C
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Último acesso */}
-                    <td className="px-4 py-3.5 font-body text-sm text-muted">
-                      {u.ultimo_acesso ? (
-                        <span title={absoluteTime(u.ultimo_acesso)}>
-                          {relativeTime(u.ultimo_acesso)}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">Nunca</span>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-body text-xs font-semibold ${u.ativo ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${u.ativo ? "bg-emerald-500" : "bg-slate-400"}`}
-                        />
-                        {u.ativo ? "Ativo" : "Inativo"}
-                      </span>
-                    </td>
-
-                    {/* Ações */}
-                    <td
-                      className="px-5 py-3.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          href={`/dashboard/usuarios/${u.id}`}
-                          className="flex h-8 items-center rounded-lg border border-border px-3 font-body text-xs font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
-                        >
-                          Editar
-                        </Link>
-                        <DeleteUsuarioButton id={u.id} login={u.login} />
-                      </div>
-                    </td>
+          <>
+            {/* Desktop table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-slate-50/50">
+                    <th className="px-5 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Usuário
+                    </th>
+                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Categoria
+                    </th>
+                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Validade
+                    </th>
+                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Pendências
+                    </th>
+                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Último acesso
+                    </th>
+                    <th className="px-4 py-3 text-left font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Status
+                    </th>
+                    <th className="px-5 py-3 text-right font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                      Ações
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filtered.map((u) => (
+                    <tr
+                      key={u.id}
+                      onClick={() => router.push(`/dashboard/usuarios/${u.id}`)}
+                      className="group cursor-pointer transition-colors duration-100 hover:bg-primary/5"
+                    >
+                      {/* Usuário */}
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full font-body text-sm font-bold ${avatarColor(u.login)} ${!u.ativo ? "opacity-50" : ""}`}
+                          >
+                            {u.login.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p
+                              className={`font-body text-sm font-semibold ${u.ativo ? "text-fg" : "text-muted"}`}
+                            >
+                              {u.login}
+                            </p>
+                            <p className="truncate font-body text-xs text-muted">
+                              {u.nome}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Categoria */}
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-body text-xs font-semibold ${CATEGORIA_COLORS[u.categoria] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}
+                        >
+                          {u.categoria}
+                        </span>
+                      </td>
+
+                      {/* Validade */}
+                      <td className="px-4 py-3.5 font-body text-sm text-muted">
+                        {u.validade ? (
+                          new Date(u.validade).toLocaleDateString("pt-BR")
+                        ) : (
+                          <span className="text-slate-300">Sem prazo</span>
+                        )}
+                      </td>
+
+                      {/* Pendências */}
+                      <td className="px-4 py-3.5">
+                        {u.tarefas_pendentes + u.controles_pendentes === 0 ? (
+                          <span className="font-body text-xs text-slate-300">
+                            —
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {u.tarefas_pendentes > 0 && (
+                              <span className="rounded-full bg-teal-50 px-2 py-0.5 font-body text-[11px] font-semibold text-teal-700">
+                                {u.tarefas_pendentes}T
+                              </span>
+                            )}
+                            {u.controles_pendentes > 0 && (
+                              <span className="rounded-full bg-amber-50 px-2 py-0.5 font-body text-[11px] font-semibold text-amber-700">
+                                {u.controles_pendentes}C
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Último acesso */}
+                      <td className="px-4 py-3.5 font-body text-sm text-muted">
+                        {u.ultimo_acesso ? (
+                          <span title={absoluteTime(u.ultimo_acesso)}>
+                            {relativeTime(u.ultimo_acesso)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">Nunca</span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-body text-xs font-semibold ${u.ativo ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${u.ativo ? "bg-emerald-500" : "bg-slate-400"}`}
+                          />
+                          {u.ativo ? "Ativo" : "Inativo"}
+                        </span>
+                      </td>
+
+                      {/* Ações */}
+                      <td
+                        className="px-5 py-3.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/dashboard/usuarios/${u.id}`}
+                            className="flex h-8 items-center rounded-lg border border-border px-3 font-body text-xs font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
+                          >
+                            Editar
+                          </Link>
+                          <DeleteUsuarioButton id={u.id} login={u.login} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile card list — a tabela só tinha rolagem horizontal
+                aqui, sem layout alternativo (diferente de Clientes/
+                Processos/Colaboradores, que já têm cards no mobile). Ações
+                destrutivas (Excluir) ficam só na tela de edição, não no
+                card — mesmo padrão já usado na lista de colaboradores. */}
+            <ul className="divide-y divide-border md:hidden">
+              {filtered.map((u) => (
+                <li key={u.id}>
+                  <Link
+                    href={`/dashboard/usuarios/${u.id}`}
+                    className="flex items-center gap-3 px-4 py-4 transition-colors duration-150 hover:bg-primary/5"
+                  >
+                    <div
+                      className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full font-body text-sm font-bold ${avatarColor(u.login)} ${!u.ativo ? "opacity-50" : ""}`}
+                    >
+                      {u.login.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={`truncate font-body text-sm font-semibold ${u.ativo ? "text-fg" : "text-muted"}`}
+                        >
+                          {u.login}
+                        </p>
+                        <span
+                          className={`flex-shrink-0 rounded-full border px-2 py-0.5 font-body text-[11px] font-semibold ${CATEGORIA_COLORS[u.categoria] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}
+                        >
+                          {u.categoria}
+                        </span>
+                      </div>
+                      <p className="truncate font-body text-xs text-muted">
+                        {u.nome}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-body text-[11px] font-semibold ${u.ativo ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${u.ativo ? "bg-emerald-500" : "bg-slate-400"}`}
+                          />
+                          {u.ativo ? "Ativo" : "Inativo"}
+                        </span>
+                        {u.tarefas_pendentes > 0 && (
+                          <span className="rounded-full bg-teal-50 px-2 py-0.5 font-body text-[11px] font-semibold text-teal-700">
+                            {u.tarefas_pendentes}T
+                          </span>
+                        )}
+                        {u.controles_pendentes > 0 && (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 font-body text-[11px] font-semibold text-amber-700">
+                            {u.controles_pendentes}C
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRightIcon className="h-4 w-4 flex-shrink-0 text-muted" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </div>

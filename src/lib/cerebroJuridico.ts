@@ -2455,11 +2455,22 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
   const rawAnalise =
     extractText(aiResp) || "Não foi possível analisar o documento.";
 
-  // Extrai o bloco JSON de CAMPOS_JSON e separa do texto narrativo
+  // Extrai o bloco JSON de CAMPOS_JSON e separa do texto narrativo.
+  // O grupo de captura tinha "*?" (não-guloso) — casava só até a PRIMEIRA
+  // "}" depois da primeira "{", então qualquer objeto aninhado dentro do
+  // JSON (ex: "cids_encontrados": [{"cid":"F84.0",...}, {"cid":"F90.0"...}])
+  // cortava a captura bem no meio, no "}" do primeiro item do array, antes
+  // da "}" de fechamento de verdade. JSON.parse falhava (silenciosamente,
+  // no catch abaixo) e TODOS os campos extraídos se perdiam — não só os
+  // CIDs. Achado real do Orlando: documento com múltiplos CIDs "lido" na
+  // análise em texto, mas nenhum campo estruturado (nem CID nem outros)
+  // chegava a gravar no cadastro. "CAMPOS_JSON" é sempre a última seção da
+  // resposta (ver prompt acima), então capturar de forma gulosa até a
+  // ÚLTIMA "}" do texto é seguro — e não corta mais no meio de um array.
   let extracted: Record<string, unknown> = {};
   let analise = rawAnalise;
   const jsonBlockMatch = rawAnalise.match(
-    /##\s*CAMPOS_JSON[\s\S]*?(\{[\s\S]*?\})/i
+    /##\s*CAMPOS_JSON[\s\S]*?(\{[\s\S]*\})/i
   );
   if (jsonBlockMatch) {
     try {
@@ -2532,7 +2543,29 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
       `documento "${doc.nome}" (processo)`
     ).catch(() => null);
 
-    const cidsEncontrados = parseCidsEncontrados(extracted.cids_encontrados);
+    let cidsEncontrados = parseCidsEncontrados(extracted.cids_encontrados);
+    // Fallback: se o JSON não trouxe a lista (campo null/ausente mesmo com
+    // extração correta), mas o texto da análise cita códigos CID-10, pelo
+    // menos os códigos entram — mesmo princípio do fallback de
+    // cid_principal já usado em ai-juridico.ts.
+    if (cidsEncontrados.length === 0) {
+      const todosCids = Array.from(
+        new Set(
+          Array.from(analise.matchAll(/\b([A-Z]\d{2}(?:[.\-]\d+)?)\b/g), (m) =>
+            m[1].toUpperCase()
+          )
+        )
+      );
+      if (todosCids.length > 0) {
+        cidsEncontrados = todosCids.map((cid) => ({
+          cid,
+          descricao: null,
+          medicoNome: null,
+          medicoCrm: null,
+          dataDocumento: null,
+        }));
+      }
+    }
     if (cidsEncontrados.length > 0) {
       await adicionarCidsCliente(
         clientId,

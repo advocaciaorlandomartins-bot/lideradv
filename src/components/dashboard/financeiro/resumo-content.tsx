@@ -160,14 +160,14 @@ export default function ResumoContent({
         <KpiCard
           label="A Pagar (equipe)"
           value={remuneracaoKpis.aPagar}
-          sub="colaboradores"
+          sub="salário + comissão + bônus já pendentes, de toda a equipe"
           valueColor="text-amber-600"
           href="/dashboard/financeiro?tab=remuneracoes"
         />
         <KpiCard
-          label="Saldo Projetado"
+          label="Saldo Atual"
           value={saldo}
-          sub="a receber − a pagar (não é um link — é o cálculo dos dois cards acima)"
+          sub="a receber − a pagar (equipe), só com o que já está lançado hoje"
           valueColor={saldo >= 0 ? "text-emerald-700" : "text-red-600"}
         />
       </div>
@@ -191,18 +191,23 @@ export default function ResumoContent({
           value={folhaPendente}
           color="text-amber-600"
           href="/dashboard/financeiro?tab=remuneracoes"
+          sub="já lançada no caixa, falta pagar"
         />
         <SmallKpi
           label="Folha paga"
           value={folhaPaga}
           color="text-muted"
           href="/dashboard/financeiro?tab=remuneracoes"
+          sub="já lançada no caixa e paga"
         />
       </div>
 
       {/* Projeção financeira do escritório — admin-only */}
       {projecaoEscritorio && (
-        <ProjecaoEscritorioContent projecao={projecaoEscritorio} />
+        <ProjecaoEscritorioContent
+          projecao={projecaoEscritorio}
+          aPagarEquipeAtual={remuneracaoKpis.aPagar}
+        />
       )}
 
       {/* Quick nav cards */}
@@ -532,11 +537,13 @@ function SmallKpi({
   value,
   color,
   href,
+  sub,
 }: {
   label: string;
   value: number;
   color: string;
   href?: string;
+  sub?: string;
 }) {
   const inner = (
     <div
@@ -548,6 +555,7 @@ function SmallKpi({
       <p className={`mt-0.5 font-body text-sm font-semibold ${color}`}>
         {fmt(value)}
       </p>
+      {sub && <p className="mt-0.5 font-body text-[10px] text-muted">{sub}</p>}
     </div>
   );
   if (href) return <Link href={href}>{inner}</Link>;

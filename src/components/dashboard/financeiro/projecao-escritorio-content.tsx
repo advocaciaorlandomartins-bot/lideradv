@@ -22,6 +22,8 @@ function fmt(v: number) {
 
 interface Props {
   projecao: ProjecaoEscritorio;
+  /** "A Pagar (equipe)" do resumo — remunerações (salário+comissão+bônus) já reais, pendentes de pagamento, SEM relação com os casos ainda em andamento abaixo. Orlando pediu explicitamente que o saldo final também descontasse isso: "Honorário estimado - Comissão estimada - a pagar equipe". */
+  aPagarEquipeAtual: number;
 }
 
 /**
@@ -31,9 +33,19 @@ interface Props {
  * session.categoria === "Administrador(a)" — aqui dentro não tem checagem
  * própria porque o dado nem chega até o componente se não for admin.
  */
-export default function ProjecaoEscritorioContent({ projecao }: Props) {
+export default function ProjecaoEscritorioContent({
+  projecao,
+  aPagarEquipeAtual,
+}: Props) {
   const [expandidoColaborador, setExpandidoColaborador] = useState(false);
   const [expandidoProcessos, setExpandidoProcessos] = useState(false);
+  const [paginaProcessos, setPaginaProcessos] = useState(0);
+  const PROCESSOS_POR_PAG = 10;
+
+  const saldoFinal =
+    projecao.totalHonorarioEstimado -
+    projecao.totalComissaoEstimada -
+    aPagarEquipeAtual;
 
   return (
     <div className="overflow-hidden rounded-xl border border-violet-200 bg-violet-50/40 shadow-sm">
@@ -43,14 +55,15 @@ export default function ProjecaoEscritorioContent({ projecao }: Props) {
         </p>
         <p className="font-body text-xs text-violet-700">
           Quanto o escritório receberia em honorários e pagaria em comissão SE
-          cada processo em andamento der resultado favorável. Estimativa
-          otimista, não um valor garantido — só visível pra administrador(a).
+          cada processo em andamento der resultado favorável, já descontando
+          também o que a equipe tem a receber hoje. Estimativa otimista, não um
+          valor garantido — só visível pra administrador(a).
         </p>
       </div>
 
       <div className="p-5 space-y-4">
         {/* Resumo */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2">
               <BanknotesIcon className="h-4 w-4 text-emerald-600" />
@@ -64,7 +77,7 @@ export default function ProjecaoEscritorioContent({ projecao }: Props) {
             <p className="mt-0.5 font-body text-xs text-muted">
               {projecao.processosComHonorario} processo
               {projecao.processosComHonorario !== 1 ? "s" : ""} com valor
-              definido
+              definido — futuro, casos em andamento
             </p>
           </div>
           <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
@@ -78,25 +91,39 @@ export default function ProjecaoEscritorioContent({ projecao }: Props) {
               {fmt(projecao.totalComissaoEstimada)}
             </p>
             <p className="mt-0.5 font-body text-xs text-muted">
-              a pagar pra equipe, se tudo for ganho
+              futuro — se os casos acima forem ganhos
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <CurrencyIcon className="h-4 w-4 text-orange-600" />
+              <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
+                A pagar (equipe) hoje
+              </p>
+            </div>
+            <p className="mt-2 font-heading text-lg font-semibold text-orange-700">
+              {fmt(aPagarEquipeAtual)}
+            </p>
+            <p className="mt-0.5 font-body text-xs text-muted">
+              já real, não depende dos casos acima
             </p>
           </div>
           <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2">
               <BanknotesIcon
-                className={`h-4 w-4 ${projecao.saldoLiquidoProjetado >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                className={`h-4 w-4 ${saldoFinal >= 0 ? "text-emerald-600" : "text-red-600"}`}
               />
               <p className="font-body text-xs font-semibold uppercase tracking-wide text-muted">
                 Saldo líquido projetado
               </p>
             </div>
             <p
-              className={`mt-2 font-heading text-lg font-semibold ${projecao.saldoLiquidoProjetado >= 0 ? "text-emerald-700" : "text-red-600"}`}
+              className={`mt-2 font-heading text-lg font-semibold ${saldoFinal >= 0 ? "text-emerald-700" : "text-red-600"}`}
             >
-              {fmt(projecao.saldoLiquidoProjetado)}
+              {fmt(saldoFinal)}
             </p>
             <p className="mt-0.5 font-body text-xs text-muted">
-              honorário − comissão
+              honorário − comissão − a pagar hoje
             </p>
           </div>
         </div>
@@ -179,105 +206,177 @@ export default function ProjecaoEscritorioContent({ projecao }: Props) {
               className={`ml-auto h-4 w-4 text-muted transition-transform duration-200 ${expandidoProcessos ? "rotate-180" : ""}`}
             />
           </button>
-          {expandidoProcessos && (
-            <div className="overflow-x-auto border-t border-border">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-border bg-slate-50/60">
-                    <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      Cliente / Ação
-                    </th>
-                    <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      Estágio
-                    </th>
-                    <th className="px-4 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      Honorário estimado
-                    </th>
-                    <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      Comissão estimada (responsável)
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {projecao.processos.map((p) => {
-                    const meta = p.estagioProducao
-                      ? (ESTAGIO_PRODUCAO_META[
-                          p.estagioProducao as EstagioProducao
-                        ] ?? null)
-                      : null;
-                    return (
-                      <tr
-                        key={p.id}
-                        className="border-b border-border/60 last:border-0"
-                      >
-                        <td className="px-4 py-2.5">
-                          <Link
-                            href={`/dashboard/processos/${p.id}`}
-                            className="font-body text-xs font-semibold text-fg hover:text-primary"
-                          >
-                            {p.clientName}
-                          </Link>
-                          <p className="font-body text-[11px] text-muted">
-                            {p.tipoAcao}
-                          </p>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {meta ? (
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-[10px] font-semibold ${meta.bg} ${meta.color}`}
+          {expandidoProcessos &&
+            (() => {
+              const totalPag = Math.ceil(
+                projecao.processos.length / PROCESSOS_POR_PAG
+              );
+              const pagAtual = Math.min(
+                paginaProcessos,
+                Math.max(0, totalPag - 1)
+              );
+              const pagItens = projecao.processos.slice(
+                pagAtual * PROCESSOS_POR_PAG,
+                pagAtual * PROCESSOS_POR_PAG + PROCESSOS_POR_PAG
+              );
+              return (
+                <>
+                  <div className="overflow-x-auto border-t border-border">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-border bg-slate-50/60">
+                          <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            Cliente / Ação
+                          </th>
+                          <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            Estágio
+                          </th>
+                          <th className="px-4 py-2 text-right font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            Honorário estimado
+                          </th>
+                          <th className="px-4 py-2 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+                            Comissão estimada (responsável)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagItens.map((p) => {
+                          const meta = p.estagioProducao
+                            ? (ESTAGIO_PRODUCAO_META[
+                                p.estagioProducao as EstagioProducao
+                              ] ?? null)
+                            : null;
+                          return (
+                            <tr
+                              key={p.id}
+                              className="border-b border-border/60 last:border-0"
                             >
-                              {meta.label}
-                            </span>
-                          ) : (
-                            <span className="font-body text-xs text-muted">
-                              —
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-body text-xs font-semibold tabular-nums whitespace-nowrap">
-                          {p.semHonorarioDefinido ? (
-                            <span className="text-amber-600">
-                              Não cadastrado
-                            </span>
-                          ) : (
-                            <span className="text-emerald-700">
-                              {fmt(p.honorarioEstimado)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {p.responsaveis.filter((r) => r.comissaoEstimada > 0)
-                            .length === 0 ? (
-                            <span className="font-body text-xs text-muted">
-                              —
-                            </span>
-                          ) : (
-                            <div className="space-y-0.5">
-                              {p.responsaveis
-                                .filter((r) => r.comissaoEstimada > 0)
-                                .map((r) => (
-                                  <p
-                                    key={r.colaboradorId}
-                                    className="font-body text-xs text-amber-700"
+                              <td className="px-4 py-2.5">
+                                <Link
+                                  href={`/dashboard/processos/${p.id}`}
+                                  className="font-body text-xs font-semibold text-fg hover:text-primary"
+                                >
+                                  {p.clientName}
+                                </Link>
+                                <p className="font-body text-[11px] text-muted">
+                                  {p.tipoAcao}
+                                </p>
+                              </td>
+                              <td className="px-4 py-2.5">
+                                {meta ? (
+                                  <span
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 font-body text-[10px] font-semibold ${meta.bg} ${meta.color}`}
                                   >
-                                    {r.nome}:{" "}
-                                    <span className="font-semibold">
-                                      {fmt(r.comissaoEstimada)}
-                                    </span>
-                                    {r.comissaoPct != null &&
-                                      ` (${r.comissaoPct}%)`}
-                                  </p>
-                                ))}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                                    {meta.label}
+                                  </span>
+                                ) : (
+                                  <span className="font-body text-xs text-muted">
+                                    —
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5 text-right font-body text-xs font-semibold tabular-nums whitespace-nowrap">
+                                {p.semHonorarioDefinido ? (
+                                  <span className="text-amber-600">
+                                    Não cadastrado
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-700">
+                                    {fmt(p.honorarioEstimado)}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                {p.responsaveis.filter(
+                                  (r) => r.comissaoEstimada > 0
+                                ).length === 0 ? (
+                                  <span className="font-body text-xs text-muted">
+                                    —
+                                  </span>
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    {p.responsaveis
+                                      .filter((r) => r.comissaoEstimada > 0)
+                                      .map((r) => (
+                                        <p
+                                          key={r.colaboradorId}
+                                          className="font-body text-xs text-amber-700"
+                                        >
+                                          {r.nome}:{" "}
+                                          <span className="font-semibold">
+                                            {fmt(r.comissaoEstimada)}
+                                          </span>
+                                          {r.comissaoPct != null &&
+                                            ` (${r.comissaoPct}%)`}
+                                        </p>
+                                      ))}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {totalPag > 1 && (
+                    <div className="flex items-center justify-between border-t border-border px-4 py-2">
+                      <span className="font-body text-xs text-muted">
+                        {pagAtual * PROCESSOS_POR_PAG + 1}–
+                        {Math.min(
+                          (pagAtual + 1) * PROCESSOS_POR_PAG,
+                          projecao.processos.length
+                        )}{" "}
+                        de {projecao.processos.length}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {(() => {
+                          const pages: (number | "...")[] = [];
+                          if (totalPag <= 7) {
+                            for (let i = 0; i < totalPag; i++) pages.push(i);
+                          } else {
+                            pages.push(0);
+                            if (pagAtual > 2) pages.push("...");
+                            for (
+                              let i = Math.max(1, pagAtual - 1);
+                              i <= Math.min(totalPag - 2, pagAtual + 1);
+                              i++
+                            )
+                              pages.push(i);
+                            if (pagAtual < totalPag - 3) pages.push("...");
+                            pages.push(totalPag - 1);
+                          }
+                          return pages.map((p, i) =>
+                            p === "..." ? (
+                              <span
+                                key={`dots-${i}`}
+                                className="px-1 font-body text-xs text-muted"
+                              >
+                                …
+                              </span>
+                            ) : (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => setPaginaProcessos(p)}
+                                className={`min-w-[28px] cursor-pointer rounded-lg border px-2 py-1 font-body text-xs font-semibold transition-colors ${
+                                  p === pagAtual
+                                    ? "border-primary bg-primary text-white"
+                                    : "border-border text-fg hover:bg-slate-50"
+                                }`}
+                              >
+                                {p + 1}
+                              </button>
+                            )
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
         </div>
       </div>
     </div>

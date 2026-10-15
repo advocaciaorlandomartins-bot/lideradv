@@ -27,6 +27,7 @@ import {
   UsersIcon,
   FolderOpenIcon,
   BanknotesIcon,
+  CurrencyIcon,
   CalendarIcon,
   AlertIcon,
   UserPlusIcon,
@@ -642,6 +643,36 @@ export default async function DashboardPage() {
             </p>
             <p className="mt-2 font-body text-xs font-semibold text-amber-600 group-hover:underline">
               A receber: {fmt(meuFinanceiro.escritorioMes.totalAReceber)} →
+            </p>
+          </Link>
+        )}
+
+        {showFinanceiroPessoal && meuFinanceiro && (
+          <Link
+            href="/dashboard/meu-financeiro"
+            className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between">
+              <div className="rounded-lg bg-purple-50 p-2.5 transition-colors group-hover:bg-purple-100">
+                <CurrencyIcon className="h-5 w-5 text-purple-600" />
+              </div>
+              <span className="font-body text-xs font-semibold text-muted group-hover:underline">
+                Ver processo e previsão →
+              </span>
+            </div>
+            <p
+              className="mt-3 font-heading text-sm font-bold text-purple-700 sm:text-xl whitespace-nowrap overflow-hidden text-ellipsis leading-tight"
+              title={fmt(meuFinanceiro.honorariosEscritorio)}
+            >
+              {fmt(meuFinanceiro.honorariosEscritorio)}
+            </p>
+            <p className="mt-0.5 font-body text-xs font-semibold text-muted">
+              Minha Comissão (estimada)
+            </p>
+            <p className="mt-2 font-body text-xs text-muted">
+              {meuFinanceiro.processosAtivosCount} processo
+              {meuFinanceiro.processosAtivosCount !== 1 ? "s" : ""} ativo
+              {meuFinanceiro.processosAtivosCount !== 1 ? "s" : ""}
             </p>
           </Link>
         )}

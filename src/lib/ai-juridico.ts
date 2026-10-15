@@ -623,6 +623,40 @@ Responda em português, com formatação markdown clara.${extrairInstrucao}`,
     }
   }
 
+  // Mesmo problema do fallback acima, mas pra lista completa (cliente_cids):
+  // achado real do Orlando — um atestado com 3 diagnósticos (F84.0, F90.0,
+  // F91.3) teve os 3 corretamente descritos no texto da análise, mas o
+  // bloco JSON estruturado só devolveu "cid_principal" (um deles), sem o
+  // array "cids_encontrados" — a lista de CIDs do cliente ficou vazia
+  // mesmo a IA tendo "lido tudo". Sem fallback aqui, qualquer falha no
+  // array (mesmo com cid_principal recuperado acima) perde os demais
+  // códigos silenciosamente. Varre o texto inteiro atrás de todo padrão
+  // de CID-10, não só o primeiro.
+  const cidsJaExtraidos = Array.isArray(dadosExtraidos?.cids_encontrados)
+    ? dadosExtraidos.cids_encontrados
+    : [];
+  if (cidsJaExtraidos.length === 0) {
+    const todosCids = Array.from(
+      new Set(
+        Array.from(resultado.matchAll(/\b([A-Z]\d{2}(?:[.\-]\d+)?)\b/g), (m) =>
+          m[1].toUpperCase()
+        )
+      )
+    );
+    if (todosCids.length > 0) {
+      dadosExtraidos = {
+        ...dadosExtraidos,
+        cids_encontrados: todosCids.map((cid) => ({
+          cid,
+          descricao: null,
+          medico_nome: null,
+          medico_crm: null,
+          data_documento: null,
+        })),
+      };
+    }
+  }
+
   return { resultado, dadosExtraidos };
 }
 

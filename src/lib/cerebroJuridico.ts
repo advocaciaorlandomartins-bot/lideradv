@@ -2432,13 +2432,15 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
       model: "claude-haiku-4-5-20251001",
       // Prompt tem 7 seções (tipo, dados extraídos, relevância, pontos de
       // atenção, o que comprova, recomendação, CAMPOS_JSON) — o bloco
-      // CAMPOS_JSON vem por último, então um corte no meio (mesmo problema
-      // já confirmado e corrigido em cerebro/analisar/route.ts com 1500
-      // pra um prompt de 12 seções) perderia justamente os dados
-      // estruturados que alimentam o write-back automático em
-      // clients/processos, sem gerar erro nenhum — só ficaria com o JSON
-      // incompleto silenciosamente.
-      max_tokens: 3000,
+      // CAMPOS_JSON vem por último, então um corte no meio perderia
+      // justamente os dados estruturados que alimentam o write-back
+      // automático em clients/processos, sem gerar erro nenhum. 3000
+      // ainda cortava de verdade em produção (achado real do Orlando,
+      // confirmado puxando a análise salva no banco: resposta de um
+      // laudo com 3 CIDs terminou no meio de uma frase, aos ~8300
+      // caracteres). Mesmo ajuste já validado em ai-juridico.ts
+      // (analisarDocumentoExtendido) pro mesmo tipo de prompt.
+      max_tokens: 4096,
       messages: [{ role: "user", content }],
     },
     isPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : {}
@@ -2456,25 +2458,35 @@ Nunca invente dados que não estejam no documento. Se não conseguir ler alguma 
     extractText(aiResp) || "Não foi possível analisar o documento.";
 
   // Extrai o bloco JSON de CAMPOS_JSON e separa do texto narrativo.
-  // O grupo de captura tinha "*?" (não-guloso) — casava só até a PRIMEIRA
-  // "}" depois da primeira "{", então qualquer objeto aninhado dentro do
-  // JSON (ex: "cids_encontrados": [{"cid":"F84.0",...}, {"cid":"F90.0"...}])
-  // cortava a captura bem no meio, no "}" do primeiro item do array, antes
-  // da "}" de fechamento de verdade. JSON.parse falhava (silenciosamente,
-  // no catch abaixo) e TODOS os campos extraídos se perdiam — não só os
-  // CIDs. Achado real do Orlando: documento com múltiplos CIDs "lido" na
-  // análise em texto, mas nenhum campo estruturado (nem CID nem outros)
-  // chegava a gravar no cadastro. "CAMPOS_JSON" é sempre a última seção da
-  // resposta (ver prompt acima), então capturar de forma gulosa até a
-  // ÚLTIMA "}" do texto é seguro — e não corta mais no meio de um array.
+  // Dois problemas reais encontrados em produção (achados do Orlando,
+  // confirmados puxando a análise salva no banco):
+  // 1) O grupo de captura tinha "*?" (não-guloso) — casava só até a
+  //    PRIMEIRA "}" depois da primeira "{", então qualquer objeto
+  //    aninhado no JSON (ex: "cids_encontrados": [{"cid":"F84.0",...},
+  //    {"cid":"F90.0"...}]) cortava a captura no "}" do primeiro item do
+  //    array, antes do fechamento de verdade — JSON.parse falhava
+  //    silenciosamente e TODOS os campos extraídos se perdiam.
+  // 2) O prompt pede o bloco depois de um cabeçalho "## CAMPOS_JSON",
+  //    mas o modelo às vezes devolve só um bloco ```json solto, sem
+  //    esse cabeçalho (e até fora de ordem, no início da resposta em
+  //    vez do final) — exigir o cabeçalho literal fazia a extração
+  //    falhar mesmo com o JSON presente e bem formado.
+  // Tenta primeiro um bloco ```json em qualquer lugar do texto (mais
+  // tolerante ao modelo variar o formato); só cai pro padrão com
+  // cabeçalho se não achar nenhuma cerca de código.
   let extracted: Record<string, unknown> = {};
   let analise = rawAnalise;
-  const jsonBlockMatch = rawAnalise.match(
-    /##\s*CAMPOS_JSON[\s\S]*?(\{[\s\S]*\})/i
-  );
+  const fenceMatch = rawAnalise.match(/```json\s*([\s\S]*?)```/i);
+  const headingMatch = fenceMatch
+    ? null
+    : rawAnalise.match(/##\s*CAMPOS_JSON[\s\S]*?(\{[\s\S]*\})/i);
+  const jsonBlockMatch = fenceMatch ?? headingMatch;
   if (jsonBlockMatch) {
     try {
-      extracted = JSON.parse(jsonBlockMatch[1]) as Record<string, unknown>;
+      extracted = JSON.parse(jsonBlockMatch[1].trim()) as Record<
+        string,
+        unknown
+      >;
       // Remove o bloco JSON do texto narrativo para não poluir a leitura
       analise = rawAnalise.replace(jsonBlockMatch[0], "").trim();
     } catch {

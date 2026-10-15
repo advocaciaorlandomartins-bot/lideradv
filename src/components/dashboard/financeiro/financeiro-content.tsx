@@ -1168,7 +1168,17 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
     }, []);
   }, [lancamentos, saldoAtualStr, today]);
 
-  const paginatedPendentes = pendentesNaoVencidos.slice(
+  // A aba "Pendentes" só mostrava o que ainda não venceu — o que já
+  // passou do vencimento ficava escondido numa aba separada
+  // ("Vencidos"), mesmo contando no total do card "A Receber"/"A
+  // Pagar" lá em cima. Achado real do Orlando: o valor do card não
+  // batia com o que aparecia na lista, e "mesmo em atraso ele é a
+  // receber e a pessoa tem que ver até pra poder cobrar". Junta os dois
+  // aqui (vencidos primeiro, pra pular aos olhos), destacados em
+  // vermelho pelo highlightOverdue por linha (abaixo) — "Vencidos"
+  // continua existindo como atalho pra quem quer só os atrasados.
+  const pendentesCombinados = [...pendentesVencidos, ...pendentesNaoVencidos];
+  const paginatedPendentes = pendentesCombinados.slice(
     (pagePendentes - 1) * pageSizePendentes,
     pagePendentes * pageSizePendentes
   );
@@ -1541,11 +1551,11 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
             >
               <BanknotesIcon className="h-4 w-4" />
               Pendentes
-              {pendentesNaoVencidos.length > 0 && (
+              {pendentesCombinados.length > 0 && (
                 <span
                   className={`rounded-full px-1.5 py-0.5 font-body text-[11px] font-bold ${mainTab === "pendentes" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}
                 >
-                  {pendentesNaoVencidos.length}
+                  {pendentesCombinados.length}
                 </span>
               )}
             </button>
@@ -1775,13 +1785,13 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
               Nenhum vencimento em atraso — tudo em dia!
             </p>
           </div>
-        ) : (mainTab === "pendentes" && pendentesNaoVencidos.length === 0) ||
+        ) : (mainTab === "pendentes" && pendentesCombinados.length === 0) ||
           (mainTab === "concluidas" && concluidas.length === 0) ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
             <BanknotesIcon className="h-10 w-10 text-slate-300" />
             <p className="font-body text-sm font-semibold text-muted">
               {mainTab === "pendentes"
-                ? "Nenhum vencimento futuro no período"
+                ? "Nenhum vencimento no período"
                 : "Nenhum registro concluído no período"}
             </p>
             {search && (
@@ -1824,7 +1834,11 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
                       canEdit={canEdit}
                       singleDeleteOnly={mainTab === "concluidas"}
                       showPagoEm={mainTab === "concluidas"}
-                      highlightOverdue={mainTab === "atrasados"}
+                      highlightOverdue={
+                        mainTab === "atrasados" ||
+                        (mainTab === "pendentes" &&
+                          parseDMY(l.data_vencimento) <= today)
+                      }
                       hidePayActions={true}
                     />
                   ))}
@@ -1848,7 +1862,7 @@ export default function FinanceiroContent({ lancamentos, canEdit }: Props) {
               }
               total={
                 mainTab === "pendentes"
-                  ? pendentesNaoVencidos.length
+                  ? pendentesCombinados.length
                   : mainTab === "concluidas"
                     ? concluidas.length
                     : pendentesVencidos.length

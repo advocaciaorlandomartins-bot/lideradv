@@ -18,6 +18,8 @@ import type {
   Lancamento,
 } from "@/lib/lancamentos-db";
 import type { RemuneracaoKpis } from "@/lib/remuneracoes-db";
+import type { ProjecaoEscritorio } from "@/lib/projecao-financeira-db";
+import ProjecaoEscritorioContent from "./projecao-escritorio-content";
 
 function fmt(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -43,6 +45,8 @@ interface Props {
   remuneracaoKpis: RemuneracaoKpis;
   chartData: MonthlyChartPoint[];
   lancamentos: Lancamento[];
+  /** Admin-only — null pra quem não é Administrador(a); a página nem busca esse dado nesse caso. */
+  projecaoEscritorio: ProjecaoEscritorio | null;
 }
 
 export default function ResumoContent({
@@ -50,6 +54,7 @@ export default function ResumoContent({
   remuneracaoKpis,
   chartData,
   lancamentos,
+  projecaoEscritorio,
 }: Props) {
   const {
     aReceber,
@@ -133,7 +138,7 @@ export default function ResumoContent({
         <KpiCard
           label="A Receber"
           value={aReceber}
-          sub="de clientes"
+          sub="lançamentos já agendados de clientes"
           valueColor="text-red-600"
           href={
             atrasados > 0
@@ -157,12 +162,12 @@ export default function ResumoContent({
           value={remuneracaoKpis.aPagar}
           sub="colaboradores"
           valueColor="text-amber-600"
-          href="/dashboard/financeiro?tab=pagar"
+          href="/dashboard/financeiro?tab=remuneracoes"
         />
         <KpiCard
           label="Saldo Projetado"
           value={saldo}
-          sub="a receber − a pagar"
+          sub="a receber − a pagar (não é um link — é o cálculo dos dois cards acima)"
           valueColor={saldo >= 0 ? "text-emerald-700" : "text-red-600"}
         />
       </div>
@@ -173,15 +178,32 @@ export default function ResumoContent({
           label="Despesas pendentes"
           value={aPagar}
           color="text-orange-600"
+          href="/dashboard/financeiro?tab=pagar"
         />
-        <SmallKpi label="Despesas pagas" value={pago} color="text-muted" />
+        <SmallKpi
+          label="Despesas pagas"
+          value={pago}
+          color="text-muted"
+          href="/dashboard/financeiro?tab=pagar"
+        />
         <SmallKpi
           label="Folha pendente"
           value={folhaPendente}
           color="text-amber-600"
+          href="/dashboard/financeiro?tab=remuneracoes"
         />
-        <SmallKpi label="Folha paga" value={folhaPaga} color="text-muted" />
+        <SmallKpi
+          label="Folha paga"
+          value={folhaPaga}
+          color="text-muted"
+          href="/dashboard/financeiro?tab=remuneracoes"
+        />
       </div>
+
+      {/* Projeção financeira do escritório — admin-only */}
+      {projecaoEscritorio && (
+        <ProjecaoEscritorioContent projecao={projecaoEscritorio} />
+      )}
 
       {/* Quick nav cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -509,19 +531,27 @@ function SmallKpi({
   label,
   value,
   color,
+  href,
 }: {
   label: string;
   value: number;
   color: string;
+  href?: string;
 }) {
-  return (
-    <div className="rounded-xl border border-border bg-white px-4 py-3 shadow-sm">
+  const inner = (
+    <div
+      className={`rounded-xl border border-border bg-white px-4 py-3 shadow-sm transition-all duration-150 ${
+        href ? "cursor-pointer hover:shadow-md hover:border-primary/40" : ""
+      }`}
+    >
       <p className="font-body text-xs text-muted">{label}</p>
       <p className={`mt-0.5 font-body text-sm font-semibold ${color}`}>
         {fmt(value)}
       </p>
     </div>
   );
+  if (href) return <Link href={href}>{inner}</Link>;
+  return inner;
 }
 
 function NavCard({

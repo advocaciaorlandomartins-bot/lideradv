@@ -8,6 +8,7 @@ import {
   getLancamentosSaida,
 } from "@/lib/lancamentos-db";
 import { getAllRemuneracoes, getRemuneracaoKpis } from "@/lib/remuneracoes-db";
+import { getProjecaoEscritorio } from "@/lib/projecao-financeira-db";
 import FinanceiroContent from "@/components/dashboard/financeiro/financeiro-content";
 import RemuneracoesContent from "@/components/dashboard/remuneracoes/remuneracoes-content";
 import ResumoContent from "@/components/dashboard/financeiro/resumo-content";
@@ -65,17 +66,29 @@ export default async function FinanceiroPage({
   // controlava os botões de editar/excluir, não o acesso à página.
   if (!hasPermission(session, "financeiro", "ver")) redirect("/dashboard");
   const canEdit = hasPermission(session, "financeiro", "editar");
+  // Projeção financeira do escritório (honorários/comissões estimados de
+  // todos os processos ativos) é admin-only — pedido explícito do Orlando:
+  // "essas informações só pra o adm, nunca pra os funcionários". O dado
+  // nem é buscado quando não é admin, não só escondido na UI.
+  const isAdmin = session.categoria === "Administrador(a)";
 
   // Carrega apenas os dados necessários para cada aba
-  const [lancamentoKpis, remuneracaoKpis, chartData, resumoLancamentos] =
+  const [
+    lancamentoKpis,
+    remuneracaoKpis,
+    chartData,
+    resumoLancamentos,
+    projecaoEscritorio,
+  ] =
     tab === "resumo"
       ? await Promise.all([
           getLancamentoKpis(),
           getRemuneracaoKpis(),
           getMonthlyChart(),
           getAllLancamentos(),
+          isAdmin ? getProjecaoEscritorio() : Promise.resolve(null),
         ])
-      : [null, null, [], []];
+      : [null, null, [], [], null];
 
   const [remuneracoes, remKpis] =
     tab === "remuneracoes"
@@ -196,6 +209,7 @@ export default async function FinanceiroPage({
           remuneracaoKpis={remuneracaoKpis!}
           chartData={chartData}
           lancamentos={resumoLancamentos}
+          projecaoEscritorio={projecaoEscritorio}
         />
       )}
       {tab === "receber" && (

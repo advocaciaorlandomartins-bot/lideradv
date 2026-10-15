@@ -47,6 +47,13 @@ export default function ProjecaoEscritorioContent({
     projecao.totalComissaoEstimada -
     aPagarEquipeAtual;
 
+  const base = projecao.totalHonorarioEstimado;
+  const pct = (v: number) =>
+    base > 0 ? `${((v / base) * 100).toFixed(0)}%` : null;
+  const pctComissao = pct(projecao.totalComissaoEstimada);
+  const pctAPagar = pct(aPagarEquipeAtual);
+  const pctSaldo = pct(saldoFinal);
+
   return (
     <div className="overflow-hidden rounded-xl border border-violet-200 bg-violet-50/40 shadow-sm">
       <div className="border-b border-violet-200 bg-violet-100/50 px-5 py-3">
@@ -87,8 +94,13 @@ export default function ProjecaoEscritorioContent({
                 Comissão estimada
               </p>
             </div>
-            <p className="mt-2 font-heading text-lg font-semibold text-amber-700">
+            <p className="mt-2 flex items-baseline gap-1.5 font-heading text-lg font-semibold text-amber-700">
               {fmt(projecao.totalComissaoEstimada)}
+              {pctComissao && (
+                <span className="font-body text-xs font-semibold text-amber-500">
+                  ({pctComissao} do honorário)
+                </span>
+              )}
             </p>
             <p className="mt-0.5 font-body text-xs text-muted">
               futuro — se os casos acima forem ganhos
@@ -101,8 +113,13 @@ export default function ProjecaoEscritorioContent({
                 A pagar (equipe) hoje
               </p>
             </div>
-            <p className="mt-2 font-heading text-lg font-semibold text-orange-700">
+            <p className="mt-2 flex items-baseline gap-1.5 font-heading text-lg font-semibold text-orange-700">
               {fmt(aPagarEquipeAtual)}
+              {pctAPagar && (
+                <span className="font-body text-xs font-semibold text-orange-500">
+                  ({pctAPagar} do honorário)
+                </span>
+              )}
             </p>
             <p className="mt-0.5 font-body text-xs text-muted">
               já real, não depende dos casos acima
@@ -118,9 +135,16 @@ export default function ProjecaoEscritorioContent({
               </p>
             </div>
             <p
-              className={`mt-2 font-heading text-lg font-semibold ${saldoFinal >= 0 ? "text-emerald-700" : "text-red-600"}`}
+              className={`mt-2 flex items-baseline gap-1.5 font-heading text-lg font-semibold ${saldoFinal >= 0 ? "text-emerald-700" : "text-red-600"}`}
             >
               {fmt(saldoFinal)}
+              {pctSaldo && (
+                <span
+                  className={`font-body text-xs font-semibold ${saldoFinal >= 0 ? "text-emerald-500" : "text-red-400"}`}
+                >
+                  ({pctSaldo} do honorário)
+                </span>
+              )}
             </p>
             <p className="mt-0.5 font-body text-xs text-muted">
               honorário − comissão − a pagar hoje

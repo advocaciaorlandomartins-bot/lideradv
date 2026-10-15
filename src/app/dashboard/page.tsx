@@ -649,7 +649,7 @@ export default async function DashboardPage() {
 
         {showFinanceiroPessoal && meuFinanceiro && (
           <Link
-            href="/dashboard/meu-financeiro"
+            href="/dashboard/meu-financeiro?abrirProcessos=1"
             className="group rounded-xl border border-border bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
           >
             <div className="flex items-start justify-between">

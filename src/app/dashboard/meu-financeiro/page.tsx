@@ -10,11 +10,16 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function MeuFinanceiroPage() {
+export default async function MeuFinanceiroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ abrirProcessos?: string }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
   if (!hasPermission(session, "meu_financeiro", "ver")) redirect("/dashboard");
 
+  const { abrirProcessos } = await searchParams;
   const dados = await getMeuFinanceiroInitial(session.id);
   const podeVerHonorarioTotal =
     session.categoria === "Administrador(a)" ||
@@ -62,6 +67,7 @@ export default async function MeuFinanceiroPage() {
         estagioSnapshot={dados.estagioSnapshot}
         comissaoConfigurada={dados.comissaoConfigurada}
         podeVerHonorarioTotal={podeVerHonorarioTotal}
+        abrirProcessosInicial={abrirProcessos === "1"}
       />
     </div>
   );

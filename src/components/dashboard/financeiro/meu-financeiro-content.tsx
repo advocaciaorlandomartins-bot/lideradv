@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -36,6 +36,7 @@ import {
   CheckCircleIcon,
   ScalesIcon,
   ClockIcon,
+  AlertIcon,
 } from "@/components/icons";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -235,6 +236,8 @@ interface Props {
    * mostra só a comissão dele, pra não expor o quanto o escritório fica com
    * o restante (evita a comparação "trabalho tanto e não vejo nada disso"). */
   podeVerHonorarioTotal: boolean;
+  /** true quando chegou pelo link "Minha Comissão" do dashboard (?abrirProcessos=1) — já abre e rola direto pra tabela de processos, em vez de cair no topo da página. */
+  abrirProcessosInicial: boolean;
 }
 
 type FiltroTipo = "todos" | "receita" | "despesa";
@@ -252,6 +255,7 @@ export default function MeuFinanceiroContent({
   estagioSnapshot,
   comissaoConfigurada,
   podeVerHonorarioTotal,
+  abrirProcessosInicial,
 }: Props) {
   const hoje = new Date();
   const mesHojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
@@ -266,7 +270,21 @@ export default function MeuFinanceiroContent({
   const [salvando, setSalvando] = useState(false);
   const [deletando, setDeletando] = useState<string | null>(null);
   const [erro, setErro] = useState("");
-  const [honorariosExpanded, setHorariosExpanded] = useState(false);
+  const [honorariosExpanded, setHorariosExpanded] = useState(
+    abrirProcessosInicial
+  );
+  const honorariosSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (abrirProcessosInicial) {
+      honorariosSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+    // Só na carga inicial — não deve rolar de novo se o usuário recolher/expandir depois.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Derived ──
   const doMes = useMemo(
@@ -289,6 +307,10 @@ export default function MeuFinanceiroContent({
     [doMes]
   );
   const saldoMes = receitasMes - despesasMes;
+  const processosSemHonorario = useMemo(
+    () => processosHonorarios.filter((p) => p.semHonorarioDefinido).length,
+    [processosHonorarios]
+  );
   const pendentesMes = useMemo(
     () =>
       doMes
@@ -731,7 +753,10 @@ export default function MeuFinanceiroContent({
       </div>
 
       {/* ── Escritório — Honorários ── */}
-      <div className="overflow-hidden rounded-xl border border-blue-200 bg-blue-50/40 shadow-sm">
+      <div
+        ref={honorariosSectionRef}
+        className="overflow-hidden rounded-xl border border-blue-200 bg-blue-50/40 shadow-sm scroll-mt-4"
+      >
         {/* Header */}
         <div className="flex flex-wrap items-center gap-3 px-4 py-3">
           <div className="flex flex-1 items-center gap-2">
@@ -818,6 +843,19 @@ export default function MeuFinanceiroContent({
                   {processosHonorarios.length}
                 </span>
               </h4>
+              {processosSemHonorario > 0 && (
+                <div className="mb-3 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <AlertIcon className="h-4 w-4 flex-shrink-0 text-amber-600" />
+                  <p className="font-body text-xs text-amber-800">
+                    {processosSemHonorario} processo
+                    {processosSemHonorario !== 1 ? "s" : ""} ativo
+                    {processosSemHonorario !== 1 ? "s" : ""} sem valor ou
+                    percentual de honorário cadastrado — fica
+                    {processosSemHonorario !== 1 ? "m" : ""} de fora desta
+                    projeção até preencher na ficha do processo.
+                  </p>
+                </div>
+              )}
               {processosHonorarios.length === 0 ? (
                 <p className="py-6 text-center font-body text-sm text-muted">
                   Nenhum processo ativo no momento.

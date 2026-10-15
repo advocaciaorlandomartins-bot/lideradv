@@ -183,6 +183,55 @@ export default async function ClienteDetailPage({
               <p className="mt-0.5 font-body text-sm text-muted">
                 {client.doc} · Cliente desde {client.since}
               </p>
+              {/* CIDs identificados — resumo compacto junto do nome, pedido
+                  do Orlando: antes só aparecia lá embaixo na aba Visão
+                  Geral, obrigando rolar a tela pra tirar a dúvida sobre o
+                  diagnóstico. Detalhe (médico/data) no hover; clique abre
+                  o documento de origem quando existe. */}
+              {cids.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {cids.map((c) => {
+                    const doc = c.documentoId
+                      ? documentos.find((d) => d.id === c.documentoId)
+                      : null;
+                    const tooltip = [
+                      c.descricao,
+                      c.medicoNome &&
+                        `Dr(a). ${c.medicoNome}${c.medicoCrm ? ` (${c.medicoCrm})` : ""}`,
+                      c.dataDocumento &&
+                        new Date(
+                          c.dataDocumento + "T12:00:00"
+                        ).toLocaleDateString("pt-BR"),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    const chipCls =
+                      "inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 font-body text-xs font-semibold text-violet-700 transition-colors";
+                    return doc ? (
+                      <a
+                        key={c.id}
+                        href={`/api/documentos/download?id=${doc.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={tooltip || undefined}
+                        className={`${chipCls} hover:bg-violet-100`}
+                      >
+                        {c.cid}
+                        {c.descricao ? ` — ${c.descricao}` : ""}
+                      </a>
+                    ) : (
+                      <span
+                        key={c.id}
+                        title={tooltip || undefined}
+                        className={chipCls}
+                      >
+                        {c.cid}
+                        {c.descricao ? ` — ${c.descricao}` : ""}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               <div className="mt-2">
                 <EtiquetaPicker
                   entidade="cliente"
@@ -225,7 +274,6 @@ export default async function ClienteDetailPage({
         initialTab={initialTab}
         podeVerFinanceiro={podeVerFinanceiro}
         modelos={modelos}
-        cids={cids}
         processoIdFiltro={processoIdFiltro ?? null}
       />
 

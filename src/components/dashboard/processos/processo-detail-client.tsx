@@ -3190,22 +3190,24 @@ export default function ProcessoDetailClient({
                 {processo.numero}
               </p>
             )}
-            {processo.cid_principal && (
+            {(processo.cid_principal || cids.length > 0) && (
               <div
                 className="mt-2.5 flex items-start gap-3 rounded-xl bg-violet-700 px-4 py-3 shadow-sm"
                 title="Diagnóstico herdado do cadastro do cliente — confira o laudo médico anexado antes de decidir a peça."
               >
                 <ActivityIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-violet-200" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-body text-[10px] font-bold uppercase tracking-wider text-violet-200">
                     Diagnóstico do cliente
                   </p>
-                  <p className="font-body text-sm font-semibold leading-snug text-white">
-                    CID {processo.cid_principal}
-                    {descreverCid(processo.cid_principal) && (
-                      <> — {descreverCid(processo.cid_principal)}</>
-                    )}
-                  </p>
+                  {processo.cid_principal && (
+                    <p className="font-body text-sm font-semibold leading-snug text-white">
+                      CID {processo.cid_principal}
+                      {descreverCid(processo.cid_principal) && (
+                        <> — {descreverCid(processo.cid_principal)}</>
+                      )}
+                    </p>
+                  )}
                   {TIPO_INCAPACIDADE_LABEL[
                     processo.tipo_incapacidade ?? ""
                   ] && (
@@ -3217,6 +3219,55 @@ export default function ProcessoDetailClient({
                         ]
                       }
                     </p>
+                  )}
+                  {/* Todos os CIDs já identificados pela IA nos documentos —
+                      pedido do Orlando: antes só o principal aparecia aqui,
+                      o resto só num card lá no final da tela. Agora tudo
+                      num lugar só; cada selo linka pro documento de origem
+                      quando existe (clique) e mostra médico/data no hover. */}
+                  {cids.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {cids.map((c) => {
+                        const doc = c.documentoId
+                          ? documentos.find((d) => d.id === c.documentoId)
+                          : null;
+                        const tooltip = [
+                          c.descricao,
+                          c.medicoNome &&
+                            `Dr(a). ${c.medicoNome}${c.medicoCrm ? ` (${c.medicoCrm})` : ""}`,
+                          c.dataDocumento &&
+                            new Date(
+                              c.dataDocumento + "T12:00:00"
+                            ).toLocaleDateString("pt-BR"),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ");
+                        const chipCls =
+                          "inline-flex items-center gap-1 rounded-full bg-violet-800/70 px-2 py-0.5 font-body text-[11px] font-semibold text-violet-50 transition-colors";
+                        return doc ? (
+                          <a
+                            key={c.id}
+                            href={`/api/documentos/download?id=${doc.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={tooltip || undefined}
+                            className={`${chipCls} hover:bg-violet-800`}
+                          >
+                            {c.cid}
+                            {c.descricao ? ` — ${c.descricao}` : ""}
+                          </a>
+                        ) : (
+                          <span
+                            key={c.id}
+                            title={tooltip || undefined}
+                            className={chipCls}
+                          >
+                            {c.cid}
+                            {c.descricao ? ` — ${c.descricao}` : ""}
+                          </span>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -3345,62 +3396,10 @@ export default function ProcessoDetailClient({
         documents={documentos}
       />
 
-      {cids.length > 0 && (
-        <div className="rounded-xl border border-border bg-white p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-700 text-white font-body text-[10px] font-bold">
-              CID
-            </span>
-            <h3 className="font-heading text-sm font-bold text-fg">
-              CIDs identificados ({cids.length})
-            </h3>
-          </div>
-          <div className="space-y-2">
-            {cids.map((c) => {
-              const doc = c.documentoId
-                ? documentos.find((d) => d.id === c.documentoId)
-                : null;
-              return (
-                <div
-                  key={c.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border px-3 py-2"
-                >
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-body text-xs font-bold text-fg">
-                    {c.cid}
-                  </span>
-                  {c.descricao && (
-                    <span className="font-body text-sm text-fg">
-                      {c.descricao}
-                    </span>
-                  )}
-                  <span className="font-body text-xs text-muted">
-                    {[
-                      c.medicoNome &&
-                        `Dr(a). ${c.medicoNome}${c.medicoCrm ? ` (${c.medicoCrm})` : ""}`,
-                      c.dataDocumento &&
-                        new Date(
-                          c.dataDocumento + "T12:00:00"
-                        ).toLocaleDateString("pt-BR"),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                  {doc && (
-                    <a
-                      href={`/api/documentos/download?id=${doc.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-auto font-body text-xs font-semibold text-primary hover:underline"
-                    >
-                      Ver documento →
-                    </a>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* CIDs identificados — movido pro card roxo "Diagnóstico do
+          cliente" lá no topo (pedido do Orlando: ficava lá embaixo,
+          exigia rolar a tela toda pra ver). Removido daqui pra não
+          duplicar a mesma lista em dois lugares. */}
 
       {/* Eventos/Tarefas/Pendências ficam por último, logo antes da Zona
           de risco (no fim da página), já que costumam estar vazios

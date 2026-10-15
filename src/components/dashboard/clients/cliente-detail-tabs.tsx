@@ -50,9 +50,18 @@ function formatCurrency(v: number) {
 function BloquearMensagensToggle({
   clientId,
   inicial,
+  temTelefone,
 }: {
   clientId: string;
   inicial: boolean;
+  /** Nem o telefone do próprio cliente nem (se menor/incapaz) o do
+   * responsável estão preenchidos — "Ativo" nesse estado é enganoso,
+   * não existe número nenhum pra mandar mensagem. Achado real do
+   * Orlando: achou que o toggle tinha ligado sozinho "pra todos", mas o
+   * padrão é mesmo ativo por padrão (só bloqueia quem o escritório
+   * decide bloquear) — o problema de verdade era a falta do telefone do
+   * responsável cadastrado. */
+  temTelefone: boolean;
 }) {
   const [bloqueado, setBloqueado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
@@ -68,10 +77,18 @@ function BloquearMensagensToggle({
     setCarregando(false);
   }
 
+  const semTelefone = !bloqueado && !temTelefone;
+
   return (
     <div>
       <div
-        className={`flex items-center justify-between rounded-xl border px-4 py-3 ${bloqueado ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}
+        className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
+          bloqueado
+            ? "border-amber-200 bg-amber-50"
+            : semTelefone
+              ? "border-red-200 bg-red-50"
+              : "border-slate-100 bg-slate-50"
+        }`}
       >
         <div className="min-w-0">
           <p className="font-body text-sm font-medium text-slate-800">
@@ -80,7 +97,9 @@ function BloquearMensagensToggle({
           <p className="font-body text-xs text-muted">
             {bloqueado
               ? "Bloqueado — nenhuma mensagem será enviada a este cliente"
-              : "Ativo — lembretes de cobrança e INSS serão enviados normalmente"}
+              : semTelefone
+                ? "Ativo, mas sem telefone cadastrado — nenhuma mensagem vai sair até preencher o telefone (do cliente ou, se menor/incapaz, do responsável)"
+                : "Ativo — lembretes de cobrança e INSS serão enviados normalmente"}
           </p>
         </div>
         <button
@@ -406,6 +425,9 @@ export default function ClienteDetailTabs({
   const [inssModalAberto, setInssModalAberto] = useState(false);
   const [judicialModalAberto, setJudicialModalAberto] = useState(false);
   const naoLidos = inboundEmails.filter((e) => !e.lida).length;
+  const temTelefone = Boolean(
+    client.phone || (client.menor_incapaz && client.responsavel_telefone)
+  );
 
   const activeProcesses = processes.filter(
     (p) => p.status === "ativo" || p.status === "em_andamento"
@@ -574,6 +596,7 @@ export default function ClienteDetailTabs({
             <BloquearMensagensToggle
               clientId={client.id}
               inicial={client.bloquear_mensagens ?? false}
+              temTelefone={temTelefone}
             />
           </div>
 
@@ -1218,6 +1241,7 @@ export default function ClienteDetailTabs({
           <BloquearMensagensToggle
             clientId={client.id}
             inicial={client.bloquear_mensagens ?? false}
+            temTelefone={temTelefone}
           />
         </div>
       )}

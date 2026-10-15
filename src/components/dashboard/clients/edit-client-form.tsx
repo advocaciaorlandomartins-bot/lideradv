@@ -483,13 +483,14 @@ export default function EditClientForm({
             )}
           </Field>
 
-          {/* Telefone */}
-          <Field label="Telefone principal" required>
+          {/* Telefone — não obrigatório: cliente menor/incapaz não tem
+              telefone próprio, o contato vai pro campo do responsável
+              legal (Etapa Previdenciária) em vez deste aqui. */}
+          <Field label="Telefone principal">
             <input
               name="phone"
               type="tel"
               autoComplete="tel"
-              required
               value={phoneValue}
               onChange={(e) => setPhoneValue(maskPhone(e.target.value))}
               disabled={isPending}

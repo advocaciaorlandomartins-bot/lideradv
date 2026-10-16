@@ -177,6 +177,77 @@ function KpiCard({
   );
 }
 
+/**
+ * Card de contagem "já entrou / falta entrada" por fase (judicial ou
+ * administrativo) — pedido do Orlando: ele contava um por um quantos
+ * clientes ainda faltava dar entrada. A lista de `clients` já chega aqui
+ * filtrada por responsável quando quem está logado é colaborador (ver
+ * page.tsx → getAllClients(podeVerTodos, colaboradorId)), então essas
+ * contagens já saem automaticamente "da colaboradora" pra ela e "gerais"
+ * pro admin, sem precisar de lógica extra aqui.
+ */
+function EstagioKpiCard({
+  title,
+  jaLabel,
+  jaCount,
+  jaActive,
+  onClickJa,
+  faltaLabel,
+  faltaCount,
+  faltaActive,
+  onClickFalta,
+}: {
+  title: string;
+  jaLabel: string;
+  jaCount: number;
+  jaActive: boolean;
+  onClickJa: () => void;
+  faltaLabel: string;
+  faltaCount: number;
+  faltaActive: boolean;
+  onClickFalta: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-white px-4 py-3">
+      <p className="mb-2 font-body text-xs font-semibold uppercase tracking-wide text-muted">
+        {title}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={onClickJa}
+          className={`cursor-pointer rounded-lg border-2 px-3 py-2 text-left transition-all duration-150 ${
+            jaActive
+              ? "border-primary bg-primary/5 shadow-sm"
+              : "border-border hover:border-primary/40 hover:bg-slate-50"
+          }`}
+        >
+          <p className="font-heading text-xl font-bold text-emerald-600">
+            {jaCount}
+          </p>
+          <p className="font-body text-[11px] text-muted leading-tight">
+            {jaLabel}
+          </p>
+        </button>
+        <button
+          onClick={onClickFalta}
+          className={`cursor-pointer rounded-lg border-2 px-3 py-2 text-left transition-all duration-150 ${
+            faltaActive
+              ? "border-primary bg-primary/5 shadow-sm"
+              : "border-border hover:border-primary/40 hover:bg-slate-50"
+          }`}
+        >
+          <p className="font-heading text-xl font-bold text-red-600">
+            {faltaCount}
+          </p>
+          <p className="font-body text-[11px] text-muted leading-tight">
+            {faltaLabel}
+          </p>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Dropdown ───────────────────────────────────────────────────
 
 function DropdownMenu({
@@ -284,6 +355,14 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  // Filtro dos cards "Entrada na Justiça"/"Entrada no INSS" — critério
+  // derivado do processo (estágio + se já tem protocolo/distribuição), não
+  // um campo do FiltroCliente avançado, por isso fica separado e é
+  // aplicado como predicado extra dentro de `filtered`.
+  const [estagioKpiFiltro, setEstagioKpiFiltro] = useState<{
+    estagio: "judicial" | "administrativo";
+    feito: boolean;
+  } | null>(null);
 
   const [showFiltro, setShowFiltro] = useState(false);
   const [showAiImport, setShowAiImport] = useState(false);
@@ -337,6 +416,18 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
       // sistema: ele quer ver de cara quantos clientes ainda não têm
       // ninguém definido como responsável, pra ir e atribuir.
       semProcesso: clients.filter((c) => c.processes === 0).length,
+      judicialEntrou: clients.filter(
+        (c) => c.estagio_producao === "judicial" && c.data_distribuicao
+      ).length,
+      judicialFalta: clients.filter(
+        (c) => c.estagio_producao === "judicial" && !c.data_distribuicao
+      ).length,
+      administrativoEntrou: clients.filter(
+        (c) => c.estagio_producao === "administrativo" && c.data_protocolo_inss
+      ).length,
+      administrativoFalta: clients.filter(
+        (c) => c.estagio_producao === "administrativo" && !c.data_protocolo_inss
+      ).length,
     }),
     [clients]
   );
@@ -393,6 +484,16 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
         }
       }
 
+      if (estagioKpiFiltro) {
+        if (c.estagio_producao !== estagioKpiFiltro.estagio) return false;
+        const feito = Boolean(
+          estagioKpiFiltro.estagio === "judicial"
+            ? c.data_distribuicao
+            : c.data_protocolo_inss
+        );
+        if (feito !== estagioKpiFiltro.feito) return false;
+      }
+
       return true;
     });
 
@@ -418,7 +519,15 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
     });
 
     return result;
-  }, [clients, search, statusFilter, filtrosAtivos, sortKey, sortDir]);
+  }, [
+    clients,
+    search,
+    statusFilter,
+    filtrosAtivos,
+    estagioKpiFiltro,
+    sortKey,
+    sortDir,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -432,6 +541,8 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
   }
   function handleStatus(s: StatusFilter) {
     setStatusFilter(s);
+    setEstagioKpiFiltro(null);
+    setActiveKpi("todos");
     // Sincroniza com o filtro avançado — sem isso, um "status" deixado lá
     // de uma busca anterior (ex: "ativo") conflitava com a aba clicada
     // agora (ex: "Inativos"), e os dois filtros juntos (AND) nunca batiam
@@ -454,6 +565,8 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
   function handleBuscarFiltro(f: FiltroCliente) {
     setFiltrosAtivos(f);
     setFiltroLocal(f);
+    setEstagioKpiFiltro(null);
+    setActiveKpi("todos");
     // Mesma sincronização do outro lado (ver handleStatus) — escolher um
     // status no filtro avançado também reflete na aba, pra não voltar a
     // conflitar se o usuário clicar numa aba depois.
@@ -467,6 +580,8 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
   function handleLimparFiltro() {
     setFiltrosAtivos(null);
     setFiltroLocal(FILTRO_CLIENTE_INICIAL);
+    setEstagioKpiFiltro(null);
+    setActiveKpi("todos");
     setPage(1);
   }
 
@@ -575,12 +690,17 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
     | "pj"
     | "inativos"
     | "comProcessos"
-    | "semProcesso";
+    | "semProcesso"
+    | "judicialEntrou"
+    | "judicialFalta"
+    | "administrativoEntrou"
+    | "administrativoFalta";
   const [activeKpi, setActiveKpi] = useState<KpiKey>("todos");
 
   function handleKpi(k: KpiKey) {
     setActiveKpi(k);
     setPage(1);
+    setEstagioKpiFiltro(null);
     if (k === "todos") {
       setStatusFilter("todos");
       setFiltrosAtivos(null);
@@ -607,6 +727,22 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
       const f = { ...FILTRO_CLIENTE_INICIAL, comProcessos: "nao" as const };
       setFiltrosAtivos(f);
       setFiltroLocal(f);
+    } else if (k === "judicialEntrou" || k === "judicialFalta") {
+      setStatusFilter("todos");
+      setFiltrosAtivos(null);
+      setFiltroLocal(FILTRO_CLIENTE_INICIAL);
+      setEstagioKpiFiltro({
+        estagio: "judicial",
+        feito: k === "judicialEntrou",
+      });
+    } else if (k === "administrativoEntrou" || k === "administrativoFalta") {
+      setStatusFilter("todos");
+      setFiltrosAtivos(null);
+      setFiltroLocal(FILTRO_CLIENTE_INICIAL);
+      setEstagioKpiFiltro({
+        estagio: "administrativo",
+        feito: k === "administrativoEntrou",
+      });
     }
   }
 
@@ -624,6 +760,36 @@ export default function ClientsContent({ clients }: ClientsContentProps) {
             onClick={() => handleKpi(k.key)}
           />
         ))}
+      </div>
+
+      {/* Entrada na Justiça / Entrada no INSS — pedido do Orlando: ele
+          contava um por um quantos clientes ainda faltava dar entrada.
+          `clients` já chega escopado por responsável quando quem está
+          logado é colaborador, então esses números já saem "dela" pra
+          colaboradora e "gerais" pro admin, sem lógica extra aqui. */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <EstagioKpiCard
+          title="Entrada na Justiça"
+          jaLabel="Já deram entrada"
+          jaCount={kpiCounts.judicialEntrou}
+          jaActive={activeKpi === "judicialEntrou"}
+          onClickJa={() => handleKpi("judicialEntrou")}
+          faltaLabel="Falta dar entrada"
+          faltaCount={kpiCounts.judicialFalta}
+          faltaActive={activeKpi === "judicialFalta"}
+          onClickFalta={() => handleKpi("judicialFalta")}
+        />
+        <EstagioKpiCard
+          title="Entrada no INSS (Administrativo)"
+          jaLabel="Já protocolado"
+          jaCount={kpiCounts.administrativoEntrou}
+          jaActive={activeKpi === "administrativoEntrou"}
+          onClickJa={() => handleKpi("administrativoEntrou")}
+          faltaLabel="Falta protocolar"
+          faltaCount={kpiCounts.administrativoFalta}
+          faltaActive={activeKpi === "administrativoFalta"}
+          onClickFalta={() => handleKpi("administrativoFalta")}
+        />
       </div>
 
       {/* Main panel */}

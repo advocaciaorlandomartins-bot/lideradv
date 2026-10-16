@@ -228,18 +228,29 @@ function EstagioKpiCard({
             {jaLabel}
           </p>
         </button>
+        {/* Sólido e vermelho quando tem pendência — pedido do Orlando: "ao
+            olhar já sabe o que tem pra fazer". Sem pendência (0), fica
+            neutro — não faz sentido chamar atenção pra "falta: 0". */}
         <button
           onClick={onClickFalta}
           className={`cursor-pointer rounded-lg border-2 px-3 py-2 text-left transition-all duration-150 ${
-            faltaActive
-              ? "border-primary bg-primary/5 shadow-sm"
-              : "border-border hover:border-primary/40 hover:bg-slate-50"
+            faltaCount > 0
+              ? faltaActive
+                ? "border-red-700 bg-red-700 shadow-md"
+                : "border-red-600 bg-red-600 hover:bg-red-700 hover:border-red-700 shadow-sm"
+              : faltaActive
+                ? "border-primary bg-primary/5 shadow-sm"
+                : "border-border hover:border-primary/40 hover:bg-slate-50"
           }`}
         >
-          <p className="font-heading text-xl font-bold text-red-600">
+          <p
+            className={`font-heading text-xl font-bold ${faltaCount > 0 ? "text-white" : "text-slate-400"}`}
+          >
             {faltaCount}
           </p>
-          <p className="font-body text-[11px] text-muted leading-tight">
+          <p
+            className={`font-body text-[11px] leading-tight ${faltaCount > 0 ? "font-semibold text-red-50" : "text-muted"}`}
+          >
             {faltaLabel}
           </p>
         </button>

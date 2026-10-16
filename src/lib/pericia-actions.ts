@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { podeAcessarPericia } from "./acesso";
 import { logAction } from "./audit";
 import { sincronizarCompromissoDaPericia } from "./pericia-agenda-sync";
 
@@ -98,6 +99,13 @@ export async function updatePericiaAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "editar"))
     return { error: "Sem permissão." };
+  // Checagem de módulo acima é só "tem acesso a Controles" — sem isto,
+  // qualquer colaborador com permissão de editar controles podia editar a
+  // perícia de QUALQUER outro colega, de qualquer processo, só sabendo o
+  // UUID (achado em auditoria de segurança 2026-10-15; mesmo padrão já
+  // corrigido pra processos/clientes/leads, faltava aqui).
+  if (!(await podeAcessarPericia(session, id)))
+    return { error: "Sem permissão." };
 
   const f = getFields(formData);
 
@@ -173,6 +181,8 @@ export async function markPericiaRealizadaAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "editar"))
     return { error: "Sem permissão." };
+  if (!(await podeAcessarPericia(session, id)))
+    return { error: "Sem permissão." };
 
   try {
     await sql`
@@ -198,6 +208,8 @@ export async function deletePericiaAction(
 ): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "excluir"))
+    return { error: "Sem permissão." };
+  if (!(await podeAcessarPericia(session, id)))
     return { error: "Sem permissão." };
 
   try {

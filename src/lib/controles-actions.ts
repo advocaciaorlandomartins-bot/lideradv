@@ -5,6 +5,7 @@ import { after } from "next/server";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
+import { podeAcessarControle } from "./acesso";
 import { logAction } from "./audit";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
@@ -425,6 +426,13 @@ export async function updateControleAction(
       : 1;
 
   if (!id) return { error: "ID inválido." };
+  // Checagem de módulo acima é só "tem acesso a Controles" — sem isto,
+  // qualquer colaborador com permissão de editar controles podia editar o
+  // controle de QUALQUER outro colega só sabendo o UUID (achado em
+  // auditoria de segurança 2026-10-15; mesmo padrão já corrigido pra
+  // processos/clientes/leads/perícias, faltava aqui).
+  if (!(await podeAcessarControle(session, id)))
+    return { error: "Sem permissão." };
   if (!tipo) return { error: "Tipo obrigatório." };
   if (
     tipo !== "audiencias" &&
@@ -561,6 +569,8 @@ export async function updateStatusControleAction(
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "editar"))
     return { error: "Sem permissão." };
+  if (!(await podeAcessarControle(session, id)))
+    return { error: "Sem permissão." };
   if (novoStatus === "concluido" && !(await checklistCompleto("controle", id)))
     return { error: "Marque todos os itens do checklist antes de concluir." };
 
@@ -584,6 +594,7 @@ export async function updateStatusControleAction(
 export async function deleteControleAction(id: string): Promise<void> {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "excluir")) return;
+  if (!(await podeAcessarControle(session, id))) return;
 
   // Antes de excluir: reverte pontos se o controle já tinha sido concluído
   // — sem isso, o ponto "zumbi" (sem controle de origem) continuava sendo

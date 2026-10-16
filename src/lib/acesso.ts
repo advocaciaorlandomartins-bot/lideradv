@@ -92,6 +92,34 @@ export async function podeEditarCliente(
 }
 
 /**
+ * Acesso a um controle (prazo/tarefa da Controladoria) — controles.responsavel_id
+ * referencia usuarios(id) diretamente (não colaboradores(id) como em
+ * processos/clientes), por isso compara contra session.id, não contra
+ * getColaboradorIdForUser(). Sem "controles_ver_todos", só o responsável
+ * pelo controle pode editar/excluir. As Server Actions de escrita
+ * (updateControleAction, updateStatusControleAction, deleteControleAction)
+ * só checavam a permissão genérica do módulo ("controles":"editar"/
+ * "excluir"), nunca ownership — quem soubesse o UUID editava/excluía/
+ * concluía QUALQUER controle do escritório, inclusive prazo fatal de
+ * outro colega. Mesmo padrão de bug já corrigido pra processos/clientes/
+ * leads/perícias; achado em auditoria de segurança 2026-10-15.
+ */
+export async function podeAcessarControle(
+  session: SessionUser,
+  controleId: string
+): Promise<boolean> {
+  if (!hasPermission(session, "controles", "ver")) return false;
+  if (hasPermission(session, "controles_ver_todos", "ver")) return true;
+
+  const rows = await sql`
+    SELECT 1 FROM controles
+    WHERE id = ${controleId}::uuid AND responsavel_id = ${session.id}::uuid
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+/**
  * Acesso a uma perícia — herda o acesso do processo vinculado quando existe;
  * senão cai na permissão de controles.
  */

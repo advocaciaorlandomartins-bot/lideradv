@@ -172,7 +172,17 @@ export async function getAllClients(
         )
       )
     ORDER BY c.created_at DESC
+    LIMIT 3000
   `;
+  // Sem paginação de verdade nesta lista (o filtro/busca/ordenação roda
+  // client-side, instantâneo, em cima do array inteiro — não queremos
+  // perder isso). Esse LIMIT é só uma rede de segurança: impede que a
+  // consulta cresça sem limite pra sempre conforme o escritório ganha
+  // clientes — 3000 é bem acima do volume atual (~30) e de qualquer
+  // crescimento razoável nos próximos anos. Se um dia isso for atingido de
+  // verdade, aí sim vale migrar pra paginação server-side (como já existe
+  // em controles-db.ts). Mesmo padrão em processos-db.ts/producao-db.ts/
+  // publicacoes-db.ts/crm-db.ts.
 
   return rows.map((r) => ({
     id: r.id,

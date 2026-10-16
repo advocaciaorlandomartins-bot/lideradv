@@ -184,6 +184,7 @@ export async function getAllProcessos(
         JOIN clients c ON c.id = p.client_id
         WHERE p.deleted_at IS NULL AND p.responsavel_id = ${responsavelId}::uuid
         ORDER BY COALESCE(p.updated_at, p.created_at) DESC
+        LIMIT 3000
       `
     : await sql`
         SELECT
@@ -231,7 +232,11 @@ export async function getAllProcessos(
         JOIN clients c ON c.id = p.client_id
         WHERE p.deleted_at IS NULL
         ORDER BY COALESCE(p.updated_at, p.created_at) DESC
+        LIMIT 3000
       `;
+  // Sem paginação de verdade (busca/filtro/ordenação roda client-side em
+  // cima do array inteiro). LIMIT é só rede de segurança contra
+  // crescimento sem fim — ver mesmo comentário em clients-db.ts.
   return rows.map(mapRow);
 }
 

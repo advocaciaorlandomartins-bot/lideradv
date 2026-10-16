@@ -65,7 +65,11 @@ export async function getAllLeads(
     LEFT JOIN colaboradores col ON col.id = l.responsavel_id
     WHERE ${cid}::uuid IS NULL OR l.responsavel_id = ${cid}::uuid
     ORDER BY l.created_at DESC
+    LIMIT 3000
   `;
+  // Sem paginação de verdade (funil/lista roda client-side em cima do
+  // array inteiro). LIMIT é rede de segurança contra crescimento sem fim
+  // — ver mesmo comentário em clients-db.ts/processos-db.ts.
   return rows.map(mapLead);
 }
 

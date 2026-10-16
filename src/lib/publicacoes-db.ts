@@ -42,13 +42,22 @@ export interface OabMonitorada {
 // ── Publicações ───────────────────────────────────────────────────────────────
 
 export async function getAllPublicacoes(): Promise<Publicacao[]> {
+  // `conteudo_completo` (texto integral da publicação, bem maior que o
+  // `conteudo`/snippet de 200 chars que a lista realmente usa) não é lido
+  // em publicacoes-content.tsx — só getPublicacaoById (detalhe de UMA
+  // publicação) precisa dele. Buscar isso pra TODAS as linhas da lista
+  // inflava o payload sem necessidade. LIMIT é rede de segurança: essa
+  // tabela cresce sozinha todo dia útil (captura automática de DJE/DJEN
+  // por OAB monitorada) — sem paginação de verdade (busca/filtro roda
+  // client-side), mesmo raciocínio de clients-db.ts/processos-db.ts.
   const rows = await sql`
     SELECT
       id, processo, tipo, destinatario, advogados, orgao, tribunal,
       TO_CHAR(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
-      status, origem, conteudo, conteudo_completo, resumo_ia, created_at::text
+      status, origem, conteudo, resumo_ia, created_at::text
     FROM publicacoes
     ORDER BY disponibilizacao DESC, id DESC
+    LIMIT 5000
   `;
   return rows.map(mapPublicacao);
 }

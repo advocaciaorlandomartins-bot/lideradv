@@ -139,6 +139,10 @@ export async function getAllProcessosProducao(
       AND (${cid}::uuid IS NULL OR p.responsavel_id = ${cid}::uuid)
     GROUP BY p.id, c.name, resp.nome
     ORDER BY p.data_estagio_at ASC
+    LIMIT 3000
   `;
+  // Sem paginação de verdade (o kanban/lista roda client-side em cima do
+  // array inteiro). LIMIT é rede de segurança contra crescimento sem fim
+  // — ver mesmo comentário em clients-db.ts/processos-db.ts.
   return rows.map(mapRow);
 }

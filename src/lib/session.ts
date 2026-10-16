@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { after } from "next/server";
 import sql from "./db";
@@ -51,107 +52,119 @@ export async function createSession(user: SessionUser): Promise<void> {
   });
 }
 
-export async function getSession(): Promise<SessionUser | null> {
-  const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
-  if (!token) return null;
+// cache() do React: deduplica chamadas idênticas DENTRO da mesma
+// requisição (layout.tsx + cada page.tsx chamam getSession() de forma
+// independente — sem isso, toda navegação pagava 2+ idas-e-voltas ao
+// banco só pra sessão). Isolado por requisição — nunca vaza entre
+// requisições/usuários diferentes, então a garantia de permissões sempre
+// frescas (ver comentário abaixo) continua intacta.
+export const getSession = cache(
+  async function getSession(): Promise<SessionUser | null> {
+    const jar = await cookies();
+    const token = jar.get(COOKIE)?.value;
+    if (!token) return null;
 
-  const dot = token.lastIndexOf(".");
-  if (dot === -1) return null;
-  const payload = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
+    const dot = token.lastIndexOf(".");
+    if (dot === -1) return null;
+    const payload = token.slice(0, dot);
+    const sig = token.slice(dot + 1);
 
-  const expected = sign(payload);
-  const sigBuf = Buffer.from(sig, "hex");
-  const expectedBuf = Buffer.from(expected, "hex");
-  if (
-    sigBuf.length !== expectedBuf.length ||
-    !crypto.timingSafeEqual(sigBuf, expectedBuf)
-  ) {
-    return null;
-  }
+    const expected = sign(payload);
+    const sigBuf = Buffer.from(sig, "hex");
+    const expectedBuf = Buffer.from(expected, "hex");
+    if (
+      sigBuf.length !== expectedBuf.length ||
+      !crypto.timingSafeEqual(sigBuf, expectedBuf)
+    ) {
+      return null;
+    }
 
-  let data: { id?: string; login?: string; exp?: number };
-  try {
-    data = JSON.parse(Buffer.from(payload, "base64url").toString());
-  } catch {
-    return null;
-  }
-  if (typeof data.exp !== "number" || data.exp < Date.now() / 1000 || !data.id)
-    return null;
+    let data: { id?: string; login?: string; exp?: number };
+    try {
+      data = JSON.parse(Buffer.from(payload, "base64url").toString());
+    } catch {
+      return null;
+    }
+    if (
+      typeof data.exp !== "number" ||
+      data.exp < Date.now() / 1000 ||
+      !data.id
+    )
+      return null;
 
-  // O cookie assinado só prova QUEM é o usuário (autenticação) — categoria
-  // e permissões sempre vêm frescas do banco a cada chamada, nunca do que
-  // foi gravado no cookie no momento do login. Sem isso, um admin
-  // revogava/reduzia a permissão de alguém na tela de Usuários e isso só
-  // valia depois da sessão atual daquela pessoa expirar sozinha (até 8h) —
-  // achado de verdade: financeiro desmarcado pra uma colaboradora que
-  // continuava vendo a aba Financeiro do cliente, porque o cookie dela já
-  // tinha sido emitido antes da permissão ser corrigida. De quebra, também
-  // derruba na hora quem for desativado (usuarios.ativo = false).
-  // Antes, uma falha transitória de conexão com o banco (Neon serverless
-  // tem cold-start/soluço ocasional — mesma classe de instabilidade vista
-  // nos deploys da Vercel hoje) virava `rows = []` silenciosamente, sem
-  // log nenhum, e o chamador via isso IDÊNTICO a "sessão inválida" — o
-  // usuário levava "Não autorizado" num clique no meio de uma sessão
-  // válida, sem rastro nenhum pra diagnosticar depois. Uma retentativa
-  // cobre o caso comum (soluço de um request isolado); se a segunda
-  // também falhar, loga o erro de verdade antes de cair em null (mantém
-  // o mesmo contrato de retorno pros ~200 lugares que chamam getSession).
-  async function buscarUsuario() {
-    return sql`
+    // O cookie assinado só prova QUEM é o usuário (autenticação) — categoria
+    // e permissões sempre vêm frescas do banco a cada chamada, nunca do que
+    // foi gravado no cookie no momento do login. Sem isso, um admin
+    // revogava/reduzia a permissão de alguém na tela de Usuários e isso só
+    // valia depois da sessão atual daquela pessoa expirar sozinha (até 8h) —
+    // achado de verdade: financeiro desmarcado pra uma colaboradora que
+    // continuava vendo a aba Financeiro do cliente, porque o cookie dela já
+    // tinha sido emitido antes da permissão ser corrigida. De quebra, também
+    // derruba na hora quem for desativado (usuarios.ativo = false).
+    // Antes, uma falha transitória de conexão com o banco (Neon serverless
+    // tem cold-start/soluço ocasional — mesma classe de instabilidade vista
+    // nos deploys da Vercel hoje) virava `rows = []` silenciosamente, sem
+    // log nenhum, e o chamador via isso IDÊNTICO a "sessão inválida" — o
+    // usuário levava "Não autorizado" num clique no meio de uma sessão
+    // válida, sem rastro nenhum pra diagnosticar depois. Uma retentativa
+    // cobre o caso comum (soluço de um request isolado); se a segunda
+    // também falhar, loga o erro de verdade antes de cair em null (mantém
+    // o mesmo contrato de retorno pros ~200 lugares que chamam getSession).
+    async function buscarUsuario() {
+      return sql`
       SELECT nome, categoria, permissoes, ativo, ultimo_acesso FROM usuarios WHERE id = ${data.id}::uuid
     `;
-  }
-  let rows: Awaited<ReturnType<typeof buscarUsuario>>;
-  try {
-    rows = await buscarUsuario();
-  } catch {
+    }
+    let rows: Awaited<ReturnType<typeof buscarUsuario>>;
     try {
       rows = await buscarUsuario();
-    } catch (err) {
-      console.error("[getSession] Falha ao buscar usuário no banco:", err);
-      rows = [];
-    }
-  }
-  const row = rows[0] as
-    | {
-        nome: string;
-        categoria: string;
-        permissoes: Permissoes;
-        ativo: boolean;
-        ultimo_acesso: string | null;
+    } catch {
+      try {
+        rows = await buscarUsuario();
+      } catch (err) {
+        console.error("[getSession] Falha ao buscar usuário no banco:", err);
+        rows = [];
       }
-    | undefined;
-  if (!row || row.ativo === false) return null;
+    }
+    const row = rows[0] as
+      | {
+          nome: string;
+          categoria: string;
+          permissoes: Permissoes;
+          ativo: boolean;
+          ultimo_acesso: string | null;
+        }
+      | undefined;
+    if (!row || row.ativo === false) return null;
 
-  const ultimoAcessoMs = row.ultimo_acesso
-    ? new Date(row.ultimo_acesso).getTime()
-    : 0;
-  if (Date.now() - ultimoAcessoMs > THROTTLE_ULTIMO_ACESSO_MS) {
-    after(async () => {
-      await sql`UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ${data.id}::uuid`.catch(
-        () => {}
-      );
-    });
+    const ultimoAcessoMs = row.ultimo_acesso
+      ? new Date(row.ultimo_acesso).getTime()
+      : 0;
+    if (Date.now() - ultimoAcessoMs > THROTTLE_ULTIMO_ACESSO_MS) {
+      after(async () => {
+        await sql`UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ${data.id}::uuid`.catch(
+          () => {}
+        );
+      });
+    }
+
+    return {
+      id: data.id,
+      login: data.login ?? "",
+      nome: row.nome ?? data.login ?? "",
+      categoria: row.categoria,
+      // resolvePermissoes garante TODOS os módulos presentes (customizado
+      // salvo + default da categoria pro que faltar) — sem isso, contas com
+      // permissões customizadas salvas antes de um módulo novo existir
+      // (ex: dashboard_financeiro, gerenciador) ficavam sem acesso a ele pra
+      // sempre, mesmo com hasPermission() tendo lógica de fallback própria
+      // (bug real: faltava só "dashboard" no objeto customizado de uma conta
+      // Administrador(a), e isso bastava pra bloquear a página inteira do
+      // Gerenciador, que exige dashboard_financeiro:ver).
+      permissoes: resolvePermissoes(row.categoria, row.permissoes ?? null),
+    };
   }
-
-  return {
-    id: data.id,
-    login: data.login ?? "",
-    nome: row.nome ?? data.login ?? "",
-    categoria: row.categoria,
-    // resolvePermissoes garante TODOS os módulos presentes (customizado
-    // salvo + default da categoria pro que faltar) — sem isso, contas com
-    // permissões customizadas salvas antes de um módulo novo existir
-    // (ex: dashboard_financeiro, gerenciador) ficavam sem acesso a ele pra
-    // sempre, mesmo com hasPermission() tendo lógica de fallback própria
-    // (bug real: faltava só "dashboard" no objeto customizado de uma conta
-    // Administrador(a), e isso bastava pra bloquear a página inteira do
-    // Gerenciador, que exige dashboard_financeiro:ver).
-    permissoes: resolvePermissoes(row.categoria, row.permissoes ?? null),
-  };
-}
+);
 
 export async function destroySession(): Promise<void> {
   const jar = await cookies();

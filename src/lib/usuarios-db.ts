@@ -1,3 +1,4 @@
+import { cache } from "react";
 import sql from "./db";
 
 export {
@@ -78,14 +79,23 @@ export async function getSenhaHash(id: string): Promise<string | null> {
 }
 
 /** colaborador_id vinculado ao usuário logado — usado para restringir dados a "só os meus". */
-export async function getColaboradorIdForUser(
-  userId: string
-): Promise<string | null> {
-  const rows = await sql`
+// cache() do React: a mesma page.tsx (ou layout + page juntos) costuma
+// chamar isso várias vezes pro mesmo userId dentro de uma única
+// requisição (visto até 6x numa página só, algumas dentro de um mesmo
+// array de Promise.all — o que paradoxalmente SERIALIZAVA aquelas
+// chamadas em vez de paralelizar, já que um await dentro do literal do
+// array bloqueia a avaliação do próximo elemento). Deduplicar aqui corta
+// todas essas idas ao banco pra 1 só, por requisição.
+export const getColaboradorIdForUser = cache(
+  async function getColaboradorIdForUser(
+    userId: string
+  ): Promise<string | null> {
+    const rows = await sql`
     SELECT colaborador_id::text FROM usuarios WHERE id = ${userId}::uuid
   `;
-  return rows[0]?.colaborador_id ?? null;
-}
+    return rows[0]?.colaborador_id ?? null;
+  }
+);
 
 /**
  * currentId: colaborador atualmente vinculado ao usuário sendo editado.

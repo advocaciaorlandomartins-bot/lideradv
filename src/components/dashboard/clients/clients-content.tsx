@@ -60,7 +60,25 @@ function estagioInfo(c: Client): {
     ESTAGIO_PRODUCAO_META[c.estagio_producao as EstagioProducao] ??
     ESTAGIO_PRODUCAO_META.analise;
   let sub: { label: string; cls: string } | null = null;
-  if (c.estagio_producao === "administrativo" && !c.resultado_administrativo) {
+  // INSS indeferiu e o caso ainda não foi direcionado à justiça — mesmo
+  // critério e mesma prioridade de getProximaAcaoProcesso (processo-fases.ts):
+  // urgente, independente de já ter saído de "administrativo". Faltava
+  // aqui — a condição antiga só cobria "!resultado_administrativo", e
+  // "negado" é uma string não-vazia, então esse caso não mostrava NADA,
+  // escondendo um estado que pede ação urgente (achado em auditoria de
+  // 2026-10-15).
+  if (
+    c.resultado_administrativo === "negado" &&
+    c.estagio_producao !== "judicial"
+  ) {
+    sub = {
+      label: "INSS indeferiu — ingressar com ação judicial",
+      cls: "text-red-600 font-bold",
+    };
+  } else if (
+    c.estagio_producao === "administrativo" &&
+    !c.resultado_administrativo
+  ) {
     sub = c.data_protocolo_inss
       ? { label: "Aguardando resultado do INSS", cls: "text-blue-600" }
       : { label: "Aguardando entrada", cls: "text-red-600" };

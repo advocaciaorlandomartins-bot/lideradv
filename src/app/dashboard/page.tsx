@@ -256,6 +256,17 @@ export default async function DashboardPage() {
   const needsGerData =
     showFinanceiro || showCrm || perm.clientes || perm.processos;
   const needsDashData = showControles || showFinanceiro || perm.clientes;
+  // Resolvido uma única vez aqui (já é cache() por requisição em
+  // usuarios-db.ts, mas um `await` solto dentro de um literal de array
+  // passado pro Promise.all abaixo ainda serializaria a CONSTRUÇÃO do
+  // array — cada await bloqueia a avaliação do próximo elemento antes de
+  // o Promise.all sequer começar a rodar as promises em paralelo.
+  // Resolver antes e só referenciar o valor já pronto nos elementos do
+  // array garante paralelismo de verdade.
+  const colaboradorId =
+    needsDashData || perm.clientes || perm.processos
+      ? ((await getColaboradorIdForUser(session.id)) ?? null)
+      : null;
 
   const [
     gerData,
@@ -272,7 +283,7 @@ export default async function DashboardPage() {
       ? getDashboardData(
           session.login,
           hasPermission(session, "clientes_ver_todos", "ver"),
-          (await getColaboradorIdForUser(session.id)) ?? null,
+          colaboradorId,
           hasPermission(session, "controles_ver_todos", "ver"),
           session.id
         )
@@ -281,13 +292,13 @@ export default async function DashboardPage() {
       ? getAllRecentEmails(
           20,
           hasPermission(session, "clientes_ver_todos", "ver"),
-          (await getColaboradorIdForUser(session.id)) ?? null
+          colaboradorId
         ).catch(() => [])
       : Promise.resolve([]),
     perm.clientes
       ? countUnreadEmails(
           hasPermission(session, "clientes_ver_todos", "ver"),
-          (await getColaboradorIdForUser(session.id)) ?? null
+          colaboradorId
         ).catch(() => 0)
       : Promise.resolve(0),
     countMinhasPendentes(
@@ -298,7 +309,7 @@ export default async function DashboardPage() {
     perm.processos
       ? getAlertasPrevidenciarios(
           hasPermission(session, "processos_ver_todos", "ver"),
-          (await getColaboradorIdForUser(session.id)) ?? null
+          colaboradorId
         ).catch(() => [])
       : Promise.resolve([]),
     showFinanceiroPessoal
@@ -321,8 +332,7 @@ export default async function DashboardPage() {
     ? verTodosProcessos
       ? (gerData?.counts.totalProcessos ?? 0)
       : await getProcessosCount(
-          (await getColaboradorIdForUser(session.id)) ??
-            "00000000-0000-0000-0000-000000000000"
+          colaboradorId ?? "00000000-0000-0000-0000-000000000000"
         )
     : 0;
 
@@ -334,7 +344,7 @@ export default async function DashboardPage() {
   const clientesVisiveisCount = perm.clientes
     ? verTodosClientes
       ? (gerData?.counts.totalClientes ?? 0)
-      : await getClientesCount(false, await getColaboradorIdForUser(session.id))
+      : await getClientesCount(false, colaboradorId)
     : 0;
 
   const kpis = gerData?.kpis;

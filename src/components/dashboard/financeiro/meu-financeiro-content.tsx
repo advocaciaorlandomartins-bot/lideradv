@@ -174,6 +174,7 @@ function KpiCard({
   color,
   icon: Icon,
   negative,
+  onClick,
 }: {
   label: string;
   sub: string;
@@ -181,6 +182,8 @@ function KpiCard({
   color: "blue" | "emerald" | "red" | "amber" | "teal";
   icon: React.ComponentType<{ className?: string }>;
   negative?: boolean;
+  /** Pedido do Orlando: "coloque esses card com o botão, ele não direciona" — os KPIs do topo eram só visuais, sem ação. Quando presente, o card inteiro vira clicável e leva pra seção relevante da página. */
+  onClick?: () => void;
 }) {
   const ring: Record<string, string> = {
     blue: "ring-blue-200    bg-blue-50    text-blue-600",
@@ -196,8 +199,8 @@ function KpiCard({
     amber: "text-amber-700",
     teal: "text-teal-700",
   };
-  return (
-    <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+  const content = (
+    <>
       <div className="mb-3 flex items-center justify-between">
         <span className="font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
           {label}
@@ -214,6 +217,22 @@ function KpiCard({
         {value}
       </p>
       <p className="mt-0.5 font-body text-[11px] text-muted">{sub}</p>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="cursor-pointer rounded-xl border border-border bg-white p-4 text-left shadow-sm transition-all duration-150 hover:border-primary/40 hover:shadow-md"
+      >
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+      {content}
     </div>
   );
 }
@@ -274,6 +293,7 @@ export default function MeuFinanceiroContent({
     abrirProcessosInicial
   );
   const honorariosSectionRef = useRef<HTMLDivElement>(null);
+  const listaSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (abrirProcessosInicial) {
@@ -285,6 +305,24 @@ export default function MeuFinanceiroContent({
     // Só na carga inicial — não deve rolar de novo se o usuário recolher/expandir depois.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pedido do Orlando: "coloque esses card com o botão, ele não direciona" —
+  // os KPIs do topo eram só decorativos. Agora cada um leva pra seção
+  // correspondente da própria página.
+  function irParaProcessos() {
+    setHorariosExpanded(true);
+    honorariosSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+  function irParaLista(tipo: FiltroTipo) {
+    setFiltroTipo(tipo);
+    listaSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
 
   // ── Derived ──
   const doMes = useMemo(
@@ -649,6 +687,7 @@ export default function MeuFinanceiroContent({
           value={String(processosAtivosCount)}
           color="blue"
           icon={ScalesIcon}
+          onClick={irParaProcessos}
         />
         <KpiCard
           label="Minha comissão"
@@ -660,6 +699,7 @@ export default function MeuFinanceiroContent({
           value={fmt(honorariosEscritorio)}
           color="blue"
           icon={BanknotesIcon}
+          onClick={irParaProcessos}
         />
         <KpiCard
           label="Receitas"
@@ -667,6 +707,7 @@ export default function MeuFinanceiroContent({
           value={fmt(receitasMes)}
           color="emerald"
           icon={TrendUpIcon}
+          onClick={() => irParaLista("receita")}
         />
         <KpiCard
           label="Despesas"
@@ -674,6 +715,7 @@ export default function MeuFinanceiroContent({
           value={fmt(despesasMes)}
           color="red"
           icon={TrendDownIcon}
+          onClick={() => irParaLista("despesa")}
         />
         <KpiCard
           label="Saldo"
@@ -682,6 +724,7 @@ export default function MeuFinanceiroContent({
           color={saldoMes >= 0 ? "teal" : "red"}
           icon={CurrencyIcon}
           negative={saldoMes < 0}
+          onClick={() => irParaLista("todos")}
         />
         <KpiCard
           label="A Receber"
@@ -689,6 +732,7 @@ export default function MeuFinanceiroContent({
           value={fmt(pendentesMes)}
           color="amber"
           icon={CheckCircleIcon}
+          onClick={() => irParaLista("receita")}
         />
       </div>
 
@@ -1273,7 +1317,10 @@ export default function MeuFinanceiroContent({
       </div>
 
       {/* ── Transaction list ── */}
-      <div className="rounded-xl border border-border bg-white shadow-sm">
+      <div
+        ref={listaSectionRef}
+        className="rounded-xl border border-border bg-white shadow-sm scroll-mt-4"
+      >
         {/* List toolbar */}
         <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex gap-0.5 rounded-lg border border-border bg-slate-50 p-0.5">

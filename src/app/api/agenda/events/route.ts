@@ -254,10 +254,17 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Lançamentos financeiros ─────────────────────────────────────────────────
+  // toISOString() pega a data em UTC no servidor — entre 21h e 23h59 em
+  // Brasília, lançamentos vencendo HOJE já apareciam marcados como
+  // vencidos (vermelho) horas antes do real. Mesmo bug já corrigido em
+  // outras rotas.
+  const hojeISO = new Date().toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
   for (const l of lancRows) {
     const isEntrada = l.tipo === "entrada";
     const dvStr = String(l.data_vencimento);
-    const isVencido = dvStr < new Date().toISOString().slice(0, 10);
+    const isVencido = dvStr < hojeISO;
     const color = isVencido ? "#dc2626" : isEntrada ? "#059669" : "#ea580c";
     const valor = Number(l.valor).toLocaleString("pt-BR", {
       style: "currency",

@@ -187,7 +187,17 @@ function ProducaoBar({
   const [resultadoJud, setResultadoJud] = useState<
     "procedente" | "improcedente" | "parcial"
   >("procedente");
-  const hoje = new Date().toISOString().slice(0, 10);
+  // toISOString() pega a data em UTC — entre 21h e 23h59 em Brasília o UTC
+  // já virou o dia seguinte, então "Dar entrada no INSS"/"Registrar
+  // distribuição judicial" pré-carregavam com a data de AMANHÃ em vez de
+  // hoje. Essas datas ficam congeladas (travam prazo/prescrição e comissão
+  // — ver comissao-colaborador.ts) no momento do registro; se o usuário
+  // não notasse e corrigisse manualmente, gravava a data errada. Mesmo bug
+  // de toISOString() já corrigido em outras rotas, só que aqui do lado
+  // client-side.
+  const hoje = new Date().toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
   const [showFormProtocolo, setShowFormProtocolo] = useState(false);
   const [protocoloNumero, setProtocoloNumero] = useState("");
   const [protocoloData, setProtocoloData] = useState(hoje);

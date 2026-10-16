@@ -256,7 +256,13 @@ export default function ControleForm({
   const [prazoInterno, setPrazoInterno] = useState(
     controle?.prazo_interno ?? ""
   );
-  const todayISO = new Date().toISOString().split("T")[0];
+  // toISOString() pega a data em UTC — entre 21h e 23h59 em Brasília um
+  // prazo cadastrado pra HOJE já aparecia marcado como "data já passou"
+  // nesse aviso, horas antes do real. Mesmo bug já corrigido em outras
+  // rotas, só que aqui do lado client-side.
+  const todayISO = new Date().toLocaleDateString("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  });
   const dataPassada = dataEvento && dataEvento < todayISO;
 
   const tipoConfig = getTipoConfig(tipo);

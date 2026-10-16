@@ -150,11 +150,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, reason: "email não configurado" });
     }
 
-    const hoje = new Date();
-    const dataMin = hoje.toISOString().slice(0, 10);
-    const dataMax = new Date(hoje.getTime() + 7 * 86400000)
-      .toISOString()
-      .slice(0, 10);
+    // "hoje" aqui precisa ser só a DATA (meia-noite), sem hora — misturar
+    // um timestamp com hora (toISOString() em UTC) com datas de vencimento
+    // (sempre meia-noite) faz a subtração em ms dar fracionário e
+    // arredondar errado. Esse cron roda às 14h UTC (11h em Brasília): um
+    // prazo vencendo HOJE calculava diff = -1 dia (14h de diferença vira
+    // "ontem" no arredondamento) e era descartado pelo "if (diff < 0)
+    // continue" — o prazo sumia do e-mail diário no dia exato em que
+    // vencia. Mesmo bug de data-com-hora-vs-data-pura já corrigido em
+    // resumo-diario.ts e outras rotas, só que esta ficou de fora.
+    const hojeISO = new Date().toLocaleDateString("sv-SE", {
+      timeZone: "America/Sao_Paulo",
+    });
+    const hojeUTC = new Date(`${hojeISO}T00:00:00Z`).getTime();
+    const dataMin = hojeISO;
+    const dataMax = new Date(hojeUTC + 7 * 86400000).toISOString().slice(0, 10);
 
     // Controles vencendo nos próximos 7 dias
     const controles = await sql`
@@ -201,7 +211,7 @@ export async function GET(request: Request) {
         (c.prazo_interno as string | null) ?? (c.data_evento as string | null);
       if (!dataBase) continue;
       const dataVenc = new Date(dataBase);
-      const diff = Math.round((dataVenc.getTime() - hoje.getTime()) / 86400000);
+      const diff = Math.round((dataVenc.getTime() - hojeUTC) / 86400000);
       if (diff < 0) continue;
       items.push({
         tipo: "controle",
@@ -216,7 +226,7 @@ export async function GET(request: Request) {
 
     for (const t of tarefas) {
       const dataVenc = new Date(t.data_vencimento as string);
-      const diff = Math.round((dataVenc.getTime() - hoje.getTime()) / 86400000);
+      const diff = Math.round((dataVenc.getTime() - hojeUTC) / 86400000);
       if (diff < 0) continue;
       items.push({
         tipo: "tarefa",
@@ -245,7 +255,8 @@ export async function GET(request: Request) {
     }
 
     const resend = new Resend(resendKey);
-    const hojeLabel = hoje.toLocaleDateString("pt-BR", {
+    const hojeLabel = new Date().toLocaleDateString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
       weekday: "long",
       day: "numeric",
       month: "long",

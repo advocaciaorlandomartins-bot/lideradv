@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import sql from "./db";
 import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
@@ -118,5 +118,8 @@ export async function saveEscritorioConfigAction(
   }
 
   revalidatePath("/dashboard/configuracoes");
+  // updateTag (não revalidateTag) porque isso roda dentro de uma Server
+  // Action — expira a cache na hora, sem janela de "stale-while-revalidate".
+  updateTag("escritorio-config");
   return { success: true };
 }

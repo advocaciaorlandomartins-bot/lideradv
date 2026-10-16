@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import sql from "./db";
 
 export interface EscritorioConfig {
@@ -42,8 +43,20 @@ export interface EscritorioConfig {
   salario_minimo: number;
 }
 
-export async function getEscritorioConfig(): Promise<EscritorioConfig> {
-  const rows = await sql`
+// Config do escritório (nome, OAB, logo, formatação de PDF, salário
+// mínimo) é a mesma pra TODOS os usuários e muda raríssimas vezes — mas
+// getEscritorioConfig() era chamada sem cache nenhum em ~22 lugares,
+// incluindo dashboard/layout.tsx (via getBrandingSrcs), ou seja, essa
+// query rodava em TODA navegação de TODA página do dashboard. unstable_cache
+// (compartilhado entre usuários/requisições, diferente do cache() de
+// session.ts que é por-requisição) com revalidateTag("escritorio-config")
+// nos dois pontos que escrevem na tabela (escritorio-actions.ts e a
+// ferramenta "atualizar_escritorio" da Íris em iris-tools.ts) garante
+// que uma alteração aparece na hora pra todo mundo, sem pagar a query em
+// toda navegação enquanto nada mudou.
+export const getEscritorioConfig = unstable_cache(
+  async function getEscritorioConfig(): Promise<EscritorioConfig> {
+    const rows = await sql`
     SELECT id::text, nome, oab, oab_uf, cnpj, telefone, email, site,
            endereco, cidade, estado, cep, logo_url, logo_ativo,
            logo_app_url, logo_app_icon_url,
@@ -60,78 +73,82 @@ export async function getEscritorioConfig(): Promise<EscritorioConfig> {
     FROM escritorio_config
     LIMIT 1
   `;
-  const DEFAULTS = {
-    logo_ativo: true,
-    identificacao_ativo: true,
-    font_padrao: "Times",
-    tamanho_padrao: 12,
-    line_height: 1.8,
-    margem_topo: 25,
-    margem_direita: 25,
-    margem_inferior: 28,
-    margem_esquerda: 25,
-    modelo_timbrado: "classico",
-    modelo_timbrado_ativo: true,
-    fundo_timbrado: null,
-    fundo_timbrado_ativo: true,
-    salario_minimo: 1518.0,
-  };
-
-  if (rows.length === 0) {
-    return {
-      id: "",
-      nome: "Advocacia Orlando Martins",
-      oab: null,
-      oab_uf: null,
-      cnpj: null,
-      telefone: null,
-      email: null,
-      site: null,
-      endereco: null,
-      cidade: null,
-      estado: null,
-      cep: null,
-      logo_url: null,
-      logo_app_url: null,
-      logo_app_icon_url: null,
-      ...DEFAULTS,
+    const DEFAULTS = {
+      logo_ativo: true,
+      identificacao_ativo: true,
+      font_padrao: "Times",
+      tamanho_padrao: 12,
+      line_height: 1.8,
+      margem_topo: 25,
+      margem_direita: 25,
+      margem_inferior: 28,
+      margem_esquerda: 25,
+      modelo_timbrado: "classico",
+      modelo_timbrado_ativo: true,
+      fundo_timbrado: null,
+      fundo_timbrado_ativo: true,
+      salario_minimo: 1518.0,
     };
-  }
-  const r = rows[0];
-  return {
-    id: r.id,
-    nome: r.nome,
-    oab: r.oab ?? null,
-    oab_uf: r.oab_uf ?? null,
-    cnpj: r.cnpj ?? null,
-    telefone: r.telefone ?? null,
-    email: r.email ?? null,
-    site: r.site ?? null,
-    endereco: r.endereco ?? null,
-    cidade: r.cidade ?? null,
-    estado: r.estado ?? null,
-    cep: r.cep ?? null,
-    logo_url: r.logo_url ?? null,
-    logo_ativo: r.logo_ativo ?? DEFAULTS.logo_ativo,
-    logo_app_url: r.logo_app_url ?? null,
-    logo_app_icon_url: r.logo_app_icon_url ?? null,
-    identificacao_ativo: r.identificacao_ativo ?? DEFAULTS.identificacao_ativo,
-    font_padrao: r.font_padrao ?? DEFAULTS.font_padrao,
-    tamanho_padrao: r.tamanho_padrao ?? DEFAULTS.tamanho_padrao,
-    line_height: r.line_height ?? DEFAULTS.line_height,
-    margem_topo: r.margem_topo ?? DEFAULTS.margem_topo,
-    margem_direita: r.margem_direita ?? DEFAULTS.margem_direita,
-    margem_inferior: r.margem_inferior ?? DEFAULTS.margem_inferior,
-    margem_esquerda: r.margem_esquerda ?? DEFAULTS.margem_esquerda,
-    modelo_timbrado: r.modelo_timbrado ?? DEFAULTS.modelo_timbrado,
-    modelo_timbrado_ativo:
-      r.modelo_timbrado_ativo ?? DEFAULTS.modelo_timbrado_ativo,
-    fundo_timbrado: r.fundo_timbrado ?? null,
-    fundo_timbrado_ativo:
-      r.fundo_timbrado_ativo ?? DEFAULTS.fundo_timbrado_ativo,
-    salario_minimo: r.salario_minimo ?? DEFAULTS.salario_minimo,
-  };
-}
+
+    if (rows.length === 0) {
+      return {
+        id: "",
+        nome: "Advocacia Orlando Martins",
+        oab: null,
+        oab_uf: null,
+        cnpj: null,
+        telefone: null,
+        email: null,
+        site: null,
+        endereco: null,
+        cidade: null,
+        estado: null,
+        cep: null,
+        logo_url: null,
+        logo_app_url: null,
+        logo_app_icon_url: null,
+        ...DEFAULTS,
+      };
+    }
+    const r = rows[0];
+    return {
+      id: r.id,
+      nome: r.nome,
+      oab: r.oab ?? null,
+      oab_uf: r.oab_uf ?? null,
+      cnpj: r.cnpj ?? null,
+      telefone: r.telefone ?? null,
+      email: r.email ?? null,
+      site: r.site ?? null,
+      endereco: r.endereco ?? null,
+      cidade: r.cidade ?? null,
+      estado: r.estado ?? null,
+      cep: r.cep ?? null,
+      logo_url: r.logo_url ?? null,
+      logo_ativo: r.logo_ativo ?? DEFAULTS.logo_ativo,
+      logo_app_url: r.logo_app_url ?? null,
+      logo_app_icon_url: r.logo_app_icon_url ?? null,
+      identificacao_ativo:
+        r.identificacao_ativo ?? DEFAULTS.identificacao_ativo,
+      font_padrao: r.font_padrao ?? DEFAULTS.font_padrao,
+      tamanho_padrao: r.tamanho_padrao ?? DEFAULTS.tamanho_padrao,
+      line_height: r.line_height ?? DEFAULTS.line_height,
+      margem_topo: r.margem_topo ?? DEFAULTS.margem_topo,
+      margem_direita: r.margem_direita ?? DEFAULTS.margem_direita,
+      margem_inferior: r.margem_inferior ?? DEFAULTS.margem_inferior,
+      margem_esquerda: r.margem_esquerda ?? DEFAULTS.margem_esquerda,
+      modelo_timbrado: r.modelo_timbrado ?? DEFAULTS.modelo_timbrado,
+      modelo_timbrado_ativo:
+        r.modelo_timbrado_ativo ?? DEFAULTS.modelo_timbrado_ativo,
+      fundo_timbrado: r.fundo_timbrado ?? null,
+      fundo_timbrado_ativo:
+        r.fundo_timbrado_ativo ?? DEFAULTS.fundo_timbrado_ativo,
+      salario_minimo: r.salario_minimo ?? DEFAULTS.salario_minimo,
+    };
+  },
+  ["escritorio-config"],
+  { tags: ["escritorio-config"], revalidate: 300 }
+);
 
 /**
  * Aplica o toggle "identificacao_ativo" removendo nome/OAB/CNPJ/contato/

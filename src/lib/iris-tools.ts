@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { revalidateTag } from "next/cache";
 import sql from "./db";
 import { enviarMensagemDireta } from "./prevbot-outbound";
 import { getLancamentoKpis, getContasAReceber } from "./lancamentos-db";
@@ -1256,6 +1257,11 @@ async function executarFerramentaIrisInterno(
             mensagem: `Campo "${campo}" não permitido`,
           });
       }
+      // revalidateTag (não updateTag) porque isso roda a partir de uma
+      // Route Handler (/api/iris/chat), não de uma Server Action — updateTag
+      // só funciona dentro de Server Actions. { expire: 0 } expira na hora,
+      // sem janela de stale-while-revalidate.
+      revalidateTag("escritorio-config", { expire: 0 });
       return JSON.stringify({
         ok: true,
         mensagem: `${campo} atualizado para "${valor}"`,

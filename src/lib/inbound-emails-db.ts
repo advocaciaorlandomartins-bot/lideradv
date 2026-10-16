@@ -33,7 +33,15 @@ export interface InboundAttachment {
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
+// Sem essa guarda, setupInboundEmailTables() rodava 5 DDLs sequenciais
+// (CREATE TABLE/INDEX idempotentes) em TODA visita à ficha de cliente —
+// a tela mais acessada do sistema — mesmo as tabelas já existindo desde a
+// primeira execução. Mesmo padrão já usado em audit.ts (ensureTable):
+// só roda uma vez por instância do servidor.
+let ready = false;
+
 export async function setupInboundEmailTables() {
+  if (ready) return;
   await sql`
     CREATE TABLE IF NOT EXISTS inbound_email_addresses (
       id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,6 +81,7 @@ export async function setupInboundEmailTables() {
     ALTER TABLE inbound_emails
       ADD COLUMN IF NOT EXISTS ai_summary TEXT
   `;
+  ready = true;
 }
 
 // ── Address helpers ────────────────────────────────────────────────────────────

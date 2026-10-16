@@ -56,14 +56,31 @@ export default async function ColaboradorDetailPage({
   if (!session || !hasPermission(session, "colaboradores", "ver")) notFound();
 
   const { id } = await params;
-  const [colaborador, conta, estagioSnapshot, bonusStatus, cargaRaw] =
-    await Promise.all([
-      getColaboradorFull(id),
-      getColaboradorContaPagar(id),
-      getEstagioSnapshotByResponsavel(id),
-      getBonusMetaStatus(id),
-      getCargaColaboradores(id),
-    ]);
+  // getColaboradorIdForUser/podeAcessarColaborador só dependem de
+  // session/id, nunca do resultado de getColaboradorFull — rodavam em
+  // série DEPOIS desse primeiro batch sem necessidade (achado em
+  // auditoria de performance de 2026-10-15).
+  const [
+    colaborador,
+    conta,
+    estagioSnapshot,
+    bonusStatus,
+    cargaRaw,
+    meuColaboradorId,
+    podeVerArquivos,
+  ] = await Promise.all([
+    getColaboradorFull(id),
+    getColaboradorContaPagar(id),
+    getEstagioSnapshotByResponsavel(id),
+    getBonusMetaStatus(id),
+    getCargaColaboradores(id),
+    getColaboradorIdForUser(session.id),
+    // "Arquivos" (ex: contrato de parceria assinado) é área pessoal — quem
+    // tem só colaboradores:ver (a maioria dos cargos, por padrão) enxerga o
+    // perfil básico de qualquer colega, mas os documentos ficam restritos a
+    // quem administra colaboradores ou ao próprio dono do perfil.
+    podeAcessarColaborador(session, id),
+  ]);
   if (!colaborador) notFound();
 
   const temMetas =
@@ -79,18 +96,14 @@ export default async function ColaboradorDetailPage({
     "processos_ver_todos",
     "ver"
   );
-  const meuColaboradorId = await getColaboradorIdForUser(session.id);
   const carga = filtrarCargaPorPermissao(
     cargaRaw,
     podeVerDetalhesDeTodos,
     meuColaboradorId
   )[0];
 
-  // "Arquivos" (ex: contrato de parceria assinado) é área pessoal — quem
-  // tem só colaboradores:ver (a maioria dos cargos, por padrão) enxerga o
-  // perfil básico de qualquer colega, mas os documentos ficam restritos a
-  // quem administra colaboradores ou ao próprio dono do perfil.
-  const podeVerArquivos = await podeAcessarColaborador(session, id);
+  // Esse SIM depende do resultado acima (podeVerArquivos), não dá pra
+  // paralelizar com o primeiro batch.
   const documentos = podeVerArquivos
     ? await getDocumentosByEntityId("colaborador", id)
     : [];

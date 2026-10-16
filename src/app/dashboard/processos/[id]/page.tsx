@@ -44,6 +44,11 @@ export default async function ProcessoDetailPage({
 
   const { id } = await params;
 
+  // getColaboradorIdForUser/etiquetas/catalogoEtiquetas/pontosAtencao só
+  // dependem de `id`/`session.id`, nunca do resultado de getProcessoExtended
+  // — rodavam em série DEPOIS desse primeiro batch sem necessidade (achado
+  // em auditoria de performance de 2026-10-15). Juntar tudo num Promise.all
+  // só corta 3 idas-e-voltas seriais evitáveis nesta página.
   const [
     processo,
     historico,
@@ -53,6 +58,11 @@ export default async function ProcessoDetailPage({
     colaboradores,
     modelos,
     carga,
+    meuColaboradorId,
+    etiquetas,
+    etiquetasHerdadas,
+    catalogoEtiquetas,
+    pontosAtencaoRaw,
   ] = await Promise.all([
     getProcessoExtended(id),
     getHistoricoByProcesso(id),
@@ -62,13 +72,17 @@ export default async function ProcessoDetailPage({
     getColaboradoresAtivos(),
     getModelosAtivos(),
     getCargaColaboradores(),
+    getColaboradorIdForUser(session.id),
+    getEtiquetasDeProcesso(id),
+    getEtiquetasHerdadasDoCliente(id),
+    getCatalogoEtiquetas(),
+    listarPontosAtencao(id),
   ]);
 
   if (!processo) notFound();
 
   // Sem "processos_ver_todos": só pode abrir o processo se for o responsável.
   const verTodos = hasPermission(session, "processos_ver_todos", "ver");
-  const meuColaboradorId = await getColaboradorIdForUser(session.id);
   if (!verTodos) {
     if (!meuColaboradorId || processo.responsavel_id !== meuColaboradorId)
       notFound();
@@ -79,13 +93,9 @@ export default async function ProcessoDetailPage({
     meuColaboradorId
   );
 
-  const [etiquetas, etiquetasHerdadas, catalogoEtiquetas] = await Promise.all([
-    getEtiquetasDeProcesso(id),
-    getEtiquetasHerdadasDoCliente(id),
-    getCatalogoEtiquetas(),
-  ]);
-
-  // Carrega documentos do processo + documentos do cliente (enviados pela ficha do cliente)
+  // Carrega documentos do processo + documentos do cliente (enviados pela
+  // ficha do cliente) — esse batch SIM depende do resultado acima
+  // (processo.client_id), não dá pra paralelizar com o primeiro.
   const [docsProcesso, docsCliente, cids] = await Promise.all([
     getDocumentosByEntityId("processo", id),
     processo.client_id
@@ -97,9 +107,7 @@ export default async function ProcessoDetailPage({
   ]);
   const documentos = [...docsProcesso, ...docsCliente];
 
-  const pontosAtencao = (await listarPontosAtencao(id)).filter(
-    (p) => !p.resolvido
-  );
+  const pontosAtencao = pontosAtencaoRaw.filter((p) => !p.resolvido);
 
   return (
     <div className="space-y-5">

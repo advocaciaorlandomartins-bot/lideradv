@@ -328,24 +328,29 @@ export default async function DashboardPage() {
     "processos_ver_todos",
     "ver"
   );
-  const processosVisiveisCount = perm.processos
-    ? verTodosProcessos
-      ? (gerData?.counts.totalProcessos ?? 0)
-      : await getProcessosCount(
-          colaboradorId ?? "00000000-0000-0000-0000-000000000000"
-        )
-    : 0;
-
   // Mesmo raciocínio pro KPI de Clientes: gerData.counts.totalClientes é o
   // total do escritório inteiro, mas sem "clientes_ver_todos" a lista de
   // Clientes já mostra só os que têm processo com o colaborador como
   // responsável (ou sem processo nenhum ainda) — o card precisa bater.
   const verTodosClientes = hasPermission(session, "clientes_ver_todos", "ver");
-  const clientesVisiveisCount = perm.clientes
-    ? verTodosClientes
-      ? (gerData?.counts.totalClientes ?? 0)
-      : await getClientesCount(false, colaboradorId)
-    : 0;
+  // As duas contagens são independentes (tabelas diferentes, sem relação
+  // entre si) mas estavam em dois `await` sequenciais em vez de
+  // Promise.all — mesma classe de bug que motivou a auditoria de
+  // performance de 2026-10-15, só que fora de um array literal.
+  const [processosVisiveisCount, clientesVisiveisCount] = await Promise.all([
+    perm.processos
+      ? verTodosProcessos
+        ? Promise.resolve(gerData?.counts.totalProcessos ?? 0)
+        : getProcessosCount(
+            colaboradorId ?? "00000000-0000-0000-0000-000000000000"
+          )
+      : Promise.resolve(0),
+    perm.clientes
+      ? verTodosClientes
+        ? Promise.resolve(gerData?.counts.totalClientes ?? 0)
+        : getClientesCount(false, colaboradorId)
+      : Promise.resolve(0),
+  ]);
 
   const kpis = gerData?.kpis;
   const counts = gerData?.counts;

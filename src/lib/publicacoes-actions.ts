@@ -237,11 +237,8 @@ export async function verificarPublicacoesAction(): Promise<{
     FROM oabs_monitoradas WHERE ativa = true
   `;
 
-  const {
-    buscarPublicacoesPorOab,
-    buscarMovimentosPorProcesso,
-    buscarEArmazenarMovimentacoes,
-  } = await import("./datajud");
+  const { buscarPublicacoesPorOab, buscarMovimentosPorProcesso } =
+    await import("./datajud");
   const { buscarPublicacoesDjeEsaj } = await import("./dje-esaj");
 
   // 1. Busca por OAB no DataJud (limitado por LGPD — retorna 0 em quase todos tribunais)
@@ -295,16 +292,13 @@ export async function verificarPublicacoesAction(): Promise<{
         apiKey,
         30
       );
-      // Histórico processual completo (aba "Movimentações" do processo) —
-      // requisição própria ao DataJud, independente da busca de
-      // publicações acima.
-      await buscarEArmazenarMovimentacoes(
-        String(proc.id),
-        String(proc.numero),
-        apiKey
-      );
     }
   }
+  // Movimentações (histórico processual completo) sincronizam só no cron
+  // diário (api/cron/publicacoes), não aqui — esse botão é clicado na
+  // hora pelo usuário e precisa responder rápido; rodar o dobro de
+  // requisições ao DataJud aqui já estourou o timeout de 300s do Vercel
+  // em produção (2026-10-17, achado real pelo Orlando).
 
   // 4. TramitaSign login sync
   const { sincronizarTramitaSign, tramitaSyncAtivo } =

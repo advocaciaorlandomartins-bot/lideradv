@@ -130,6 +130,45 @@ function tribunalIndexDoCNJ(numero: string): string | null {
   return null;
 }
 
+// Uma única requisição ao DataJud por processo, compartilhada por
+// buscarMovimentosPorProcesso e sincronizarMovimentacoesEPublicacoes —
+// achado em produção 2026-10-17: ter duas funções fazendo fetch próprio
+// pro MESMO processo (uma pra publicações, outra pra movimentações)
+// dobrava o tempo do botão "Verificar publicações agora", que estourou o
+// timeout de 300s do Vercel com ~15-20 processos. Retorna null em
+// qualquer falha (número inválido, HTTP não-ok, processo não encontrado)
+// — quem chama trata como "nada pra processar", igual já fazia antes.
+async function buscarFonteProcessoDataJud(
+  numeroProcesso: string,
+  apiKey: string
+): Promise<{ tribunalIndex: string; src: DatajudProcesso } | null> {
+  const tribunalIndex = tribunalIndexDoCNJ(numeroProcesso);
+  if (!tribunalIndex) return null;
+
+  const numDigits = numeroProcesso.replace(/\D/g, "");
+
+  const res = await fetch(`${DATAJUD_BASE}/${tribunalIndex}/_search`, {
+    method: "POST",
+    headers: {
+      Authorization: `ApiKey ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: { term: { numeroProcesso: numDigits } },
+      size: 1,
+      _source: true,
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const src: DatajudProcesso = data?.hits?.hits?.[0]?._source;
+  if (!src) return null;
+
+  return { tribunalIndex, src };
+}
+
 export async function buscarMovimentosPorProcesso(
   processoDbId: string,
   numeroProcesso: string,
@@ -137,31 +176,10 @@ export async function buscarMovimentosPorProcesso(
   apiKey: string,
   diasAtras = 3
 ): Promise<number> {
-  const tribunalIndex = tribunalIndexDoCNJ(numeroProcesso);
-  if (!tribunalIndex) return 0;
-
-  const numDigits = numeroProcesso.replace(/\D/g, "");
-
   try {
-    const res = await fetch(`${DATAJUD_BASE}/${tribunalIndex}/_search`, {
-      method: "POST",
-      headers: {
-        Authorization: `ApiKey ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query: { term: { numeroProcesso: numDigits } },
-        size: 1,
-        _source: true,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!res.ok) return 0;
-
-    const data = await res.json();
-    const src: DatajudProcesso = data?.hits?.hits?.[0]?._source;
-    if (!src) return 0;
+    const fonte = await buscarFonteProcessoDataJud(numeroProcesso, apiKey);
+    if (!fonte) return 0;
+    const { tribunalIndex, src } = fonte;
 
     const tribunalNome =
       src.tribunal ??
@@ -240,73 +258,144 @@ export async function buscarMovimentosPorProcesso(
 }
 
 /**
- * Busca TODOS os movimentos processuais do DataJud (não só os que parecem
- * publicação — ver CODIGOS_PUBLICACAO acima) e guarda em `movimentacoes`,
- * pra alimentar a aba de histórico processual do processo. Faz uma
- * requisição PRÓPRIA ao DataJud (mesmo endpoint de
- * buscarMovimentosPorProcesso) em vez de reaproveitar o resultado daquela
- * — deliberado: mantém as duas funções independentes, então um erro aqui
- * nunca quebra a captura de publicações (que já está em produção e
- * funcionando) e vice-versa. Sem filtro de data: a API já devolve o
- * histórico processual inteiro no array `movimentos`, e a deduplicação
- * (índice único em movimentacoes) garante que reexecuções não dupliquem.
+ * Guarda em `movimentacoes` TODOS os movimentos processuais retornados por
+ * uma fonte do DataJud já buscada (`fonte`) — não faz fetch nenhum, só
+ * processa o que já veio. Separado de buscarMovimentosPorProcesso (que só
+ * guarda os que parecem publicação, ver CODIGOS_PUBLICACAO) porque a
+ * história completa do processo é um dado diferente, pra outra tela
+ * (timeline do processo) — mas reaproveita a MESMA requisição ao DataJud,
+ * nunca faz uma segunda. Sem filtro de data: a dedupe (índice único em
+ * movimentacoes) garante que reexecuções não dupliquem.
  */
-export async function buscarEArmazenarMovimentacoes(
+async function armazenarMovimentacoesDaFonte(
+  processoDbId: string,
+  fonte: { tribunalIndex: string; src: DatajudProcesso }
+): Promise<number> {
+  const { src } = fonte;
+  if (!src.movimentos || src.movimentos.length === 0) return 0;
+
+  const itens = src.movimentos
+    .filter((m) => m.dataHora)
+    .map((m) => {
+      const partes = [
+        ...(m.complementos ?? []),
+        ...(m.complementosTabelados ?? []),
+      ];
+      return {
+        codigo: m.codigo ?? null,
+        nome: m.nome || "Movimentação",
+        dataHora: m.dataHora,
+        grau: src.grau ?? null,
+        complementos:
+          partes.length > 0
+            ? partes.map((c) => `${c.descricao}: ${c.valor}`).join("; ")
+            : null,
+      };
+    });
+
+  return inserirMovimentacoes(processoDbId, itens);
+}
+
+/**
+ * Sincroniza publicações E movimentações de UM processo numa ÚNICA
+ * requisição ao DataJud — pedido pelo Orlando depois de um timeout real em
+ * produção (2026-10-17): chamar buscarMovimentosPorProcesso E uma busca de
+ * movimentações separada, cada uma com seu próprio fetch, dobrava o tempo
+ * do cron/verificação pra cada processo monitorado e estourou o limite de
+ * 300s do Vercel com a carga atual de processos. Usado só pelo cron diário
+ * (não pelo botão manual "Verificar publicações agora", que precisa
+ * continuar rápido pra quem está esperando na tela).
+ */
+export async function sincronizarMovimentacoesEPublicacoes(
   processoDbId: string,
   numeroProcesso: string,
-  apiKey: string
-): Promise<number> {
-  const tribunalIndex = tribunalIndexDoCNJ(numeroProcesso);
-  if (!tribunalIndex) return 0;
-
-  const numDigits = numeroProcesso.replace(/\D/g, "");
-
+  clienteNome: string | null,
+  apiKey: string,
+  diasAtras = 3
+): Promise<{ publicacoesInseridas: number; movimentacoesInseridas: number }> {
   try {
-    const res = await fetch(`${DATAJUD_BASE}/${tribunalIndex}/_search`, {
-      method: "POST",
-      headers: {
-        Authorization: `ApiKey ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query: { term: { numeroProcesso: numDigits } },
-        size: 1,
-        _source: true,
-      }),
-      signal: AbortSignal.timeout(15000),
+    const fonte = await buscarFonteProcessoDataJud(numeroProcesso, apiKey);
+    if (!fonte) return { publicacoesInseridas: 0, movimentacoesInseridas: 0 };
+    const { tribunalIndex, src } = fonte;
+
+    const tribunalNome =
+      src.tribunal ??
+      tribunalIndex
+        .replace("api_publica_", "")
+        .toUpperCase()
+        .replace(/^TJ([A-Z]+)$/, "TJ-$1")
+        .replace(/^TRT(\d+)$/, "TRT $1ª Região");
+    const orgao = src.orgaoJulgador?.nome ?? "—";
+
+    const limite = new Date();
+    limite.setDate(limite.getDate() - diasAtras);
+
+    const movimentosRecentes = (src.movimentos ?? []).filter((m) => {
+      if (!CODIGOS_PUBLICACAO.has(m.codigo)) return false;
+      try {
+        return new Date(m.dataHora) >= limite;
+      } catch {
+        return false;
+      }
     });
-    if (!res.ok) return 0;
 
-    const data = await res.json();
-    const src: DatajudProcesso = data?.hits?.hits?.[0]?._source;
-    if (!src || !src.movimentos || src.movimentos.length === 0) return 0;
+    let publicacoesInseridas = 0;
+    for (const mov of movimentosRecentes.slice(0, 10)) {
+      const tipo = mov.nome || "Publicação";
+      const disponibilizacao = new Date(mov.dataHora)
+        .toISOString()
+        .slice(0, 10);
 
-    const itens = src.movimentos
-      .filter((m) => m.dataHora)
-      .map((m) => {
-        const partes = [
-          ...(m.complementos ?? []),
-          ...(m.complementosTabelados ?? []),
-        ];
-        return {
-          codigo: m.codigo ?? null,
-          nome: m.nome || "Movimentação",
-          dataHora: m.dataHora,
-          grau: src.grau ?? null,
-          complementos:
-            partes.length > 0
-              ? partes.map((c) => `${c.descricao}: ${c.valor}`).join("; ")
-              : null,
-        };
-      });
+      const partes = [
+        ...(mov.complementos ?? []),
+        ...(mov.complementosTabelados ?? []),
+      ];
+      const conteudo =
+        partes.length > 0
+          ? partes.map((c) => `${c.descricao}: ${c.valor}`).join("; ")
+          : null;
 
-    return await inserirMovimentacoes(processoDbId, itens);
+      const existe = await sql`
+        SELECT 1 FROM publicacoes
+        WHERE processo = ${numeroProcesso}
+          AND tipo = ${tipo}
+          AND disponibilizacao = ${disponibilizacao}::date
+        LIMIT 1
+      `;
+      if (existe.length > 0) continue;
+
+      await sql`
+        INSERT INTO publicacoes
+          (processo, tipo, destinatario, advogados, orgao, tribunal,
+           disponibilizacao, status, origem, conteudo)
+        VALUES (
+          ${numeroProcesso},
+          ${tipo},
+          ${clienteNome},
+          ${[]},
+          ${orgao},
+          ${tribunalNome},
+          ${disponibilizacao}::date,
+          'nao_lida',
+          'automatica',
+          ${conteudo}
+        )
+      `;
+      publicacoesInseridas++;
+    }
+
+    const movimentacoesInseridas = await armazenarMovimentacoesDaFonte(
+      processoDbId,
+      fonte
+    );
+
+    return { publicacoesInseridas, movimentacoesInseridas };
   } catch (err) {
     console.error(
-      `Erro DataJud (buscarEArmazenarMovimentacoes) ${numeroProcesso}:`,
+      `Erro DataJud (sincronizarMovimentacoesEPublicacoes) ${numeroProcesso}:`,
       err
     );
-    return 0;
+    return { publicacoesInseridas: 0, movimentacoesInseridas: 0 };
   }
 }
 

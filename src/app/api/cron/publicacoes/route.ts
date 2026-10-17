@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 import {
   buscarPublicacoesPorOab,
-  buscarMovimentosPorProcesso,
-  buscarEArmazenarMovimentacoes,
+  sincronizarMovimentacoesEPublicacoes,
 } from "@/lib/datajud";
 import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
 import { sincronizarTramitaSign } from "@/lib/tramitasign-sync";
@@ -121,25 +120,26 @@ export async function GET(request: Request) {
 
   if (apiKey) {
     for (const proc of processos) {
-      const inseridos = await buscarMovimentosPorProcesso(
-        String(proc.id),
-        String(proc.numero),
-        proc.cliente_nome ? String(proc.cliente_nome) : null,
-        apiKey,
-        diasAtras
-      );
-      processoInseridos += inseridos;
-      if (inseridos > 0)
-        processosResultados.push({ numero: String(proc.numero), inseridos });
-
-      // Histórico processual completo (aba "Movimentações" do processo) —
-      // requisição própria ao DataJud, independente da busca de
-      // publicações acima (ver comentário em buscarEArmazenarMovimentacoes).
-      movimentacoesInseridas += await buscarEArmazenarMovimentacoes(
-        String(proc.id),
-        String(proc.numero),
-        apiKey
-      );
+      // Publicações + movimentações (histórico processual, aba
+      // "Movimentações" do processo) numa ÚNICA requisição ao DataJud por
+      // processo — duas requisições separadas aqui dobrava o tempo total
+      // do cron e estourou o timeout de 300s do Vercel em produção
+      // (2026-10-17).
+      const { publicacoesInseridas, movimentacoesInseridas: movsProc } =
+        await sincronizarMovimentacoesEPublicacoes(
+          String(proc.id),
+          String(proc.numero),
+          proc.cliente_nome ? String(proc.cliente_nome) : null,
+          apiKey,
+          diasAtras
+        );
+      processoInseridos += publicacoesInseridas;
+      if (publicacoesInseridas > 0)
+        processosResultados.push({
+          numero: String(proc.numero),
+          inseridos: publicacoesInseridas,
+        });
+      movimentacoesInseridas += movsProc;
     }
   }
 

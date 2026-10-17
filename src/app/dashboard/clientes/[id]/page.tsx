@@ -245,7 +245,9 @@ export default async function ClienteDetailPage({
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Actions — exclusão fica só na Zona de risco lá embaixo; não
+              deixa uma ação destrutiva solta ao lado de ações rotineiras
+              aqui em cima. */}
           <div className="flex flex-wrap gap-2">
             <AgendarVideochamadaButton
               clienteId={client.id}
@@ -253,11 +255,10 @@ export default async function ClienteDetailPage({
             />
             <Link
               href={`/dashboard/clientes/${client.id}/editar`}
-              className="flex h-9 items-center rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
+              className="flex h-9 items-center whitespace-nowrap rounded-lg border border-border px-4 font-body text-sm font-semibold text-fg transition-colors hover:border-primary hover:text-primary"
             >
               Editar cadastro
             </Link>
-            <DeleteClientButton id={client.id} />
           </div>
         </div>
       </div>

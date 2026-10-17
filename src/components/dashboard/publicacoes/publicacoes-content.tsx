@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Publicacao, OabMonitorada } from "@/lib/publicacoes-db";
@@ -372,6 +372,138 @@ function ListaPublicacoes({
   );
 }
 
+// ── Painel (mestre-detalhe) ──────────────────────────────────────────────────
+// Segunda visão da lista, pedido do Orlando depois de comparar com o
+// TramitaSign: lista compacta à esquerda, detalhe à direita (como um
+// cliente de e-mail), com atalhos de teclado j/k pra navegar sem tirar a
+// mão do teclado — útil pra quem trata muita publicação de uma vez. O
+// "detalhe" reaproveita o PublicacaoCard que a Lista já usa, só que
+// mostrando uma publicação por vez em destaque, em vez de duplicar o
+// card inteiro de novo.
+
+function PainelPublicacoes({
+  publicacoes,
+  emptyMsg,
+}: {
+  publicacoes: Publicacao[];
+  emptyMsg: string;
+}) {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  // Deriva o índice/seleção efetivos direto na renderização, em vez de um
+  // efeito que chama setState — quando a lista filtrada muda (ex: tratar a
+  // publicação selecionada faz ela sumir da aba "Não lidas") e o
+  // selectedId salvo não existe mais na lista atual, cai pro primeiro item
+  // automaticamente, sem round-trip de re-render.
+  const selectedIndexRaw = publicacoes.findIndex((p) => p.id === selectedId);
+  const selectedIndex =
+    selectedIndexRaw >= 0 ? selectedIndexRaw : publicacoes.length > 0 ? 0 : -1;
+  const selected = selectedIndex >= 0 ? publicacoes[selectedIndex] : null;
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+      if (publicacoes.length === 0) return;
+      if (e.key === "j") {
+        e.preventDefault();
+        const next = Math.min(
+          selectedIndex < 0 ? 0 : selectedIndex + 1,
+          publicacoes.length - 1
+        );
+        setSelectedId(publicacoes[next].id);
+      } else if (e.key === "k") {
+        e.preventDefault();
+        const prev = Math.max(selectedIndex - 1, 0);
+        setSelectedId(publicacoes[prev].id);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [publicacoes, selectedIndex]);
+
+  if (publicacoes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
+        <span className="text-4xl">📭</span>
+        <p className="font-body text-sm font-semibold text-muted">{emptyMsg}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-[320px_1fr]">
+      <div className="max-h-[70vh] space-y-1 overflow-y-auto rounded-xl border border-border bg-white p-2">
+        <p className="flex items-center gap-1 px-2 pb-1.5 font-body text-[11px] font-semibold uppercase tracking-wide text-muted">
+          <kbd className="rounded border border-border bg-slate-50 px-1 font-mono text-[10px]">
+            j
+          </kbd>
+          <kbd className="rounded border border-border bg-slate-50 px-1 font-mono text-[10px]">
+            k
+          </kbd>
+          navegar
+        </p>
+        {publicacoes.map((p) => {
+          const ativo = p.id === selectedId;
+          return (
+            <button
+              key={p.id}
+              onClick={() => setSelectedId(p.id)}
+              className={`block w-full cursor-pointer rounded-lg border-l-4 px-2.5 py-2 text-left transition-colors ${
+                ativo
+                  ? "border-primary bg-primary/5"
+                  : "border-transparent hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-body text-xs font-semibold text-fg">
+                  {p.tribunal || p.tipo}
+                </span>
+                <span className="flex-shrink-0 font-body text-[10px] text-muted">
+                  {p.disponibilizacao}
+                </span>
+              </div>
+              <p className="truncate font-mono text-[11px] text-muted">
+                {p.processo}
+              </p>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                {p.status === "nao_lida" && (
+                  <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />
+                )}
+                {p.clienteNome && (
+                  <span className="truncate font-body text-[10px] text-violet-700">
+                    {p.clienteNome}
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div>
+        {selected ? (
+          <PublicacaoCard key={selected.id} pub={selected} />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-16 text-center">
+            <p className="font-body text-sm text-muted">
+              Selecione uma publicação — use{" "}
+              <kbd className="rounded border border-border bg-slate-50 px-1 font-mono text-xs">
+                j
+              </kbd>{" "}
+              e{" "}
+              <kbd className="rounded border border-border bg-slate-50 px-1 font-mono text-xs">
+                k
+              </kbd>{" "}
+              para navegar
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Tab: Automática ───────────────────────────────────────────────────────────
 
 function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
@@ -382,6 +514,9 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
   // livre, nem eles têm os dois juntos (só tribunal, não tipo).
   const [tribunalFiltro, setTribunalFiltro] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState("");
+  // Segunda visão da lista (painel mestre-detalhe com atalhos j/k) — ver
+  // PainelPublicacoes acima.
+  const [viewMode, setViewMode] = useState<"lista" | "painel">("lista");
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -539,6 +674,22 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
             Limpar filtros
           </button>
         )}
+
+        {/* Lista (cartões, um por vez) × Painel (mestre-detalhe com j/k) */}
+        <div className="ml-auto flex gap-0.5 rounded-lg border border-border bg-slate-50 p-0.5">
+          <button
+            onClick={() => setViewMode("lista")}
+            className={`cursor-pointer rounded-md px-2.5 py-1 font-body text-xs font-semibold transition-colors ${viewMode === "lista" ? "bg-white text-fg shadow-sm" : "text-muted hover:text-fg"}`}
+          >
+            Lista
+          </button>
+          <button
+            onClick={() => setViewMode("painel")}
+            className={`cursor-pointer rounded-md px-2.5 py-1 font-body text-xs font-semibold transition-colors ${viewMode === "painel" ? "bg-white text-fg shadow-sm" : "text-muted hover:text-fg"}`}
+          >
+            Painel
+          </button>
+        </div>
       </div>
 
       <p className="font-body text-xs text-muted">
@@ -547,14 +698,25 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
         {exibindo.length > 0 ? `1 a ${exibindo.length}` : "0"}
       </p>
 
-      <ListaPublicacoes
-        publicacoes={exibindo}
-        emptyMsg={
-          statusFilter === "nao_lida"
-            ? "Nenhuma publicação não lida."
-            : "Nenhuma publicação tratada ainda."
-        }
-      />
+      {viewMode === "painel" ? (
+        <PainelPublicacoes
+          publicacoes={exibindo}
+          emptyMsg={
+            statusFilter === "nao_lida"
+              ? "Nenhuma publicação não lida."
+              : "Nenhuma publicação tratada ainda."
+          }
+        />
+      ) : (
+        <ListaPublicacoes
+          publicacoes={exibindo}
+          emptyMsg={
+            statusFilter === "nao_lida"
+              ? "Nenhuma publicação não lida."
+              : "Nenhuma publicação tratada ainda."
+          }
+        />
+      )}
     </div>
   );
 }

@@ -192,6 +192,12 @@ export async function GET() {
   );
 
   await run(
+    "ia_peticoes.created_by",
+    () =>
+      sql`ALTER TABLE ia_peticoes ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES usuarios(id) ON DELETE SET NULL`
+  );
+
+  await run(
     "testes_comportamentais",
     () => sql`
       CREATE TABLE IF NOT EXISTS testes_comportamentais (

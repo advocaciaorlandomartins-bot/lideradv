@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
   const [row] = await sql`
     INSERT INTO ia_peticoes
-      (area, tipo_peticao, titulo, texto, resumo, aprovada, processo_id, cliente_id)
+      (area, tipo_peticao, titulo, texto, resumo, aprovada, processo_id, cliente_id, created_by)
     VALUES (
       ${body.area},
       ${body.tipoPeticao},
@@ -80,7 +80,8 @@ export async function POST(request: Request) {
       ${resumo},
       FALSE,
       ${body.processoId ?? null}::uuid,
-      ${body.clienteId ?? null}::uuid
+      ${body.clienteId ?? null}::uuid,
+      ${session.id}::uuid
     )
     RETURNING id::text, titulo, created_at
   `;

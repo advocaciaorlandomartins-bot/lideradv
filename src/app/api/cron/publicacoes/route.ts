@@ -3,6 +3,7 @@ import sql from "@/lib/db";
 import {
   buscarPublicacoesPorOab,
   buscarMovimentosPorProcesso,
+  buscarEArmazenarMovimentacoes,
 } from "@/lib/datajud";
 import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
 import { sincronizarTramitaSign } from "@/lib/tramitasign-sync";
@@ -115,6 +116,7 @@ export async function GET(request: Request) {
     : [];
 
   let processoInseridos = 0;
+  let movimentacoesInseridas = 0;
   const processosResultados: { numero: string; inseridos: number }[] = [];
 
   if (apiKey) {
@@ -129,6 +131,15 @@ export async function GET(request: Request) {
       processoInseridos += inseridos;
       if (inseridos > 0)
         processosResultados.push({ numero: String(proc.numero), inseridos });
+
+      // Histórico processual completo (aba "Movimentações" do processo) —
+      // requisição própria ao DataJud, independente da busca de
+      // publicações acima (ver comentário em buscarEArmazenarMovimentacoes).
+      movimentacoesInseridas += await buscarEArmazenarMovimentacoes(
+        String(proc.id),
+        String(proc.numero),
+        apiKey
+      );
     }
   }
 
@@ -236,6 +247,7 @@ export async function GET(request: Request) {
       por_oab: resultados,
       por_processo: processosResultados,
       processos_monitorados: processos.length,
+      movimentacoes_inseridas: movimentacoesInseridas,
       djen: { inseridos: djenInseridos },
       tramitasign: {
         metodo: tramitaResult.metodo ?? "nenhum",

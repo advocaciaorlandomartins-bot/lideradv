@@ -18,6 +18,8 @@ import type {
 import type { ModeloDocumento } from "@/lib/modelos-db";
 import type { Documento } from "@/lib/documents-db";
 import type { ClienteCid } from "@/lib/clients-db";
+import type { Movimentacao } from "@/lib/movimentacoes-db";
+import type { Publicacao } from "@/lib/publicacoes-db";
 import {
   updateRelatoAction,
   updateResponsavelAction,
@@ -73,6 +75,7 @@ import {
   KanbanIcon,
   ArchiveBoxIcon,
   ActivityIcon,
+  ChevronDownIcon,
 } from "@/components/icons";
 import { descreverCid } from "@/lib/cid-map";
 import { checklistStatus } from "@/lib/checklist-types";
@@ -92,6 +95,8 @@ interface Props {
   modelos: ModeloDocumento[];
   documentos: Documento[];
   cids: ClienteCid[];
+  movimentacoes?: Movimentacao[];
+  publicacoesDoProcesso?: Publicacao[];
   sessionNome?: string;
   podeAlterarResponsavel?: boolean;
   podeVerFinanceiro?: boolean;
@@ -1295,6 +1300,153 @@ function ResumoIaTab({ processoId }: { processoId: string }) {
   );
 }
 
+// ── Movimentações judiciais (DataJud) — pedido do Orlando após comparar
+// com o painel do TramitaSign: histórico processual (distribuição,
+// decisões, petições, atos ordinatórios...) separado das publicações
+// (que têm prazo) e dos registros internos (que o escritório edita).
+// Read-only — não tem editar/excluir porque vem direto do tribunal. ───
+
+function MovimentacoesSection({
+  movimentacoes,
+}: {
+  movimentacoes: Movimentacao[];
+}) {
+  const [expanded, setExpanded] = useState(movimentacoes.length > 0);
+
+  if (movimentacoes.length === 0) return null;
+
+  // Agrupa por dia — já vem ordenado por data_hora DESC do banco.
+  const grupos = new Map<string, Movimentacao[]>();
+  for (const m of movimentacoes) {
+    const dia = new Date(m.dataHora).toLocaleDateString("pt-BR");
+    const lista = grupos.get(dia) ?? [];
+    lista.push(m);
+    grupos.set(dia, lista);
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left"
+      >
+        <ActivityIcon className="h-4 w-4 text-muted" />
+        <span className="font-heading text-sm font-semibold text-fg">
+          Movimentações judiciais
+        </span>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-body text-[11px] font-bold text-slate-600">
+          {movimentacoes.length}
+        </span>
+        <span className="ml-auto font-body text-[10px] text-muted">
+          via DataJud/CNJ
+        </span>
+        <ChevronDownIcon
+          className={`h-4 w-4 text-muted transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+      {expanded && (
+        <div className="max-h-96 space-y-4 overflow-y-auto border-t border-border px-4 py-3">
+          {Array.from(grupos.entries()).map(([dia, itens]) => (
+            <div key={dia}>
+              <p className="mb-1.5 font-body text-[11px] font-bold uppercase tracking-wide text-muted">
+                {dia}
+              </p>
+              <div className="space-y-1.5">
+                {itens.map((m) => (
+                  <div
+                    key={m.id}
+                    className="rounded-lg border border-border/60 bg-slate-50/50 px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-body text-[11px] text-muted">
+                        {new Date(m.dataHora).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {m.grau && (
+                        <span className="rounded bg-slate-200 px-1.5 py-0.5 font-body text-[10px] font-semibold text-slate-600">
+                          {m.grau}
+                        </span>
+                      )}
+                      <span className="font-body text-sm font-medium text-fg">
+                        {m.nome}
+                      </span>
+                    </div>
+                    {m.complementos && (
+                      <p className="mt-0.5 font-body text-xs text-muted">
+                        {m.complementos}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Publicações deste processo ──────────────────────────────────
+// Lista compacta das publicações já vinculadas a este processo — antes só
+// davam pra ver indo até a tela de Publicações e filtrando manualmente.
+
+function PublicacoesDoProcessoSection({
+  publicacoes,
+}: {
+  publicacoes: Publicacao[];
+}) {
+  const [expanded, setExpanded] = useState(publicacoes.length > 0);
+
+  if (publicacoes.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left"
+      >
+        <DocumentTextIcon className="h-4 w-4 text-muted" />
+        <span className="font-heading text-sm font-semibold text-fg">
+          Publicações deste processo
+        </span>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-body text-[11px] font-bold text-slate-600">
+          {publicacoes.length}
+        </span>
+        <ChevronDownIcon
+          className={`ml-auto h-4 w-4 text-muted transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+      {expanded && (
+        <div className="divide-y divide-border border-t border-border">
+          {publicacoes.map((p) => (
+            <Link
+              key={p.id}
+              href={`/dashboard/publicacoes/${p.id}`}
+              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50"
+            >
+              <span
+                className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${p.status === "nao_lida" ? "bg-amber-500" : "bg-emerald-500"}`}
+              />
+              <span className="min-w-0 flex-1 truncate font-body text-sm text-fg">
+                {p.tipo}
+              </span>
+              <span className="flex-shrink-0 font-body text-xs text-muted">
+                {p.disponibilizacao}
+              </span>
+              <ChevronRightIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted" />
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Linha do Tempo Tab ─────────────────────────────────────────
 
 const TIPO_REGISTRO_CORES: Record<string, string> = {
@@ -1307,10 +1459,14 @@ function LinhaDoTempoTab({
   registros,
   processo,
   onNovoRegistro,
+  movimentacoes,
+  publicacoesDoProcesso,
 }: {
   registros: HistoricoRegistro[];
   processo: ProcessoExtended;
   onNovoRegistro: () => void;
+  movimentacoes: Movimentacao[];
+  publicacoesDoProcesso: Publicacao[];
 }) {
   const [filtroTipo, setFiltroTipo] = useState<string>("Todos");
   const [, startTransition] = useTransition();
@@ -1335,6 +1491,9 @@ function LinhaDoTempoTab({
 
   return (
     <div className="space-y-4">
+      <MovimentacoesSection movimentacoes={movimentacoes} />
+      <PublicacoesDoProcessoSection publicacoes={publicacoesDoProcesso} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2 flex-wrap">
           {["Todos", "Demanda", "Cliente", "Registro de Atividades"].map(
@@ -3127,6 +3286,8 @@ export default function ProcessoDetailClient({
   modelos,
   documentos,
   cids,
+  movimentacoes = [],
+  publicacoesDoProcesso = [],
   sessionNome,
   podeAlterarResponsavel,
   podeVerFinanceiro,
@@ -3393,6 +3554,8 @@ export default function ProcessoDetailClient({
             registros={historico}
             processo={processo}
             onNovoRegistro={() => setNovoRegistroOpen(true)}
+            movimentacoes={movimentacoes}
+            publicacoesDoProcesso={publicacoesDoProcesso}
           />
         )}
       </div>

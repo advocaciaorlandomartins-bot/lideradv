@@ -73,6 +73,36 @@ export async function getAllPublicacoes(): Promise<Publicacao[]> {
   return rows.map(mapPublicacao);
 }
 
+/**
+ * Publicações de UM processo específico — usado na timeline do processo
+ * (pedido do Orlando após comparar com o TramitaSign, que mostra
+ * publicações+movimentações juntas na ficha do processo). Casa tanto por
+ * processo_id (vínculo já resolvido) quanto por número CNJ em texto
+ * (publicações antigas/capturadas antes do vínculo existir).
+ */
+export async function getPublicacoesByProcesso(
+  processoId: string,
+  numeroProcesso: string | null
+): Promise<Publicacao[]> {
+  const rows = await sql`
+    SELECT
+      pub.id, pub.processo, pub.tipo, pub.destinatario, pub.advogados,
+      pub.orgao, pub.tribunal,
+      TO_CHAR(pub.disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
+      pub.status, pub.origem, pub.conteudo, pub.resumo_ia,
+      pub.created_at::text,
+      pub.processo_id::text, p.client_id::text AS cliente_id,
+      cl.name AS cliente_nome
+    FROM publicacoes pub
+    LEFT JOIN processos p ON p.id = pub.processo_id
+    LEFT JOIN clients cl ON cl.id = p.client_id
+    WHERE pub.processo_id = ${processoId}::uuid
+       OR (${numeroProcesso}::text IS NOT NULL AND pub.processo = ${numeroProcesso})
+    ORDER BY pub.disponibilizacao DESC, pub.id DESC
+  `;
+  return rows.map(mapPublicacao);
+}
+
 export async function getPublicacaoById(
   id: number
 ): Promise<Publicacao | null> {

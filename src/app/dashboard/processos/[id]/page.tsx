@@ -15,6 +15,8 @@ import {
 } from "@/lib/processo-full-db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
 import { getCidsByCliente } from "@/lib/clients-db";
+import { getPublicacoesByProcesso } from "@/lib/publicacoes-db";
+import { getMovimentacoesByProcesso } from "@/lib/movimentacoes-db";
 import { getModelosAtivos } from "@/lib/modelos-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import {
@@ -63,6 +65,7 @@ export default async function ProcessoDetailPage({
     etiquetasHerdadas,
     catalogoEtiquetas,
     pontosAtencaoRaw,
+    movimentacoes,
   ] = await Promise.all([
     getProcessoExtended(id),
     getHistoricoByProcesso(id),
@@ -77,6 +80,7 @@ export default async function ProcessoDetailPage({
     getEtiquetasHerdadasDoCliente(id),
     getCatalogoEtiquetas(),
     listarPontosAtencao(id),
+    getMovimentacoesByProcesso(id),
   ]);
 
   if (!processo) notFound();
@@ -96,15 +100,17 @@ export default async function ProcessoDetailPage({
   // Carrega documentos do processo + documentos do cliente (enviados pela
   // ficha do cliente) — esse batch SIM depende do resultado acima
   // (processo.client_id), não dá pra paralelizar com o primeiro.
-  const [docsProcesso, docsCliente, cids] = await Promise.all([
-    getDocumentosByEntityId("processo", id),
-    processo.client_id
-      ? getDocumentosByEntityId("cliente", processo.client_id)
-      : Promise.resolve([]),
-    processo.client_id
-      ? getCidsByCliente(processo.client_id)
-      : Promise.resolve([]),
-  ]);
+  const [docsProcesso, docsCliente, cids, publicacoesDoProcesso] =
+    await Promise.all([
+      getDocumentosByEntityId("processo", id),
+      processo.client_id
+        ? getDocumentosByEntityId("cliente", processo.client_id)
+        : Promise.resolve([]),
+      processo.client_id
+        ? getCidsByCliente(processo.client_id)
+        : Promise.resolve([]),
+      getPublicacoesByProcesso(id, processo.numero ?? null),
+    ]);
   const documentos = [...docsProcesso, ...docsCliente];
 
   const pontosAtencao = pontosAtencaoRaw.filter((p) => !p.resolvido);
@@ -148,6 +154,8 @@ export default async function ProcessoDetailPage({
         modelos={modelos}
         documentos={documentos}
         cids={cids}
+        movimentacoes={movimentacoes}
+        publicacoesDoProcesso={publicacoesDoProcesso}
         sessionNome={session.nome}
         podeAlterarResponsavel={hasPermission(
           session,

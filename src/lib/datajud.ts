@@ -5,6 +5,7 @@
  */
 
 import sql from "./db";
+import { inserirMovimentacoes } from "./movimentacoes-db";
 
 const DATAJUD_BASE = "https://api-publica.datajud.cnj.jus.br";
 
@@ -234,6 +235,77 @@ export async function buscarMovimentosPorProcesso(
     return inseridos;
   } catch (err) {
     console.error(`Erro DataJud processo ${numeroProcesso}:`, err);
+    return 0;
+  }
+}
+
+/**
+ * Busca TODOS os movimentos processuais do DataJud (não só os que parecem
+ * publicação — ver CODIGOS_PUBLICACAO acima) e guarda em `movimentacoes`,
+ * pra alimentar a aba de histórico processual do processo. Faz uma
+ * requisição PRÓPRIA ao DataJud (mesmo endpoint de
+ * buscarMovimentosPorProcesso) em vez de reaproveitar o resultado daquela
+ * — deliberado: mantém as duas funções independentes, então um erro aqui
+ * nunca quebra a captura de publicações (que já está em produção e
+ * funcionando) e vice-versa. Sem filtro de data: a API já devolve o
+ * histórico processual inteiro no array `movimentos`, e a deduplicação
+ * (índice único em movimentacoes) garante que reexecuções não dupliquem.
+ */
+export async function buscarEArmazenarMovimentacoes(
+  processoDbId: string,
+  numeroProcesso: string,
+  apiKey: string
+): Promise<number> {
+  const tribunalIndex = tribunalIndexDoCNJ(numeroProcesso);
+  if (!tribunalIndex) return 0;
+
+  const numDigits = numeroProcesso.replace(/\D/g, "");
+
+  try {
+    const res = await fetch(`${DATAJUD_BASE}/${tribunalIndex}/_search`, {
+      method: "POST",
+      headers: {
+        Authorization: `ApiKey ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: { term: { numeroProcesso: numDigits } },
+        size: 1,
+        _source: true,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return 0;
+
+    const data = await res.json();
+    const src: DatajudProcesso = data?.hits?.hits?.[0]?._source;
+    if (!src || !src.movimentos || src.movimentos.length === 0) return 0;
+
+    const itens = src.movimentos
+      .filter((m) => m.dataHora)
+      .map((m) => {
+        const partes = [
+          ...(m.complementos ?? []),
+          ...(m.complementosTabelados ?? []),
+        ];
+        return {
+          codigo: m.codigo ?? null,
+          nome: m.nome || "Movimentação",
+          dataHora: m.dataHora,
+          grau: src.grau ?? null,
+          complementos:
+            partes.length > 0
+              ? partes.map((c) => `${c.descricao}: ${c.valor}`).join("; ")
+              : null,
+        };
+      });
+
+    return await inserirMovimentacoes(processoDbId, itens);
+  } catch (err) {
+    console.error(
+      `Erro DataJud (buscarEArmazenarMovimentacoes) ${numeroProcesso}:`,
+      err
+    );
     return 0;
   }
 }

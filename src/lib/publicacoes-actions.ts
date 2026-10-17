@@ -237,8 +237,11 @@ export async function verificarPublicacoesAction(): Promise<{
     FROM oabs_monitoradas WHERE ativa = true
   `;
 
-  const { buscarPublicacoesPorOab, buscarMovimentosPorProcesso } =
-    await import("./datajud");
+  const {
+    buscarPublicacoesPorOab,
+    buscarMovimentosPorProcesso,
+    buscarEArmazenarMovimentacoes,
+  } = await import("./datajud");
   const { buscarPublicacoesDjeEsaj } = await import("./dje-esaj");
 
   // 1. Busca por OAB no DataJud (limitado por LGPD — retorna 0 em quase todos tribunais)
@@ -291,6 +294,14 @@ export async function verificarPublicacoesAction(): Promise<{
         proc.cliente_nome ? String(proc.cliente_nome) : null,
         apiKey,
         30
+      );
+      // Histórico processual completo (aba "Movimentações" do processo) —
+      // requisição própria ao DataJud, independente da busca de
+      // publicações acima.
+      await buscarEArmazenarMovimentacoes(
+        String(proc.id),
+        String(proc.numero),
+        apiKey
       );
     }
   }

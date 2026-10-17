@@ -365,3 +365,44 @@ export async function getProcessosByClientId(
   `;
   return rows.map(mapRow);
 }
+
+export interface ContadoresAtividadesPrazo {
+  atrasadas: number;
+  hoje: number;
+  amanha: number;
+  futuras: number;
+  semData: number;
+}
+
+/**
+ * Tarefas abertas (não concluídas/canceladas) dos processos visíveis ao
+ * usuário, agrupadas por prazo — inspirado no painel "Atividades" da lista
+ * de processos do concorrente Tramitação Inteligente (levantamento de
+ * 17/10/2026). responsavelId null = escritório inteiro (mesma regra de
+ * "processos_ver_todos" usada no resto do módulo).
+ */
+export async function getContadoresAtividadesPrazo(
+  responsavelId: string | null
+): Promise<ContadoresAtividadesPrazo> {
+  const rows = await sql`
+    SELECT
+      COUNT(*) FILTER (WHERE t.prazo < CURRENT_DATE)::int AS atrasadas,
+      COUNT(*) FILTER (WHERE t.prazo = CURRENT_DATE)::int AS hoje,
+      COUNT(*) FILTER (WHERE t.prazo = CURRENT_DATE + 1)::int AS amanha,
+      COUNT(*) FILTER (WHERE t.prazo > CURRENT_DATE + 1)::int AS futuras,
+      COUNT(*) FILTER (WHERE t.prazo IS NULL)::int AS sem_data
+    FROM tarefas_processo t
+    JOIN processos p ON p.id = t.processo_id
+    WHERE p.deleted_at IS NULL
+      AND (${responsavelId}::uuid IS NULL OR p.responsavel_id = ${responsavelId}::uuid)
+      AND t.status IN ('Pendente', 'Em andamento')
+  `;
+  const r = rows[0];
+  return {
+    atrasadas: Number(r?.atrasadas ?? 0),
+    hoje: Number(r?.hoje ?? 0),
+    amanha: Number(r?.amanha ?? 0),
+    futuras: Number(r?.futuras ?? 0),
+    semData: Number(r?.sem_data ?? 0),
+  };
+}

@@ -1,9 +1,13 @@
 import { notFound } from "next/navigation";
-import { getAllProcessos } from "@/lib/processos-db";
+import {
+  getAllProcessos,
+  getContadoresAtividadesPrazo,
+} from "@/lib/processos-db";
 import { getAllClients } from "@/lib/clients-db";
 import { getColaboradorIdForUser } from "@/lib/usuarios-db";
 import ProcessosContent from "@/components/dashboard/processos/processos-content";
 import ProcessosSubNav from "@/components/dashboard/processos/processos-sub-nav";
+import AtividadesPrazoPanel from "@/components/dashboard/processos/atividades-prazo-panel";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 
@@ -32,9 +36,10 @@ export default async function ProcessosPage({
     : ((await getColaboradorIdForUser(session.id)) ??
       "00000000-0000-0000-0000-000000000000");
 
-  const [processosRaw, clients] = await Promise.all([
+  const [processosRaw, clients, contadoresAtividades] = await Promise.all([
     getAllProcessos(verTodos ? null : colaboradorId),
     getAllClients(),
+    getContadoresAtividadesPrazo(verTodos ? null : colaboradorId),
   ]);
 
   // Sem permissão de financeiro: remove valores monetários já no servidor
@@ -67,6 +72,8 @@ export default async function ProcessosPage({
       </div>
 
       <ProcessosSubNav />
+
+      <AtividadesPrazoPanel contadores={contadoresAtividades} />
 
       <ProcessosContent
         processos={processos}

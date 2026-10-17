@@ -467,7 +467,18 @@ export async function enviarEnvelopeParaTramitaSign(
         a.papel === "testemunha" || a.papel === "avalista"
           ? a.papel
           : "assinante",
-      selfieRequired: a.valSelfie,
+      // A API do TramitaSign rejeita (HTTP 422) documentPhotoRequired=true
+      // sem selfieRequired=true junto ("a validação por foto do documento
+      // requer que a validação por selfie também seja selecionada") —
+      // achado em produção 2026-10-17: envelope "Procuração e Contrato -
+      // Eliane" ficava preso em erro de reenvio porque foi criado com só
+      // "Documento" marcado no formulário, sem "Selfie". O formulário
+      // (novo-envelope.tsx) agora força os dois juntos pra criação nova,
+      // mas esse envelope já tinha os dois valores gravados assim no
+      // banco — corrigido aqui também, na hora de montar o payload, pra
+      // valer também pra reenvio de envelope antigo sem precisar editar
+      // nada manualmente.
+      selfieRequired: a.valSelfie || a.valDocumento,
       documentPhotoRequired: a.valDocumento,
       handwrittenSignatureRequired: a.valAssinaturaDesenhada,
     });

@@ -847,45 +847,63 @@ export default function NovoEnvelope({
                 Validações obrigatórias
               </label>
               <div className="flex flex-wrap gap-4">
-                {[
-                  {
-                    key: "email",
-                    label: "Email",
-                    val: newValEmail,
-                    set: setNewValEmail,
-                  },
-                  {
-                    key: "selfie",
-                    label: "Selfie",
-                    val: newValSelfie,
-                    set: setNewValSelfie,
-                  },
-                  {
-                    key: "doc",
-                    label: "Documento",
-                    val: newValDoc,
-                    set: setNewValDoc,
-                  },
-                  {
-                    key: "assinaturaDesenhada",
-                    label: "Assinatura desenhada",
-                    val: newValAssinaturaDesenhada,
-                    set: setNewValAssinaturaDesenhada,
-                  },
-                ].map(({ key, label, val, set }) => (
-                  <label
-                    key={key}
-                    className="flex items-center gap-2 cursor-pointer select-none"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={val}
-                      onChange={(e) => set(e.target.checked)}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
-                    />
-                    <span className="font-body text-sm text-fg">{label}</span>
-                  </label>
-                ))}
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newValEmail}
+                    onChange={(e) => setNewValEmail(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  />
+                  <span className="font-body text-sm text-fg">Email</span>
+                </label>
+                {/* A API do TramitaSign rejeita "Documento" marcado sem
+                    "Selfie" junto (HTTP 422 — achado em produção
+                    2026-10-17, envelope travado em erro de reenvio por
+                    causa disso). Trava os dois juntos aqui pra não deixar
+                    criar essa combinação de novo. */}
+                <label
+                  className={`flex items-center gap-2 select-none ${newValDoc ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                  title={
+                    newValDoc
+                      ? "Obrigatório quando 'Documento' está marcado"
+                      : undefined
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={newValSelfie || newValDoc}
+                    disabled={newValDoc}
+                    onChange={(e) => setNewValSelfie(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  />
+                  <span className="font-body text-sm text-fg">Selfie</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newValDoc}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setNewValDoc(checked);
+                      if (checked) setNewValSelfie(true);
+                    }}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  />
+                  <span className="font-body text-sm text-fg">Documento</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newValAssinaturaDesenhada}
+                    onChange={(e) =>
+                      setNewValAssinaturaDesenhada(e.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                  />
+                  <span className="font-body text-sm text-fg">
+                    Assinatura desenhada
+                  </span>
+                </label>
               </div>
             </div>
 

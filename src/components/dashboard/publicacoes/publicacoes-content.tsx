@@ -155,13 +155,26 @@ function PublicacaoCard({ pub }: { pub: Publicacao }) {
         </div>
       </div>
 
-      {/* Processo */}
-      <Link
-        href={`/dashboard/publicacoes/${pub.id}`}
-        className="mt-2 block font-mono text-sm font-semibold text-primary hover:underline"
-      >
-        {pub.processo}
-      </Link>
+      {/* Processo + cliente cadastrado */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Link
+          href={`/dashboard/publicacoes/${pub.id}`}
+          className="font-mono text-sm font-semibold text-primary hover:underline"
+        >
+          {pub.processo}
+        </Link>
+        {/* Cliente do CADASTRO (não o "destinatário" bruto extraído do texto
+            da publicação, que pode vir com grafia diferente) — antes a
+            lista não mostrava isso, só o nome cru da fonte. */}
+        {pub.clienteNome && pub.clienteId && (
+          <Link
+            href={`/dashboard/clientes/${pub.clienteId}`}
+            className="inline-flex items-center gap-1 rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 font-body text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
+          >
+            {pub.clienteNome}
+          </Link>
+        )}
+      </div>
 
       {/* Ação necessária */}
       {ri?.acao_necessaria && (
@@ -364,38 +377,60 @@ function ListaPublicacoes({
 function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("nao_lida");
   const [search, setSearch] = useState("");
+  // Filtros por tribunal/tipo — pedido explícito do Orlando após comparar
+  // com o TramitaSign: a lista não tinha filtro nenhum além de busca
+  // livre, nem eles têm os dois juntos (só tribunal, não tipo).
+  const [tribunalFiltro, setTribunalFiltro] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState("");
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   const isAutomatica = (origem: string) =>
     origem === "automatica" || origem === "tramitasign";
 
-  const naoLidas = useMemo(
-    () =>
-      publicacoes.filter(
-        (p) => p.status === "nao_lida" && isAutomatica(p.origem)
-      ),
+  const automaticas = useMemo(
+    () => publicacoes.filter((p) => isAutomatica(p.origem)),
     [publicacoes]
   );
-  const tratadas = useMemo(
+  const tribunais = useMemo(
     () =>
-      publicacoes.filter(
-        (p) => p.status === "tratada" && isAutomatica(p.origem)
-      ),
-    [publicacoes]
+      Array.from(
+        new Set(automaticas.map((p) => p.tribunal).filter(Boolean))
+      ).sort(),
+    [automaticas]
+  );
+  const tipos = useMemo(
+    () =>
+      Array.from(
+        new Set(automaticas.map((p) => p.tipo).filter(Boolean))
+      ).sort(),
+    [automaticas]
+  );
+
+  const naoLidas = useMemo(
+    () => automaticas.filter((p) => p.status === "nao_lida"),
+    [automaticas]
+  );
+  const tratadas = useMemo(
+    () => automaticas.filter((p) => p.status === "tratada"),
+    [automaticas]
   );
   const baseList = statusFilter === "nao_lida" ? naoLidas : tratadas;
   const exibindo = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return baseList;
-    return baseList.filter(
-      (p) =>
+    return baseList.filter((p) => {
+      if (tribunalFiltro && p.tribunal !== tribunalFiltro) return false;
+      if (tipoFiltro && p.tipo !== tipoFiltro) return false;
+      if (!q) return true;
+      return (
         p.processo.toLowerCase().includes(q) ||
         p.destinatario.toLowerCase().includes(q) ||
         p.advogados.some((a) => a.toLowerCase().includes(q)) ||
-        p.orgao.toLowerCase().includes(q)
-    );
-  }, [baseList, search]);
+        p.orgao.toLowerCase().includes(q) ||
+        (p.clienteNome ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [baseList, search, tribunalFiltro, tipoFiltro]);
 
   function handleTratarTodas() {
     if (
@@ -462,6 +497,46 @@ function TabAutomatica({ publicacoes }: { publicacoes: Publicacao[] }) {
           >
             {isPending ? <SpinnerIcon className="h-3 w-3" /> : "✅"}
             Marcar todas as {naoLidas.length} como tratadas
+          </button>
+        )}
+      </div>
+
+      {/* Filtros por tribunal/tipo — opções vêm dos valores que de fato
+          aparecem nas publicações automáticas do escritório. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={tribunalFiltro}
+          onChange={(e) => setTribunalFiltro(e.target.value)}
+          className="h-8 rounded-lg border border-border bg-white px-2.5 font-body text-xs text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+        >
+          <option value="">Todos os tribunais</option>
+          {tribunais.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <select
+          value={tipoFiltro}
+          onChange={(e) => setTipoFiltro(e.target.value)}
+          className="h-8 rounded-lg border border-border bg-white px-2.5 font-body text-xs text-fg outline-none focus:border-primary focus:ring-2 focus:ring-blue-100"
+        >
+          <option value="">Todos os tipos</option>
+          {tipos.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        {(tribunalFiltro || tipoFiltro) && (
+          <button
+            onClick={() => {
+              setTribunalFiltro("");
+              setTipoFiltro("");
+            }}
+            className="font-body text-xs font-semibold text-primary hover:underline"
+          >
+            Limpar filtros
           </button>
         )}
       </div>

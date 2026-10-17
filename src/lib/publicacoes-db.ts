@@ -50,13 +50,24 @@ export async function getAllPublicacoes(): Promise<Publicacao[]> {
   // tabela cresce sozinha todo dia útil (captura automática de DJE/DJEN
   // por OAB monitorada) — sem paginação de verdade (busca/filtro roda
   // client-side), mesmo raciocínio de clients-db.ts/processos-db.ts.
+  // JOIN com processos/clients pra trazer o cliente CADASTRADO — antes a
+  // lista só mostrava "destinatario" (nome bruto extraído do texto da
+  // publicação pela fonte), que não necessariamente bate com o cadastro
+  // (grafia diferente, nome incompleto). getPublicacaoById já fazia esse
+  // join pro detalhe; a lista nunca fazia.
   const rows = await sql`
     SELECT
-      id, processo, tipo, destinatario, advogados, orgao, tribunal,
-      TO_CHAR(disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
-      status, origem, conteudo, resumo_ia, created_at::text
-    FROM publicacoes
-    ORDER BY disponibilizacao DESC, id DESC
+      pub.id, pub.processo, pub.tipo, pub.destinatario, pub.advogados,
+      pub.orgao, pub.tribunal,
+      TO_CHAR(pub.disponibilizacao, 'DD/MM/YYYY') AS disponibilizacao,
+      pub.status, pub.origem, pub.conteudo, pub.resumo_ia,
+      pub.created_at::text,
+      pub.processo_id::text, p.client_id::text AS cliente_id,
+      cl.name AS cliente_nome
+    FROM publicacoes pub
+    LEFT JOIN processos p ON p.id = pub.processo_id
+    LEFT JOIN clients cl ON cl.id = p.client_id
+    ORDER BY pub.disponibilizacao DESC, pub.id DESC
     LIMIT 5000
   `;
   return rows.map(mapPublicacao);

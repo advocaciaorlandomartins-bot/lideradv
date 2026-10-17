@@ -49,6 +49,9 @@ interface WebhookEnvelope {
 // publicamente, então a extração abaixo tenta os formatos mais prováveis
 // em vez de assumir só um.
 export async function POST(request: Request) {
+  // Secret do webhook "LiderAdvAssinaturas" (contratos/assinaturas) — o
+  // webhook "LiderAdv" (publicações) tem sua PRÓPRIA chave diferente, em
+  // TRAMITASIGN_WEBHOOK_SECRET_PUBLICACOES (ver publicacoes/route.ts).
   const secret = process.env.TRAMITASIGN_WEBHOOK_SECRET;
   if (!secret) {
     return NextResponse.json(

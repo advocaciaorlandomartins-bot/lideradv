@@ -162,7 +162,15 @@ function verificarAssinatura(
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.TRAMITASIGN_WEBHOOK_SECRET;
+  // Secret PRÓPRIO deste webhook ("LiderAdv", de publicações) — diferente
+  // do secret do webhook "LiderAdvAssinaturas" (contratos/route.ts), que
+  // usa TRAMITASIGN_WEBHOOK_SECRET. Confirmado pelo suporte do TramitaSign
+  // em 2026-10-17: cada webhook deles tem sua própria chave; usar a mesma
+  // variável pros dois fazia TODA entrega de publicação falhar com
+  // "Assinatura inválida" desde a criação do webhook de assinaturas
+  // (26/09) — o secret salvo em TRAMITASIGN_WEBHOOK_SECRET passou a ser o
+  // do webhook errado pra esta rota.
+  const secret = process.env.TRAMITASIGN_WEBHOOK_SECRET_PUBLICACOES;
   if (!secret) {
     return NextResponse.json(
       { error: "Webhook não configurado no servidor." },

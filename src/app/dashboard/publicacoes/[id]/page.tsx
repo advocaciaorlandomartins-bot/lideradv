@@ -166,7 +166,11 @@ export default async function PublicacaoDetalhePage({
           <h1 className="mt-2 font-heading text-xl font-semibold text-fg">
             #{pub.id} — {pub.tipo}
           </h1>
-          <p className="mt-0.5 font-mono text-sm text-muted">{pub.processo}</p>
+          <p className="mt-0.5 font-mono text-sm text-muted">
+            {pub.processo.startsWith("tramita-")
+              ? "Processo não identificado"
+              : pub.processo}
+          </p>
           <p className="mt-0.5 font-body text-xs text-muted">
             {pub.orgao} · {pub.tribunal}
           </p>
@@ -306,7 +310,13 @@ export default async function PublicacaoDetalhePage({
           </div>
           <dl className="divide-y divide-border">
             {[
-              { label: "Nº do Processo", value: pub.processo, mono: true },
+              {
+                label: "Nº do Processo",
+                value: pub.processo.startsWith("tramita-")
+                  ? "Não identificado — texto da intimação não trazia o CNJ"
+                  : pub.processo,
+                mono: !pub.processo.startsWith("tramita-"),
+              },
               { label: "Tipo", value: pub.tipo },
               { label: "Órgão", value: pub.orgao },
               { label: "Tribunal", value: pub.tribunal },

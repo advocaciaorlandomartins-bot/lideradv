@@ -30,6 +30,20 @@ type StatusFilter = "nao_lida" | "tratada";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * O webhook do TramitaSign (v2) não traz um campo estruturado de número de
+ * processo — só o texto livre da intimação, de onde tentamos extrair o CNJ
+ * por regex (ver normalizarV2 em api/webhooks/tramitasign/publicacoes). Sem
+ * CNJ no texto, cai num placeholder interno "tramita-{id}" só pra não
+ * quebrar o INSERT (que exige processo NOT NULL) — isso nunca deveria
+ * aparecer cru pro usuário como se fosse um número de processo real.
+ */
+function labelProcesso(processo: string): string {
+  return processo.startsWith("tramita-")
+    ? "Processo não identificado"
+    : processo;
+}
+
 function calcDiasRestantes(
   disponibilizacao: string,
   prazoDias: number | null
@@ -159,9 +173,13 @@ function PublicacaoCard({ pub }: { pub: Publicacao }) {
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <Link
           href={`/dashboard/publicacoes/${pub.id}`}
-          className="font-mono text-sm font-semibold text-primary hover:underline"
+          className={
+            pub.processo.startsWith("tramita-")
+              ? "font-body text-sm font-semibold italic text-muted hover:underline"
+              : "font-mono text-sm font-semibold text-primary hover:underline"
+          }
         >
-          {pub.processo}
+          {labelProcesso(pub.processo)}
         </Link>
         {/* Cliente do CADASTRO (não o "destinatário" bruto extraído do texto
             da publicação, que pode vir com grafia diferente) — antes a
@@ -464,7 +482,7 @@ function PainelPublicacoes({
                 </span>
               </div>
               <p className="truncate font-mono text-[11px] text-muted">
-                {p.processo}
+                {labelProcesso(p.processo)}
               </p>
               <div className="mt-0.5 flex items-center gap-1.5">
                 {p.status === "nao_lida" && (

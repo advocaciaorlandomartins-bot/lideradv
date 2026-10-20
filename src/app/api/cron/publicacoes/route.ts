@@ -5,13 +5,23 @@ import {
   sincronizarMovimentacoesEPublicacoes,
 } from "@/lib/datajud";
 import { buscarPublicacoesDjeEsaj } from "@/lib/dje-esaj";
-import { sincronizarTramitaSign } from "@/lib/tramitasign-sync";
+import {
+  sincronizarTramitaSign,
+  sincronizarMovimentacoesTramitaSign,
+} from "@/lib/tramitasign-sync";
+import { tramitaSignAtivo } from "@/lib/tramitasign";
 import { enviarEmailNovaPublicacao } from "@/lib/email";
 import { enviarMensagemDireta } from "@/lib/prevbot-outbound";
 import { sincronizarDJEN } from "@/lib/djen";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// Aumentado de 120 pra 280 ao somar o reforço do TramitaSign (cadastro +
+// busca de movimentações) ao loop por processo que já tinha o DataJud —
+// dobrar as chamadas de rede por processo sem folga de tempo é exatamente
+// o que causou o timeout de 300s em produção em 2026-10-17. Cron não tem
+// usuário esperando na tela, então pode usar o teto real da plataforma
+// (confirmado em produção: até 300s) com margem de segurança.
+export const maxDuration = 280;
 
 export async function GET(request: Request) {
   // Autenticação do cron — precisa de CRON_SECRET configurado nas env vars
@@ -103,19 +113,22 @@ export async function GET(request: Request) {
     });
   }
 
-  // Monitoramento por número de processo via DataJud (requer DATAJUD_API_KEY)
-  const processos = apiKey
-    ? await sql`
+  // Monitoramento por número de processo via DataJud e/ou TramitaSign
+  const tramitaAtivo = tramitaSignAtivo();
+  const processos =
+    apiKey || tramitaAtivo
+      ? await sql`
         SELECT p.id::text, p.numero, c.name AS cliente_nome
         FROM processos p
         LEFT JOIN clients c ON c.id = p.client_id
         WHERE p.numero IS NOT NULL AND p.numero != ''
           AND LENGTH(REGEXP_REPLACE(p.numero, '[^0-9]', '', 'g')) = 20
       `
-    : [];
+      : [];
 
   let processoInseridos = 0;
   let movimentacoesInseridas = 0;
+  let movimentacoesTramitaSign = 0;
   const processosResultados: { numero: string; inseridos: number }[] = [];
 
   if (apiKey) {
@@ -140,6 +153,25 @@ export async function GET(request: Request) {
           inseridos: publicacoesInseridas,
         });
       movimentacoesInseridas += movsProc;
+    }
+  }
+
+  // Movimentações — reforço do TramitaSign (decisão do Orlando, 2026-10-20):
+  // mesma tabela `movimentacoes`, loop separado do DataJud pra não ficar
+  // condicionado à DATAJUD_API_KEY existir. Cadastro+busca por processo —
+  // é a 2ª fonte de rede por processo neste cron, daí o maxDuration maior.
+  if (tramitaAtivo) {
+    for (const proc of processos) {
+      movimentacoesTramitaSign += await sincronizarMovimentacoesTramitaSign(
+        String(proc.id),
+        String(proc.numero)
+      ).catch((e) => {
+        console.error(
+          `[cron/publicacoes] Erro TramitaSign movimentações ${proc.numero}:`,
+          e
+        );
+        return 0;
+      });
     }
   }
 
@@ -248,6 +280,7 @@ export async function GET(request: Request) {
       por_processo: processosResultados,
       processos_monitorados: processos.length,
       movimentacoes_inseridas: movimentacoesInseridas,
+      movimentacoes_inseridas_tramitasign: movimentacoesTramitaSign,
       djen: { inseridos: djenInseridos },
       tramitasign: {
         metodo: tramitaResult.metodo ?? "nenhum",

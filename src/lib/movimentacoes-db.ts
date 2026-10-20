@@ -17,6 +17,7 @@ export interface Movimentacao {
   dataHora: string;
   grau: string | null;
   complementos: string | null;
+  fonte: string;
 }
 
 let ready = false;
@@ -35,13 +36,24 @@ async function ensureTable() {
       created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
-  // Índice único via índice parcial (não via UNIQUE de coluna) porque
-  // `complementos`/`grau` podem ser NULL e dois movimentos distintos
-  // podem legitimamente ter o mesmo código+nome+data_hora só diferindo
-  // nesses campos — a chave de dedupe real é processo+código+data_hora+nome.
+  // "fonte" — de onde veio o movimento (datajud | tramitasign). Adicionado
+  // quando o TramitaSign entrou como reforço ao DataJud (2026-10-20):
+  // os dois podem trazer o mesmo evento do tribunal, então a chave de
+  // dedupe abaixo foi relaxada (ver nota) pra reconhecer isso como a
+  // MESMA movimentação, não duas.
+  await sql`
+    ALTER TABLE movimentacoes ADD COLUMN IF NOT EXISTS fonte TEXT NOT NULL DEFAULT 'datajud'
+  `;
+  // O código (campo numérico padrão CNJ) só existe nos dados do DataJud —
+  // o TramitaSign não expõe código, só o nome do tipo. Com "código" na
+  // chave de dedupe, o mesmo evento vindo das duas fontes nunca colidia
+  // (código real vs sempre NULL) e virava duplicata na timeline. A chave
+  // de dedupe real agora é processo+data_hora+nome — código fica só como
+  // dado informativo, fora da unicidade.
+  await sql`DROP INDEX IF EXISTS idx_movimentacoes_dedupe`;
   await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacoes_dedupe
-      ON movimentacoes (processo_id, COALESCE(codigo, -1), data_hora, nome)
+      ON movimentacoes (processo_id, data_hora, nome)
   `;
   await sql`
     CREATE INDEX IF NOT EXISTS idx_movimentacoes_processo_data
@@ -56,7 +68,7 @@ export async function getMovimentacoesByProcesso(
   await ensureTable();
   const rows = await sql`
     SELECT id::text, processo_id::text, codigo, nome, data_hora::text,
-           grau, complementos
+           grau, complementos, fonte
     FROM movimentacoes
     WHERE processo_id = ${processoId}::uuid
     ORDER BY data_hora DESC
@@ -69,6 +81,7 @@ export async function getMovimentacoesByProcesso(
     dataHora: String(r.data_hora),
     grau: r.grau ? String(r.grau) : null,
     complementos: r.complementos ? String(r.complementos) : null,
+    fonte: String(r.fonte ?? "datajud"),
   }));
 }
 
@@ -78,12 +91,15 @@ export interface NovaMovimentacao {
   dataHora: string;
   grau: string | null;
   complementos: string | null;
+  fonte?: string;
 }
 
 /**
- * Insere em lote, ignorando duplicatas (mesmo processo+código+data_hora+
- * nome já capturado antes) — chamada toda vez que o processo é
- * resincronizado com o DataJud, então a maioria das linhas já existe.
+ * Insere em lote, ignorando duplicatas (mesmo processo+data_hora+nome já
+ * capturado antes, de qualquer fonte) — chamada toda vez que o processo é
+ * resincronizado com o DataJud e/ou o TramitaSign, então a maioria das
+ * linhas já existe. Em conflito, mantém a linha existente (não troca a
+ * fonte) — a primeira fonte a trazer o evento "ganha" o registro.
  */
 export async function inserirMovimentacoes(
   processoId: string,
@@ -96,12 +112,13 @@ export async function inserirMovimentacoes(
     try {
       const res = await sql`
         INSERT INTO movimentacoes
-          (processo_id, codigo, nome, data_hora, grau, complementos)
+          (processo_id, codigo, nome, data_hora, grau, complementos, fonte)
         VALUES (
           ${processoId}::uuid, ${m.codigo}, ${m.nome},
-          ${m.dataHora}::timestamptz, ${m.grau}, ${m.complementos}
+          ${m.dataHora}::timestamptz, ${m.grau}, ${m.complementos},
+          ${m.fonte ?? "datajud"}
         )
-        ON CONFLICT (processo_id, COALESCE(codigo, -1), data_hora, nome)
+        ON CONFLICT (processo_id, data_hora, nome)
           DO NOTHING
         RETURNING id
       `;

@@ -5,7 +5,13 @@
  */
 
 import sql from "./db";
-import { tramitaBuscarPublicacoesAPI, tramitaSignAtivo } from "./tramitasign";
+import {
+  tramitaBuscarPublicacoesAPI,
+  tramitaSignAtivo,
+  tramitaGarantirProcessoCadastrado,
+  tramitaBuscarMovimentacoes,
+} from "./tramitasign";
+import { inserirMovimentacoes } from "./movimentacoes-db";
 
 const TRAMITA_BASE = "https://planilha.tramitacaointeligente.com.br";
 
@@ -394,4 +400,36 @@ export async function sincronizarTramitaSign(dias = 30): Promise<{
     `[TramitaSync] Scraping: ${inseridos} inseridas, ${pulados} puladas`
   );
   return { inseridos, pulados, metodo: "scraping" };
+}
+
+/**
+ * Movimentações via TramitaSign — reforço ao DataJud (decisão do Orlando,
+ * 2026-10-20): os dois seguem rodando, cada um alimentando a mesma tabela
+ * `movimentacoes` (dedupe por processo+data_hora+nome cobre as duas
+ * fontes). Cadastra o processo na conta do TramitaSign se ainda não
+ * estiver (idempotente) e lê o que eles já importaram — nunca dispara
+ * import síncrono, então processo recém-cadastrado pode voltar vazio até
+ * a próxima rodada deles.
+ */
+export async function sincronizarMovimentacoesTramitaSign(
+  processoDbId: string,
+  numeroCNJ: string
+): Promise<number> {
+  const cadastrado = await tramitaGarantirProcessoCadastrado(numeroCNJ);
+  if (!cadastrado) return 0;
+
+  const movimentos = await tramitaBuscarMovimentacoes(numeroCNJ);
+  const itens = movimentos
+    .filter((m) => m.dataHora)
+    .map((m) => ({
+      codigo: null,
+      nome: m.tipoNome || "Movimentação",
+      dataHora: m.dataHora as string,
+      grau: m.grau,
+      complementos: m.descricao,
+      fonte: "tramitasign",
+    }));
+  if (itens.length === 0) return 0;
+
+  return inserirMovimentacoes(processoDbId, itens);
 }

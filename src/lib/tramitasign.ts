@@ -595,3 +595,98 @@ export async function tramitaObterEnvelopeAssinatura(
     return null;
   }
 }
+
+// ── Processos / Movimentações (reforço ao DataJud, confirmado contra a
+// documentação pública /api/docs/endpoints/processos/*.json em 2026-10-20) ──
+//
+// Decisão do Orlando (2026-10-20): usar como REFORÇO ao DataJud, não
+// substituição — os dois seguem rodando. Vantagem real: o TramitaSign
+// atualiza as movimentações sozinho todo dia (basta a conta consultar a API
+// pelo menos 1x a cada 7 dias), sem o rate-limit/timeout que o DataJud
+// mostrou ter (achado em produção em 2026-10-17).
+//
+// POST /v1/processos exige "kind" + "number" (CNJ) e devolve 422 se o
+// número já está cadastrado na organização — tratado como sucesso (já
+// estava lá, provavelmente importado automaticamente ao cadastrar a OAB).
+// Não é preciso guardar o id interno deles: GET movimentacoes aceita o
+// próprio CNJ (sem máscara) como {id} no path.
+
+/**
+ * Garante que o processo está cadastrado na conta do TramitaSign — só assim
+ * eles importam e mantêm as movimentações atualizadas (endpoint de leitura
+ * nunca dispara import sozinho). Idempotente: 201 (criado agora) e 422
+ * (já existia) contam como sucesso.
+ */
+export async function tramitaGarantirProcessoCadastrado(
+  numeroCNJ: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${baseUrl()}/processos`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        lawsuit: { number: numeroCNJ, kind: "judicial" },
+      }),
+    });
+    if (res.status === 201 || res.status === 422) return true;
+    if (res.status === 402) {
+      console.error(
+        "[TramitaSign] garantirProcessoCadastrado: plano sem acesso à API de processos"
+      );
+      return false;
+    }
+    const txt = await res.text().catch(() => "");
+    console.error(
+      `[TramitaSign] garantirProcessoCadastrado: HTTP ${res.status} — ${txt.slice(0, 300)}`
+    );
+    return false;
+  } catch (e) {
+    console.error("[TramitaSign] garantirProcessoCadastrado error:", e);
+    return false;
+  }
+}
+
+export interface TramitaMovimento {
+  dataHora: string | null;
+  descricao: string | null;
+  tipoNome: string | null;
+  grau: string | null;
+}
+
+/**
+ * Busca as movimentações já importadas pelo TramitaSign para o processo
+ * (aceita o CNJ sem máscara direto como {id}). Nunca dispara import — só
+ * lê o que já foi coletado; processo recém-cadastrado pode voltar vazio
+ * até a próxima rodada de importação deles.
+ */
+export async function tramitaBuscarMovimentacoes(
+  numeroCNJ: string
+): Promise<TramitaMovimento[]> {
+  const idSemMascara = numeroCNJ.replace(/\D/g, "");
+  try {
+    const res = await fetch(
+      `${baseUrl()}/processos/${idSemMascara}/movimentacoes?per_page=100`,
+      { headers: headers() }
+    );
+    if (!res.ok) {
+      if (res.status !== 404) {
+        const txt = await res.text().catch(() => "");
+        console.error(
+          `[TramitaSign] buscarMovimentacoes: HTTP ${res.status} — ${txt.slice(0, 300)}`
+        );
+      }
+      return [];
+    }
+    const data = await res.json();
+    const movements = Array.isArray(data?.movements) ? data.movements : [];
+    return movements.map((m: Record<string, unknown>) => ({
+      dataHora: typeof m.data_hora === "string" ? m.data_hora : null,
+      descricao: typeof m.descricao === "string" ? m.descricao : null,
+      tipoNome: typeof m.tipo_nome === "string" ? m.tipo_nome : null,
+      grau: typeof m.grau === "string" ? m.grau : null,
+    }));
+  } catch (e) {
+    console.error("[TramitaSign] buscarMovimentacoes error:", e);
+    return [];
+  }
+}

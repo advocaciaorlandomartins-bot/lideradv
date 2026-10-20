@@ -1,10 +1,11 @@
 import "server-only";
 import sql from "./db";
 import {
-  agendarNotificacoesCompromisso,
+  agendarLembretesInss,
   cancelarLembretesCompromisso,
 } from "./lembretes";
 import { enviarMensagemDireta } from "./prevbot-outbound";
+import { getEscritorioConfig } from "./escritorio-db";
 
 /**
  * Perícia (Controles → Perícias) e compromisso (Agenda) descrevem o mesmo
@@ -98,17 +99,49 @@ export async function sincronizarCompromissoDaPericia(
   const tituloLabel =
     TIPO_PERICIA_LABEL[pericia.tipo] ?? String(pericia.tipo).replace(/_/g, " ");
 
-  await agendarNotificacoesCompromisso({
+  // Responsável (staff) pelo processo vinculado — mesma busca de
+  // criarNovoAgendamentoPericia, pra avisar o colaborador também quando a
+  // perícia é remarcada, não só na criação.
+  const [respRow] = await sql`
+    SELECT col.nome AS resp_nome, col.telefone AS resp_telefone
+    FROM clients cl
+    LEFT JOIN LATERAL (
+      SELECT p.responsavel_id
+      FROM processos p
+      WHERE p.client_id = cl.id
+        AND p.deleted_at IS NULL
+        AND p.responsavel_id IS NOT NULL
+      ORDER BY p.created_at DESC
+      LIMIT 1
+    ) lp ON true
+    LEFT JOIN colaboradores col ON col.id = lp.responsavel_id AND col.status = 'ativo'
+    WHERE cl.id = ${pericia.client_id}::uuid
+    LIMIT 1
+  `;
+  const escritorio = await getEscritorioConfig().catch(() => null);
+
+  // Modelo específico de INSS (menciona o órgão, pede pra separar
+  // documentos) — não o genérico de compromisso ("Consulta com nosso
+  // escritório"), que faz parecer uma visita ao escritório quando na
+  // verdade é um atendimento no INSS que o cliente comparece sozinho.
+  // Achado pelo Orlando: a perícia do Tiago foi remarcada em 24/09 e o
+  // lembrete de "hoje" saiu com o texto genérico, confuso.
+  await agendarLembretesInss({
     compromissoId: pericia.compromisso_id,
-    titulo: tituloLabel,
-    tipo: "consulta",
+    clienteId: String(cliente.id),
+    clienteNome: String(cliente.name),
+    telefoneCliente:
+      clienteContato && !clienteResponsavel ? clienteContato.telefone : null,
+    telefoneResponsavel: respRow?.resp_telefone
+      ? String(respRow.resp_telefone)
+      : null,
+    nomeResponsavel: respRow?.resp_nome ? String(respRow.resp_nome) : null,
+    guardian: clienteResponsavel,
     dataEvento,
-    hora: horaFmt,
-    local: pericia.local_pericia,
-    link: null,
-    colaborador: null,
-    cliente: clienteContato,
-    clienteResponsavel,
+    horaEvento: horaFmt ?? "",
+    tipoServico: tituloLabel,
+    local: pericia.local_pericia ?? "",
+    escritorio: escritorio?.nome ?? undefined,
   }).catch(() => null);
 
   // Aviso imediato da remarcação — os lembretes acima só disparam mais perto

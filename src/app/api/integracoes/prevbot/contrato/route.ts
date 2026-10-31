@@ -72,6 +72,12 @@ export async function POST(req: NextRequest) {
   const nome = String(body.nome ?? "").trim();
   const cpfRaw = String(body.cpf ?? "").replace(/\D/g, "");
   const telefone = normalizarTelefone(String(body.telefone ?? ""));
+  // Slug do PrevBot (bpc_loas, salario_maternidade...) — decide quais
+  // documentos ADICIONAIS (Termo BPC-LOAS, Declaração de Renúncia Bolsa
+  // Família, Termo de Representação, Formulário LOAS) entram automaticamente
+  // no mesmo envelope do contrato de honorários. Sem isso (omitido/vazio),
+  // comportamento igual a antes: só o contrato.
+  const beneficio = String(body.beneficio ?? "").trim() || null;
   if (!nome || !cpfRaw || !telefone) {
     return NextResponse.json(
       { ok: false, error: "Campos obrigatórios: nome, cpf, telefone." },
@@ -254,6 +260,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── 2c. Bundle automático por benefício — pedido do Orlando
+    // (2026-10-31): "se o cliente responder no whatsapp as perguntas ele já
+    // pode gerar o documento e enviar todos pro cliente já preenchido".
+    // Um modelo entra no bundle se: (a) está marcado pra esse `beneficio`
+    // em beneficios_aplicaveis, e (b) se ele declara perguntas_extras (caso
+    // do Formulário LOAS), TODAS precisam já estar respondidas — senão ele
+    // fica de fora e continua manual com um colaborador (pedido explícito
+    // do Orlando pra não perder o cliente nem mandar documento com lacuna
+    // visível tipo "b.1: ____").
+    const respostasTotaisPorTag: Record<string, string> = {
+      ...(client.respostas_extras ?? {}),
+      ...respostasValidas,
+    };
+    const extras = beneficio
+      ? modelos.filter((m) => {
+          if (m.id === modelo.id) return false;
+          if (!(m.beneficios_aplicaveis ?? []).includes(beneficio))
+            return false;
+          const tags = (m.perguntas_extras ?? []).map((p) => p.tag);
+          return tags.every((t) => respostasTotaisPorTag[t]?.trim());
+        })
+      : [];
+
     // Quem assina — bug real encontrado em 2026-10-31: esta rota sempre
     // montava o assinante com os dados do BENEFICIÁRIO, mesmo escolhendo o
     // modelo "requer responsável legal" acima. A tela manual de Assinaturas
@@ -300,6 +329,30 @@ export async function POST(req: NextRequest) {
       ? blocksToHtml(substituteVariablesInBlocks(modelo.conteudo_blocks, vars))
       : textToHtml(replaceVars(modelo.conteudo, vars));
 
+    // Os documentos extras (Termo BPC-LOAS, Declaração de Renúncia Bolsa
+    // Família, Termo de Representação) usam {{responsavel_nome}}/
+    // {{responsavel_cpf}} incondicionalmente no texto cadastrado — faz
+    // sentido no caso com responsável, mas pra um adulto capaz assinando
+    // por si mesmo (ex: BPC idoso sem representante) esses campos ficariam
+    // em branco no documento final, já que buildModeloVars só preenche
+    // {{responsavel_*}} quando existe responsável cadastrado. Sobrepõe
+    // aqui pra sempre resolver pra quem realmente assina.
+    const varsExtras = { ...vars };
+    if (!requerResponsavel) {
+      varsExtras["{{responsavel_nome}}"] = nome;
+      varsExtras["{{responsavel_cpf}}"] = client.doc;
+    }
+    const documentosExtras = extras.map((m, i) => ({
+      modeloId: m.id,
+      nome: m.titulo,
+      htmlContent: m.conteudo_blocks
+        ? blocksToHtml(
+            substituteVariablesInBlocks(m.conteudo_blocks, varsExtras)
+          )
+        : textToHtml(replaceVars(m.conteudo, varsExtras)),
+      ordem: i + 2,
+    }));
+
     // ── 4. Cria o envelope (registro interno) ──
     const criadoPor = await resolverAdminLogin();
     const { id: envelopeId } = await criarEnvelope({
@@ -331,6 +384,7 @@ export async function POST(req: NextRequest) {
           htmlContent: html,
           ordem: 1,
         },
+        ...documentosExtras,
       ],
     });
 
@@ -382,6 +436,7 @@ export async function POST(req: NextRequest) {
       documento_id: envelopeId,
       client_id: clienteId,
       modelo: modelo.titulo,
+      documentos_incluidos: [modelo.titulo, ...extras.map((m) => m.titulo)],
     });
   } catch (err) {
     console.error(

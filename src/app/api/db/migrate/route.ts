@@ -385,6 +385,20 @@ export async function GET() {
       sql`ALTER TABLE escritorio_config ADD COLUMN IF NOT EXISTS oab_uf VARCHAR(2)`
   );
 
+  // Amarra um modelo a um ou mais tipos de benefício (slugs do PrevBot:
+  // bpc_loas, salario_maternidade etc.) — pedido do Orlando (2026-10-31):
+  // quando o PrevBot manda o benefício no payload do contrato automático,
+  // o LiderAdv precisa saber SOZINHO quais outros documentos (Termo
+  // BPC-LOAS, Declaração de Renúncia Bolsa Família, Termo de
+  // Representação, Formulário LOAS) entram no mesmo envelope, sem depender
+  // de um admin selecionar manualmente. Null/vazio = modelo não entra em
+  // nenhum bundle automático (continua só manual, como hoje).
+  await run(
+    "modelos_documento.beneficios_aplicaveis",
+    () =>
+      sql`ALTER TABLE modelos_documento ADD COLUMN IF NOT EXISTS beneficios_aplicaveis TEXT[]`
+  );
+
   const allOk = migrations.every((m) => m.ok);
 
   return NextResponse.json({

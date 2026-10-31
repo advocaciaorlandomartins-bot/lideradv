@@ -27,6 +27,11 @@ export interface ModeloDocumento {
   // (nome em texto no topo). Pra formulários oficiais que precisam sair
   // neutros.
   ocultar_identificacao_escritorio: boolean;
+  // Tipos de benefício (slugs do PrevBot: bpc_loas, salario_maternidade...)
+  // em que esse modelo entra automaticamente no envelope do contrato
+  // gerado via /api/integracoes/prevbot/contrato, junto com o contrato de
+  // honorários — null/vazio = nunca entra sozinho, só manual.
+  beneficios_aplicaveis: string[] | null;
   perguntas_extras: PerguntaExtra[] | null;
   /** Override opcional de tamanho de fonte (pt) só pra esse modelo — null usa o padrão do escritório (Configurações). */
   fonte_tamanho: number | null;
@@ -57,6 +62,9 @@ function mapRow(r: any): ModeloDocumento {
     usar_prevbot_contrato: r.usar_prevbot_contrato ?? false,
     ocultar_identificacao_escritorio:
       r.ocultar_identificacao_escritorio ?? false,
+    beneficios_aplicaveis: Array.isArray(r.beneficios_aplicaveis)
+      ? r.beneficios_aplicaveis.filter((b: unknown) => typeof b === "string")
+      : null,
     perguntas_extras: Array.isArray(r.perguntas_extras)
       ? r.perguntas_extras.filter(isPerguntaExtra)
       : null,
@@ -69,7 +77,7 @@ function mapRow(r: any): ModeloDocumento {
 export async function getAllModelos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, fonte_tamanho, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, beneficios_aplicaveis, perguntas_extras, fonte_tamanho, created_at, updated_at
     FROM modelos_documento
     ORDER BY categoria NULLS LAST, titulo
   `;
@@ -79,7 +87,7 @@ export async function getAllModelos(): Promise<ModeloDocumento[]> {
 export async function getModelosAtivos(): Promise<ModeloDocumento[]> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, fonte_tamanho, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, beneficios_aplicaveis, perguntas_extras, fonte_tamanho, created_at, updated_at
     FROM modelos_documento
     WHERE ativo = TRUE
     ORDER BY categoria NULLS LAST, titulo
@@ -92,7 +100,7 @@ export async function getModeloById(
 ): Promise<ModeloDocumento | null> {
   const rows = await sql`
     SELECT id::text, titulo, categoria, descricao, conteudo, conteudo_blocks,
-           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, perguntas_extras, fonte_tamanho, created_at, updated_at
+           ativo, usar_timbrado, usar_fundo_timbrado, requer_responsavel_legal, usar_prevbot_contrato, ocultar_identificacao_escritorio, beneficios_aplicaveis, perguntas_extras, fonte_tamanho, created_at, updated_at
     FROM modelos_documento
     WHERE id = ${id}::uuid
   `;

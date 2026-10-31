@@ -102,6 +102,31 @@ export async function POST(req: NextRequest) {
     cidade: String(body.cidade ?? "").trim() || null,
     estado: String(body.estado ?? "").trim() || null,
   };
+  // Dados do responsável legal — sem isso o cliente menor/incapaz nunca
+  // chegava marcado como tal quando o próprio PrevBot cria o cadastro
+  // (achado em 2026-10-31: o signatário do envelope ficava sempre sendo o
+  // beneficiário, nunca o responsável, mesmo em caso de BPC/LOAS com
+  // responsável familiar). `menor_incapaz` só é alterado quando o PrevBot
+  // manda o campo explicitamente (null aqui = não mexe no que já tá
+  // cadastrado) — não dá pra inferir isso a partir da presença de
+  // responsavel_nome, porque um adulto capaz também pode ter um "contato de
+  // apoio" cadastrado sem que o caso seja de representação legal.
+  const menorIncapazBody =
+    typeof body.menor_incapaz === "boolean" ? body.menor_incapaz : null;
+  const camposResponsavel = {
+    responsavel_nome: String(body.responsavel_nome ?? "").trim() || null,
+    responsavel_cpf:
+      String(body.responsavel_cpf ?? "").replace(/\D/g, "") || null,
+    responsavel_rg: String(body.responsavel_rg ?? "").trim() || null,
+    responsavel_rg_orgao:
+      String(body.responsavel_rg_orgao ?? "").trim() || null,
+    responsavel_telefone: body.responsavel_telefone
+      ? normalizarTelefone(String(body.responsavel_telefone))
+      : null,
+    responsavel_email: String(body.responsavel_email ?? "").trim() || null,
+    responsavel_parentesco:
+      String(body.responsavel_parentesco ?? "").trim() || null,
+  };
 
   try {
     // ── 1. Resolve ou cria o cliente pelo CPF ──
@@ -127,7 +152,15 @@ export async function POST(req: NextRequest) {
           addr_number = COALESCE(${camposOpcionais.numero}, addr_number),
           neighborhood= COALESCE(${camposOpcionais.bairro}, neighborhood),
           city        = COALESCE(${camposOpcionais.cidade}, city),
-          state       = COALESCE(${camposOpcionais.estado}, state)
+          state       = COALESCE(${camposOpcionais.estado}, state),
+          menor_incapaz        = COALESCE(${menorIncapazBody}, menor_incapaz),
+          responsavel_nome     = COALESCE(${camposResponsavel.responsavel_nome}, responsavel_nome),
+          responsavel_cpf      = COALESCE(${camposResponsavel.responsavel_cpf}, responsavel_cpf),
+          responsavel_rg       = COALESCE(${camposResponsavel.responsavel_rg}, responsavel_rg),
+          responsavel_rg_orgao = COALESCE(${camposResponsavel.responsavel_rg_orgao}, responsavel_rg_orgao),
+          responsavel_telefone = COALESCE(${camposResponsavel.responsavel_telefone}, responsavel_telefone),
+          responsavel_email    = COALESCE(${camposResponsavel.responsavel_email}, responsavel_email),
+          responsavel_parentesco = COALESCE(${camposResponsavel.responsavel_parentesco}, responsavel_parentesco)
         WHERE id = ${clienteId}::uuid
       `;
     } else {
@@ -136,11 +169,17 @@ export async function POST(req: NextRequest) {
           type, name, doc, email, phone,
           rg, rg_orgao, estado_civil, profissao,
           cep, street, addr_number, neighborhood, city, state,
+          menor_incapaz, responsavel_nome, responsavel_cpf, responsavel_rg,
+          responsavel_rg_orgao, responsavel_telefone, responsavel_email,
+          responsavel_parentesco,
           status
         ) VALUES (
           'PF', ${nome}, ${cpfRaw}, ${email ?? ""}, ${telefone},
           ${camposOpcionais.rg}, ${camposOpcionais.rg_orgao}, ${camposOpcionais.estado_civil}, ${camposOpcionais.profissao},
           ${camposOpcionais.cep}, ${camposOpcionais.endereco}, ${camposOpcionais.numero}, ${camposOpcionais.bairro}, ${camposOpcionais.cidade}, ${camposOpcionais.estado},
+          ${menorIncapazBody ?? false}, ${camposResponsavel.responsavel_nome}, ${camposResponsavel.responsavel_cpf}, ${camposResponsavel.responsavel_rg},
+          ${camposResponsavel.responsavel_rg_orgao}, ${camposResponsavel.responsavel_telefone}, ${camposResponsavel.responsavel_email},
+          ${camposResponsavel.responsavel_parentesco},
           'ativo'
         )
         RETURNING id::text
@@ -177,6 +216,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Quem assina — bug real encontrado em 2026-10-31: esta rota sempre
+    // montava o assinante com os dados do BENEFICIÁRIO, mesmo escolhendo o
+    // modelo "requer responsável legal" acima. A tela manual de Assinaturas
+    // (novo-envelope.tsx) já troca pelo responsável quando o cliente é
+    // menor/incapaz — replicado aqui. Erra travando (422) em vez de assinar
+    // com a pessoa errada: é exatamente o tipo de erro silencioso que não
+    // pode se repetir (caso real de cliente ligando confuso por mensagem
+    // errada, 2026-10).
+    if (requerResponsavel && !client.responsavel_nome) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Cliente marcado como menor/incapaz mas sem responsável legal cadastrado (responsavel_nome). Envie responsavel_nome (e responsavel_cpf/telefone/email) no payload antes de gerar o contrato.",
+        },
+        { status: 422 }
+      );
+    }
+    const assinanteNome = requerResponsavel
+      ? String(client.responsavel_nome)
+      : nome;
+    const assinanteEmail = requerResponsavel
+      ? (client.responsavel_email ?? "")
+      : (email ?? "");
+
     // ── 3. Monta o HTML já preenchido ──
     const escritorioConfig = await getEscritorioConfig();
     const dataHoje = new Date().toLocaleDateString("pt-BR", {
@@ -205,8 +269,8 @@ export async function POST(req: NextRequest) {
       assinantes: [
         {
           tipo: "cliente",
-          nome,
-          email: email ?? "",
+          nome: assinanteNome,
+          email: assinanteEmail,
           papel: "assinante",
           valEmail: false,
           valSelfie: true,

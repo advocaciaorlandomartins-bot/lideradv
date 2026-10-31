@@ -3037,6 +3037,7 @@ function NovaTarefaModal({
   const [comentarios, setComentarios] = useState("");
   const [checklistTexto, setChecklistTexto] = useState("");
   const [coResponsaveisIds, setCoResponsaveisIds] = useState<string[]>([]);
+  const [avisarAgora, setAvisarAgora] = useState(false);
   const [loading, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -3061,6 +3062,7 @@ function NovaTarefaModal({
         comentarios: comentarios || null,
         checklistTexto: checklistTexto || null,
         coResponsaveisIds,
+        avisarAgora: avisarAgora && !!responsavel,
       });
       if (result.error) {
         setError(result.error);
@@ -3113,6 +3115,19 @@ function NovaTarefaModal({
             </select>
           </div>
         </div>
+        {responsavel && (
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-slate-50 px-3 py-2">
+            <input
+              type="checkbox"
+              checked={avisarAgora}
+              onChange={(e) => setAvisarAgora(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <span className="font-body text-sm text-fg">
+              Avisar <strong>{responsavel}</strong> agora por WhatsApp
+            </span>
+          </label>
+        )}
         {colaboradores.length > 0 && (
           <div>
             <label className={labelCls}>Colaboradores adicionais</label>

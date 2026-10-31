@@ -16,6 +16,9 @@ const CRONS = [
   // Aprendizado do Cérebro Jurídico a partir de casos encerrados — antes só
   // rodava se alguém reabrisse o painel de um caso já concluído por acaso.
   "/api/cerebro/scheduler",
+  // Avisa por WhatsApp quem teve tarefa ficando atrasada ontem — pedido do
+  // Orlando (2026-10-31).
+  "/api/cron/alertas-colaborador",
 ];
 
 // Timeout do fetch pra cada sub-rota — precisa acompanhar o maxDuration que

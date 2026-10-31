@@ -12,6 +12,7 @@ import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
 import { sincronizarStatusClienteAposMudarProcesso } from "./cliente-status-sync";
 import { logAction } from "./audit";
+import { avisarResponsavelTarefa } from "./tarefa-avisos";
 
 // ── Fase / Status ──────────────────────────────────────────────
 
@@ -207,8 +208,10 @@ export async function createHistoricoRegistroAction(data: {
           );
           if (urgente && proximaAcao) {
             const [resp] = await sql`
-              SELECT col.nome FROM colaboradores col
+              SELECT col.nome, p.numero AS processo_numero, c.name AS cliente_nome
+              FROM colaboradores col
               JOIN processos p ON p.responsavel_id = col.id
+              LEFT JOIN clients c ON c.id = p.client_id
               WHERE p.id = ${data.processoId}::uuid
             `.catch(() => [] as Record<string, unknown>[]);
             const responsavelNome = resp?.nome ? String(resp.nome) : null;
@@ -225,6 +228,24 @@ export async function createHistoricoRegistroAction(data: {
                 'Pendente'
               )
             `.catch(() => null);
+            // Avisa na hora — essa tarefa é gerada sozinha pelo Cérebro, sem
+            // nenhum clique do Orlando, então faz mais sentido ainda do que
+            // na criação manual "surgir" algo pro colaborador sem avisar.
+            if (responsavelNome) {
+              await avisarResponsavelTarefa({
+                responsavelNome,
+                titulo: proximaAcao.substring(0, 200),
+                prazoFormatado: prazo ?? null,
+                prioridade: "Alta",
+                clienteNome: resp?.cliente_nome
+                  ? String(resp.cliente_nome)
+                  : null,
+                processoNumero: resp?.processo_numero
+                  ? String(resp.processo_numero)
+                  : null,
+                origem: "Identificado automaticamente pelo Cérebro Jurídico",
+              }).catch(() => null);
+            }
           }
         } catch (e) {
           console.error(
@@ -470,6 +491,10 @@ export async function createTarefaProcessoAction(data: {
   comentarios: string | null;
   checklistTexto?: string | null;
   coResponsaveisIds?: string[];
+  // Pedido do Orlando (2026-10-31): como admin, escolher na hora de criar
+  // se isso fica só passivo em Minhas Tarefas ou se avisa o responsável
+  // por WhatsApp imediatamente.
+  avisarAgora?: boolean;
 }): Promise<{ error?: string; id?: string }> {
   const session = await getSession();
   if (!session || !hasPermission(session, "processos", "editar"))
@@ -518,6 +543,36 @@ export async function createTarefaProcessoAction(data: {
       descricao: `Criou tarefa: ${data.titulo.trim()}`,
     });
     revalidatePath(`/dashboard/processos/${data.processoId}`);
+
+    if (data.avisarAgora && data.responsavel) {
+      const responsavelNome = data.responsavel;
+      const prazoFormatado = data.prazo
+        ? new Date(data.prazo + "T12:00:00").toLocaleDateString("pt-BR")
+        : null;
+      // after() — rodar isso antes de devolver a resposta já causou envio
+      // silencioso "perdido" em outra Server Action desta sessão (promise
+      // solta sem after()); aqui o WhatsApp precisa terminar de enviar
+      // mesmo que o navegador do Orlando já tenha seguido em frente.
+      after(async () => {
+        const [ctx] = await sql`
+          SELECT p.numero AS processo_numero, c.name AS cliente_nome
+          FROM processos p
+          LEFT JOIN clients c ON c.id = p.client_id
+          WHERE p.id = ${data.processoId}::uuid
+        `.catch(() => [] as Record<string, unknown>[]);
+        await avisarResponsavelTarefa({
+          responsavelNome,
+          titulo: data.titulo.trim(),
+          prazoFormatado,
+          prioridade: data.prioridade,
+          clienteNome: ctx?.cliente_nome ? String(ctx.cliente_nome) : null,
+          processoNumero: ctx?.processo_numero
+            ? String(ctx.processo_numero)
+            : null,
+        }).catch(() => null);
+      });
+    }
+
     return { id: tarefaId };
   } catch (e) {
     console.error("[tarefas] falha ao criar:", e);

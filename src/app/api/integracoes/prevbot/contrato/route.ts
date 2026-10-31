@@ -216,6 +216,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── 2b. Salva respostas das perguntas_extras (ex: b.1 a b.5 do
+    // Formulário LOAS) que o PrevBot já tenha coletado na conversa —
+    // pedido do Orlando (2026-10-31): se o cliente já respondeu no
+    // WhatsApp, não faz sentido perguntar tudo de novo quando um
+    // colaborador for gerar o Formulário LOAS manualmente depois (hoje só
+    // isso: a API não gera esse documento sozinha, mas pré-preenche pra
+    // quando alguém gerar). Mesma regra de segurança de assinaturas-actions
+    // (adicionarDocumentoAction) — só aceita tag que algum modelo ATIVO
+    // realmente declarou em perguntas_extras, pra não deixar a chamada
+    // injetar uma variável arbitrária em qualquer documento futuro desse
+    // cliente. Merge (não substitui), mesma regra de lá.
+    const tagsPermitidas = new Set(
+      modelos.flatMap((m) => (m.perguntas_extras ?? []).map((p) => p.tag))
+    );
+    const respostasExtrasBrutas =
+      body.respostas_extras && typeof body.respostas_extras === "object"
+        ? (body.respostas_extras as Record<string, unknown>)
+        : {};
+    const respostasValidas: Record<string, string> = {};
+    for (const [tag, valor] of Object.entries(respostasExtrasBrutas)) {
+      if (
+        tagsPermitidas.has(tag) &&
+        typeof valor === "string" &&
+        valor.trim()
+      ) {
+        respostasValidas[tag] = valor.trim();
+      }
+    }
+    if (Object.keys(respostasValidas).length > 0) {
+      await sql`
+        UPDATE clients
+        SET respostas_extras = COALESCE(respostas_extras, '{}'::jsonb) || ${JSON.stringify(respostasValidas)}::jsonb
+        WHERE id = ${clienteId}::uuid
+      `.catch((e) =>
+        console.error("[prevbot/contrato] falha ao salvar respostas_extras:", e)
+      );
+    }
+
     // Quem assina — bug real encontrado em 2026-10-31: esta rota sempre
     // montava o assinante com os dados do BENEFICIÁRIO, mesmo escolhendo o
     // modelo "requer responsável legal" acima. A tela manual de Assinaturas
@@ -251,6 +289,13 @@ export async function POST(req: NextRequest) {
     });
     const advogados = await getAdvogadosParaDocumento().catch(() => []);
     const vars = buildModeloVars(client, escritorioConfig, dataHoje, advogados);
+    // client.respostas_extras foi lido ANTES do merge acima — sobrepõe aqui
+    // pra esta própria geração já refletir uma resposta que acabou de
+    // chegar nesta mesma chamada (hoje não afeta o contrato de honorários,
+    // que não tem perguntas_extras, mas evita a pegadinha se isso mudar).
+    for (const [tag, valor] of Object.entries(respostasValidas)) {
+      vars[`{{${tag}}}`] = valor;
+    }
     const html = modelo.conteudo_blocks
       ? blocksToHtml(substituteVariablesInBlocks(modelo.conteudo_blocks, vars))
       : textToHtml(replaceVars(modelo.conteudo, vars));

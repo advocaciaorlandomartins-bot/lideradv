@@ -67,25 +67,56 @@ function normalizar(texto: string): string {
  * charset no header — decodificar como UTF-8 vira "?" em todo acento
  * (confirmado buscando a Lei 12.764/2012 em 2026-10-08). Decodifica como
  * latin1 sempre, é o formato real dessas páginas.
+ *
+ * Abaixo de ~5.000 caracteres quase certamente não é o texto completo da
+ * lei — a mais curta em escopo (Lei 12.764/2012, texto de autismo) já tem
+ * ~9.500 caracteres de verdade (confirmado em 2026-10-31); uma resposta de
+ * bloqueio/erro da fonte (rede, WAF, timeout no meio do download) costuma
+ * vir bem menor que isso. Tentar de novo uma vez antes de desistir evita
+ * que uma falha de rede passageira vire "todo mundo mudou" — achado real
+ * em 2026-10-28→31: a comparação ficou 4 dias seguidos marcando ~84 de 86
+ * dispositivos como alterados ao mesmo tempo em 4 leis sem relação,
+ * enquanto o texto batia perfeito ao buscar a mesma URL de outra rede —
+ * impossível ser mudança de lei de verdade, só podia ser a fonte vindo
+ * incompleta pro ambiente de produção. Essa checagem de tamanho é só a
+ * 1ª linha de defesa; a 2ª (mais confiável, não depende de adivinhar um
+ * número) é o teste de plausibilidade logo abaixo em sincronizarNorma.
  */
+const TAMANHO_MINIMO_PAGINA_VALIDA = 5_000;
+
+async function buscarUmaVez(url: string): Promise<string | null> {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  let html = buf.toString("latin1");
+  html = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "");
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function buscarTextoOficial(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    let html = buf.toString("latin1");
-    html = html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "");
-    return html
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/\s+/g, " ")
-      .trim();
+    const primeira = await buscarUmaVez(url);
+    if (primeira && primeira.length >= TAMANHO_MINIMO_PAGINA_VALIDA)
+      return primeira;
+    // Resposta ausente ou suspeita de curta — espera um pouco e tenta de
+    // novo antes de desistir (ver nota acima).
+    await new Promise((r) => setTimeout(r, 3000));
+    const segunda = await buscarUmaVez(url);
+    if (segunda && segunda.length >= TAMANHO_MINIMO_PAGINA_VALIDA)
+      return segunda;
+    // As duas tentativas vieram curtas/vazias — não é confiável pra
+    // comparar; melhor "não consegui verificar" do que um falso "mudou".
+    return null;
   } catch {
     return null;
   }
@@ -125,13 +156,37 @@ export async function sincronizarNorma(
   }
 
   const textoOficialNorm = normalizar(textoOficial);
-  const alterados: string[] = [];
-  let checados = 0;
 
-  for (const d of emEscopo) {
-    if (d.texto.includes(TEXTO_PLACEHOLDER)) continue; // nota editorial minha, não é texto de lei — nunca vai bater, e não é pra bater
-    checados++;
-    const aindaBate = textoOficialNorm.includes(normalizar(d.texto));
+  // Primeiro só calcula (sem gravar nada) — decide se o resultado é
+  // plausível antes de mexer no banco ou avisar alguém.
+  const candidatos = emEscopo
+    .filter((d) => !d.texto.includes(TEXTO_PLACEHOLDER)) // nota editorial minha, não é texto de lei — nunca vai bater, e não é pra bater
+    .map((d) => ({
+      d,
+      aindaBate: textoOficialNorm.includes(normalizar(d.texto)),
+    }));
+  const checados = candidatos.length;
+  const alterados = candidatos
+    .filter((c) => !c.aindaBate)
+    .map((c) => c.d.caminho);
+
+  // Mais da metade dos dispositivos da norma "mudando" ao mesmo tempo não é
+  // plausível (leis não são reescritas inteiras do dia pra noite) — é sinal
+  // de a página oficial ter vindo com conteúdo diferente do esperado por
+  // algum outro motivo (reformatação da fonte, bloqueio parcial etc.), não
+  // de mudança legislativa real. Nesse caso, não grava nada e não alerta —
+  // melhor "não consegui confirmar hoje" do que uma lista enorme assustando
+  // o Orlando com algo que não é de verdade (achado de 2026-10-31).
+  if (checados > 1 && alterados.length / checados > 0.5) {
+    return {
+      norma,
+      checados: 0,
+      alterados: [],
+      erro: `resultado implausível (${alterados.length}/${checados} dispositivos "alterados" de uma vez) — fonte oficial provavelmente veio incompleta/diferente do esperado, não confirmado`,
+    };
+  }
+
+  for (const { d, aindaBate } of candidatos) {
     if (aindaBate) {
       await sql`UPDATE dispositivos SET verificado_em = NOW() WHERE id = ${d.id}::uuid`;
       await sql`
@@ -139,7 +194,6 @@ export async function sincronizarNorma(
         WHERE norma = ${norma} AND caminho = ${d.caminho} AND resolvido = false
       `;
     } else {
-      alterados.push(d.caminho);
       await sql`
         INSERT INTO legislacao_sync_alertas (norma, caminho)
         VALUES (${norma}, ${d.caminho})

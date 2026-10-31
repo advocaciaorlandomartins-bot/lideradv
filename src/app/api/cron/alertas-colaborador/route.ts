@@ -12,6 +12,13 @@
  * "Carga da equipe" (controladoria-db.ts) ficam de fora por ora — juntar
  * as duas fontes é mais trabalho de categorização e risco de duplicar
  * aviso; ver se vale a pena depois de usar esta versão mais simples.
+ *
+ * Cobre as 3 fontes de "quem é responsável" que minhas-tarefas-db.ts usa
+ * pra decidir o que aparece em "Minhas Tarefas" de cada colaborador:
+ * responsável principal (t.responsavel), co-responsável
+ * (tarefa_responsaveis_adicionais) e o fallback pro responsável do
+ * processo quando a tarefa não tem responsavel próprio. Sem isso, um
+ * colaborador podia ver a tarefa atrasada na tela e nunca ser avisado.
  */
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
@@ -27,18 +34,54 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
+  // UNION (não UNION ALL) de 3 fontes de "quem é responsável por esta
+  // tarefa" — mesmas 3 fontes que minhas-tarefas-db.ts usa pra decidir o que
+  // aparece em "Minhas Tarefas" de cada colaborador. Um cron que só olhasse
+  // t.responsavel (como a v1 original fazia) ficava mudo justamente nos
+  // casos de co-responsável e de tarefa sem responsavel — ou seja, o
+  // colaborador via a tarefa atrasada na tela e nunca recebia aviso nenhum.
   const atrasadas = await sql`
-    SELECT
-      t.responsavel, col.telefone,
-      t.titulo, c.name AS cliente_nome, p.numero AS processo_numero
-    FROM tarefas_processo t
-    JOIN colaboradores col ON col.nome = t.responsavel AND col.status = 'ativo'
-    JOIN processos p ON p.id = t.processo_id
-    LEFT JOIN clients c ON c.id = t.client_id
-    WHERE t.status IN ('Pendente', 'Em andamento')
-      AND t.prazo = (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - 1
-      AND col.telefone IS NOT NULL
-    ORDER BY t.responsavel
+    SELECT col_nome, telefone, titulo, cliente_nome, processo_numero FROM (
+      SELECT
+        col.nome AS col_nome, col.telefone,
+        t.titulo, c.name AS cliente_nome, p.numero AS processo_numero
+      FROM tarefas_processo t
+      JOIN colaboradores col ON col.nome = t.responsavel AND col.status = 'ativo'
+      JOIN processos p ON p.id = t.processo_id
+      LEFT JOIN clients c ON c.id = t.client_id
+      WHERE t.status IN ('Pendente', 'Em andamento')
+        AND t.prazo = (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - 1
+        AND col.telefone IS NOT NULL
+
+      UNION
+
+      SELECT
+        col.nome AS col_nome, col.telefone,
+        t.titulo, c.name AS cliente_nome, p.numero AS processo_numero
+      FROM tarefas_processo t
+      JOIN tarefa_responsaveis_adicionais tra ON tra.tarefa_id = t.id
+      JOIN colaboradores col ON col.id = tra.colaborador_id AND col.status = 'ativo'
+      JOIN processos p ON p.id = t.processo_id
+      LEFT JOIN clients c ON c.id = t.client_id
+      WHERE t.status IN ('Pendente', 'Em andamento')
+        AND t.prazo = (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - 1
+        AND col.telefone IS NOT NULL
+
+      UNION
+
+      SELECT
+        col.nome AS col_nome, col.telefone,
+        t.titulo, c.name AS cliente_nome, p.numero AS processo_numero
+      FROM tarefas_processo t
+      JOIN processos p ON p.id = t.processo_id
+      JOIN colaboradores col ON col.id = p.responsavel_id AND col.status = 'ativo'
+      LEFT JOIN clients c ON c.id = t.client_id
+      WHERE t.status IN ('Pendente', 'Em andamento')
+        AND t.responsavel IS NULL
+        AND t.prazo = (NOW() AT TIME ZONE 'America/Sao_Paulo')::date - 1
+        AND col.telefone IS NOT NULL
+    ) combinado
+    ORDER BY col_nome
   `;
 
   const porColaborador = new Map<
@@ -53,7 +96,7 @@ export async function GET(req: Request) {
     }
   >();
   for (const r of atrasadas) {
-    const nome = String(r.responsavel);
+    const nome = String(r.col_nome);
     if (!porColaborador.has(nome)) {
       porColaborador.set(nome, { telefone: String(r.telefone), itens: [] });
     }

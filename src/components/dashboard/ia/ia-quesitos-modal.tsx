@@ -50,6 +50,8 @@ export default function IaQuesitosModal({
   const [erro, setErro] = useState("");
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [geradoEm, setGeradoEm] = useState<string | null>(null);
+  const [docsAnalisados, setDocsAnalisados] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -75,6 +77,25 @@ export default function IaQuesitosModal({
         setErro("Erro ao carregar documentos.");
       } finally {
         setCarregandoDocs(false);
+      }
+    })();
+
+    // Já existe uma análise salva? Traz pronta em vez de obrigar a gerar de
+    // novo (e gastar tokens) só pra rever o que já foi feito antes.
+    (async () => {
+      try {
+        const res = await fetch(`/api/ia/quesitos?processoId=${processoId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.resultado) {
+          setResultado(data.resultado);
+          setGeradoEm(data.geradoEm ?? null);
+          setDocsAnalisados(
+            Array.isArray(data.documentos) ? data.documentos : []
+          );
+        }
+      } catch {
+        // silencioso — não bloqueia o fluxo normal de gerar uma nova análise
       }
     })();
   }, [processoId, clienteId]);
@@ -104,7 +125,13 @@ export default function IaQuesitosModal({
       });
       const data = await res.json();
       if (!res.ok) setErro(data.error ?? "Erro ao gerar os quesitos.");
-      else setResultado(data);
+      else {
+        setResultado(data);
+        setGeradoEm(new Date().toISOString());
+        setDocsAnalisados(
+          docs.filter((d) => selecionados.has(d.id)).map((d) => d.nome)
+        );
+      }
     } catch {
       setErro("Erro de conexão.");
     } finally {
@@ -214,6 +241,22 @@ export default function IaQuesitosModal({
 
           {resultado && (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                <p className="font-body text-xs text-muted">
+                  {geradoEm
+                    ? `Gerado em ${new Date(geradoEm).toLocaleString("pt-BR")}`
+                    : "Análise gerada"}
+                  {docsAnalisados.length > 0 &&
+                    ` · ${docsAnalisados.join(", ")}`}
+                </p>
+                <button
+                  onClick={() => setResultado(null)}
+                  className="font-body text-xs font-semibold text-primary hover:underline"
+                >
+                  ↺ Selecionar outros documentos
+                </button>
+              </div>
+
               <div className="rounded-xl border border-teal-200 bg-teal-50 p-4">
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="font-body text-xs font-bold uppercase tracking-wide text-teal-700">
@@ -295,22 +338,22 @@ export default function IaQuesitosModal({
           >
             Fechar
           </button>
-          <button
-            onClick={gerar}
-            disabled={carregando || selecionados.size === 0}
-            className="flex h-9 items-center gap-2 rounded-lg bg-teal-600 px-4 font-body text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {carregando ? (
-              <>
-                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Gerando…
-              </>
-            ) : resultado ? (
-              "🔄 Gerar de novo"
-            ) : (
-              "🩺 Gerar quesitos"
-            )}
-          </button>
+          {!resultado && (
+            <button
+              onClick={gerar}
+              disabled={carregando || selecionados.size === 0}
+              className="flex h-9 items-center gap-2 rounded-lg bg-teal-600 px-4 font-body text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {carregando ? (
+                <>
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Gerando…
+                </>
+              ) : (
+                "🩺 Gerar quesitos"
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

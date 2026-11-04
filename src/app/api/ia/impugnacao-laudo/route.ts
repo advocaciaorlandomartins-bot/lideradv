@@ -4,7 +4,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { podeEditarProcesso } from "@/lib/processo-ownership";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { getProcessoById } from "@/lib/processos-db";
-import { gerarImpugnacaoLaudo } from "@/lib/impugnacao-laudo";
+import { gerarImpugnacaoLaudo, type VicioLaudo } from "@/lib/impugnacao-laudo";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,52 @@ async function fetchBlobContent(url: string): Promise<Response | null> {
     }).catch(() => null);
   }
   return fetch(url).catch(() => null);
+}
+
+// Traz a última impugnação já gerada e salva pra esse processo, sem gastar
+// tokens regenerando — o modal usa isso ao abrir pra não exigir "Gerar de
+// novo" só pra rever um resultado que já existe.
+export async function GET(req: Request) {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "processos", "ver")) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const processoId = searchParams.get("processoId");
+  if (!processoId || !UUID_RE.test(processoId)) {
+    return NextResponse.json({ error: "Processo inválido." }, { status: 400 });
+  }
+  if (!(await podeEditarProcesso(session, processoId))) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  }
+
+  const rows = await sql`
+    SELECT analise, metadata, created_at::text AS criado_em
+    FROM cerebro_analises
+    WHERE processo_id = ${processoId}::uuid AND tipo = 'impugnacao_laudo'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  if (rows.length === 0) return NextResponse.json({ resultado: null });
+
+  const r = rows[0];
+  const meta = (r.metadata ?? {}) as {
+    vicios?: VicioLaudo[];
+    quesitos_complementares?: string[];
+    teses_juridicas?: string[];
+    documentos?: string[];
+  };
+  return NextResponse.json({
+    resultado: {
+      vicios: meta.vicios ?? [],
+      quesitosComplementares: meta.quesitos_complementares ?? [],
+      tesesJuridicas: meta.teses_juridicas ?? [],
+      minutaImpugnacao: r.analise,
+    },
+    geradoEm: r.criado_em,
+    documentos: meta.documentos ?? [],
+  });
 }
 
 export async function POST(req: Request) {
@@ -172,7 +218,8 @@ export async function POST(req: Request) {
     let msg = "Erro ao gerar a impugnação do laudo.";
     if (
       raw.includes("Não foi possível baixar") ||
-      raw.includes("é grande demais")
+      raw.includes("é grande demais") ||
+      raw.includes("A IA não retornou uma análise")
     )
       msg = raw;
     else if (

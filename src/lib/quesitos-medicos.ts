@@ -94,7 +94,23 @@ Retorne APENAS um JSON com a estrutura EXATA abaixo (nenhum texto fora do JSON, 
     temPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
   );
 
-  const fullText = extractText(res) || "{}";
+  // Nunca cair silenciosamente num "{}" quando a API não devolve bloco de
+  // texto (ex: parou por outro motivo antes de gerar qualquer texto) — isso
+  // já aconteceu de verdade em produção e o resultado virava "sucesso" com
+  // tudo vazio (0 quesitos, briefing vazio) sem nenhum erro visível pro
+  // usuário. Melhor falhar alto, com o stop_reason no log, do que devolver
+  // um resultado que parece ok mas não serve pra nada.
+  const fullText = extractText(res);
+  if (!fullText.trim()) {
+    console.error("[gerarQuesitosMedicos] resposta sem texto", {
+      stopReason: res.stop_reason,
+      blockTypes: res.content.map((b) => b.type),
+      usage: res.usage,
+    });
+    throw new Error(
+      `A IA não retornou uma análise (motivo: ${res.stop_reason ?? "desconhecido"}). Tente novamente — se persistir, tente com menos documentos selecionados.`
+    );
+  }
 
   // Normaliza um item de "quesitos" pra string legível mesmo se a IA
   // devolver um objeto em vez de string (ex: {texto: "..."}) — sem isso

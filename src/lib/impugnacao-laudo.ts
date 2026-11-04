@@ -69,10 +69,21 @@ export async function gerarImpugnacaoLaudo(
   const temPdf = documentos.some((d) => d.mimeType === "application/pdf");
   const nomesLista = documentos.map((d) => d.nome).join(", ");
 
-  const res = await client.messages.create(
+  // Streaming (não .create direto) pelo mesmo motivo documentado em
+  // ai-juridico.ts: uma chamada não-streaming fica em silêncio até a
+  // resposta inteira terminar, mais sujeita a timeout de proxy/gateway no
+  // meio do caminho num PDF grande. max_tokens alto o bastante pra sobrar
+  // espaço de verdade pro JSON depois do raciocínio — causa raiz real
+  // confirmada em produção (caso real, laudo da Silvanizia): claude-sonnet-5
+  // usa thinking automaticamente mesmo sem o parâmetro `thinking` ser
+  // passado, e com max_tokens=4000 o raciocínio sozinho consumiu o limite
+  // inteiro (stop_reason: max_tokens, blockTypes: ["thinking"],
+  // thinking_tokens: 4000, 0 de texto), fazendo o JSON vir "{}" e o
+  // resultado salvo ficar vazio sem erro nenhum pro usuário.
+  const stream = client.messages.stream(
     {
       model: "claude-sonnet-5",
-      max_tokens: 4000,
+      max_tokens: 16000,
       system:
         "Você é o Dr. Lex, o melhor especialista em Direito Previdenciário brasileiro, com foco em perícia médica judicial. Sua tarefa é analisar um laudo pericial já realizado (SISPERJUD/CNJ ou formato livre) e, se houver, outros documentos do processo anexados junto, pra montar a base técnica e jurídica de uma impugnação ao laudo. Leia cada campo do laudo com rigor: campos obrigatórios deixados em branco, contradições entre a conclusão e os dados do próprio laudo (ex: doença classificada como grave mas prazo de recuperação fixado sem exame que o próprio perito diz não ter), datas-base inconsistentes com a documentação mais completa, sintomas relatados na anamnese sem o CID correspondente, respostas que ignoram anexos/benefícios anteriores do próprio processo, seções de quesitos do juízo deixadas em branco. Nunca aponte um vício que não esteja de fato no texto — cite o trecho exato entre aspas. Nunca invente ou arredonde número de lei, súmula, acórdão ou citação jurisprudencial — só cite base legal de que tenha certeza (ex: art. 480 e art. 477, §1º, do CPC; art. 60, §§8º-9º, e art. 26, II/art. 151 da Lei 8.213/91, quando pertinente); se não tiver certeza de uma citação mais específica, diga que precisa ser conferida antes de protocolar, em vez de inventar.",
       messages: [
@@ -104,6 +115,7 @@ Retorne APENAS um JSON com a estrutura EXATA abaixo (nenhum texto fora do JSON, 
     },
     temPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
   );
+  const res = await stream.finalMessage();
 
   // Nunca cair silenciosamente num "{}" quando a API não devolve bloco de
   // texto — já aconteceu de verdade em produção (mesma causa raiz do bug

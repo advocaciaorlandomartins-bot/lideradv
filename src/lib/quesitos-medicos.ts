@@ -60,10 +60,21 @@ export async function gerarQuesitosMedicos(
   const temPdf = documentos.some((d) => d.mimeType === "application/pdf");
   const nomesLista = documentos.map((d) => d.nome).join(", ");
 
-  const res = await client.messages.create(
+  // Streaming (não .create direto) pelo mesmo motivo documentado em
+  // ai-juridico.ts: uma chamada não-streaming fica em silêncio até a
+  // resposta inteira terminar, mais sujeita a timeout de proxy/gateway no
+  // meio do caminho num PDF grande. max_tokens alto o bastante pra sobrar
+  // espaço de verdade pro JSON depois do raciocínio — causa raiz real já
+  // confirmada em produção na função irmã (gerarImpugnacaoLaudo, mesmo
+  // padrão): claude-sonnet-5 usa thinking automaticamente mesmo sem o
+  // parâmetro `thinking` ser passado, e com max_tokens baixo demais o
+  // raciocínio sozinho consome o limite inteiro (stop_reason: max_tokens,
+  // blockTypes: ["thinking"], 0 de texto), fazendo o JSON vir "{}" e o
+  // resultado salvo ficar vazio sem erro nenhum pro usuário.
+  const stream = client.messages.stream(
     {
       model: "claude-sonnet-5",
-      max_tokens: 3000,
+      max_tokens: 10000,
       system:
         "Você é o Dr. Lex, especialista em Direito Previdenciário brasileiro, com foco em perícias médicas do INSS. Sua tarefa é analisar os documentos anexados (petição inicial, laudo/parecer administrativo do INSS, exames médicos) e gerar quesitos médicos complementares estratégicos para a perícia judicial — específicos ao caso concreto, não genéricos, explorando fragilidades do laudo administrativo e reforçando achados favoráveis ao segurado presentes nos exames.",
       messages: [
@@ -93,6 +104,7 @@ Retorne APENAS um JSON com a estrutura EXATA abaixo (nenhum texto fora do JSON, 
     },
     temPdf ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } } : undefined
   );
+  const res = await stream.finalMessage();
 
   // Nunca cair silenciosamente num "{}" quando a API não devolve bloco de
   // texto (ex: parou por outro motivo antes de gerar qualquer texto) — isso

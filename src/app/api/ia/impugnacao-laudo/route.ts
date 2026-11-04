@@ -8,7 +8,14 @@ import { gerarImpugnacaoLaudo, type VicioLaudo } from "@/lib/impugnacao-laudo";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// 60s não bastava: claude-sonnet-5 usa thinking automaticamente (sem
+// precisar do parâmetro `thinking`) e, com max_tokens mais alto pra dar
+// espaço de sobra pro raciocínio + a minuta de petição inteira, a geração
+// real pode passar de 1 minuto. /api/cron/orquestrador e /api/cron/
+// publicacoes já provam que o plano aceita muito mais que 60s (300/280) —
+// esse teto de 60 não era um limite do Vercel, era só não ter sido
+// revisado nessa rota.
+export const maxDuration = 180;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

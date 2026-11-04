@@ -8,7 +8,12 @@ import { gerarQuesitosMedicos } from "@/lib/quesitos-medicos";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Mesmo motivo do ajuste em /api/ia/impugnacao-laudo: claude-sonnet-5 usa
+// thinking automaticamente e, com max_tokens maior pra sobrar espaço de
+// verdade pro JSON depois do raciocínio, a geração pode passar de 1
+// minuto. /api/cron/orquestrador e /api/cron/publicacoes já provam que o
+// plano aceita bem mais que 60s.
+export const maxDuration = 180;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

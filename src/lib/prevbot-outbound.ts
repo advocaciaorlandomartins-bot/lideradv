@@ -147,11 +147,28 @@ export async function notificarPausaAutomaticaPrevBot(opts: {
   const telefone = opts.telefone.replace(/\D/g, "");
   if (!telefone) return { ok: false, error: "Telefone inválido" };
 
-  return _enviarWebhook(key, {
+  const resultado = await _enviarWebhook(key, {
     tenant_id: getTenantId(),
     evento: opts.pausada ? "ia_pausada" : "ia_retomada",
     telefone,
   });
+
+  // Sem log em tabela (diferente de notificarPrevBot) — esse evento não
+  // precisa de retry automático, mas precisa de ALGUM rastro: sem isso, uma
+  // falha (chave errada, PrevBot fora do ar) fica completamente invisível,
+  // já que o toggle em si segue dando "sucesso" mesmo se o aviso falhar.
+  if (resultado.ok) {
+    console.log(
+      `[prevbot] ${opts.pausada ? "ia_pausada" : "ia_retomada"} enviado (telefone terminando em ${telefone.slice(-4)})`
+    );
+  } else {
+    console.warn(
+      `[prevbot] ${opts.pausada ? "ia_pausada" : "ia_retomada"} falhou (telefone terminando em ${telefone.slice(-4)}):`,
+      resultado.error
+    );
+  }
+
+  return resultado;
 }
 
 /**

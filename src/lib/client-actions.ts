@@ -6,7 +6,10 @@ import { logAction } from "./audit";
 import { getSession, type SessionUser } from "./session";
 import { hasPermission } from "./permissoes";
 import { podeEditarCliente } from "./acesso";
-import { notificarPrevBot } from "./prevbot-outbound";
+import {
+  notificarPrevBot,
+  notificarPausaAutomaticaPrevBot,
+} from "./prevbot-outbound";
 import { checklistPadrao } from "./checklist-documentos";
 
 export type ClientFormState = { error: string } | null;
@@ -802,6 +805,30 @@ export async function toggleBloquearMensagensAction(
         WHERE cliente_id = ${clientId}::uuid
           AND NOT enviado
       `;
+    }
+
+    // Avisa o PrevBot (sistema separado, roda a IA conversacional própria)
+    // pra pausar/retomar também do lado dele — sem isso, esse toggle só
+    // bloqueava lembrete automático do LiderAdv, e a IA do PrevBot
+    // continuava respondendo normalmente pro mesmo número. Mesmo telefone
+    // "efetivo" usado em toda a comunicação com o cliente (do responsável
+    // legal se for menor/incapaz, senão o do próprio cliente).
+    const [row] = await sql`
+      SELECT phone, menor_incapaz, responsavel_telefone
+      FROM clients
+      WHERE id = ${clientId}::uuid
+    `;
+    const telefoneEfetivo =
+      row?.menor_incapaz && row?.responsavel_telefone
+        ? String(row.responsavel_telefone)
+        : row?.phone
+          ? String(row.phone)
+          : null;
+    if (telefoneEfetivo) {
+      await notificarPausaAutomaticaPrevBot({
+        telefone: telefoneEfetivo,
+        pausada: bloquear,
+      }).catch(() => null);
     }
 
     await logAction({

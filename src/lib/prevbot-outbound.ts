@@ -10,6 +10,17 @@ export type PrevBotEvento =
   | "cliente_inativo"
   | "mensagem_direta";
 
+// tenant_id extraído do final da URL do webhook (ex: /webhook/lideradv →
+// "lideradv") — mesmo valor usado nos dois eventos que mandam tenant_id
+// direto (mensagem_direta e ia_pausada/ia_retomada).
+function getTenantId(): string {
+  return (
+    process.env.PREVBOT_TENANT_ID ??
+    PREVBOT_WEBHOOK_URL.split("/").pop() ??
+    "lideradv"
+  );
+}
+
 interface ContatoPrevBot {
   leadId: string;
   prevbotLeadId: string | null;
@@ -104,17 +115,42 @@ export async function enviarMensagemDireta(opts: {
   const telefone = opts.telefone.replace(/\D/g, "");
   if (!telefone) return { ok: false, error: "Telefone inválido" };
 
-  // tenant_id extraído do final da URL (ex: /webhook/lideradv → "lideradv")
-  const tenantId =
-    process.env.PREVBOT_TENANT_ID ??
-    PREVBOT_WEBHOOK_URL.split("/").pop() ??
-    "lideradv";
-
   return _enviarWebhook(key, {
-    tenant_id: tenantId,
+    tenant_id: getTenantId(),
     evento: "mensagem_direta",
     telefone,
     dados: { texto: opts.mensagem },
+  });
+}
+
+/**
+ * Avisa o PrevBot quando o toggle "Mensagens automáticas por WhatsApp" do
+ * cliente é ligado/desligado no LiderAdv (toggleBloquearMensagensAction em
+ * client-actions.ts). Sem isso, o bloqueio só valia pro lado do LiderAdv
+ * (lembretes de cobrança/INSS) — a IA conversacional do PrevBot (sistema
+ * separado) continuava respondendo normalmente pro mesmo número, porque
+ * não tinha como saber do toggle. Bug real reportado pelo Orlando: cliente
+ * já convertida (Célia Vieira Rodrigues) continuou recebendo mensagem
+ * automática mesmo com o toggle desligado no cadastro dela.
+ *
+ * Diferente de notificarPrevBot, NÃO é idempotente-pra-sempre — o toggle
+ * pode ser ligado e desligado várias vezes pro mesmo cliente, e cada
+ * mudança precisa avisar o PrevBot de novo.
+ */
+export async function notificarPausaAutomaticaPrevBot(opts: {
+  telefone: string;
+  pausada: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
+  const key = process.env.PREVBOT_WEBHOOK_KEY ?? process.env.PREVBOT_API_KEY;
+  if (!key) return { ok: false, error: "PREVBOT_API_KEY não configurada" };
+
+  const telefone = opts.telefone.replace(/\D/g, "");
+  if (!telefone) return { ok: false, error: "Telefone inválido" };
+
+  return _enviarWebhook(key, {
+    tenant_id: getTenantId(),
+    evento: opts.pausada ? "ia_pausada" : "ia_retomada",
+    telefone,
   });
 }
 

@@ -27,6 +27,8 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   consultar_financeiro: "Consultou o financeiro",
   listar_processos_risco: "Consultou processos por risco",
   consultar_analise_cerebro: "Consultou o Cérebro Jurídico",
+  localizar_documentos_processo: "Localizou os documentos do processo",
+  consultar_impugnacao_laudo: "Consultou a impugnação ao laudo pericial",
   listar_etiquetas: "Consultou as etiquetas cadastradas",
   adicionar_etiqueta: "Aplicou uma etiqueta",
   consultar_atualizacoes_legais: "Consultou mudanças legais recentes",
@@ -184,6 +186,38 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
     name: "consultar_analise_cerebro",
     description:
       "Traz a análise mais recente do Cérebro Jurídico (risco, probabilidade de êxito, próxima ação, base legal) para um cliente ou processo específico, pelo nome do cliente ou número do processo.",
+    input_schema: {
+      type: "object",
+      properties: {
+        busca: {
+          type: "string",
+          description:
+            "Nome do cliente (ou parte) ou número do processo (CNJ).",
+        },
+      },
+      required: ["busca"],
+    },
+  },
+  {
+    name: "localizar_documentos_processo",
+    description:
+      "Localiza um processo pelo nome do cliente ou número CNJ e lista os documentos PDF/imagem já anexados a ele (petição, laudo pericial, exames etc.) com nome e data. Use quando o usuário pedir pra analisar, impugnar ou comentar um laudo pericial de um processo específico — pra identificar o nome exato do documento antes de orientar o próximo passo. Esta ferramenta só lista; ela NÃO lê o conteúdo do documento nem gera análise.",
+    input_schema: {
+      type: "object",
+      properties: {
+        busca: {
+          type: "string",
+          description:
+            "Nome do cliente (ou parte) ou número do processo (CNJ).",
+        },
+      },
+      required: ["busca"],
+    },
+  },
+  {
+    name: "consultar_impugnacao_laudo",
+    description:
+      "Traz a impugnação ao laudo pericial já gerada para um processo (vícios encontrados no laudo com o trecho citado, quesitos complementares de esclarecimento, teses jurídicas e a minuta da petição) — pelo nome do cliente ou número do processo. NÃO gera uma análise nova: se não houver nenhuma salva ainda, oriente o usuário a abrir o processo → painel 'IA Jurídica' → botão 'Impugnar Laudo', selecionar o laudo pericial anexado e gerar por lá (é uma leitura pesada do PDF que não cabe dentro do chat). Depois de gerada, use esta ferramenta pra trazer o resultado e discutir/elaborar mais sobre ele livremente no chat.",
     input_schema: {
       type: "object",
       properties: {
@@ -880,7 +914,9 @@ export async function executarFerramentaIris(
   }
   if (
     (name === "listar_processos_risco" ||
-      name === "consultar_analise_cerebro") &&
+      name === "consultar_analise_cerebro" ||
+      name === "localizar_documentos_processo" ||
+      name === "consultar_impugnacao_laudo") &&
     !hasPermission(session, "processos", "ver")
   ) {
     return JSON.stringify({
@@ -1529,6 +1565,116 @@ async function executarFerramentaIrisInterno(
           base_legal: r.base_legal,
           analisado_em: r.criado_em,
         })),
+      });
+    }
+
+    case "localizar_documentos_processo": {
+      const buscaDoc = String(input.busca ?? "").trim();
+      if (!buscaDoc)
+        return JSON.stringify({
+          erro: "Informe um nome de cliente ou número de processo.",
+        });
+      const podeVerTodosDoc = hasPermission(
+        session,
+        "processos_ver_todos",
+        "ver"
+      );
+      const colaboradorIdDoc = podeVerTodosDoc
+        ? null
+        : await getColaboradorIdForUser(session.id);
+      const candidatosProc = await sql`
+        SELECT p.id::text, p.client_id::text, p.numero, cl.name AS cliente_nome
+        FROM processos p
+        LEFT JOIN clients cl ON cl.id = p.client_id
+        WHERE p.deleted_at IS NULL
+          AND (cl.name ILIKE ${"%" + buscaDoc + "%"} OR p.numero ILIKE ${"%" + buscaDoc + "%"})
+          AND (${podeVerTodosDoc} OR p.responsavel_id = ${colaboradorIdDoc}::uuid)
+        ORDER BY p.created_at DESC
+        LIMIT 5
+      `;
+      if (candidatosProc.length === 0)
+        return JSON.stringify({
+          mensagem: `Nenhum processo encontrado para "${buscaDoc}".`,
+        });
+      if (candidatosProc.length > 1)
+        return JSON.stringify({
+          ok: false,
+          erro: `Mais de um processo bate com "${buscaDoc}" — pergunte ao usuário qual.`,
+          opcoes: candidatosProc.map(
+            (p) => `${p.cliente_nome ?? "—"} (${p.numero})`
+          ),
+        });
+      const proc = candidatosProc[0];
+      const MIME_DOC = new Set([
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ]);
+      const docsProc = await sql`
+        SELECT nome, tipo, created_at::text AS criado_em
+        FROM documentos
+        WHERE (entity_type = 'processo' AND entity_id = ${proc.id}::uuid)
+           OR (entity_type = 'cliente' AND entity_id = ${proc.client_id}::uuid)
+        ORDER BY created_at DESC
+      `;
+      return JSON.stringify({
+        processo: proc.numero,
+        cliente: proc.cliente_nome ?? "—",
+        documentos: docsProc
+          .filter((d) => MIME_DOC.has(String(d.tipo)))
+          .map((d) => ({ nome: d.nome, anexado_em: d.criado_em })),
+      });
+    }
+
+    case "consultar_impugnacao_laudo": {
+      const buscaImp = String(input.busca ?? "").trim();
+      if (!buscaImp)
+        return JSON.stringify({
+          erro: "Informe um nome de cliente ou número de processo.",
+        });
+      const podeVerTodosImp = hasPermission(
+        session,
+        "processos_ver_todos",
+        "ver"
+      );
+      const colaboradorIdImp = podeVerTodosImp
+        ? null
+        : await getColaboradorIdForUser(session.id);
+      const rowsImp = await sql`
+        SELECT ca.analise, ca.metadata, ca.created_at::text AS criado_em,
+               p.numero AS processo_numero, cl.name AS cliente_nome
+        FROM cerebro_analises ca
+        JOIN processos p ON p.id = ca.processo_id
+        LEFT JOIN clients cl ON cl.id = p.client_id
+        WHERE ca.tipo = 'impugnacao_laudo'
+          AND p.deleted_at IS NULL
+          AND (cl.name ILIKE ${"%" + buscaImp + "%"} OR p.numero ILIKE ${"%" + buscaImp + "%"})
+          AND (${podeVerTodosImp} OR p.responsavel_id = ${colaboradorIdImp}::uuid)
+        ORDER BY ca.created_at DESC
+        LIMIT 1
+      `;
+      if (rowsImp.length === 0)
+        return JSON.stringify({
+          mensagem: `Nenhuma impugnação de laudo pericial já gerada para "${buscaImp}". Oriente o usuário a abrir o processo → painel "IA Jurídica" → botão "Impugnar Laudo", selecionar o laudo pericial anexado e gerar por lá.`,
+        });
+      const rImp = rowsImp[0];
+      const metaImp = (rImp.metadata ?? {}) as {
+        vicios?: unknown;
+        quesitos_complementares?: unknown;
+        teses_juridicas?: unknown;
+        documentos?: unknown;
+      };
+      return JSON.stringify({
+        processo: rImp.processo_numero ?? "—",
+        cliente: rImp.cliente_nome ?? "—",
+        gerado_em: rImp.criado_em,
+        documentos_analisados: metaImp.documentos ?? [],
+        vicios: metaImp.vicios ?? [],
+        quesitos_complementares: metaImp.quesitos_complementares ?? [],
+        teses_juridicas: metaImp.teses_juridicas ?? [],
+        minuta_impugnacao: rImp.analise,
       });
     }
 

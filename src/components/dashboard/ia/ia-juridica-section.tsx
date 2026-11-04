@@ -17,6 +17,9 @@ const IaAnalisarModal = dynamic(() => import("./ia-analisar-modal"), {
 const IaQuesitosModal = dynamic(() => import("./ia-quesitos-modal"), {
   ssr: false,
 });
+const IaImpugnacaoModal = dynamic(() => import("./ia-impugnacao-modal"), {
+  ssr: false,
+});
 
 interface Props {
   clienteId?: string;
@@ -44,7 +47,13 @@ const LABEL_RISCO: Record<string, string> = {
   alto: "Risco Alto",
 };
 
-type Secao = "peticao" | "analisar" | "estrategia" | "quesitos" | null;
+type Secao =
+  | "peticao"
+  | "analisar"
+  | "estrategia"
+  | "quesitos"
+  | "impugnacao"
+  | null;
 
 // Passo 1: docs analisados / Passo 2: cadastro complementado / Passo 3: Cérebro rodou
 type WorkflowStep = 0 | 1 | 2 | 3;
@@ -142,6 +151,13 @@ export default function IaJuridicaSection({
           onClose={() => setSecao(null)}
         />
       )}
+      {secao === "impugnacao" && processoId && (
+        <IaImpugnacaoModal
+          clienteId={clienteId}
+          processoId={processoId}
+          onClose={() => setSecao(null)}
+        />
+      )}
 
       {/* ── Painel principal ── */}
       <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
@@ -149,7 +165,7 @@ export default function IaJuridicaSection({
         <WorkflowGuide step={workflowStep} temCliente={!!clienteId} />
 
         {/* Header com botões em linha — ordem do fluxo */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-b border-border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 border-b border-border">
           <ActionButton
             icon="🔍"
             label="Analisar Documento"
@@ -186,6 +202,19 @@ export default function IaJuridicaSection({
               active={secao === "quesitos"}
               onClick={() => setSecao(secao === "quesitos" ? null : "quesitos")}
               color="teal"
+              border
+            />
+          )}
+          {processoId && (
+            <ActionButton
+              icon="📑"
+              label="Impugnar Laudo"
+              sublabel="Perícia judicial"
+              active={secao === "impugnacao"}
+              onClick={() =>
+                setSecao(secao === "impugnacao" ? null : "impugnacao")
+              }
+              color="rose"
               border
             />
           )}
@@ -480,7 +509,7 @@ function ActionButton({
   sublabel: string;
   active: boolean;
   onClick: () => void;
-  color: "primary" | "blue" | "violet" | "teal";
+  color: "primary" | "blue" | "violet" | "teal" | "rose";
   border?: boolean;
 }) {
   const activeClasses = {
@@ -488,12 +517,14 @@ function ActionButton({
     blue: "bg-blue-600 text-white",
     violet: "bg-violet-600 text-white",
     teal: "bg-teal-600 text-white",
+    rose: "bg-rose-600 text-white",
   };
   const hoverClasses = {
     primary: "hover:bg-primary/5 hover:text-primary",
     blue: "hover:bg-blue-50 hover:text-blue-700",
     violet: "hover:bg-violet-50 hover:text-violet-700",
     teal: "hover:bg-teal-50 hover:text-teal-700",
+    rose: "hover:bg-rose-50 hover:text-rose-700",
   };
 
   return (

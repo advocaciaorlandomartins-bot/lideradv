@@ -27,9 +27,9 @@ export type TipoLembrete =
   | "dcb_30d"
   | "dcb_15d"
   | "dcb_5d"
-  | "prazo_judicial_imediato"
-  | "prazo_judicial_5d"
-  | "prazo_judicial_1d";
+  | "controle_fatal_imediato"
+  | "controle_fatal_5d"
+  | "controle_fatal_1d";
 
 // ── Helpers de data ───────────────────────────────────────────
 //
@@ -1112,16 +1112,19 @@ export async function agendarLembretesDcb(opts: {
   }
 }
 
-// Pedido do Orlando (2026-11-05): prazo extraído de documento judicial
-// (Processar Judicial, na ficha do cliente) tem que SEMPRE avisar o
-// advogado responsável pelo processo — não só o escritório — e NUNCA
+// Pedido do Orlando (2026-11-05): qualquer controle marcado como "prazo
+// fatal" (audiência, prazo, benefício, alvará etc — qualquer tipo, chamado
+// de createControleAction pra todo mundo que cria um controle fatal, não
+// só o fluxo de Processar Judicial onde isso começou) tem que SEMPRE
+// avisar o responsável diretamente — não só o escritório — e NUNCA
 // depender só do aviso em cima da hora/no dia do vencimento: por isso,
 // além de um aviso quase-imediato (respeitando horário comercial — ver
 // proximoHorarioComercial), agenda avisos de antecedência (5 e 1 dia
-// antes) igual já existe pra DCB. Sem isso, o responsável só ficava
-// sabendo se abrisse o sistema e olhasse Controles/Agenda por conta
-// própria.
-export async function agendarLembretesPrazoJudicial(opts: {
+// antes), parecido com o que já existe pra DCB (agendarLembretesDcb, fluxo
+// próprio e mais escalonado por ser um prazo tipicamente de meses, não
+// dias). Sem isso, o responsável só ficava sabendo se abrisse o sistema e
+// olhasse Controles/Agenda por conta própria.
+export async function agendarLembretesResponsavelControleFatal(opts: {
   controleId: string;
   clienteId: string;
   clienteNome: string;
@@ -1146,7 +1149,7 @@ export async function agendarLembretesPrazoJudicial(opts: {
        destinatario_tipo, destinatario_telefone, destinatario_nome,
        mensagem, enviar_em)
     VALUES
-      ('prazo_judicial_imediato', 'controle', ${opts.controleId}::uuid,
+      ('controle_fatal_imediato', 'controle', ${opts.controleId}::uuid,
        ${opts.clienteId}::uuid, ${opts.clienteNome},
        'colaborador', ${opts.colaboradorTelefone}, ${opts.colaboradorNome},
        ${mensagemImediata}, ${imediatoEm.toISOString()})
@@ -1154,12 +1157,12 @@ export async function agendarLembretesPrazoJudicial(opts: {
 
   const avisos: Array<{ tipo: TipoLembrete; enviarEm: Date; dias: number }> = [
     {
-      tipo: "prazo_judicial_5d",
+      tipo: "controle_fatal_5d",
       enviarEm: diasAntes(opts.dataEvento, 5, 8),
       dias: 5,
     },
     {
-      tipo: "prazo_judicial_1d",
+      tipo: "controle_fatal_1d",
       enviarEm: diasAntes(opts.dataEvento, 1, 8),
       dias: 1,
     },

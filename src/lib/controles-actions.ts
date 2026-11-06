@@ -10,25 +10,19 @@ import { logAction } from "./audit";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
 import { alertarPrazoFatalNovo } from "./resumo-diario";
-import { agendarLembretesPrazoJudicial } from "./lembretes";
+import { agendarLembretesResponsavelControleFatal } from "./lembretes";
 
 export type ControleFormState = {
   error?: string;
   success?: boolean;
   id?: string;
-} | null;
-
-export type ControleJudicialResult = {
-  error?: string;
-  success?: boolean;
-  id?: string;
-  /** true só quando o processo tinha responsável com telefone cadastrado e
-   * os avisos dedicados (imediato + 5d/1d antes) foram agendados pra ele —
-   * usado pra tela não afirmar "o responsável foi avisado" quando isso de
-   * fato não aconteceu (ex: processo sem vínculo ou responsável sem
-   * telefone). */
+  /** true só quando o controle criado/atualizado é fatal, tem responsável
+   * com telefone cadastrado, e os avisos dedicados a ele (imediato +
+   * 5d/1d antes) foram agendados — usado pra tela não afirmar "o
+   * responsável foi avisado" quando isso de fato não aconteceu (ex: sem
+   * responsável, responsável sem telefone, ou controle não fatal). */
   avisoResponsavelAgendado?: boolean;
-};
+} | null;
 
 async function buildDadosAudiencia(formData: FormData): Promise<string | null> {
   const hora = ((formData.get("hora") as string) ?? "").trim() || null;
@@ -384,9 +378,14 @@ export async function createControleAction(
     descricao: `Criou controle: ${tipo}`,
   });
 
+  let avisoResponsavelAgendado = false;
+
   if (fatal && novoId) {
     const descricaoFinal = descricao || tipo;
     const clienteIdFinal = clienteId;
+
+    // Alerta geral do escritório (já existia) — segue em background, não
+    // precisa que a tela espere isso pra responder.
     after(async () => {
       const clienteNome = clienteIdFinal
         ? await sql`SELECT name FROM clients WHERE id = ${clienteIdFinal}::uuid`
@@ -395,10 +394,58 @@ export async function createControleAction(
         : null;
       await alertarPrazoFatalNovo(descricaoFinal, dataEvento, clienteNome);
     });
+
+    // Aviso dedicado ao responsável do controle (pedido do Orlando,
+    // 2026-11-05: generalizado de Processar Judicial pra qualquer controle
+    // fatal criado por aqui — formulário manual, Processar Judicial etc.).
+    // Síncrono (só inserts em lembretes_agendados, sem chamada de API aqui
+    // dentro) pra poder reportar de verdade se o aviso foi agendado.
+    if (responsavelId && clienteIdFinal && dataEvento) {
+      try {
+        const [usr] = await sql`
+          SELECT colaborador_id::text FROM usuarios WHERE id = ${responsavelId}::uuid
+        `;
+        const colaboradorId =
+          (usr?.colaborador_id as string | undefined) ?? null;
+        if (colaboradorId) {
+          const [col] = await sql`
+            SELECT telefone, nome FROM colaboradores WHERE id = ${colaboradorId}::uuid
+          `;
+          const colaboradorTelefone = col?.telefone
+            ? String(col.telefone)
+            : null;
+          const colaboradorNome = col?.nome ? String(col.nome) : null;
+          if (colaboradorTelefone) {
+            const [cli] = await sql`
+              SELECT name FROM clients WHERE id = ${clienteIdFinal}::uuid
+            `;
+            await agendarLembretesResponsavelControleFatal({
+              controleId: novoId,
+              clienteId: clienteIdFinal,
+              clienteNome: (cli?.name as string | undefined) ?? "",
+              descricao: descricaoFinal,
+              dataEvento: new Date(`${dataEvento}T12:00:00`),
+              colaboradorTelefone,
+              colaboradorNome: colaboradorNome ?? "Responsável",
+            });
+            avisoResponsavelAgendado = true;
+          }
+        }
+      } catch (err) {
+        console.error(
+          "[createControleAction] falha ao agendar aviso do responsável:",
+          err
+        );
+      }
+    }
   }
 
   revalidatePath("/dashboard/controles");
-  return { success: true, id: novoId ?? undefined };
+  return {
+    success: true,
+    id: novoId ?? undefined,
+    avisoResponsavelAgendado,
+  };
 }
 
 /**
@@ -419,13 +466,13 @@ export async function createControleAction(
  * responsável que depois comparasse com session.id).
  *
  * fatal=true sempre — prazo de intimação/decisão perdido pode encerrar o
- * direito do cliente. Isso já dispara o alerta pro escritório (ver
- * alertarPrazoFatalNovo, agora também ciente de horário comercial) e entra
- * automaticamente no resumo diário por e-mail (cron /api/cron/prazos) e na
- * Agenda/Controles, que leem direto da tabela controles. Além disso, SE o
- * processo tiver responsável com telefone cadastrado, agenda os avisos
- * dedicados a ele (agendarLembretesPrazoJudicial) — aviso quase-imediato +
- * 5 e 1 dia antes do vencimento, nunca só "no dia".
+ * direito do cliente. createControleAction cuida do resto sozinho a partir
+ * daqui: alerta pro escritório, resumo diário por e-mail, Agenda/Controles,
+ * e — se o responsavel_id resolvido abaixo tiver telefone cadastrado — os
+ * avisos dedicados a ele (aviso quase-imediato + 5 e 1 dia antes do
+ * vencimento, nunca só "no dia"; ver agendarLembretesResponsavelControleFatal
+ * em lembretes.ts), já generalizado pra valer em qualquer controle fatal
+ * criado no sistema, não só por aqui.
  */
 export async function criarControleDeDocumentoJudicialAction(opts: {
   clienteId: string;
@@ -436,26 +483,18 @@ export async function criarControleDeDocumentoJudicialAction(opts: {
   dataEvento: string;
   hora?: string | null;
   localTexto?: string | null;
-}): Promise<ControleJudicialResult> {
+}): Promise<ControleFormState> {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "criar"))
     return { error: "Sem permissão." };
 
   let usuarioResponsavelId: string | null = null;
-  let colaboradorTelefone: string | null = null;
-  let colaboradorNome: string | null = null;
   if (opts.processoId) {
     const [proc] = await sql`
       SELECT responsavel_id::text FROM processos WHERE id = ${opts.processoId}::uuid
     `;
     const colaboradorId = (proc?.responsavel_id as string | undefined) ?? null;
     if (colaboradorId) {
-      const [col] = await sql`
-        SELECT telefone, nome FROM colaboradores WHERE id = ${colaboradorId}::uuid
-      `;
-      colaboradorTelefone = col?.telefone ? String(col.telefone) : null;
-      colaboradorNome = col?.nome ? String(col.nome) : null;
-
       const [usr] = await sql`
         SELECT id::text FROM usuarios WHERE colaborador_id = ${colaboradorId}::uuid
       `;
@@ -481,30 +520,7 @@ export async function criarControleDeDocumentoJudicialAction(opts: {
     }
   }
 
-  const resultado = await createControleAction(null, form);
-  let avisoResponsavelAgendado = false;
-
-  if (resultado?.success && resultado.id && colaboradorTelefone) {
-    try {
-      await agendarLembretesPrazoJudicial({
-        controleId: resultado.id,
-        clienteId: opts.clienteId,
-        clienteNome: opts.clienteNome,
-        descricao: opts.descricao,
-        dataEvento: new Date(`${opts.dataEvento}T12:00:00`),
-        colaboradorTelefone,
-        colaboradorNome: colaboradorNome ?? "Responsável",
-      });
-      avisoResponsavelAgendado = true;
-    } catch (err) {
-      console.error(
-        "[criarControleDeDocumentoJudicialAction] falha ao agendar lembretes:",
-        err
-      );
-    }
-  }
-
-  return { ...resultado, avisoResponsavelAgendado };
+  return createControleAction(null, form);
 }
 
 export async function updateControleAction(

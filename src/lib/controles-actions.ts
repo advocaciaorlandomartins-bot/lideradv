@@ -10,12 +10,25 @@ import { logAction } from "./audit";
 import { registrarPontosConclusao, reverterPontosConclusao } from "./pontuacao";
 import { checklistCompleto } from "./checklist";
 import { alertarPrazoFatalNovo } from "./resumo-diario";
+import { agendarLembretesPrazoJudicial } from "./lembretes";
 
 export type ControleFormState = {
   error?: string;
   success?: boolean;
   id?: string;
 } | null;
+
+export type ControleJudicialResult = {
+  error?: string;
+  success?: boolean;
+  id?: string;
+  /** true só quando o processo tinha responsável com telefone cadastrado e
+   * os avisos dedicados (imediato + 5d/1d antes) foram agendados pra ele —
+   * usado pra tela não afirmar "o responsável foi avisado" quando isso de
+   * fato não aconteceu (ex: processo sem vínculo ou responsável sem
+   * telefone). */
+  avisoResponsavelAgendado?: boolean;
+};
 
 async function buildDadosAudiencia(formData: FormData): Promise<string | null> {
   const hora = ((formData.get("hora") as string) ?? "").trim() || null;
@@ -395,39 +408,66 @@ export async function createControleAction(
  * vinculado (se houver) em vez de deixar em branco: sem isso, o prazo
  * criado não aparecia pro advogado responsável pelo processo em nenhuma
  * visão filtrada por responsável (Minhas Tarefas, Controles sem
- * "ver todos"), só pra quem tem processos_ver_todos. fatal=true sempre —
- * prazo de intimação/decisão perdido pode encerrar o direito do cliente,
- * e fatal=true já dispara o alerta imediato por WhatsApp (ver
- * alertarPrazoFatalNovo) pro telefone do escritório, além de entrar
- * automaticamente no resumo diário por e-mail (cron /api/cron/prazos) e
- * na Agenda/Controles, que já leem direto da tabela controles.
+ * "ver todos"), só pra quem tem processos_ver_todos.
+ *
+ * processos.responsavel_id referencia colaboradores(id), mas
+ * controles.responsavel_id referencia usuarios(id) (mesma regra já
+ * documentada dentro de createControleAction) — por isso faz a conversão
+ * colaborador→usuário aqui antes de montar o form, em vez de repassar o id
+ * do processo direto (isso gravaria um colaboradores.id num campo que
+ * espera usuarios.id, quebrando silenciosamente qualquer filtro por
+ * responsável que depois comparasse com session.id).
+ *
+ * fatal=true sempre — prazo de intimação/decisão perdido pode encerrar o
+ * direito do cliente. Isso já dispara o alerta pro escritório (ver
+ * alertarPrazoFatalNovo, agora também ciente de horário comercial) e entra
+ * automaticamente no resumo diário por e-mail (cron /api/cron/prazos) e na
+ * Agenda/Controles, que leem direto da tabela controles. Além disso, SE o
+ * processo tiver responsável com telefone cadastrado, agenda os avisos
+ * dedicados a ele (agendarLembretesPrazoJudicial) — aviso quase-imediato +
+ * 5 e 1 dia antes do vencimento, nunca só "no dia".
  */
 export async function criarControleDeDocumentoJudicialAction(opts: {
   clienteId: string;
+  clienteNome: string;
   processoId: string | null;
   tipo: "prazos" | "audiencias";
   descricao: string;
   dataEvento: string;
   hora?: string | null;
   localTexto?: string | null;
-}): Promise<ControleFormState> {
+}): Promise<ControleJudicialResult> {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "criar"))
     return { error: "Sem permissão." };
 
-  let responsavelId: string | null = null;
+  let usuarioResponsavelId: string | null = null;
+  let colaboradorTelefone: string | null = null;
+  let colaboradorNome: string | null = null;
   if (opts.processoId) {
-    const [row] = await sql`
+    const [proc] = await sql`
       SELECT responsavel_id::text FROM processos WHERE id = ${opts.processoId}::uuid
     `;
-    responsavelId = (row?.responsavel_id as string | undefined) ?? null;
+    const colaboradorId = (proc?.responsavel_id as string | undefined) ?? null;
+    if (colaboradorId) {
+      const [col] = await sql`
+        SELECT telefone, nome FROM colaboradores WHERE id = ${colaboradorId}::uuid
+      `;
+      colaboradorTelefone = col?.telefone ? String(col.telefone) : null;
+      colaboradorNome = col?.nome ? String(col.nome) : null;
+
+      const [usr] = await sql`
+        SELECT id::text FROM usuarios WHERE colaborador_id = ${colaboradorId}::uuid
+      `;
+      usuarioResponsavelId = (usr?.id as string | undefined) ?? null;
+    }
   }
 
   const form = new FormData();
   form.set("tipo", opts.tipo);
   form.set("cliente_id", opts.clienteId);
   if (opts.processoId) form.set("processo_id", opts.processoId);
-  if (responsavelId) form.set("responsavel_id", responsavelId);
+  if (usuarioResponsavelId) form.set("responsavel_id", usuarioResponsavelId);
   form.set("descricao", opts.descricao);
   form.set("data_evento", opts.dataEvento);
   form.set("fatal", "on");
@@ -441,7 +481,30 @@ export async function criarControleDeDocumentoJudicialAction(opts: {
     }
   }
 
-  return createControleAction(null, form);
+  const resultado = await createControleAction(null, form);
+  let avisoResponsavelAgendado = false;
+
+  if (resultado?.success && resultado.id && colaboradorTelefone) {
+    try {
+      await agendarLembretesPrazoJudicial({
+        controleId: resultado.id,
+        clienteId: opts.clienteId,
+        clienteNome: opts.clienteNome,
+        descricao: opts.descricao,
+        dataEvento: new Date(`${opts.dataEvento}T12:00:00`),
+        colaboradorTelefone,
+        colaboradorNome: colaboradorNome ?? "Responsável",
+      });
+      avisoResponsavelAgendado = true;
+    } catch (err) {
+      console.error(
+        "[criarControleDeDocumentoJudicialAction] falha ao agendar lembretes:",
+        err
+      );
+    }
+  }
+
+  return { ...resultado, avisoResponsavelAgendado };
 }
 
 export async function updateControleAction(

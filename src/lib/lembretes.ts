@@ -26,7 +26,10 @@ export type TipoLembrete =
   | "conta_vence_hoje"
   | "dcb_30d"
   | "dcb_15d"
-  | "dcb_5d";
+  | "dcb_5d"
+  | "prazo_judicial_imediato"
+  | "prazo_judicial_5d"
+  | "prazo_judicial_1d";
 
 // ── Helpers de data ───────────────────────────────────────────
 //
@@ -40,7 +43,7 @@ const OFFSET_BRASILIA_HORAS = 3;
 
 // Combina ano/mês/dia (em UTC, como dataEvento é sempre construída) com um
 // horário de relógio de Brasília e devolve o instante absoluto (UTC) correto.
-function horaBrasiliaParaUTC(
+export function horaBrasiliaParaUTC(
   ano: number,
   mesIndex: number,
   dia: number,
@@ -67,6 +70,40 @@ function diasAntes(
     hora,
     minuto
   );
+}
+
+// Hora de Brasília "agora" como um Date cujos getFullYear/getMonth/getDate/
+// getHours já refletem o relógio de Brasília — não dá pra usar os getters
+// UTC direto porque o runtime serverless roda em UTC. Mesmo truque já usado
+// em /api/cron/lembretes.
+export function agoraBrasilia(): Date {
+  return new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  );
+}
+
+const HORA_COMERCIAL_INICIO = 8;
+const HORA_COMERCIAL_FIM = 20;
+
+export function dentroHorarioComercial(): boolean {
+  const h = agoraBrasilia().getHours();
+  return h >= HORA_COMERCIAL_INICIO && h < HORA_COMERCIAL_FIM;
+}
+
+// Próximas 8h de Brasília — hoje se ainda não passou das 8h, senão amanhã.
+// Usado pra nunca mandar uma notificação "imediata" de verdade fora do
+// horário comercial (madrugada/noite): quem recebe pode estar dormindo e
+// uma mensagem àquela hora passa impressão de urgência que não existe.
+export function proximoHorarioComercial(): Date {
+  const br = agoraBrasilia();
+  const alvoHoje = horaBrasiliaParaUTC(
+    br.getFullYear(),
+    br.getMonth(),
+    br.getDate(),
+    HORA_COMERCIAL_INICIO
+  );
+  if (br.getHours() < HORA_COMERCIAL_INICIO) return alvoHoje;
+  return new Date(alvoHoje.getTime() + 24 * 60 * 60 * 1000);
 }
 
 function mesmoDia(dataEvento: Date, hora: number, minuto = 0): Date {
@@ -1071,6 +1108,78 @@ export async function agendarLembretesDcb(opts: {
          ${opts.clienteId}::uuid, ${opts.clienteNome},
          'colaborador', ${opts.colaboradorTelefone}, ${opts.colaboradorNome},
          ${mensagem}, ${lembrete.enviarEm.toISOString()})
+    `;
+  }
+}
+
+// Pedido do Orlando (2026-11-05): prazo extraído de documento judicial
+// (Processar Judicial, na ficha do cliente) tem que SEMPRE avisar o
+// advogado responsável pelo processo — não só o escritório — e NUNCA
+// depender só do aviso em cima da hora/no dia do vencimento: por isso,
+// além de um aviso quase-imediato (respeitando horário comercial — ver
+// proximoHorarioComercial), agenda avisos de antecedência (5 e 1 dia
+// antes) igual já existe pra DCB. Sem isso, o responsável só ficava
+// sabendo se abrisse o sistema e olhasse Controles/Agenda por conta
+// própria.
+export async function agendarLembretesPrazoJudicial(opts: {
+  controleId: string;
+  clienteId: string;
+  clienteNome: string;
+  descricao: string;
+  dataEvento: Date;
+  colaboradorTelefone: string;
+  colaboradorNome: string;
+}): Promise<void> {
+  const dataFormatada = formatarData(opts.dataEvento);
+  const agora = new Date();
+
+  const imediatoEm = dentroHorarioComercial()
+    ? agora
+    : proximoHorarioComercial();
+  const mensagemImediata =
+    `🚨 *Novo prazo registrado — ${opts.clienteNome}*\n\n${opts.descricao}` +
+    `\nVence em: ${dataFormatada}\n\n` +
+    `_Você é o responsável por esse processo no LiderAdv._`;
+  await sql`
+    INSERT INTO lembretes_agendados
+      (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+       destinatario_tipo, destinatario_telefone, destinatario_nome,
+       mensagem, enviar_em)
+    VALUES
+      ('prazo_judicial_imediato', 'controle', ${opts.controleId}::uuid,
+       ${opts.clienteId}::uuid, ${opts.clienteNome},
+       'colaborador', ${opts.colaboradorTelefone}, ${opts.colaboradorNome},
+       ${mensagemImediata}, ${imediatoEm.toISOString()})
+  `;
+
+  const avisos: Array<{ tipo: TipoLembrete; enviarEm: Date; dias: number }> = [
+    {
+      tipo: "prazo_judicial_5d",
+      enviarEm: diasAntes(opts.dataEvento, 5, 8),
+      dias: 5,
+    },
+    {
+      tipo: "prazo_judicial_1d",
+      enviarEm: diasAntes(opts.dataEvento, 1, 8),
+      dias: 1,
+    },
+  ];
+  for (const aviso of avisos) {
+    if (aviso.enviarEm <= agora) continue;
+    const mensagem =
+      `⏰ *Prazo se aproximando — ${opts.clienteNome}*\n\n${opts.descricao}` +
+      `\nFaltam ${aviso.dias} dia${aviso.dias > 1 ? "s" : ""} (${dataFormatada}).\n\n` +
+      `_Você é o responsável por esse processo no LiderAdv._`;
+    await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+         destinatario_tipo, destinatario_telefone, destinatario_nome,
+         mensagem, enviar_em)
+      VALUES
+        (${aviso.tipo}, 'controle', ${opts.controleId}::uuid,
+         ${opts.clienteId}::uuid, ${opts.clienteNome},
+         'colaborador', ${opts.colaboradorTelefone}, ${opts.colaboradorNome},
+         ${mensagem}, ${aviso.enviarEm.toISOString()})
     `;
   }
 }

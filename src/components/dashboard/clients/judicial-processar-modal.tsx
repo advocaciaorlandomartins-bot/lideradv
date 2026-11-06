@@ -45,6 +45,9 @@ export default function JudicialProcessarModal({
     Record<number, StatusControle>
   >({});
   const [erroControle, setErroControle] = useState<Record<number, string>>({});
+  const [avisoResponsavel, setAvisoResponsavel] = useState<
+    Record<number, boolean>
+  >({});
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Cria o prazo/audiência extraído direto em Controles — já entra
@@ -63,6 +66,7 @@ export default function JudicialProcessarModal({
     const res = r.data_audiencia
       ? await criarControleDeDocumentoJudicialAction({
           clienteId,
+          clienteNome,
           processoId: processoSelecionado || null,
           tipo: "audiencias",
           dataEvento: r.data_audiencia,
@@ -76,6 +80,7 @@ export default function JudicialProcessarModal({
       : r.data_prazo
         ? await criarControleDeDocumentoJudicialAction({
             clienteId,
+            clienteNome,
             processoId: processoSelecionado || null,
             tipo: "prazos",
             dataEvento: r.data_prazo,
@@ -92,6 +97,10 @@ export default function JudicialProcessarModal({
       setErroControle((prev) => ({ ...prev, [i]: res.error! }));
     } else {
       setStatusControle((prev) => ({ ...prev, [i]: "criado" }));
+      setAvisoResponsavel((prev) => ({
+        ...prev,
+        [i]: !!res.avisoResponsavelAgendado,
+      }));
     }
   }
 
@@ -311,11 +320,12 @@ export default function JudicialProcessarModal({
                       {statusControle[i] === "criado" ? (
                         <p className="font-body text-xs font-semibold text-emerald-700">
                           ✓ {r.data_audiencia ? "Audiência" : "Prazo"} criado —
-                          já está em Controles, na Agenda e no responsável do
-                          processo foi avisado por WhatsApp (prazo fatal)
-                          {processoSelecionado
-                            ? ""
-                            : ". Vinculado só ao cliente — sem processo selecionado abaixo, não tem responsável definido."}
+                          já está em Controles e na Agenda.{" "}
+                          {avisoResponsavel[i]
+                            ? "O responsável pelo processo vai ser avisado por WhatsApp (agora ou amanhã de manhã, se for fora do horário comercial) e vai receber lembretes de novo 5 e 1 dia antes do vencimento."
+                            : processoSelecionado
+                              ? "O processo selecionado não tem responsável com telefone cadastrado — ninguém será avisado por WhatsApp, só quem olhar Controles/Agenda manualmente."
+                              : "Vinculado só ao cliente, sem processo selecionado acima — ninguém será avisado por WhatsApp, só quem olhar Controles/Agenda manualmente."}
                         </p>
                       ) : (
                         <>

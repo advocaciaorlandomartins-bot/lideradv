@@ -8,6 +8,7 @@ import { enviarMensagemDireta } from "./prevbot-outbound";
 import { getAllProcessosProducao } from "./producao-db";
 import { getLancamentoKpis } from "./lancamentos-db";
 import { getClientesAguardandoResposta } from "./prevbot-status";
+import { dentroHorarioComercial, proximoHorarioComercial } from "./lembretes";
 
 // Nenhum SLA/tempo médio por estágio existe no sistema hoje — 30 dias é um
 // limiar de bom senso ("ninguém tocou nisso há um mês"), não um cálculo.
@@ -18,7 +19,8 @@ const DIAS_PROCESSO_PARADO = 30;
  * Alerta imediato (não espera o resumo do dia seguinte) quando um controle é
  * marcado prazo fatal — criado assim ou editado passando a ser fatal. Só
  * quem chama decide QUANDO disparar (na transição false→true); esta função
- * só monta e manda a mensagem.
+ * só monta a mensagem e decide mandar na hora (horário comercial) ou
+ * agendar pra 8h do próximo dia (fora dele).
  */
 export async function alertarPrazoFatalNovo(
   descricao: string,
@@ -37,9 +39,23 @@ export async function alertarPrazoFatalNovo(
       `${clienteNome ? `\nCliente: ${clienteNome}` : ""}` +
       `\nData: ${dataFmt}` +
       `\n\nAcesse LiderAdv para conferir.`;
-    await enviarMensagemDireta({ telefone, mensagem: msg });
+
+    if (dentroHorarioComercial()) {
+      await enviarMensagemDireta({ telefone, mensagem: msg });
+      return;
+    }
+
+    await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, cliente_nome, destinatario_tipo,
+         destinatario_telefone, destinatario_nome, mensagem, enviar_em)
+      VALUES
+        ('prazo_fatal_imediato', 'controle', ${clienteNome},
+         'escritorio', ${telefone}, 'Escritório', ${msg},
+         ${proximoHorarioComercial().toISOString()})
+    `;
   } catch (err) {
-    console.error("[alertarPrazoFatalNovo] falha ao enviar:", err);
+    console.error("[alertarPrazoFatalNovo] falha ao enviar/agendar:", err);
   }
 }
 

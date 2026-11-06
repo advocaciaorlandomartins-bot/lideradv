@@ -388,6 +388,62 @@ export async function createControleAction(
   return { success: true, id: novoId ?? undefined };
 }
 
+/**
+ * Cria prazo/audiência extraído por IA de um documento judicial (modal
+ * "Processar Judicial" na ficha do cliente) — wrapper fino sobre
+ * createControleAction. Resolve o responsavel_id a partir do processo
+ * vinculado (se houver) em vez de deixar em branco: sem isso, o prazo
+ * criado não aparecia pro advogado responsável pelo processo em nenhuma
+ * visão filtrada por responsável (Minhas Tarefas, Controles sem
+ * "ver todos"), só pra quem tem processos_ver_todos. fatal=true sempre —
+ * prazo de intimação/decisão perdido pode encerrar o direito do cliente,
+ * e fatal=true já dispara o alerta imediato por WhatsApp (ver
+ * alertarPrazoFatalNovo) pro telefone do escritório, além de entrar
+ * automaticamente no resumo diário por e-mail (cron /api/cron/prazos) e
+ * na Agenda/Controles, que já leem direto da tabela controles.
+ */
+export async function criarControleDeDocumentoJudicialAction(opts: {
+  clienteId: string;
+  processoId: string | null;
+  tipo: "prazos" | "audiencias";
+  descricao: string;
+  dataEvento: string;
+  hora?: string | null;
+  localTexto?: string | null;
+}): Promise<ControleFormState> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "controles", "criar"))
+    return { error: "Sem permissão." };
+
+  let responsavelId: string | null = null;
+  if (opts.processoId) {
+    const [row] = await sql`
+      SELECT responsavel_id::text FROM processos WHERE id = ${opts.processoId}::uuid
+    `;
+    responsavelId = (row?.responsavel_id as string | undefined) ?? null;
+  }
+
+  const form = new FormData();
+  form.set("tipo", opts.tipo);
+  form.set("cliente_id", opts.clienteId);
+  if (opts.processoId) form.set("processo_id", opts.processoId);
+  if (responsavelId) form.set("responsavel_id", responsavelId);
+  form.set("descricao", opts.descricao);
+  form.set("data_evento", opts.dataEvento);
+  form.set("fatal", "on");
+  form.set("prioridade", "alta");
+  if (opts.tipo === "audiencias") {
+    if (opts.hora) form.set("hora", opts.hora);
+    if (opts.localTexto) {
+      form.set("local_mode", "existente");
+      form.set("local_id", "outro");
+      form.set("local_outro_texto", opts.localTexto);
+    }
+  }
+
+  return createControleAction(null, form);
+}
+
 export async function updateControleAction(
   _prev: ControleFormState,
   formData: FormData

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import type { Processo } from "@/lib/processos-db";
 import type { DocumentoJudicialExtraido } from "@/app/api/ia/processar-judicial/route";
-import { createControleAction } from "@/lib/controles-actions";
+import { criarControleDeDocumentoJudicialAction } from "@/lib/controles-actions";
 
 interface Props {
   clienteId: string;
@@ -47,8 +47,11 @@ export default function JudicialProcessarModal({
   const [erroControle, setErroControle] = useState<Record<number, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Cria o prazo/audiência extraído direto em Controles (e, por tabela,
-  // na Agenda) — antes a tela de revisão só MOSTRAVA o que a IA achou e
+  // Cria o prazo/audiência extraído direto em Controles — já entra
+  // sozinho na Agenda e no resumo diário por e-mail (ambos leem direto da
+  // tabela controles), com o responsável do processo vinculado (se
+  // houver) e fatal=true, que dispara aviso imediato por WhatsApp pro
+  // escritório. Antes a tela de revisão só MOSTRAVA o que a IA achou e
   // dizia pra cadastrar manualmente depois, em outro lugar. Bug real
   // reportado pelo Orlando: achou que o prazo de uma intimação (15 dias)
   // tinha sido cadastrado só por ter "processado com sucesso", mas nada
@@ -57,44 +60,34 @@ export default function JudicialProcessarModal({
     setStatusControle((prev) => ({ ...prev, [i]: "criando" }));
     setErroControle((prev) => ({ ...prev, [i]: "" }));
 
-    const form = new FormData();
-    form.set("cliente_id", clienteId);
-    if (processoSelecionado) form.set("processo_id", processoSelecionado);
-    // Prazo de intimação/decisão perdido pode encerrar o direito do
-    // cliente — mesmo critério já usado em outros fluxos de controle do
-    // sistema (ex: criar_controle da Íris): melhor alertar o escritório
-    // à toa do que deixar passar em silêncio.
-    form.set("fatal", "on");
-    form.set("prioridade", "alta");
+    const res = r.data_audiencia
+      ? await criarControleDeDocumentoJudicialAction({
+          clienteId,
+          processoId: processoSelecionado || null,
+          tipo: "audiencias",
+          dataEvento: r.data_audiencia,
+          descricao:
+            r.tipo_ato ||
+            r.resumo ||
+            "Audiência (extraída de documento judicial)",
+          hora: r.hora_audiencia,
+          localTexto: r.local_audiencia,
+        })
+      : r.data_prazo
+        ? await criarControleDeDocumentoJudicialAction({
+            clienteId,
+            processoId: processoSelecionado || null,
+            tipo: "prazos",
+            dataEvento: r.data_prazo,
+            descricao:
+              r.prazo_descricao ||
+              r.resumo ||
+              "Prazo (extraído de documento judicial)",
+          })
+        : null;
 
-    if (r.data_audiencia) {
-      form.set("tipo", "audiencias");
-      form.set("data_evento", r.data_audiencia);
-      form.set(
-        "descricao",
-        r.tipo_ato || r.resumo || "Audiência (extraída de documento judicial)"
-      );
-      if (r.hora_audiencia) form.set("hora", r.hora_audiencia);
-      if (r.local_audiencia) {
-        form.set("local_mode", "existente");
-        form.set("local_id", "outro");
-        form.set("local_outro_texto", r.local_audiencia);
-      }
-    } else if (r.data_prazo) {
-      form.set("tipo", "prazos");
-      form.set("data_evento", r.data_prazo);
-      form.set(
-        "descricao",
-        r.prazo_descricao ||
-          r.resumo ||
-          "Prazo (extraído de documento judicial)"
-      );
-    } else {
-      return;
-    }
-
-    const res = await createControleAction(null, form);
-    if (res?.error) {
+    if (!res) return;
+    if (res.error) {
       setStatusControle((prev) => ({ ...prev, [i]: "erro" }));
       setErroControle((prev) => ({ ...prev, [i]: res.error! }));
     } else {
@@ -307,6 +300,44 @@ export default function JudicialProcessarModal({
                   key={i}
                   className="rounded-xl border border-slate-200 p-4 space-y-3"
                 >
+                  {(r.data_prazo || r.data_audiencia) && (
+                    <div
+                      className={`rounded-lg px-3 py-2.5 ${
+                        statusControle[i] === "criado"
+                          ? "bg-emerald-50"
+                          : "bg-amber-50"
+                      }`}
+                    >
+                      {statusControle[i] === "criado" ? (
+                        <p className="font-body text-xs font-semibold text-emerald-700">
+                          ✓ {r.data_audiencia ? "Audiência" : "Prazo"} criado —
+                          já está em Controles, na Agenda e no responsável do
+                          processo foi avisado por WhatsApp (prazo fatal)
+                          {processoSelecionado
+                            ? ""
+                            : ". Vinculado só ao cliente — sem processo selecionado abaixo, não tem responsável definido."}
+                        </p>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => criarControle(i, r)}
+                            disabled={statusControle[i] === "criando"}
+                            className="w-full rounded-lg bg-emerald-600 px-3 py-2 font-body text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {statusControle[i] === "criando"
+                              ? "Criando…"
+                              : `⚠️ Criar ${r.data_audiencia ? "audiência" : "prazo"} em Controles (avisa por WhatsApp)`}
+                          </button>
+                          {statusControle[i] === "erro" && (
+                            <p className="mt-1 font-body text-xs text-red-600">
+                              {erroControle[i]}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 font-body text-xs font-medium text-blue-700">
@@ -399,37 +430,6 @@ export default function JudicialProcessarModal({
                       </>
                     )}
                   </dl>
-
-                  {(r.data_prazo || r.data_audiencia) && (
-                    <div className="border-t border-slate-100 pt-3">
-                      {statusControle[i] === "criado" ? (
-                        <p className="font-body text-xs font-medium text-emerald-700">
-                          ✓ {r.data_audiencia ? "Audiência" : "Prazo"} criado em
-                          Controles
-                          {processoSelecionado
-                            ? ""
-                            : " (vinculado só ao cliente — sem processo selecionado acima)"}
-                        </p>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => criarControle(i, r)}
-                            disabled={statusControle[i] === "criando"}
-                            className="rounded-lg bg-emerald-600 px-3 py-1.5 font-body text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                          >
-                            {statusControle[i] === "criando"
-                              ? "Criando…"
-                              : `+ Criar ${r.data_audiencia ? "audiência" : "prazo"} em Controles`}
-                          </button>
-                          {statusControle[i] === "erro" && (
-                            <p className="mt-1 font-body text-xs text-red-600">
-                              {erroControle[i]}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

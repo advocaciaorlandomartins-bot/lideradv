@@ -160,18 +160,19 @@ export default function DocumentsSection({
     setOpenError(null);
 
     // Um arquivo só não precisa virar zip — baixa ele direto, mais rápido
-    // e sem o nome genérico "documentos.zip" pra um único arquivo.
+    // e sem o nome genérico "documentos.zip" pra um único arquivo. Mesmo
+    // caso de handleAbrir acima: o retorno de window.open não é confiável
+    // pra detectar bloqueio real (confirmado em produção — documento
+    // abrindo normalmente mesmo com retorno falsy), então não checa mais
+    // esse retorno aqui também. Esse call site ainda tinha o check antigo
+    // quando o outro já tinha sido corrigido — bug real reportado pelo
+    // Orlando: baixava o arquivo certinho e mesmo assim mostrava o erro.
     if (ids && ids.length === 1) {
-      const aberta = window.open(
+      window.open(
         `/api/documentos/download?id=${ids[0]}&download=1`,
         "_blank",
         "noopener,noreferrer"
       );
-      if (!aberta) {
-        setOpenError(
-          "Não consegui baixar o arquivo — o navegador bloqueou a aba. Tente permitir pop-ups para este site."
-        );
-      }
       return;
     }
 

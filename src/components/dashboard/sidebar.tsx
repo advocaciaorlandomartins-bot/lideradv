@@ -30,6 +30,7 @@ import {
   ChevronRightIcon,
   CheckCircleIcon,
   BookOpenIcon,
+  ScalesIcon,
   IdentificationIcon,
   BellAlertIcon,
   CurrencyIcon,
@@ -122,6 +123,12 @@ const GROUPS: {
         href: "/dashboard/modelos",
         icon: DocumentTextIcon,
         label: "Modelos",
+        modulo: "modelos",
+      },
+      {
+        href: "/dashboard/biblioteca",
+        icon: ScalesIcon,
+        label: "Biblioteca Jurídica",
         modulo: "modelos",
       },
       {

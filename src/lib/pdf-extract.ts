@@ -97,6 +97,26 @@ export async function extractPdfAsImages(
 }
 
 /**
+ * Só o texto digital do PDF, sem nenhum prompt embutido — "" se o PDF for
+ * escaneado (sem camada de texto extraível). Usado quando o texto em si
+ * precisa ser gravado/guardado tal como está no documento (ex: petição que
+ * vira referência em ia_peticoes), em vez de só ser lido pela IA — pedir
+ * pra um modelo "transcrever" um documento jurídico inteiro de volta
+ * arrisca erro de transcrição; extrair com pdf-parse é fiel ao original.
+ */
+export async function extractPdfText(buffer: Buffer): Promise<string> {
+  const { PDFParse } = await loadPdfParse();
+  const textParser = new PDFParse({ data: buffer });
+  await textParser.load();
+  const textResult = await textParser.getText();
+  const fullText = textResult.pages
+    .map((p) => p.text)
+    .join("\n")
+    .trim();
+  return fullText.length > 80 ? fullText : "";
+}
+
+/**
  * Extrai um PDF como texto (digital) ou como imagens das páginas (escaneado).
  * `promptText` é anexado ao final do texto digital, ou enviado como primeiro
  * bloco antes das imagens no caso escaneado.

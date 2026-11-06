@@ -189,6 +189,14 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Gerar modelo com IA: botão "Gerar com IA" → envia arquivo de exemplo (PDF/imagem) ou cola texto → a IA reconstrói o documento em blocos formatados e insere as variáveis certas, preservando ao máximo a redação original (inclusive caixas em formato pergunta/resposta, se o exemplo tiver) — documentos gerados são sempre em preto e branco, sem cor de destaque
 - Para usar com um cliente: aba Documentos do cliente → "Gerar Documento" → escolhe o modelo → variáveis preenchidas automaticamente
 
+## BIBLIOTECA JURÍDICA (menu: Documentos → Biblioteca Jurídica)
+- Diferente de Modelos (mala-direta) e diferente de um documento comum anexado a cliente/processo: aqui o usuário envia um ARQUIVO REAL (uma petição que o escritório já escreveu, ou uma sentença/acórdão favorável) sem vínculo a cliente/processo específico — é um repositório do escritório inteiro
+- Ao enviar (PDF/imagem), a IA lê e classifica automaticamente em "Modelo de petição" (peça própria, vira referência de estilo/argumentação), "Precedente" (decisão judicial favorável, vira jurisprudência consultável) ou "Outro" (não entra na base) — e sugere um nome de arquivo descritivo
+- NUNCA entra direto na base: fica "Aguardando revisão" até um ADMINISTRADOR conferir os dados extraídos (editáveis na tela) e clicar em "Aprovar" — só então grava de verdade
+- Precedente aprovado vai pra tabela de Jurisprudência Viva (a mesma que o Cérebro Jurídico e o Dr. Lex já consultam automaticamente em toda análise/petição do mesmo tipo de benefício, com citação exata verificada) — efeito imediato em casos futuros, sem precisar mexer em mais nada
+- Modelo de petição aprovado vai pro banco de petições-referência (ia_peticoes) — o mesmo banco que já é usado como "petições aprovadas do mesmo tipo (referência de argumentação)" quando o Dr. Lex gera uma peça nova
+- Filtros na tela: por status (aguardando revisão / aprovados / rejeitados / todos), por categoria, e busca por nome/tese/identificação — serve de repositório pesquisável pra qualquer advogado/colaborador, não só pra IA
+
 ## ASSINATURAS (menu: Documentos → Assinaturas)
 - Envelopes de assinatura digital via TramitaSign
 - Botão "Novo envelope" → fluxo em 5 passos: Envelope (nome, cliente vinculado) → Documentos (modelos) → Assinantes → Notificações → Revisão

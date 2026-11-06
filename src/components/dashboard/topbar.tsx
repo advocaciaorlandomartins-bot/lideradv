@@ -95,6 +95,12 @@ const NAV_ITEMS = [
     modulo: "modelos",
   },
   {
+    href: "/dashboard/biblioteca",
+    icon: ScalesIcon,
+    label: "Biblioteca Jurídica",
+    modulo: "modelos",
+  },
+  {
     href: "/dashboard/assinaturas",
     icon: PenSignIcon,
     label: "Assinaturas",

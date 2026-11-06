@@ -129,7 +129,7 @@ const GROUPS: {
         href: "/dashboard/biblioteca",
         icon: ScalesIcon,
         label: "Biblioteca Jurídica",
-        modulo: "modelos",
+        modulo: "biblioteca_juridica",
       },
       {
         href: "/dashboard/assinaturas",

@@ -13,7 +13,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
-  if (!session || !hasPermission(session, "modelos", "editar")) {
+  if (!session || !hasPermission(session, "biblioteca_juridica", "editar")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

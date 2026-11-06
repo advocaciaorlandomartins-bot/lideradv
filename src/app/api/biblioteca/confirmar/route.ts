@@ -33,7 +33,7 @@ async function fetchBlobContent(url: string): Promise<Response | null> {
 
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session || !hasPermission(session, "modelos", "criar")) {
+  if (!session || !hasPermission(session, "biblioteca_juridica", "criar")) {
     return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 

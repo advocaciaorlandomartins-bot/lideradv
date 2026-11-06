@@ -12,7 +12,8 @@ export const metadata = {
 
 export default async function BibliotecaPage() {
   const session = await getSession();
-  if (!session || !hasPermission(session, "modelos", "ver")) notFound();
+  if (!session || !hasPermission(session, "biblioteca_juridica", "ver"))
+    notFound();
 
   const itensIniciais = await listarBibliotecaJuridica();
   const podeAprovar = session.categoria === "Administrador(a)";

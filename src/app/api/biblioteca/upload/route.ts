@@ -26,7 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       onBeforeGenerateToken: async (pathname) => {
         const session = await getSession();
         if (!session) throw new Error("Não autorizado.");
-        if (!hasPermission(session, "modelos", "criar"))
+        if (!hasPermission(session, "biblioteca_juridica", "criar"))
           throw new Error("Sem permissão.");
 
         const ext = (pathname.split(".").pop() ?? "").toLowerCase();

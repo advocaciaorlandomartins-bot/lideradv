@@ -21,7 +21,7 @@ const CATEGORIAS_VALIDAS = new Set(["modelo_peticao", "precedente", "outro"]);
 
 export async function GET(request: Request) {
   const session = await getSession();
-  if (!session || !hasPermission(session, "modelos", "ver")) {
+  if (!session || !hasPermission(session, "biblioteca_juridica", "ver")) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 

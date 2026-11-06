@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { Processo } from "@/lib/processos-db";
 import type { DocumentoJudicialExtraido } from "@/app/api/ia/processar-judicial/route";
+import { createControleAction } from "@/lib/controles-actions";
 
 interface Props {
   clienteId: string;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 type Etapa = "upload" | "revisao" | "sucesso";
+type StatusControle = "idle" | "criando" | "criado" | "erro";
 
 const TIPO_LABEL: Record<string, string> = {
   citacao: "Citação",
@@ -27,6 +29,7 @@ const TIPO_LABEL: Record<string, string> = {
 };
 
 export default function JudicialProcessarModal({
+  clienteId,
   clienteNome,
   processos,
   onClose,
@@ -38,7 +41,66 @@ export default function JudicialProcessarModal({
   const [erro, setErro] = useState<string | null>(null);
   const [resultados, setResultados] = useState<DocumentoJudicialExtraido[]>([]);
   const [processoSelecionado, setProcessoSelecionado] = useState<string>("");
+  const [statusControle, setStatusControle] = useState<
+    Record<number, StatusControle>
+  >({});
+  const [erroControle, setErroControle] = useState<Record<number, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Cria o prazo/audiência extraído direto em Controles (e, por tabela,
+  // na Agenda) — antes a tela de revisão só MOSTRAVA o que a IA achou e
+  // dizia pra cadastrar manualmente depois, em outro lugar. Bug real
+  // reportado pelo Orlando: achou que o prazo de uma intimação (15 dias)
+  // tinha sido cadastrado só por ter "processado com sucesso", mas nada
+  // existia em Controles nem na Agenda — ninguém ia ser avisado do prazo.
+  async function criarControle(i: number, r: DocumentoJudicialExtraido) {
+    setStatusControle((prev) => ({ ...prev, [i]: "criando" }));
+    setErroControle((prev) => ({ ...prev, [i]: "" }));
+
+    const form = new FormData();
+    form.set("cliente_id", clienteId);
+    if (processoSelecionado) form.set("processo_id", processoSelecionado);
+    // Prazo de intimação/decisão perdido pode encerrar o direito do
+    // cliente — mesmo critério já usado em outros fluxos de controle do
+    // sistema (ex: criar_controle da Íris): melhor alertar o escritório
+    // à toa do que deixar passar em silêncio.
+    form.set("fatal", "on");
+    form.set("prioridade", "alta");
+
+    if (r.data_audiencia) {
+      form.set("tipo", "audiencias");
+      form.set("data_evento", r.data_audiencia);
+      form.set(
+        "descricao",
+        r.tipo_ato || r.resumo || "Audiência (extraída de documento judicial)"
+      );
+      if (r.hora_audiencia) form.set("hora", r.hora_audiencia);
+      if (r.local_audiencia) {
+        form.set("local_mode", "existente");
+        form.set("local_id", "outro");
+        form.set("local_outro_texto", r.local_audiencia);
+      }
+    } else if (r.data_prazo) {
+      form.set("tipo", "prazos");
+      form.set("data_evento", r.data_prazo);
+      form.set(
+        "descricao",
+        r.prazo_descricao ||
+          r.resumo ||
+          "Prazo (extraído de documento judicial)"
+      );
+    } else {
+      return;
+    }
+
+    const res = await createControleAction(null, form);
+    if (res?.error) {
+      setStatusControle((prev) => ({ ...prev, [i]: "erro" }));
+      setErroControle((prev) => ({ ...prev, [i]: res.error! }));
+    } else {
+      setStatusControle((prev) => ({ ...prev, [i]: "criado" }));
+    }
+  }
 
   function adicionarArquivos(files: FileList | null) {
     if (!files) return;
@@ -81,6 +143,14 @@ export default function JudicialProcessarModal({
     const [y, m, d] = iso.split("-");
     return `${d}/${m}/${y}`;
   }
+
+  const comPrazoOuAudiencia = resultados
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.data_prazo || r.data_audiencia);
+  const totalCriados = comPrazoOuAudiencia.filter(
+    ({ i }) => statusControle[i] === "criado"
+  ).length;
+  const totalPendentes = comPrazoOuAudiencia.length - totalCriados;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
@@ -329,6 +399,37 @@ export default function JudicialProcessarModal({
                       </>
                     )}
                   </dl>
+
+                  {(r.data_prazo || r.data_audiencia) && (
+                    <div className="border-t border-slate-100 pt-3">
+                      {statusControle[i] === "criado" ? (
+                        <p className="font-body text-xs font-medium text-emerald-700">
+                          ✓ {r.data_audiencia ? "Audiência" : "Prazo"} criado em
+                          Controles
+                          {processoSelecionado
+                            ? ""
+                            : " (vinculado só ao cliente — sem processo selecionado acima)"}
+                        </p>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => criarControle(i, r)}
+                            disabled={statusControle[i] === "criando"}
+                            className="rounded-lg bg-emerald-600 px-3 py-1.5 font-body text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {statusControle[i] === "criando"
+                              ? "Criando…"
+                              : `+ Criar ${r.data_audiencia ? "audiência" : "prazo"} em Controles`}
+                          </button>
+                          {statusControle[i] === "erro" && (
+                            <p className="mt-1 font-body text-xs text-red-600">
+                              {erroControle[i]}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -355,8 +456,11 @@ export default function JudicialProcessarModal({
                   Documentos processados!
                 </p>
                 <p className="mt-1 font-body text-sm text-muted">
-                  Os dados foram extraídos. Adicione os compromissos ao
-                  calendário manualmente conforme necessário.
+                  {comPrazoOuAudiencia.length === 0
+                    ? "Os dados foram extraídos. Nenhum prazo ou audiência foi identificado nos documentos."
+                    : totalPendentes === 0
+                      ? `${totalCriados} ${totalCriados === 1 ? "prazo/audiência criado" : "prazos/audiências criados"} em Controles.`
+                      : `${totalCriados} de ${comPrazoOuAudiencia.length} prazo(s)/audiência(s) criado(s) em Controles — ${totalPendentes} ainda ${totalPendentes === 1 ? "não foi criado" : "não foram criados"}. Volte e clique em "Criar" nos pendentes antes de fechar, ou cadastre manualmente em Controles.`}
                 </p>
               </div>
               <button

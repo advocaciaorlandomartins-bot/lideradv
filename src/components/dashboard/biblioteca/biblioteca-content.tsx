@@ -175,6 +175,21 @@ export default function BibliotecaContent({
     if (inputRef.current) inputRef.current.value = "";
   }
 
+  // Depois de aprovar/rejeitar, o item muda de status — se a aba ativa for
+  // um status específico (ex: "Aguardando revisão") e o novo status não
+  // bater mais, o item some da lista em vez de ficar preso ali mostrando
+  // "Aprovado" dentro da aba de pendentes (bug real: item aprovado
+  // continuava visível, com o selo verde, na aba que só deveria mostrar
+  // pendentes — só sumia depois de recarregar a página).
+  function atualizarOuRemoverItem(novoItem: BibliotecaItem) {
+    setItens((prev) => {
+      if (filtroStatus && novoItem.status !== filtroStatus) {
+        return prev.filter((i) => i.id !== novoItem.id);
+      }
+      return prev.map((i) => (i.id === novoItem.id ? novoItem : i));
+    });
+  }
+
   function getRascunho(item: BibliotecaItem): Rascunho {
     return rascunhos[item.id] ?? rascunhoDeItem(item);
   }
@@ -230,12 +245,8 @@ export default function BibliotecaContent({
           ...prev,
           [item.id]: data.error ?? "Erro ao aprovar.",
         }));
-      } else {
-        setItens((prev) =>
-          prev.map((i) =>
-            i.id === item.id ? (data.item as BibliotecaItem) : i
-          )
-        );
+      } else if (data.item) {
+        atualizarOuRemoverItem(data.item);
       }
     } catch {
       setErroPorItem((prev) => ({ ...prev, [item.id]: "Erro de conexão." }));
@@ -252,11 +263,7 @@ export default function BibliotecaContent({
       });
       const data: { item?: BibliotecaItem; error?: string } = await res.json();
       if (res.ok && data.item) {
-        setItens((prev) =>
-          prev.map((i) =>
-            i.id === item.id ? (data.item as BibliotecaItem) : i
-          )
-        );
+        atualizarOuRemoverItem(data.item);
       }
     } finally {
       setAcaoEmCurso(null);

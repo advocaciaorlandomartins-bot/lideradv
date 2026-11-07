@@ -11,6 +11,7 @@
 
 import sql from "./db";
 import Anthropic from "@anthropic-ai/sdk";
+import { extractText } from "./anthropic-text";
 
 const ESAJ_BASE: Record<string, string> = {
   // Confirmados funcionando via Vercel (US)
@@ -226,8 +227,13 @@ ${texto.slice(0, 4000)}`;
       messages: [{ role: "user", content: prompt }],
     });
 
-    const block = res.content[0];
-    const raw = block?.type === "text" ? block.text : "";
+    const raw = extractText(res);
+    if (!raw.trim()) {
+      console.error(
+        `[DjeEsaj] resumo IA voltou vazio pra pub ${id} — stop_reason=${res.stop_reason}, blocks=${res.content.map((b) => b.type).join(",")}`
+      );
+      return;
+    }
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return;
 

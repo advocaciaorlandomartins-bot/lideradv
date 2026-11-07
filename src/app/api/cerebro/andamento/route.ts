@@ -7,7 +7,10 @@ import { podeAcessarProcesso } from "@/lib/acesso";
 import { interpretarAndamento } from "@/lib/cerebroJuridico";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Mesmo motivo de /api/ia/quesitos e /api/ia/impugnacao-laudo: claude-sonnet-5
+// usa thinking automaticamente, então o teto de 60s (que nem é um limite
+// real do plano — /api/cron/orquestrador usa 300) era curto demais.
+export const maxDuration = 180;
 
 export async function POST(req: NextRequest) {
   const session = await getSession();

@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
 import { registrarUsoIA } from "@/lib/ia-uso-db";
+import { extractText } from "@/lib/anthropic-text";
 import {
   extractPdfContent,
   extractPdfAsImages,
@@ -203,8 +204,12 @@ export async function POST(request: Request) {
         res.usage.output_tokens,
         session.id
       ).catch(() => {});
-      const block = res.content[0];
-      rawText = block?.type === "text" ? block.text : "";
+      rawText = extractText(res);
+      if (!rawText.trim()) {
+        console.error(
+          `[importacao-ia] resposta vazia (imagem) — stop_reason=${res.stop_reason}, blocks=${res.content.map((b) => b.type).join(",")}`
+        );
+      }
     } else if (fileType === "application/pdf") {
       let pdfContent: ContentPart[];
       try {
@@ -232,8 +237,12 @@ export async function POST(request: Request) {
         res.usage.output_tokens,
         session.id
       ).catch(() => {});
-      const block = res.content[0];
-      rawText = block?.type === "text" ? block.text : "";
+      rawText = extractText(res);
+      if (!rawText.trim()) {
+        console.error(
+          `[importacao-ia] resposta vazia (pdf) — stop_reason=${res.stop_reason}, blocks=${res.content.map((b) => b.type).join(",")}`
+        );
+      }
 
       // Texto digital extraído de PDF em layout de colunas/tabela (ex:
       // carteira de trabalho digital, formulários do governo) pode sair
@@ -262,8 +271,12 @@ export async function POST(request: Request) {
             res2.usage.output_tokens,
             session.id
           ).catch(() => {});
-          const block2 = res2.content[0];
-          const rawText2 = block2?.type === "text" ? block2.text : "";
+          const rawText2 = extractText(res2);
+          if (!rawText2.trim()) {
+            console.error(
+              `[importacao-ia] resposta vazia (fallback imagem) — stop_reason=${res2.stop_reason}, blocks=${res2.content.map((b) => b.type).join(",")}`
+            );
+          }
           if (parseJson(rawText2)) rawText = rawText2;
         } catch (e) {
           console.error("PDF fallback-para-imagem falhou:", e);

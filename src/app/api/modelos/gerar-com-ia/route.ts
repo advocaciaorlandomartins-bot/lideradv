@@ -12,9 +12,14 @@ import {
 } from "@/lib/pdf-extract";
 import { isValidBlocks, type Block } from "@/lib/modelo-blocks";
 import { VARIAVEIS, CATEGORIAS } from "@/lib/modelo-variaveis";
+import { extractText } from "@/lib/anthropic-text";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Era 60 com um comentário dizendo "não dá pra aumentar" — premissa falsa,
+// confirmada em auditoria de 2026-11-07: /api/cron/orquestrador usa
+// maxDuration=300 no mesmo plano Vercel. O teto de 60s nunca foi um limite
+// da plataforma, só não tinha sido revisado nesta rota.
+export const maxDuration = 180;
 
 const TAGS_DISPONIVEIS = VARIAVEIS.flatMap((g) =>
   g.vars.map((v) => `${v.tag} (${v.desc})`)
@@ -195,25 +200,31 @@ export async function POST(request: Request) {
 
   try {
     const client = new Anthropic({ apiKey });
-    // Voltou pra Haiku: Sonnet estourava os 60s de teto fixo do plano
-    // Vercel (não dá pra aumentar) numa geração que pode chegar a 8192
-    // tokens de resposta — causou 504 real em produção. A instrução tem
-    // várias regras rígidas de fidelidade, mas o teto de tempo da
-    // plataforma pesa mais aqui do que o ganho de qualidade do Sonnet.
-    const res = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 8192,
-      messages: [{ role: "user", content }],
-    });
+    // Voltou pra Sonnet (2026-11-07): a troca pra Haiku foi um workaround
+    // pro timeout de 60s, que não era um limite real da plataforma — ver
+    // comentário do maxDuration acima. Com streaming + maxDuration=180, dá
+    // pra manter a qualidade do Sonnet nesta instrução com regras rígidas
+    // de fidelidade sem estourar o tempo.
+    const res = await client.messages
+      .stream({
+        model: "claude-sonnet-5",
+        max_tokens: 8192,
+        messages: [{ role: "user", content }],
+      })
+      .finalMessage();
     registrarUsoIA(
       "/api/modelos/gerar-com-ia",
-      "claude-haiku-4-5-20251001",
+      "claude-sonnet-5",
       res.usage.input_tokens,
       res.usage.output_tokens,
       session.id
     ).catch(() => {});
-    const block = res.content[0];
-    const rawText = block?.type === "text" ? block.text : "";
+    const rawText = extractText(res);
+    if (!rawText.trim()) {
+      console.error(
+        `[gerar-com-ia] resposta vazia — stop_reason=${res.stop_reason}, blocks=${res.content.map((b) => b.type).join(",")}`
+      );
+    }
 
     const result = parseResult(rawText);
     if (!result) {

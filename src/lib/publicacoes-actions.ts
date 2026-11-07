@@ -7,6 +7,7 @@ import { getSession } from "./session";
 import { hasPermission } from "./permissoes";
 import Anthropic from "@anthropic-ai/sdk";
 import { adicionarOabTramitaSign, tramitaSyncAtivo } from "./tramitasign-sync";
+import { extractText } from "./anthropic-text";
 
 // ── Publicações ───────────────────────────────────────────────────────────────
 
@@ -153,8 +154,12 @@ ${texto.slice(0, 4000)}`;
       messages: [{ role: "user", content: prompt }],
     });
 
-    const block = res.content[0];
-    const raw = block?.type === "text" ? block.text : "";
+    const raw = extractText(res);
+    if (!raw.trim()) {
+      console.error(
+        `[gerarResumoIaAction] resposta vazia pra publicação ${id} — stop_reason=${res.stop_reason}, blocks=${res.content.map((b) => b.type).join(",")}`
+      );
+    }
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return { ok: false, mensagem: "IA não retornou JSON válido." };
 

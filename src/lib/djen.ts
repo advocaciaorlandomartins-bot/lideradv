@@ -9,6 +9,7 @@
 
 import sql from "./db";
 import Anthropic from "@anthropic-ai/sdk";
+import { extractText } from "./anthropic-text";
 
 const DJEN_BASE = "https://comunicaapi.pje.jus.br/api/v1/comunicacao";
 
@@ -79,11 +80,18 @@ ${texto.slice(0, 1500)}`,
         },
       ],
     });
-    const raw = (msg.content[0] as { text: string }).text;
+    const raw = extractText(msg);
+    if (!raw.trim()) {
+      console.error(
+        `[djen] resumo IA voltou vazio (stop_reason=${msg.stop_reason}, blocks=${msg.content.map((b) => b.type).join(",")})`
+      );
+      return null;
+    }
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
     return JSON.parse(match[0]);
-  } catch {
+  } catch (err) {
+    console.error("[djen] gerarResumoIA falhou:", err);
     return null;
   }
 }

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { agentesEstaoAtivos } from "./config-agentes-db";
 import { registrarUsoIA } from "./ia-uso-db";
+import { extractText } from "./anthropic-text";
 
 function getClient(): Anthropic | null {
   if (!process.env.ANTHROPIC_API_KEY) return null;
@@ -44,8 +45,14 @@ export async function resumirEmail(
       res.usage.output_tokens,
       null
     );
-    const block = res.content[0];
-    return block?.type === "text" ? block.text.trim() : null;
+    const resumo = extractText(res).trim();
+    if (!resumo) {
+      console.error(
+        `[ai] resumirEmail voltou vazio — stop_reason=${res.stop_reason}, blocks=${res.content.map((b) => b.type).join(",")}`
+      );
+      return null;
+    }
+    return resumo;
   } catch (err) {
     console.error("[ai] resumirEmail:", err);
     return null;

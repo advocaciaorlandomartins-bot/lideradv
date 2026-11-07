@@ -14,12 +14,7 @@ import {
   ClipboardCopyIcon,
   ArrowTopRightOnSquareIcon,
 } from "@/components/icons";
-
-function brParaIso(br: string | null | undefined): string | null {
-  if (!br) return null;
-  const [d, m, y] = br.split("/");
-  return d && m && y ? `${y}-${m}-${d}` : null;
-}
+import { brParaIso } from "@/lib/data-br";
 
 export default function PublicacaoDetalheActions({
   pub,

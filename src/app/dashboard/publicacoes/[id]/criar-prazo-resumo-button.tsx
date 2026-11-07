@@ -5,12 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { criarControleComResponsavelDoProcessoAction } from "@/lib/controles-actions";
 import { CalendarIcon, SpinnerIcon, CheckIcon } from "@/components/icons";
-
-function brParaIso(br: string | null): string | null {
-  if (!br) return null;
-  const [d, m, y] = br.split("/");
-  return d && m && y ? `${y}-${m}-${d}` : null;
-}
+import { brParaIso } from "@/lib/data-br";
 
 interface Props {
   pubId: number;

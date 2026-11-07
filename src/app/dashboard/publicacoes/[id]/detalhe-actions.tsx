@@ -25,10 +25,12 @@ export default function PublicacaoDetalheActions({
   pub,
   tribunalUrl,
   prazoFinal,
+  jaTemControle,
 }: {
   pub: Publicacao;
   tribunalUrl: string | null;
   prazoFinal?: string | null;
+  jaTemControle?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -102,12 +104,14 @@ export default function PublicacaoDetalheActions({
         </a>
       )}
 
-      <Link
-        href={criarPrazoHref}
-        className="flex h-9 items-center rounded-lg border border-border bg-white px-3.5 font-body text-sm font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary"
-      >
-        + Criar prazo desta publicação
-      </Link>
+      {!jaTemControle && (
+        <Link
+          href={criarPrazoHref}
+          className="flex h-9 items-center rounded-lg border border-border bg-white px-3.5 font-body text-sm font-semibold text-fg transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          + Criar prazo desta publicação
+        </Link>
+      )}
 
       {pub.status === "nao_lida" ? (
         <button

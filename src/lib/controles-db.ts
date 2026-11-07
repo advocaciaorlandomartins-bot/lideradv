@@ -157,6 +157,26 @@ export async function getControleById(id: string): Promise<Controle | null> {
   return rows.length > 0 ? mapRow(rows[0]) : null;
 }
 
+/** Prazo/audiência já criado a partir desta publicação (se houver) — usado
+ * pro botão "Criar prazo" do Resumo Inteligente não oferecer criar de novo
+ * (e duplicar) quando já existe um controle vinculado. */
+export async function getControleByPublicacaoId(
+  publicacaoId: number
+): Promise<{ id: string; descricao: string; dataEvento: string } | null> {
+  const rows = await sql`
+    SELECT id::text, descricao, data_evento::text
+    FROM controles
+    WHERE publicacao_id = ${publicacaoId}
+    LIMIT 1
+  `;
+  if (rows.length === 0) return null;
+  return {
+    id: rows[0].id as string,
+    descricao: rows[0].descricao as string,
+    dataEvento: rows[0].data_evento as string,
+  };
+}
+
 export async function getClientesForControle(): Promise<ClienteOption[]> {
   const rows = await sql`
     SELECT id::text, name AS nome, COALESCE(doc, '') AS doc

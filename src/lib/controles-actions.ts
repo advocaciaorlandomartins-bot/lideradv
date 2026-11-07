@@ -449,13 +449,14 @@ export async function createControleAction(
 }
 
 /**
- * Cria prazo/audiência extraído por IA de um documento judicial (modal
- * "Processar Judicial" na ficha do cliente) — wrapper fino sobre
- * createControleAction. Resolve o responsavel_id a partir do processo
- * vinculado (se houver) em vez de deixar em branco: sem isso, o prazo
- * criado não aparecia pro advogado responsável pelo processo em nenhuma
- * visão filtrada por responsável (Minhas Tarefas, Controles sem
- * "ver todos"), só pra quem tem processos_ver_todos.
+ * Cria prazo/audiência diretamente, com o responsável sendo o do PROCESSO
+ * vinculado (se houver) em vez de ficar em branco. Usado pelos fluxos de
+ * "um clique, cria de verdade" — Processar Judicial (modal na ficha do
+ * cliente) e o botão "Criar prazo"/"Criar audiência" do Resumo Inteligente
+ * de uma publicação. Sem resolver o responsável aqui, o prazo criado não
+ * aparecia pro advogado responsável em nenhuma visão filtrada por
+ * responsável (Minhas Tarefas, Controles sem "ver todos"), só pra quem tem
+ * processos_ver_todos.
  *
  * processos.responsavel_id referencia colaboradores(id), mas
  * controles.responsavel_id referencia usuarios(id) (mesma regra já
@@ -474,7 +475,7 @@ export async function createControleAction(
  * em lembretes.ts), já generalizado pra valer em qualquer controle fatal
  * criado no sistema, não só por aqui.
  */
-export async function criarControleDeDocumentoJudicialAction(opts: {
+export async function criarControleComResponsavelDoProcessoAction(opts: {
   clienteId: string;
   clienteNome: string;
   processoId: string | null;
@@ -483,6 +484,7 @@ export async function criarControleDeDocumentoJudicialAction(opts: {
   dataEvento: string;
   hora?: string | null;
   localTexto?: string | null;
+  publicacaoId?: number | null;
 }): Promise<ControleFormState> {
   const session = await getSession();
   if (!session || !hasPermission(session, "controles", "criar"))
@@ -511,6 +513,8 @@ export async function criarControleDeDocumentoJudicialAction(opts: {
   form.set("data_evento", opts.dataEvento);
   form.set("fatal", "on");
   form.set("prioridade", "alta");
+  if (opts.publicacaoId != null)
+    form.set("publicacao_id", String(opts.publicacaoId));
   if (opts.tipo === "audiencias") {
     if (opts.hora) form.set("hora", opts.hora);
     if (opts.localTexto) {

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import type { Processo } from "@/lib/processos-db";
 import type { DocumentoJudicialExtraido } from "@/app/api/ia/processar-judicial/route";
-import { criarControleDeDocumentoJudicialAction } from "@/lib/controles-actions";
+import { criarControleComResponsavelDoProcessoAction } from "@/lib/controles-actions";
 
 interface Props {
   clienteId: string;
@@ -64,7 +64,7 @@ export default function JudicialProcessarModal({
     setErroControle((prev) => ({ ...prev, [i]: "" }));
 
     const res = r.data_audiencia
-      ? await criarControleDeDocumentoJudicialAction({
+      ? await criarControleComResponsavelDoProcessoAction({
           clienteId,
           clienteNome,
           processoId: processoSelecionado || null,
@@ -78,7 +78,7 @@ export default function JudicialProcessarModal({
           localTexto: r.local_audiencia,
         })
       : r.data_prazo
-        ? await criarControleDeDocumentoJudicialAction({
+        ? await criarControleComResponsavelDoProcessoAction({
             clienteId,
             clienteNome,
             processoId: processoSelecionado || null,

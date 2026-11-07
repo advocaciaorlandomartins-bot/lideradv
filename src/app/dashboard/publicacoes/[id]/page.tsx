@@ -7,6 +7,7 @@ export const metadata = { title: "Publicação — LiderAdv" };
 
 import { getPublicacaoById } from "@/lib/publicacoes-db";
 import { calcularPrazos } from "@/lib/publicacoes-datas";
+import { getControleByPublicacaoId } from "@/lib/controles-db";
 import {
   ChevronRightIcon,
   CalendarIcon,
@@ -14,6 +15,7 @@ import {
 } from "@/components/icons";
 import PublicacaoDetalheActions from "./detalhe-actions";
 import ResumoIaButton from "./resumo-ia-button";
+import CriarPrazoResumoButton from "./criar-prazo-resumo-button";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +78,10 @@ export default async function PublicacaoDetalhePage({
     pub.resumo_ia?.prazo_dias ?? null
   );
   const tribunalUrl = getTribunalUrl(pub.tribunal);
+  const controleExistente = await getControleByPublicacaoId(pub.id);
+  const descricaoSugerida = `${pub.tipo} — Proc. ${pub.processo}${
+    pub.resumo_ia?.acao_necessaria ? ` — ${pub.resumo_ia.acao_necessaria}` : ""
+  }`;
 
   const statusCls =
     pub.status === "nao_lida"
@@ -182,6 +188,7 @@ export default async function PublicacaoDetalhePage({
             pub={pub}
             tribunalUrl={tribunalUrl}
             prazoFinal={prazos?.prazo_final ?? null}
+            jaTemControle={!!controleExistente}
           />
         </div>
       </div>
@@ -218,6 +225,20 @@ export default async function PublicacaoDetalhePage({
                   </span>
                 )}
               </div>
+              {(pub.resumo_ia.audiencia || prazos?.prazo_final) && (
+                <div className="border-t border-border pt-3">
+                  <CriarPrazoResumoButton
+                    pubId={pub.id}
+                    clienteId={pub.clienteId}
+                    clienteNome={pub.clienteNome}
+                    processoId={pub.processoId}
+                    descricaoSugerida={descricaoSugerida}
+                    audienciaBr={pub.resumo_ia.audiencia}
+                    prazoFinalBr={prazos?.prazo_final ?? null}
+                    jaExiste={controleExistente}
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : (

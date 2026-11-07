@@ -406,3 +406,75 @@ export async function getContadoresAtividadesPrazo(
     semData: Number(r?.sem_data ?? 0),
   };
 }
+
+export type FiltroAtividadePrazo =
+  | "atrasadas"
+  | "hoje"
+  | "amanha"
+  | "futuras"
+  | "semData";
+
+export interface AtividadePrazoItem {
+  id: string;
+  titulo: string;
+  prioridade: string | null;
+  prazo: string | null;
+  diasAtraso: number | null;
+  processoId: string;
+  processoNumero: string | null;
+  clienteId: string | null;
+  clienteNome: string | null;
+}
+
+/**
+ * Mesmas tarefas de getContadoresAtividadesPrazo (mesmo WHERE, mesmo
+ * escopo por responsavel_id), só que devolvendo as linhas de um balde
+ * específico em vez de só o total — usado pela tela que os cards da
+ * Atividades em aberto (Processos) abrem ao clicar, pra não ser só um
+ * número sem nenhum jeito de ver do que se trata.
+ */
+export async function getAtividadesPrazoDetalhe(
+  responsavelId: string | null,
+  filtro: FiltroAtividadePrazo
+): Promise<AtividadePrazoItem[]> {
+  const condicaoData =
+    filtro === "atrasadas"
+      ? sql`t.prazo < CURRENT_DATE`
+      : filtro === "hoje"
+        ? sql`t.prazo = CURRENT_DATE`
+        : filtro === "amanha"
+          ? sql`t.prazo = CURRENT_DATE + 1`
+          : filtro === "futuras"
+            ? sql`t.prazo > CURRENT_DATE + 1`
+            : sql`t.prazo IS NULL`;
+
+  const rows = await sql`
+    SELECT
+      t.id::text, t.titulo, t.prioridade,
+      to_char(t.prazo, 'DD/MM/YYYY') AS prazo,
+      (CURRENT_DATE - t.prazo)::int AS dias_atraso,
+      p.id::text AS processo_id, p.numero AS processo_numero,
+      cl.id::text AS cliente_id, cl.name AS cliente_nome
+    FROM tarefas_processo t
+    JOIN processos p ON p.id = t.processo_id
+    LEFT JOIN clients cl ON cl.id = p.client_id
+    WHERE p.deleted_at IS NULL
+      AND (${responsavelId}::uuid IS NULL OR p.responsavel_id = ${responsavelId}::uuid)
+      AND t.status IN ('Pendente', 'Em andamento')
+      AND ${condicaoData}
+    ORDER BY t.prazo ASC NULLS LAST
+    LIMIT 300
+  `;
+
+  return rows.map((r) => ({
+    id: String(r.id),
+    titulo: String(r.titulo),
+    prioridade: r.prioridade ? String(r.prioridade) : null,
+    prazo: r.prazo ? String(r.prazo) : null,
+    diasAtraso: r.dias_atraso != null ? Number(r.dias_atraso) : null,
+    processoId: String(r.processo_id),
+    processoNumero: r.processo_numero ? String(r.processo_numero) : null,
+    clienteId: r.cliente_id ? String(r.cliente_id) : null,
+    clienteNome: r.cliente_nome ? String(r.cliente_nome) : null,
+  }));
+}

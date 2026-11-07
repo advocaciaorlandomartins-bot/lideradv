@@ -14,6 +14,7 @@ export default function AtividadesPrazoPanel({
   const itens = [
     {
       label: "Atrasadas",
+      filtro: "atrasadas",
       valor: atrasadas,
       destaque: atrasadas > 0,
       cls: "border-red-200 bg-red-50 text-red-700",
@@ -22,6 +23,7 @@ export default function AtividadesPrazoPanel({
     },
     {
       label: "Hoje",
+      filtro: "hoje",
       valor: hoje,
       destaque: hoje > 0,
       cls: "border-amber-200 bg-amber-50 text-amber-700",
@@ -30,6 +32,7 @@ export default function AtividadesPrazoPanel({
     },
     {
       label: "Amanhã",
+      filtro: "amanha",
       valor: amanha,
       destaque: false,
       cls: "border-blue-200 bg-blue-50 text-blue-700",
@@ -38,6 +41,7 @@ export default function AtividadesPrazoPanel({
     },
     {
       label: "Futuras",
+      filtro: "futuras",
       valor: futuras,
       destaque: false,
       cls: "border-border bg-slate-50 text-slate-600",
@@ -46,6 +50,7 @@ export default function AtividadesPrazoPanel({
     },
     {
       label: "Sem data",
+      filtro: "semData",
       valor: semData,
       destaque: false,
       cls: "border-border bg-slate-50 text-slate-500",
@@ -68,24 +73,27 @@ export default function AtividadesPrazoPanel({
         </Link>
       </div>
       <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {itens.map(({ label, valor, destaque, cls, iconCls, icon: Icon }) => (
-          <div
-            key={label}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
-              destaque ? cls : "border-border bg-slate-50 text-slate-600"
-            }`}
-          >
-            <Icon className={`h-4 w-4 flex-shrink-0 ${iconCls}`} />
-            <div>
-              <p className="font-heading text-lg font-bold leading-none">
-                {valor}
-              </p>
-              <p className="font-body text-[11px] text-current opacity-80">
-                {label}
-              </p>
-            </div>
-          </div>
-        ))}
+        {itens.map(
+          ({ label, filtro, valor, destaque, cls, iconCls, icon: Icon }) => (
+            <Link
+              key={label}
+              href={`/dashboard/processos/atividades?filtro=${filtro}`}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors hover:brightness-95 ${
+                destaque ? cls : "border-border bg-slate-50 text-slate-600"
+              }`}
+            >
+              <Icon className={`h-4 w-4 flex-shrink-0 ${iconCls}`} />
+              <div>
+                <p className="font-heading text-lg font-bold leading-none">
+                  {valor}
+                </p>
+                <p className="font-body text-[11px] text-current opacity-80">
+                  {label}
+                </p>
+              </div>
+            </Link>
+          )
+        )}
       </div>
     </div>
   );

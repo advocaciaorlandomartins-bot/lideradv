@@ -5,6 +5,7 @@ import { podeEditarProcesso } from "@/lib/processo-ownership";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { getProcessoById } from "@/lib/processos-db";
 import { gerarQuesitosMedicos } from "@/lib/quesitos-medicos";
+import { isUrlPermitida, isBlobPrivado } from "@/lib/blob-url";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,8 @@ const MAX_MB = 20;
 const MAX_DOCS = 6;
 
 async function fetchBlobContent(url: string): Promise<Response | null> {
-  if (url.includes(".private.blob.vercel-storage.com")) {
+  if (!isUrlPermitida(url)) return null;
+  if (isBlobPrivado(url)) {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
     return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},

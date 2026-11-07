@@ -5,6 +5,7 @@ import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade, podeAcessarColaborador } from "@/lib/acesso";
 import sql from "@/lib/db";
 import { getDocumentosByEntityId } from "@/lib/documents-db";
+import { isUrlPermitida, isBlobPrivado } from "@/lib/blob-url";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -200,13 +201,14 @@ export async function POST(request: Request) {
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
   for (const doc of selecionados) {
     try {
+      if (!isUrlPermitida(doc.url)) throw new Error("URL de blob inválida.");
       // Blob privado exige o header Authorization — head().downloadUrl não
       // é uma URL assinada de verdade (mesmo engano corrigido em
       // /api/documentos/download), então buscar sem o token sempre falhava
       // com 403 aqui, caindo silenciosamente em "falhas" pra todo documento
       // privado do ZIP.
       const headers: Record<string, string> =
-        doc.url.includes(".private.blob.vercel-storage.com") && blobToken
+        isBlobPrivado(doc.url) && blobToken
           ? { Authorization: `Bearer ${blobToken}` }
           : {};
       const res = await fetch(doc.url, { headers });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade, podeAcessarColaborador } from "@/lib/acesso";
+import { isUrlPermitida } from "@/lib/blob-url";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (!url.includes(".blob.vercel-storage.com")) {
+  if (!isUrlPermitida(url)) {
     return NextResponse.json({ error: "URL inválida." }, { status: 400 });
   }
 

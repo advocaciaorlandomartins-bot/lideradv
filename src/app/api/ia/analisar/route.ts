@@ -25,6 +25,7 @@ import { adicionarCidsCliente } from "@/lib/clients-db";
 import { registrarFatosEmLote } from "@/lib/fact-ledger-db";
 import { avaliarPontosAtencao } from "@/lib/pontos-atencao-db";
 import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
+import { isBlobPrivado } from "@/lib/blob-url";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -58,7 +59,7 @@ function isUrlPermitida(url: string): boolean {
 }
 
 async function fetchBlobContent(url: string): Promise<Response | null> {
-  if (url.includes(".private.blob.vercel-storage.com")) {
+  if (isBlobPrivado(url)) {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
     return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},

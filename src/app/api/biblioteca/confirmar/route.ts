@@ -9,6 +9,7 @@ import {
   getBibliotecaItemById,
 } from "@/lib/biblioteca-juridica-db";
 import { classificarDocumentoBiblioteca } from "@/lib/biblioteca-juridica-ia";
+import { isUrlPermitida, isBlobPrivado } from "@/lib/blob-url";
 
 export const dynamic = "force-dynamic";
 // Generoso de propósito (mesmo motivo de /api/ia/impugnacao-laudo e
@@ -22,7 +23,8 @@ export const maxDuration = 180;
 const MAX_MB = 25;
 
 async function fetchBlobContent(url: string): Promise<Response | null> {
-  if (url.includes(".private.blob.vercel-storage.com")) {
+  if (!isUrlPermitida(url)) return null;
+  if (isBlobPrivado(url)) {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
     return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -56,7 +58,7 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (!url.includes(".blob.vercel-storage.com")) {
+  if (!isUrlPermitida(url)) {
     return NextResponse.json({ error: "URL inválida." }, { status: 400 });
   }
   if (

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { podeAcessarEntidade } from "@/lib/acesso";
+import { isUrlPermitida, isBlobPrivado } from "@/lib/blob-url";
 import sql from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +82,14 @@ export async function GET(request: Request) {
     return `${tipo}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nomeArquivo)}`;
   };
 
+  if (!isUrlPermitida(url)) {
+    console.error(`[documentos/download] URL fora do Blob para ${id}: ${url}`);
+    return NextResponse.json(
+      { error: "Não foi possível abrir este arquivo." },
+      { status: 502 }
+    );
+  }
+
   try {
     // Blob privado: a URL crua (e o "downloadUrl" que head() devolve — que
     // na prática é só a mesma URL com ?download=1, não uma URL assinada)
@@ -89,7 +98,7 @@ export async function GET(request: Request) {
     // explicação nenhuma. Busca o conteúdo aqui no servidor (com o token) e
     // devolve os bytes direto pro navegador — mesmo padrão já usado em
     // src/app/api/ia/analisar/route.ts pra blob privado.
-    if (url.includes(".private.blob.vercel-storage.com")) {
+    if (isBlobPrivado(url)) {
       const token = process.env.BLOB_READ_WRITE_TOKEN;
       const blobRes = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},

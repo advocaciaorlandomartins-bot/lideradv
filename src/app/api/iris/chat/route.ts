@@ -14,6 +14,7 @@ import {
   executarFerramentaIris,
 } from "@/lib/iris-tools";
 import { LIDERADV_DOCS } from "@/lib/lideradv-docs";
+import { isUrlPermitida, isBlobPrivado } from "@/lib/blob-url";
 import {
   obterConversa,
   criarConversa,
@@ -24,7 +25,12 @@ import {
 } from "@/lib/iris-conversas-db";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Era 60 com um comentário dizendo que o teto da Vercel "não dá pra
+// aumentar" — premissa falsa, confirmada em auditoria de 2026-11-07:
+// /api/cron/orquestrador usa maxDuration=300 no mesmo plano. Subido junto
+// com a troca pra streaming (evita o timeout de proxy numa chamada não-
+// streaming longa, que era o risco real, não o teto em si).
+export const maxDuration = 120;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -45,29 +51,12 @@ interface AnexoRequest {
   mimeType: string;
 }
 
-// Nunca confiar numa URL arbitrária vinda do cliente pra não virar um proxy
-// de download de qualquer coisa — mesmo helper já usado em
-// /api/ia/analisar. addRandomSuffix no upload já torna a URL imprevisível,
-// isso aqui só garante que é mesmo um blob nosso.
-function isUrlPermitida(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:") return false;
-    const host = parsed.hostname;
-    return (
-      host === "blob.vercel-storage.com" ||
-      host.endsWith(".blob.vercel-storage.com")
-    );
-  } catch {
-    return false;
-  }
-}
-
 // Blobs privados exigem o token de leitura/escrita no header — sem isso o
-// fetch volta 403. Mesmo helper já usado em cerebroJuridico.ts e
-// /api/ia/quesitos e /api/ia/analisar pra ler documento já anexado.
+// fetch volta 403. isUrlPermitida/isBlobPrivado agora centralizados em
+// @/lib/blob-url (validação por hostname real, nunca substring da URL).
 async function fetchBlobContent(url: string): Promise<Response | null> {
-  if (url.includes(".private.blob.vercel-storage.com")) {
+  if (!isUrlPermitida(url)) return null;
+  if (isBlobPrivado(url)) {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
     return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -290,27 +279,25 @@ ${LIDERADV_DOCS}`;
 
   try {
     for (let i = 0; i < MAX_LOOP; i++) {
-      const response = await client.messages.create(
-        {
-          // Voltou pra Haiku: o mesmo teto fixo de 60s da Vercel (não dá
-          // pra aumentar) que já causou um 504 real em gerar-com-ia hoje
-          // é um risco aqui também — PDF grande + system prompt grande
-          // (~28KB de documentação) + até 6 chamadas em loop quando usa
-          // ferramenta somam rápido com um modelo mais lento. Erro real
-          // reportado em produção logo após um anexo de PDF pedindo pra
-          // agendar avaliação (fluxo que usa ferramenta). Sem acesso ao
-          // log exato do erro pra confirmar 100%, mas o padrão bate.
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 2048,
-          temperature: 0,
-          system: systemPrompt,
-          tools: IRIS_TOOLS,
-          messages: currentMessages,
-        },
-        temPdf
-          ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } }
-          : undefined
-      );
+      // Continua em Haiku por custo (mensagem de chat roda a cada troca,
+      // diferente de gerar-com-ia que é uma ação pontual) — mas agora via
+      // streaming, então o timeout de proxy numa chamada longa (PDF grande
+      // + até 6 chamadas em loop) não é mais risco; ver maxDuration acima.
+      const response = await client.messages
+        .stream(
+          {
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 2048,
+            temperature: 0,
+            system: systemPrompt,
+            tools: IRIS_TOOLS,
+            messages: currentMessages,
+          },
+          temPdf
+            ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } }
+            : undefined
+        )
+        .finalMessage();
 
       registrarUsoIA(
         "/api/iris/chat",

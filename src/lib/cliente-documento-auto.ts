@@ -7,6 +7,7 @@ import type { MembroFamilia } from "./clients-db";
 import { adicionarCidsCliente } from "./clients-db";
 import { agentesEstaoAtivos } from "./config-agentes-db";
 import { registrarUsoIA } from "./ia-uso-db";
+import { isUrlPermitida, isBlobPrivado } from "./blob-url";
 
 /**
  * Preenchimento automático do cadastro do cliente a partir de dado
@@ -352,9 +353,10 @@ export async function analisarDocumentoCliente(
   if (!doc) return { camposPreenchidos: [] };
 
   const docUrl = doc.url as string;
+  if (!isUrlPermitida(docUrl)) return { camposPreenchidos: [] };
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
   const resp =
-    docUrl.includes(".private.blob.vercel-storage.com") && blobToken
+    isBlobPrivado(docUrl) && blobToken
       ? await fetch(docUrl, {
           headers: { Authorization: `Bearer ${blobToken}` },
         })

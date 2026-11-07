@@ -1,4 +1,5 @@
 import "server-only";
+import { isUrlPermitida, isBlobPrivado } from "./blob-url";
 import Anthropic from "@anthropic-ai/sdk";
 import sql from "@/lib/db";
 import {
@@ -2337,9 +2338,10 @@ export async function analisarDocumento(
   if (!doc) throw new Error("Documento não encontrado");
 
   const docUrl = doc.url as string;
+  if (!isUrlPermitida(docUrl)) return "Não foi possível acessar o documento.";
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
   const resp =
-    docUrl.includes(".private.blob.vercel-storage.com") && blobToken
+    isBlobPrivado(docUrl) && blobToken
       ? await fetch(docUrl, {
           headers: { Authorization: `Bearer ${blobToken}` },
         })
@@ -2702,13 +2704,20 @@ Dispositivo que fundamenta a providência.`;
   // manda a "próxima ação obrigatória" (com base legal) direto pro
   // advogado — é raciocínio jurídico, não extração de dado, mesma
   // categoria do Diagnóstico Estratégico (que já usa Sonnet).
-  const resp = await getClaudeClient().messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 900,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const resp = await getClaudeClient()
+    .messages.stream({
+      model: "claude-sonnet-5",
+      max_tokens: 4000,
+      messages: [{ role: "user", content: prompt }],
+    })
+    .finalMessage();
 
   const texto = extractText(resp);
+  if (!texto.trim()) {
+    throw new Error(
+      `[cerebroJuridico] interpretarAndamento voltou vazio (stop_reason=${resp.stop_reason}, blocks=${resp.content.map((b) => b.type).join(",")}) — não vamos marcar "não urgente" sem a IA ter respondido de verdade.`
+    );
+  }
   const urgente = /URGENTE:\s*Sim/i.test(texto);
   const prazo =
     texto.match(/## PRAZO\n([\s\S]*?)(?=\n##|$)/i)?.[1]?.trim() ?? null;
@@ -2849,13 +2858,21 @@ Responda SOMENTE o JSON abaixo (sem markdown, sem texto fora do JSON):
 
   // Sonnet: isto vira tese/argumento reaproveitado em casos futuros
   // (cerebro_teses) — erro de leitura aqui se propaga pra outras análises.
-  const resp = await getClaudeClient().messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 1100,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const resp = await getClaudeClient()
+    .messages.stream({
+      model: "claude-sonnet-5",
+      max_tokens: 4000,
+      messages: [{ role: "user", content: prompt }],
+    })
+    .finalMessage();
 
-  const texto = extractText(resp) || "{}";
+  const textoExtraido = extractText(resp);
+  if (!textoExtraido.trim()) {
+    console.error(
+      `[cerebroJuridico] aprenderComResultado voltou vazio (stop_reason=${resp.stop_reason}, blocks=${resp.content.map((b) => b.type).join(",")})`
+    );
+  }
+  const texto = textoExtraido || "{}";
   let ap: {
     argumentos_vencedores?: string[];
     erros_cometidos?: string[];

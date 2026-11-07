@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissoes";
 import { getBibliotecaItemById } from "@/lib/biblioteca-juridica-db";
+import { isUrlPermitida, isBlobPrivado } from "@/lib/blob-url";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +34,15 @@ export async function GET(
     return `${tipo}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(nomeArquivo)}`;
   };
 
+  if (!isUrlPermitida(item.url)) {
+    return NextResponse.json(
+      { error: "Não foi possível abrir este arquivo." },
+      { status: 502 }
+    );
+  }
+
   try {
-    if (item.url.includes(".private.blob.vercel-storage.com")) {
+    if (isBlobPrivado(item.url)) {
       const token = process.env.BLOB_READ_WRITE_TOKEN;
       const blobRes = await fetch(item.url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},

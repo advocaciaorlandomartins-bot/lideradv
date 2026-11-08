@@ -9,7 +9,10 @@ import type { Documento } from "@/lib/documents-db";
 import type { ModeloDocumento } from "@/lib/modelos-db";
 import { checklistStatus, type ChecklistItem } from "@/lib/checklist-types";
 import ChecklistManager from "../controladoria/checklist-manager";
-import { toggleChecklistItemClienteViaProcessosAction } from "@/lib/checklist";
+import {
+  toggleChecklistItemClienteViaProcessosAction,
+  marcarTodosChecklistAction,
+} from "@/lib/checklist";
 import ChecklistBadge from "../checklist-badge";
 import type {
   InboundEmailAddress,
@@ -141,10 +144,13 @@ function BloquearMensagensToggle({
  */
 function ChecklistClienteDerivado({
   clientId,
+  processoId,
   itensIniciais,
   readOnly = false,
 }: {
   clientId: string;
+  /** Único processo do cliente — presente só quando !readOnly, pra permitir "Marcar todos" direto nele. */
+  processoId?: string;
   itensIniciais: ChecklistItem[];
   readOnly?: boolean;
 }) {
@@ -175,8 +181,35 @@ function ChecklistClienteDerivado({
     });
   }
 
+  function marcarTodos(feito: boolean) {
+    if (!processoId) return;
+    setErro(null);
+    startTransition(async () => {
+      const r = await marcarTodosChecklistAction("processo", processoId, feito);
+      if (r.error) {
+        setErro(r.error);
+        return;
+      }
+      if (r.checklist) setItens(r.checklist);
+    });
+  }
+
+  const todosFeitos = itens.length > 0 && itens.every((i) => i.feito);
+
   return (
     <div>
+      {!readOnly && processoId && itens.length > 1 && (
+        <div className="flex justify-end pb-1.5">
+          <button
+            type="button"
+            onClick={() => marcarTodos(!todosFeitos)}
+            disabled={isPending}
+            className="font-body text-xs font-medium text-primary hover:underline disabled:opacity-40 cursor-pointer"
+          >
+            {todosFeitos ? "Desmarcar todos" : "Marcar todos"}
+          </button>
+        </div>
+      )}
       <div className={`space-y-1.5 ${isPending ? "opacity-60" : ""}`}>
         {itens.map((item, idx) => {
           const checkbox = (
@@ -1207,6 +1240,9 @@ export default function ClienteDetailTabs({
                 </p>
                 <ChecklistClienteDerivado
                   clientId={client.id}
+                  processoId={
+                    processes.length === 1 ? processes[0].id : undefined
+                  }
                   itensIniciais={client.checklist}
                   readOnly={processes.length > 1}
                 />

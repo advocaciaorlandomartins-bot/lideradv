@@ -143,6 +143,34 @@ export async function toggleChecklistItemAction(
   }
 }
 
+/** Marca (ou desmarca) todos os itens do checklist de uma vez. */
+export async function marcarTodosChecklistAction(
+  origemTipo: OrigemChecklist,
+  origemId: string,
+  feito: boolean
+): Promise<{ error?: string; checklist?: ChecklistItem[] }> {
+  const session = await getSession();
+  if (!session) return { error: "Sem permissão." };
+
+  try {
+    const tabela = TABELA_CHECKLIST[origemTipo];
+    if (!(await podeAlterarChecklist(session, tabela, origemId)))
+      return { error: "Sem permissão." };
+
+    const raw = await lerChecklistRaw(tabela, origemId);
+    if (raw === undefined) return { error: "Item não encontrado." };
+
+    const checklist = parseChecklist(raw).map((i) => ({ ...i, feito }));
+    await gravarChecklist(tabela, origemId, JSON.stringify(checklist));
+
+    revalidarChecklist(tabela);
+    return { checklist };
+  } catch (e) {
+    console.error("[checklist] falha ao marcar todos:", e);
+    return { error: "Erro ao atualizar checklist." };
+  }
+}
+
 export async function adicionarChecklistItemAction(
   origemTipo: OrigemChecklist,
   origemId: string,

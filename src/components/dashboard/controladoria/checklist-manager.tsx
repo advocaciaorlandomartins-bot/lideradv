@@ -6,6 +6,7 @@ import {
   toggleChecklistItemAction,
   adicionarChecklistItemAction,
   removerChecklistItemAction,
+  marcarTodosChecklistAction,
 } from "@/lib/checklist";
 import { CheckIcon, XMarkIcon, PlusIcon } from "@/components/icons";
 
@@ -60,8 +61,29 @@ export default function ChecklistManager({
     });
   }
 
+  function marcarTodos(feito: boolean) {
+    startTransition(async () => {
+      const r = await marcarTodosChecklistAction(origemTipo, origemId, feito);
+      aplicar(r.checklist);
+    });
+  }
+
+  const todosFeitos = itens.length > 0 && itens.every((i) => i.feito);
+
   return (
     <div className={`space-y-1.5 ${isPending ? "opacity-60" : ""}`}>
+      {!somenteToggle && itens.length > 1 && (
+        <div className="flex justify-end pb-0.5">
+          <button
+            type="button"
+            onClick={() => marcarTodos(!todosFeitos)}
+            disabled={isPending}
+            className="font-body text-xs font-medium text-primary hover:underline disabled:opacity-40 cursor-pointer"
+          >
+            {todosFeitos ? "Desmarcar todos" : "Marcar todos"}
+          </button>
+        </div>
+      )}
       {itens.map((item, idx) => (
         <div key={idx} className="flex items-center gap-2">
           <button

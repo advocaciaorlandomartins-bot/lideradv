@@ -43,7 +43,7 @@ Logo abaixo do nome: etiquetas do cliente (ver seção ETIQUETAS)
 Abas:
 1. Visão Geral — dados de contato, endereço, dados previdenciários, processos vinculados, toggle de mensagens WhatsApp (ativar/bloquear)
 2. Processos — lista de processos desse cliente
-3. Financeiro — lançamentos e débitos do cliente
+3. Financeiro — lançamentos e débitos do cliente; marque vários lançamentos pendentes (checkbox) pra reagendar o vencimento de todos de uma vez (barra "Reagendar N selecionados" no fim da página, com campo de nova data) — ou peça direto à Íris pra reagendar em massa
 4. Documentos — arquivos enviados; botões "Processar INSS" e "Processar Judicial" para processar PDFs com IA; botão "Gerar Documento" para gerar PDF a partir de um modelo
 5. E-mail Exclusivo — caixa de entrada de e-mails recebidos no endereço exclusivo do cliente
 
@@ -175,6 +175,7 @@ Monitoramento automático de publicações e intimações judiciais. 4 abas:
 - Registrar pagamento: no lançamento → "Registrar Pagamento" → sistema envia confirmação ao cliente por WhatsApp
 - Quando um lançamento de honorário do cliente (vinculado a um processo) é marcado como pago, o sistema gera automaticamente a comissão do colaborador responsável (percentual configurado no cadastro dele, pela fase do processo) como uma remuneração "Pendente" em Remunerações — se o cliente pagar parcelado, cada parcela paga gera sua própria comissão pendente, na mesma cadência
 - "Aguardando resultado" (checkbox ao lançar uma receita): pra honorário combinado mas cujo valor final só se sabe quando sair o resultado (judicial/administrativo) — fica sem data de vencimento, listado numa seção separada em Lançamentos. Botão "Registrar resultado" reabre o lançamento com o detalhamento originalmente combinado (percentual, retroativo, salários) pré-preenchido, pra ajustar só o que mudou; ao salvar, cancela o "aguardando" e cria o lançamento final. Botão "Corrigir valor combinado" edita o valor/categoria do próprio lançamento aguardando, sem mudar o status
+- Reagendar vencimento em massa: na ficha do cliente (aba Financeiro), marcar os lançamentos pendentes desejados (ou "Selecionar todos os pendentes") e usar a barra flutuante "Reagendar N selecionados" com a nova data — não afeta lançamentos já pagos/cancelados. Fora da tela, dá pra pedir direto à Íris (ex: "reagenda todos os lançamentos pendentes do cliente X pra dia 10/12", opcionalmente só receitas ou só despesas)
 
 ## MEU FINANCEIRO (menu: Equipe → Meu Financeiro)
 - Visão financeira pessoal do colaborador logado

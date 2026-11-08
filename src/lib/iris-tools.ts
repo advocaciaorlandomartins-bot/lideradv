@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import sql from "./db";
 import { enviarMensagemDireta } from "./prevbot-outbound";
 import { getLancamentoKpis, getContasAReceber } from "./lancamentos-db";
+import { reagendarLembretesHonorarioLancamento } from "./lancamento-actions";
 import { hasPermission } from "./permissoes";
 import { getColaboradorIdForUser } from "./usuarios-db";
 import { podeAcessarCliente } from "./acesso";
@@ -41,6 +42,8 @@ export const IRIS_TOOL_LABELS: Record<string, string> = {
   cadastrar_cliente: "Cadastrou um novo cliente",
   complementar_cliente: "Completou dados do cadastro de um cliente",
   criar_controle: "Criou um controle (audiência/prazo/DCB/benefício/alvará)",
+  reagendar_lancamentos_cliente:
+    "Reagendou lançamentos financeiros de um cliente em massa",
 };
 
 export const IRIS_TOOLS: Anthropic.Tool[] = [
@@ -814,6 +817,30 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["tipo", "cliente_busca"],
+    },
+  },
+  {
+    name: "reagendar_lancamentos_cliente",
+    description:
+      "Reagenda a data de vencimento de TODOS os lançamentos financeiros PENDENTES de um cliente (buscado pelo nome) de uma vez só, pra uma nova data — útil quando o usuário cadastrou várias cobranças/despesas com a data errada e quer corrigir todas. Não afeta lançamentos já pagos ou cancelados. Use tipo pra restringir só a receitas ('entrada') ou só a despesas ('saida') se o usuário pedir especificamente um dos dois; sem tipo, reagenda ambos.",
+    input_schema: {
+      type: "object",
+      properties: {
+        cliente_busca: {
+          type: "string",
+          description: "Nome (ou parte do nome) do cliente.",
+        },
+        nova_data: {
+          type: "string",
+          description: "Nova data de vencimento, formato YYYY-MM-DD.",
+        },
+        tipo: {
+          type: "string",
+          description:
+            "Opcional: 'entrada' (só receitas) ou 'saida' (só despesas). Sem isso, reagenda os dois.",
+        },
+      },
+      required: ["cliente_busca", "nova_data"],
     },
   },
 ];
@@ -2896,6 +2923,94 @@ async function executarFerramentaIrisInterno(
         mensagem: `Controle "${getTipoConfig(tipo).label}" criado pra ${clienteNome3}${processoId3 ? " (processo vinculado)" : ""}.${cascataMsg}${dcbMsg}`,
         controle_id: novoId,
         cliente_id: clienteId3,
+      });
+    }
+
+    case "reagendar_lancamentos_cliente": {
+      if (!hasPermission(session, "financeiro", "editar")) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem permissão pra editar o financeiro. Explique isso educadamente e não tente de novo.",
+        });
+      }
+
+      const clienteBuscaReag = String(input.cliente_busca ?? "").trim();
+      const novaDataReag = String(input.nova_data ?? "").trim();
+      if (!clienteBuscaReag || !/^\d{4}-\d{2}-\d{2}$/.test(novaDataReag)) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Informe cliente_busca e nova_data no formato YYYY-MM-DD.",
+        });
+      }
+      const tipoHintReag = String(input.tipo ?? "")
+        .trim()
+        .toLowerCase();
+      const tipoFiltro =
+        tipoHintReag === "entrada" || tipoHintReag === "saida"
+          ? tipoHintReag
+          : null;
+
+      const candidatosReag = await buscarClientesPorNome(
+        session,
+        clienteBuscaReag
+      );
+      if (candidatosReag.length === 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Nenhum cliente encontrado com o nome "${clienteBuscaReag}".`,
+        });
+      }
+      if (candidatosReag.length > 1) {
+        return JSON.stringify({
+          ok: false,
+          erro: `Mais de um cliente encontrado pra "${clienteBuscaReag}" — pergunte ao usuário qual deles antes de chamar esta ferramenta.`,
+          opcoes: candidatosReag.map((c) => c.name),
+        });
+      }
+      const clienteIdReag = candidatosReag[0].id;
+      if (!(await podeAcessarCliente(session, clienteIdReag))) {
+        return JSON.stringify({
+          ok: false,
+          erro: "Este usuário não tem acesso a esse cliente. Explique isso educadamente e não tente de novo.",
+        });
+      }
+
+      const pendentesReag = await sql`
+        SELECT id::text, tipo, valor, client_id::text, descricao
+        FROM lancamentos
+        WHERE client_id = ${clienteIdReag}::uuid
+          AND status = 'pendente'
+          AND (${tipoFiltro}::text IS NULL OR tipo = ${tipoFiltro})
+      `;
+      if (pendentesReag.length === 0) {
+        return JSON.stringify({
+          ok: false,
+          erro: `${candidatosReag[0].name} não tem lançamentos pendentes${tipoFiltro ? ` do tipo ${tipoFiltro === "entrada" ? "receita" : "despesa"}` : ""} pra reagendar.`,
+        });
+      }
+
+      await sql`
+        UPDATE lancamentos
+        SET data_vencimento = ${novaDataReag}::date
+        WHERE id = ANY(${pendentesReag.map((r) => String(r.id))}::uuid[])
+      `;
+      for (const row of pendentesReag) {
+        if (row.tipo === "entrada") {
+          await reagendarLembretesHonorarioLancamento(
+            String(row.id),
+            row.client_id ? String(row.client_id) : null,
+            Number(row.valor),
+            novaDataReag,
+            String(row.descricao)
+          );
+        }
+      }
+
+      return JSON.stringify({
+        ok: true,
+        mensagem: `Reagendados ${pendentesReag.length} lançamento${pendentesReag.length > 1 ? "s" : ""} de ${candidatosReag[0].name} para ${novaDataReag}.`,
+        quantidade: pendentesReag.length,
+        cliente_id: clienteIdReag,
       });
     }
 

@@ -22,7 +22,7 @@ export type LancamentoFormState = { error: string } | null;
 // deixava os lembretes antigos com o valor/data ERRADOS ainda na fila pra
 // enviar ao cliente; excluir/cancelar deixava o lembrete antigo sendo
 // enviado para uma cobrança que não existe mais.
-async function reagendarLembretesHonorarioLancamento(
+export async function reagendarLembretesHonorarioLancamento(
   lancamentoId: string,
   clientId: string | null,
   valor: number,
@@ -973,6 +973,46 @@ export async function reagendarLancamentoAction(
   }
   revalidatePath("/dashboard/financeiro");
   return {};
+}
+
+// ── Reagendar em massa ────────────────────────────────────────────────────────
+// Mesma regra do reagendarLancamentoAction (acima), mas pra vários lançamentos
+// de uma vez — usado na seleção múltipla da tela "Lançamentos do cliente" e
+// pela ferramenta reagendar_lancamentos_cliente da Íris.
+export async function reagendarLancamentosEmMassaAction(
+  ids: string[],
+  novaData: string
+): Promise<{ error?: string; count?: number }> {
+  const session = await getSession();
+  if (!session || !hasPermission(session, "financeiro", "editar"))
+    return { error: "Sem permissão." };
+  if (ids.length === 0) return { count: 0 };
+  if (!novaData) return { error: "Informe a nova data." };
+
+  try {
+    const rows = await sql`
+      UPDATE lancamentos
+      SET data_vencimento = ${novaData}::date
+      WHERE id = ANY(${ids}::uuid[]) AND status NOT IN ('pago', 'cancelado')
+      RETURNING id::text, tipo, valor, client_id::text, descricao
+    `;
+    for (const row of rows) {
+      if (row.tipo === "entrada") {
+        await reagendarLembretesHonorarioLancamento(
+          String(row.id),
+          row.client_id ? String(row.client_id) : null,
+          Number(row.valor),
+          novaData,
+          String(row.descricao)
+        );
+      }
+    }
+    revalidatePath("/dashboard/financeiro");
+    return { count: rows.length };
+  } catch (err) {
+    console.error("reagendarLancamentosEmMassaAction DB error:", err);
+    return { error: "Erro ao reagendar. Tente novamente." };
+  }
 }
 
 export async function markAsPagoAction(

@@ -11,42 +11,42 @@ const MODELOS = [
   {
     label: "Lembrete honorário — 10 dias",
     tipo: "honorario_10d",
-    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do Orlando Martins Advocacia. Passando pra lembrar que seu honorário no valor de *R$ 1.500,00* vence em *19/07/2026* (faltam 10 dias).\n\nSe já realizou o pagamento, pode desconsiderar esta mensagem. Qualquer dúvida, é só chamar! 😊`,
+    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do escritório Orlando Martins Advocacia. Passando pra lembrar que seu honorário no valor de *R$ 1.500,00* vence em *19/07/2026* (faltam 10 dias).\n\nSe já realizou o pagamento, pode desconsiderar esta mensagem. Qualquer dúvida, é só chamar! 😊`,
   },
   {
     label: "Lembrete honorário — 5 dias",
     tipo: "honorario_5d",
-    mensagem: `{{saudacao}}, Sra. Maria! Aqui é Ana, do financeiro do Orlando Martins Advocacia. Sua cobrança de honorários de *R$ 1.500,00* vence em *19/07/2026* — faltam apenas 5 dias.\n\nSe ainda não realizou o pagamento, é uma boa hora pra se organizar. Caso já tenha pago, desconsidere esta mensagem. Obrigado! 🙏`,
+    mensagem: `{{saudacao}}, Sra. Maria! Aqui é Ana, do financeiro do escritório Orlando Martins Advocacia. Sua cobrança de honorários de *R$ 1.500,00* vence em *19/07/2026* — faltam apenas 5 dias.\n\nSe ainda não realizou o pagamento, é uma boa hora pra se organizar. Caso já tenha pago, desconsidere esta mensagem. Obrigado! 🙏`,
   },
   {
     label: "Lembrete honorário — dia do vencimento",
     tipo: "honorario_vence_hoje",
-    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do Orlando Martins Advocacia. Hoje é o dia do vencimento do seu honorário de *R$ 500,00*.\n\nPor favor, realize o pagamento para evitar pendências. Se já pagou, desconsidere esta mensagem — e muito obrigado pela pontualidade! 🙏`,
+    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do escritório Orlando Martins Advocacia. Hoje é o dia do vencimento do seu honorário de *R$ 500,00*.\n\nPor favor, realize o pagamento para evitar pendências. Se já pagou, desconsidere esta mensagem — e muito obrigado pela pontualidade! 🙏`,
   },
   {
     label: "Confirmação de pagamento (conta quitada)",
     tipo: "honorario_pago_quitado",
-    mensagem: `{{saudacao}}, Sra. Maria! Aqui é Ana, do financeiro do Orlando Martins Advocacia. ✅ Confirmamos o recebimento do seu pagamento de *R$ 1.500,00* em 09/07/2026.\n\nSua conta está totalmente quitada! Muito obrigado pela confiança e pontualidade! 🎉`,
+    mensagem: `{{saudacao}}, Sra. Maria! Aqui é Ana, do financeiro do escritório Orlando Martins Advocacia. ✅ Confirmamos o recebimento do seu pagamento de *R$ 1.500,00* em 09/07/2026.\n\nSua conta está totalmente quitada! Muito obrigado pela confiança e pontualidade! 🎉`,
   },
   {
     label: "Confirmação de pagamento (saldo restante)",
     tipo: "honorario_pago_saldo",
-    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do Orlando Martins Advocacia. ✅ Confirmamos o recebimento do seu pagamento de *R$ 500,00* em 09/11/2026.\n\nSeu saldo restante é de *R$ 7.000,00*. Em breve você receberá os próximos lembretes de vencimento. Qualquer dúvida, estou à disposição! 😊`,
+    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do escritório Orlando Martins Advocacia. ✅ Confirmamos o recebimento do seu pagamento de *R$ 500,00* em 09/11/2026.\n\nSeu saldo restante é de *R$ 7.000,00*. Em breve você receberá os próximos lembretes de vencimento. Qualquer dúvida, estou à disposição! 😊`,
   },
   {
     label: "Lembrete INSS — 15 dias antes",
     tipo: "inss_15d",
-    mensagem: `{{saudacao}}, Sra. Maria! 👋 Aqui é Ana, do Orlando Martins Advocacia. Passando pra avisar que *Avaliação Social BPC/LOAS* está marcado para segunda-feira, dia 19/10/2026 às 09:00, no APS Maceió Centro.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
+    mensagem: `{{saudacao}}, Sra. Maria! 👋 Aqui é Ana, do escritório Orlando Martins Advocacia. Passando pra avisar que *Avaliação Social BPC/LOAS* está marcado para segunda-feira, dia 19/10/2026 às 09:00, no APS Maceió Centro.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
   },
   {
     label: "Lembrete INSS — 2 dias antes",
     tipo: "inss_2d",
-    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do Orlando Martins Advocacia. *Avaliação Social BPC/LOAS* é daqui a 2 dias — segunda-feira, 19/10/2026 às 09:00.\n\n📍 Local: APS Maceió Centro\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar!`,
+    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do escritório Orlando Martins Advocacia. *Avaliação Social BPC/LOAS* é daqui a 2 dias — segunda-feira, 19/10/2026 às 09:00.\n\n📍 Local: APS Maceió Centro\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar!`,
   },
   {
     label: "Lembrete INSS — 1 dia antes (manhã)",
     tipo: "inss_1d_manha",
-    mensagem: `{{saudacao}}, Sra. Maria! 🌅 Aqui é Ana, do Orlando Martins Advocacia. Amanhã é o grande dia! *Avaliação Social BPC/LOAS* está marcado para:\n\n📅 19/10/2026 (segunda-feira)\n⏰ 09:00\n📍 APS Maceió Centro\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estou torcendo por você! 🍀`,
+    mensagem: `{{saudacao}}, Sra. Maria! 🌅 Aqui é Ana, do escritório Orlando Martins Advocacia. Amanhã é o grande dia! *Avaliação Social BPC/LOAS* está marcado para:\n\n📅 19/10/2026 (segunda-feira)\n⏰ 09:00\n📍 APS Maceió Centro\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estou torcendo por você! 🍀`,
   },
 ];
 

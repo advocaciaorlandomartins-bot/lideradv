@@ -2,6 +2,21 @@ import sql from "./db";
 
 const PREVBOT_WEBHOOK_URL = process.env.PREVBOT_WEBHOOK_URL ?? "";
 
+// Resolve o token {{saudacao}} na hora REAL do envio (não quando a
+// mensagem foi gerada/agendada) — um lembrete de honorário gerado às 15h
+// mas só disparado 10 dias depois, às 8h, precisa dizer "Bom dia", não
+// "Boa tarde". Por isso o token fica literal no texto gravado em
+// lembretes_agendados e só é substituído aqui, no único ponto por onde
+// toda mensagem direta passa antes de sair pro WhatsApp.
+function getSaudacao(): string {
+  const hora = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  ).getHours();
+  if (hora < 12) return "Bom dia";
+  if (hora < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export type PrevBotEvento =
   | "honorario_pago"
   | "processo_deferido"
@@ -115,11 +130,13 @@ export async function enviarMensagemDireta(opts: {
   const telefone = opts.telefone.replace(/\D/g, "");
   if (!telefone) return { ok: false, error: "Telefone inválido" };
 
+  const mensagem = opts.mensagem.replace(/\{\{saudacao\}\}/g, getSaudacao());
+
   return _enviarWebhook(key, {
     tenant_id: getTenantId(),
     evento: "mensagem_direta",
     telefone,
-    dados: { texto: opts.mensagem },
+    dados: { texto: mensagem },
   });
 }
 

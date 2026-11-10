@@ -6,7 +6,15 @@
  *
  * Este arquivo exporta os valores PADRÃO usados como fallback.
  * Tokens disponíveis nos templates:
- *   {{nome}}       — Primeiro nome do destinatário
+ *   {{nome}}       — Primeiro nome do destinatário, já com "Sr./Sra." na
+ *                    frente quando o cliente tem gênero cadastrado
+ *   {{atendente}}  — Nome configurado em "Nome do atendente", abaixo
+ *   {{saudacao}}   — "Bom dia"/"Boa tarde"/"Boa noite" — NÃO é resolvido
+ *                    aqui: fica literal no texto gravado e só vira o
+ *                    cumprimento certo na hora real do envio (ver
+ *                    enviarMensagemDireta em prevbot-outbound.ts), já que
+ *                    um lembrete agendado pode ser enviado dias depois de
+ *                    ser gerado
  *   {{escritorio}} — Nome do escritório
  *   {{servico}}    — Tipo do serviço
  *   {{diaSemana}}  — Dia da semana (segunda-feira...)
@@ -27,6 +35,8 @@ export function renderMensagem(
 // ── Tipo completo da config (usada no DB e no formulário) ─────────────────────
 
 export interface MensagensConfig {
+  // Identidade usada em {{atendente}} em todos os templates abaixo
+  atendente_nome: string;
   // INSS — intervalos
   inss_lembrete1_dias: number;
   inss_lembrete2_dias: number;
@@ -67,57 +77,59 @@ export interface MensagensConfig {
 // ── Valores padrão (usados se o DB ainda não tiver customizações) ─────────────
 
 export const MENSAGENS_PADROES: MensagensConfig = {
+  atendente_nome: "Ana",
+
   inss_lembrete1_dias: 15,
   inss_lembrete2_dias: 5,
   inss_lembrete3_dias: 2,
   inss_vespera_manha_hora: 8,
   inss_vespera_tarde_hora: 18,
 
-  inss_lembrete1: `Oi {{nome}}! 👋 Aqui é do {{escritorio}}. Passando pra avisar que *{{servico}}* está marcado para {{diaSemana}}, dia {{data}} às {{hora}}, em {{local}}.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
+  inss_lembrete1: `{{saudacao}}, {{nome}}! 👋 Aqui é {{atendente}}, do {{escritorio}}. Passando pra avisar que *{{servico}}* está marcado para {{diaSemana}}, dia {{data}} às {{hora}}, em {{local}}.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
 
-  inss_lembrete2: `Olá {{nome}}! Lembrando que *{{servico}}* no INSS está chegando — {{diaSemana}}, {{data}} às {{hora}}, em {{local}}.\n\nFaltam só 5 dias! Aproveite pra separar documentos: RG, CPF, Certidão de Nascimento e qualquer documentação médica ou social que tiver. Qualquer dúvida, o {{escritorio}} está à disposição! 💪`,
+  inss_lembrete2: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do {{escritorio}}. Lembrando que *{{servico}}* no INSS está chegando — {{diaSemana}}, {{data}} às {{hora}}, em {{local}}.\n\nFaltam só 5 dias! Aproveite pra separar documentos: RG, CPF, Certidão de Nascimento e qualquer documentação médica ou social que tiver. Qualquer dúvida, estou à disposição! 💪`,
 
-  inss_lembrete3: `Oi {{nome}}! *{{servico}}* é daqui a 2 dias — {{diaSemana}}, {{data}} às {{hora}}.\n\n📍 Local: {{local}}\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar com a gente!`,
+  inss_lembrete3: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do {{escritorio}}. *{{servico}}* é daqui a 2 dias — {{diaSemana}}, {{data}} às {{hora}}.\n\n📍 Local: {{local}}\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar!`,
 
-  inss_vespera_manha: `Bom dia, {{nome}}! 🌅 Amanhã é o grande dia! *{{servico}}* está marcado para:\n\n📅 {{data}} ({{diaSemana}})\n⏰ {{hora}}\n📍 {{local}}\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estamos torcendo por você! 🍀`,
+  inss_vespera_manha: `{{saudacao}}, {{nome}}! 🌅 Aqui é {{atendente}}, do {{escritorio}}. Amanhã é o grande dia! *{{servico}}* está marcado para:\n\n📅 {{data}} ({{diaSemana}})\n⏰ {{hora}}\n📍 {{local}}\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estou torcendo por você! 🍀`,
 
-  inss_vespera_tarde: `Boa tarde, {{nome}}! Só passando pra reforçar: amanhã cedo é *{{servico}}* no INSS às {{hora}}.\n\n📍 {{local}}\n\nJá separou os documentos? Qualquer dúvida de última hora, pode chamar o {{escritorio}} que a gente te ajuda! 😊`,
+  inss_vespera_tarde: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do {{escritorio}}. Só passando pra reforçar: amanhã cedo é *{{servico}}* no INSS às {{hora}}.\n\n📍 {{local}}\n\nJá separou os documentos? Qualquer dúvida de última hora, pode chamar que eu te ajudo! 😊`,
 
   honorario_lembrete1_dias: 10,
   honorario_lembrete2_dias: 5,
   honorario_lembrete3_dias: 1,
   honorario_vencimento_hoje_hora: 8,
 
-  honorario_lembrete1: `Olá {{nome}}! Passando pra lembrar que seu honorário no valor de *{{valor}}* vence em *{{data}}* (faltam 10 dias).\n\nSe já realizou o pagamento, pode desconsiderar esta mensagem. Qualquer dúvida, pode falar com o {{escritorio}}! 😊`,
+  honorario_lembrete1: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do financeiro do {{escritorio}}. Passando pra lembrar que seu honorário no valor de *{{valor}}* vence em *{{data}}* (faltam 10 dias).\n\nSe já realizou o pagamento, pode desconsiderar esta mensagem. Qualquer dúvida, é só chamar! 😊`,
 
-  honorario_lembrete2: `Oi {{nome}}! Sua cobrança de honorários de *{{valor}}* vence em *{{data}}* — faltam apenas 5 dias.\n\nSe ainda não realizou o pagamento, é uma boa hora pra se organizar. Caso já tenha pago, desconsidere esta mensagem. Obrigado! 🙏`,
+  honorario_lembrete2: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do financeiro do {{escritorio}}. Sua cobrança de honorários de *{{valor}}* vence em *{{data}}* — faltam apenas 5 dias.\n\nSe ainda não realizou o pagamento, é uma boa hora pra se organizar. Caso já tenha pago, desconsidere esta mensagem. Obrigado! 🙏`,
 
-  honorario_lembrete3: `Olá {{nome}}! Amanhã, dia *{{data}}*, vence seu honorário de *{{valor}}*.\n\nPedimos que regularize até amanhã para evitar atrasos. Se já pagou, pode desconsiderar esta mensagem. Qualquer dúvida estamos disponíveis! 😊`,
+  honorario_lembrete3: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do financeiro do {{escritorio}}. Amanhã, dia *{{data}}*, vence seu honorário de *{{valor}}*.\n\nPedimos que regularize até amanhã para evitar atrasos. Se já pagou, pode desconsiderar esta mensagem. Qualquer dúvida estou à disposição! 😊`,
 
-  honorario_vence_hoje: `Oi {{nome}}! Hoje é o dia do vencimento do seu honorário de *{{valor}}*.\n\nPor favor, realize o pagamento para evitar pendências. Se já pagou, desconsidere esta mensagem — e muito obrigado pela pontualidade! 🙏`,
+  honorario_vence_hoje: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do financeiro do {{escritorio}}. Hoje é o dia do vencimento do seu honorário de *{{valor}}*.\n\nPor favor, realize o pagamento para evitar pendências. Se já pagou, desconsidere esta mensagem — e muito obrigado pela pontualidade! 🙏`,
 
-  honorario_pagamento_quitado: `✅ {{nome}}, confirmamos o recebimento do seu pagamento de *{{valor}}* em {{data}}.\n\nSua conta está totalmente quitada! Muito obrigado pela confiança e pontualidade! 🎉`,
+  honorario_pagamento_quitado: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do financeiro do {{escritorio}}. ✅ Confirmamos o recebimento do seu pagamento de *{{valor}}* em {{data}}.\n\nSua conta está totalmente quitada! Muito obrigado pela confiança e pontualidade! 🎉`,
 
-  honorario_pagamento_parcial: `✅ {{nome}}, confirmamos o recebimento do seu pagamento de *{{valor}}* em {{data}}.\n\nSeu saldo restante é de *{{saldo}}*. Em breve você receberá os próximos lembretes de vencimento. Qualquer dúvida, estamos à disposição! 😊`,
+  honorario_pagamento_parcial: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do financeiro do {{escritorio}}. ✅ Confirmamos o recebimento do seu pagamento de *{{valor}}* em {{data}}.\n\nSeu saldo restante é de *{{saldo}}*. Em breve você receberá os próximos lembretes de vencimento. Qualquer dúvida, estou à disposição! 😊`,
 
   // ── Videochamada ─────────────────────────────────────────────────────────────
 
   videochamada_vespera_hora: 18,
   videochamada_dia_hora: 8,
 
-  videochamada_convite: `Olá {{nome}}! 👋 Aqui é do {{escritorio}}.\n\nGostaríamos de confirmar nossa *reunião por videochamada*:\n\n📅 {{diaSemana}}, {{data}}\n⏰ {{hora}}\n🔗 {{link}}\n\nPor favor, *confirme respondendo SIM* se esse horário está bom para você. Se precisar remarcar, é só falar com a gente! 😊`,
+  videochamada_convite: `{{saudacao}}, {{nome}}! 👋 Aqui é {{atendente}}, do {{escritorio}}.\n\nGostaríamos de confirmar nossa *reunião por videochamada*:\n\n📅 {{diaSemana}}, {{data}}\n⏰ {{hora}}\n🔗 {{link}}\n\nPor favor, *confirme respondendo SIM* se esse horário está bom para você. Se precisar remarcar, é só falar! 😊`,
 
-  videochamada_vespera: `Olá {{nome}}! Lembrando que amanhã temos nossa *reunião por videochamada* às *{{hora}}*.\n\n🔗 Link de acesso: {{link}}\n\nNos vemos amanhã! 😊`,
+  videochamada_vespera: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do {{escritorio}}. Lembrando que amanhã temos nossa *reunião por videochamada* às *{{hora}}*.\n\n🔗 Link de acesso: {{link}}\n\nNos vemos amanhã! 😊`,
 
-  videochamada_dia: `Bom dia, {{nome}}! 🌅 Hoje é o dia da nossa reunião — às *{{hora}}* estamos te esperando!\n\n🔗 Acesse pelo link: {{link}}\n\nAté já! 👋`,
+  videochamada_dia: `{{saudacao}}, {{nome}}! 🌅 Aqui é {{atendente}}, do {{escritorio}}. Hoje é o dia da nossa reunião — às *{{hora}}* estou te esperando!\n\n🔗 Acesse pelo link: {{link}}\n\nAté já! 👋`,
 
   // ── Ligação WhatsApp (para clientes sem acesso a Meet) ────────────────────────
 
-  wpp_call_convite: `Olá {{nome}}! 👋 Aqui é do {{escritorio}}.\n\nAgendamos uma *ligação pelo WhatsApp* com você:\n\n📅 {{diaSemana}}, {{data}}\n⏰ {{hora}}\n\nFique disponível no WhatsApp nesse horário — *vamos te ligar!* 📱\n\nPor favor, *confirme respondendo SIM* se esse horário está bom pra você. Se precisar remarcar, é só falar! 😊`,
+  wpp_call_convite: `{{saudacao}}, {{nome}}! 👋 Aqui é {{atendente}}, do {{escritorio}}.\n\nAgendamos uma *ligação pelo WhatsApp* com você:\n\n📅 {{diaSemana}}, {{data}}\n⏰ {{hora}}\n\nFique disponível no WhatsApp nesse horário — vou te ligar! 📱\n\nPor favor, *confirme respondendo SIM* se esse horário está bom pra você. Se precisar remarcar, é só falar! 😊`,
 
-  wpp_call_vespera: `Olá {{nome}}! Lembrando que amanhã às *{{hora}}* ligaremos para você pelo WhatsApp. 📱\n\nCertifique-se de estar com o WhatsApp aberto e disponível nesse horário. Nos vemos amanhã! 😊`,
+  wpp_call_vespera: `{{saudacao}}, {{nome}}! Aqui é {{atendente}}, do {{escritorio}}. Lembrando que amanhã às *{{hora}}* vou te ligar pelo WhatsApp. 📱\n\nCertifique-se de estar com o WhatsApp aberto e disponível nesse horário. Nos vemos amanhã! 😊`,
 
-  wpp_call_dia: `Bom dia, {{nome}}! 🌅 Hoje é o dia da nossa conversa. Ligaremos para você pelo WhatsApp às *{{hora}}*.\n\nFique disponível com o WhatsApp aberto! Até já! 👋`,
+  wpp_call_dia: `{{saudacao}}, {{nome}}! 🌅 Aqui é {{atendente}}, do {{escritorio}}. Hoje é o dia da nossa conversa. Vou te ligar pelo WhatsApp às *{{hora}}*.\n\nFique disponível com o WhatsApp aberto! Até já! 👋`,
 };
 
 // ── Atalhos para intervalos (compatibilidade com código legado) ───────────────

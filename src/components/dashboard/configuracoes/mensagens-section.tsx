@@ -9,7 +9,12 @@ interface Props {
 }
 
 const TOKENS = [
-  { token: "{{nome}}", desc: "Primeiro nome" },
+  { token: "{{nome}}", desc: "Primeiro nome (com Sr./Sra. automático)" },
+  { token: "{{atendente}}", desc: "Nome do atendente, definido abaixo" },
+  {
+    token: "{{saudacao}}",
+    desc: "Bom dia/Boa tarde/Boa noite, calculado na hora do envio",
+  },
   { token: "{{escritorio}}", desc: "Nome do escritório" },
   { token: "{{servico}}", desc: "Tipo do serviço (perícia, avaliação...)" },
   { token: "{{diaSemana}}", desc: "Dia da semana" },
@@ -82,6 +87,24 @@ export default function MensagensSection({ initialConfig }: Props) {
           <code className="font-mono">_itálico_</code>,{" "}
           <code className="font-mono">\n</code> = quebra de linha.
         </p>
+      </div>
+
+      {/* ── Identidade do atendente ───────────────────────────────────── */}
+      <div className="rounded-lg border border-border bg-slate-50 p-4">
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+          Nome do atendente
+        </label>
+        <p className="mb-2 text-xs text-muted">
+          Usado em {"{{atendente}}"} em todas as mensagens automáticas — ex:
+          &ldquo;Aqui é <strong>Ana</strong>, do financeiro do...&rdquo;
+        </p>
+        <input
+          type="text"
+          value={config.atendente_nome}
+          onChange={(e) => update("atendente_nome", e.target.value)}
+          maxLength={60}
+          className="h-9 w-full max-w-xs rounded-lg border border-border bg-white px-3 text-sm text-fg outline-none focus:border-primary"
+        />
       </div>
 
       {/* ── INSS ──────────────────────────────────────────────────────── */}

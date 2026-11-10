@@ -143,6 +143,27 @@ function primeiroNome(nome: string): string {
   return nome.split(" ")[0];
 }
 
+// "Sr./Sra." na frente do primeiro nome conforme o campo `genero` do
+// cadastro do cliente (GENEROS em new-client-form.tsx). Sem gênero
+// cadastrado, ou "Não binário" (não há tratamento formal padrão pra esse
+// caso), devolve só o primeiro nome — nunca chuta.
+function tratamentoNome(nome: string, genero: string | null): string {
+  const primeiro = primeiroNome(nome);
+  const g = (genero ?? "").trim().toLowerCase();
+  if (g === "masculino" || g === "homem trans") return `Sr. ${primeiro}`;
+  if (g === "feminino" || g === "mulher trans") return `Sra. ${primeiro}`;
+  return primeiro;
+}
+
+// Busca só pra decidir o tratamento (Sr./Sra.) — quem chama já tem
+// clienteId em mãos em todos os 4 fluxos que usam isso, então não precisa
+// propagar `genero` por toda a cadeia de chamadas; concentra aqui.
+async function generoDoCliente(clienteId: string): Promise<string | null> {
+  const rows =
+    await sql`SELECT genero FROM clients WHERE id = ${clienteId}::uuid`;
+  return (rows[0]?.genero as string | null | undefined) ?? null;
+}
+
 function formatarData(data: Date): string {
   return data.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -307,6 +328,7 @@ export async function agendarLembretesInss(opts: {
   escritorio?: string;
 }): Promise<void> {
   const cfg = await getMensagensConfig();
+  const generoCliente = await generoDoCliente(opts.clienteId);
 
   const destinos: Array<{
     tipo: string;
@@ -386,7 +408,11 @@ export async function agendarLembretesInss(opts: {
       if (lembrete.enviarEm <= new Date()) continue;
 
       const vars = {
-        nome: primeiroNome(dest.nome),
+        nome:
+          dest.tipo === "cliente"
+            ? tratamentoNome(dest.nome, generoCliente)
+            : primeiroNome(dest.nome),
+        atendente: cfg.atendente_nome,
         escritorio: opts.escritorio ?? "nosso escritório",
         servico: opts.tipoServico || "atendimento no INSS",
         diaSemana: formatarDiaSemana(opts.dataEvento),
@@ -434,6 +460,12 @@ export async function agendarLembretesHonorario(opts: {
   if (!destTelefone) return;
 
   const cfg = await getMensagensConfig();
+  const generoCliente =
+    destTipo === "cliente" ? await generoDoCliente(opts.clienteId) : null;
+  const nomeFormatado =
+    destTipo === "cliente"
+      ? tratamentoNome(destNome, generoCliente)
+      : primeiroNome(destNome);
 
   const tiposLembrete: Array<{
     tipo:
@@ -485,7 +517,8 @@ export async function agendarLembretesHonorario(opts: {
     const mensagem =
       prefixo +
       renderMensagem(lembrete.template, {
-        nome: primeiroNome(destNome),
+        nome: nomeFormatado,
+        atendente: cfg.atendente_nome,
         escritorio,
         valor,
         data: formatarData(opts.dataVencimento),
@@ -512,7 +545,8 @@ export async function agendarLembretesHonorario(opts: {
     const mensagem =
       prefixo +
       renderMensagem(cfg.honorario_vence_hoje, {
-        nome: primeiroNome(destNome),
+        nome: nomeFormatado,
+        atendente: cfg.atendente_nome,
         escritorio,
         valor,
         data: formatarData(opts.dataVencimento),
@@ -581,8 +615,16 @@ export async function agendarVideochamadaWhatsApp(opts: {
     : "";
 
   if (destClienteTelefone) {
+    const generoCliente =
+      destClienteTipo === "cliente"
+        ? await generoDoCliente(opts.clienteId)
+        : null;
     const varsCliente = {
-      nome: primeiroNome(destClienteNome),
+      nome:
+        destClienteTipo === "cliente"
+          ? tratamentoNome(destClienteNome, generoCliente)
+          : primeiroNome(destClienteNome),
+      atendente: cfg.atendente_nome,
       escritorio: opts.escritorio ?? "nosso escritório",
       diaSemana: formatarDiaSemana(opts.dataEvento),
       data: formatarData(opts.dataEvento),
@@ -1197,6 +1239,7 @@ export async function agendarConfirmacaoPagamento(opts: {
   valorPago: number;
   dataPagamento: Date;
   saldoRestante: number;
+  escritorio?: string;
 }): Promise<void> {
   const destTelefone = opts.responsavel?.telefone ?? opts.telefone;
   const destNome = opts.responsavel?.nome ?? opts.clienteNome;
@@ -1205,7 +1248,14 @@ export async function agendarConfirmacaoPagamento(opts: {
   if (!destTelefone) return;
 
   const cfg = await getMensagensConfig();
-  const nome = primeiroNome(destNome);
+  const generoCliente =
+    destTipo === "cliente" ? await generoDoCliente(opts.clienteId) : null;
+  const nome =
+    destTipo === "cliente"
+      ? tratamentoNome(destNome, generoCliente)
+      : primeiroNome(destNome);
+  const atendente = cfg.atendente_nome;
+  const escritorio = opts.escritorio ?? "nosso escritório";
   const valor = formatarMoeda(opts.valorPago);
   const data = formatarData(opts.dataPagamento);
 
@@ -1216,9 +1266,17 @@ export async function agendarConfirmacaoPagamento(opts: {
   const mensagem =
     prefixo +
     (opts.saldoRestante <= 0
-      ? renderMensagem(cfg.honorario_pagamento_quitado, { nome, valor, data })
+      ? renderMensagem(cfg.honorario_pagamento_quitado, {
+          nome,
+          atendente,
+          escritorio,
+          valor,
+          data,
+        })
       : renderMensagem(cfg.honorario_pagamento_parcial, {
           nome,
+          atendente,
+          escritorio,
           valor,
           data,
           saldo: formatarMoeda(opts.saldoRestante),

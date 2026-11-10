@@ -2,46 +2,51 @@
 
 import { useState } from "react";
 
+// {{saudacao}} fica literal de propósito — o botão "Enviar via WhatsApp"
+// passa por enviarMensagemDireta (prevbot-outbound.ts), que resolve esse
+// token pra Bom dia/Boa tarde/Boa noite na hora real do envio, igual
+// acontece com os lembretes de verdade. Nome do escritório/atendente aqui
+// são só exemplo (esta tela é um testador manual, não lê a config salva).
 const MODELOS = [
   {
     label: "Lembrete honorário — 10 dias",
     tipo: "honorario_10d",
-    mensagem: `Olá! Passando pra lembrar que seu honorário no valor de *R$ 1.500,00* vence em *19/07/2026* (faltam 10 dias).\n\nSe já realizou o pagamento, pode desconsiderar esta mensagem. Qualquer dúvida, pode falar com o escritório! 😊`,
+    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do Orlando Martins Advocacia. Passando pra lembrar que seu honorário no valor de *R$ 1.500,00* vence em *19/07/2026* (faltam 10 dias).\n\nSe já realizou o pagamento, pode desconsiderar esta mensagem. Qualquer dúvida, é só chamar! 😊`,
   },
   {
     label: "Lembrete honorário — 5 dias",
     tipo: "honorario_5d",
-    mensagem: `Oi! Sua cobrança de honorários de *R$ 1.500,00* vence em *19/07/2026* — faltam apenas 5 dias.\n\nSe ainda não realizou o pagamento, é uma boa hora pra se organizar. Caso já tenha pago, desconsidere esta mensagem. Obrigado! 🙏`,
+    mensagem: `{{saudacao}}, Sra. Maria! Aqui é Ana, do financeiro do Orlando Martins Advocacia. Sua cobrança de honorários de *R$ 1.500,00* vence em *19/07/2026* — faltam apenas 5 dias.\n\nSe ainda não realizou o pagamento, é uma boa hora pra se organizar. Caso já tenha pago, desconsidere esta mensagem. Obrigado! 🙏`,
   },
   {
     label: "Lembrete honorário — dia do vencimento",
     tipo: "honorario_vence_hoje",
-    mensagem: `Oi! Hoje é o dia do vencimento do seu honorário de *R$ 1.500,00*.\n\nPor favor, realize o pagamento para evitar pendências. Se já pagou, desconsidere esta mensagem — e muito obrigado pela pontualidade! 🙏`,
+    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do Orlando Martins Advocacia. Hoje é o dia do vencimento do seu honorário de *R$ 500,00*.\n\nPor favor, realize o pagamento para evitar pendências. Se já pagou, desconsidere esta mensagem — e muito obrigado pela pontualidade! 🙏`,
   },
   {
     label: "Confirmação de pagamento (conta quitada)",
     tipo: "honorario_pago_quitado",
-    mensagem: `✅ Confirmamos o recebimento do seu pagamento de *R$ 1.500,00* em 09/07/2026.\n\nSua conta está totalmente quitada! Muito obrigado pela confiança e pontualidade! 🎉`,
+    mensagem: `{{saudacao}}, Sra. Maria! Aqui é Ana, do financeiro do Orlando Martins Advocacia. ✅ Confirmamos o recebimento do seu pagamento de *R$ 1.500,00* em 09/07/2026.\n\nSua conta está totalmente quitada! Muito obrigado pela confiança e pontualidade! 🎉`,
   },
   {
     label: "Confirmação de pagamento (saldo restante)",
     tipo: "honorario_pago_saldo",
-    mensagem: `✅ Confirmamos o recebimento do seu pagamento de *R$ 500,00* em 09/07/2026.\n\nSeu saldo restante é de *R$ 1.000,00*. Em breve você receberá os próximos lembretes de vencimento. Qualquer dúvida, estamos à disposição! 😊`,
+    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do financeiro do Orlando Martins Advocacia. ✅ Confirmamos o recebimento do seu pagamento de *R$ 500,00* em 09/11/2026.\n\nSeu saldo restante é de *R$ 7.000,00*. Em breve você receberá os próximos lembretes de vencimento. Qualquer dúvida, estou à disposição! 😊`,
   },
   {
     label: "Lembrete INSS — 15 dias antes",
     tipo: "inss_15d",
-    mensagem: `Oi! 👋 Aqui é do escritório. Passando pra avisar que sua Avaliação Social BPC/LOAS está marcada para segunda-feira, dia 19/10/2026 às 09:00, no APS Maceió Centro.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
+    mensagem: `{{saudacao}}, Sra. Maria! 👋 Aqui é Ana, do Orlando Martins Advocacia. Passando pra avisar que *Avaliação Social BPC/LOAS* está marcado para segunda-feira, dia 19/10/2026 às 09:00, no APS Maceió Centro.\n\nFaltam 15 dias — já é uma boa hora pra ir se organizando com documentos e transporte. Se precisar de ajuda ou tiver dúvidas, é só chamar. Estamos contigo! 😊`,
   },
   {
     label: "Lembrete INSS — 2 dias antes",
     tipo: "inss_2d",
-    mensagem: `Oi! Sua Avaliação Social BPC/LOAS é daqui a 2 dias — segunda-feira, 19/10/2026 às 09:00.\n\n📍 Local: APS Maceió Centro\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar com a gente!`,
+    mensagem: `{{saudacao}}, Sr. Marcio! Aqui é Ana, do Orlando Martins Advocacia. *Avaliação Social BPC/LOAS* é daqui a 2 dias — segunda-feira, 19/10/2026 às 09:00.\n\n📍 Local: APS Maceió Centro\n\nAproveite para confirmar como vai chegar lá e já deixar os documentos separadinhos. Se precisar de algo, é só falar!`,
   },
   {
     label: "Lembrete INSS — 1 dia antes (manhã)",
     tipo: "inss_1d_manha",
-    mensagem: `Bom dia! 🌅 Amanhã é o grande dia! Sua Avaliação Social BPC/LOAS está marcada para:\n\n📅 19/10/2026 (segunda-feira)\n⏰ 09:00\n📍 APS Maceió Centro\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estamos torcendo por você! 🍀`,
+    mensagem: `{{saudacao}}, Sra. Maria! 🌅 Aqui é Ana, do Orlando Martins Advocacia. Amanhã é o grande dia! *Avaliação Social BPC/LOAS* está marcado para:\n\n📅 19/10/2026 (segunda-feira)\n⏰ 09:00\n📍 APS Maceió Centro\n\nLembre de chegar 15 minutos antes e trazer RG, CPF e qualquer documentação médica ou social. Boa sorte — estou torcendo por você! 🍀`,
   },
 ];
 

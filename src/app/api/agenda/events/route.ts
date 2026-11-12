@@ -164,20 +164,40 @@ export async function GET(req: NextRequest) {
           `
       : Promise.resolve([]),
 
-    // Compromissos pessoais
-    sql`
-        SELECT
-          comp.*,
-          cl.name  AS cliente_nome_join,
-          cl.id::text AS cliente_id_join
-        FROM compromissos comp
-        LEFT JOIN clients cl ON cl.id = comp.cliente_id
-        WHERE comp.criado_por  = ${session.login}
-          AND comp.data_inicio >= ${startDate}::date
-          AND comp.data_inicio <  ${endDate}::date
-          ${showArchived ? sql`` : sql`AND comp.status = 'pendente'`}
-        ORDER BY comp.data_inicio, comp.hora_inicio NULLS LAST
-      `,
+    // Compromissos pessoais — "ver todos" (admin/sócio) enxerga os de
+    // qualquer colaborador, igual já acontece com controles/processos acima;
+    // sem isso, um compromisso marcado por outro colaborador (ex: reunião da
+    // Karine com um cliente) nunca aparecia pro administrador, que não tinha
+    // como saber que ele existia.
+    hasPermission(session, "compromissos_ver_todos", "ver")
+      ? sql`
+          SELECT
+            comp.*,
+            cl.name  AS cliente_nome_join,
+            cl.id::text AS cliente_id_join,
+            u.nome   AS criador_nome
+          FROM compromissos comp
+          LEFT JOIN clients cl ON cl.id = comp.cliente_id
+          LEFT JOIN usuarios u ON u.login = comp.criado_por
+          WHERE comp.data_inicio >= ${startDate}::date
+            AND comp.data_inicio <  ${endDate}::date
+            ${showArchived ? sql`` : sql`AND comp.status = 'pendente'`}
+          ORDER BY comp.data_inicio, comp.hora_inicio NULLS LAST
+        `
+      : sql`
+          SELECT
+            comp.*,
+            cl.name  AS cliente_nome_join,
+            cl.id::text AS cliente_id_join,
+            NULL::text AS criador_nome
+          FROM compromissos comp
+          LEFT JOIN clients cl ON cl.id = comp.cliente_id
+          WHERE comp.criado_por  = ${session.login}
+            AND comp.data_inicio >= ${startDate}::date
+            AND comp.data_inicio <  ${endDate}::date
+            ${showArchived ? sql`` : sql`AND comp.status = 'pendente'`}
+          ORDER BY comp.data_inicio, comp.hora_inicio NULLS LAST
+        `,
 
     // Token Google Calendar — sem catch aqui, uma falha de decriptação (ex:
     // SESSION_SECRET rotacionada) derrubava a agenda inteira (controles,
@@ -350,10 +370,18 @@ export async function GET(req: NextRequest) {
     const clientePrimeiro = clienteNomeJoin
       ? ` · ${clienteNomeJoin.split(" ")[0]}`
       : "";
+    // Só faz sentido mostrar de quem é quando o compromisso não é do próprio
+    // usuário vendo a tela (visível pra ele só por causa de compromissos_ver_todos)
+    // — sem isso, "ver todos" misturava compromissos de todo mundo sem dar
+    // nenhuma pista de quem marcou cada um.
+    const criadorNome =
+      c.criador_nome && String(c.criado_por) !== session.login
+        ? String(c.criador_nome).split(" ")[0]
+        : null;
 
     events.push({
       id: `comp-${String(c.id)}`,
-      title: `${icon} ${String(c.titulo)}${clientePrimeiro}`,
+      title: `${icon} ${String(c.titulo)}${clientePrimeiro}${criadorNome ? ` (${criadorNome})` : ""}`,
       start: startStr,
       ...(endStr ? { end: endStr } : {}),
       allDay: !hasTime,
@@ -368,6 +396,7 @@ export async function GET(req: NextRequest) {
         compromissoTipo: tipo,
         clienteNome: clienteNomeJoin ?? null,
         clienteId: c.cliente_id_join ?? null,
+        criadorNome: criadorNome,
         compromissoHoraInicio: c.hora_inicio
           ? String(c.hora_inicio).slice(0, 5)
           : null,

@@ -53,6 +53,27 @@ export async function obterConversa(
   return { id: rows[0].id as string, titulo: rows[0].titulo as string };
 }
 
+/**
+ * Conversa mais recente do usuário, só se foi atualizada dentro da janela
+ * (minutos) — usado pelo canal de WhatsApp (sem conceito de "conversa aberta
+ * na tela") pra dar continuidade natural entre mensagens próximas no tempo
+ * (ex: a Íris pergunta "qual das duas perícias?" e a resposta do usuário
+ * precisa desse contexto), sem misturar com uma conversa de dias atrás.
+ */
+export async function obterConversaRecente(
+  usuarioId: string,
+  janelaMinutos: number
+): Promise<string | null> {
+  const rows = await sql`
+    SELECT id::text FROM iris_conversas
+    WHERE usuario_id = ${usuarioId}::uuid
+      AND updated_at > NOW() - (${janelaMinutos} || ' minutes')::interval
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `;
+  return rows[0]?.id ? String(rows[0].id) : null;
+}
+
 export async function criarConversa(
   usuarioId: string,
   titulo: string

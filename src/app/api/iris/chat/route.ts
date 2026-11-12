@@ -1,28 +1,12 @@
-import { NextRequest, NextResponse, after } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { hasPermission } from "@/lib/permissoes";
 import { podeAcessarEntidade } from "@/lib/acesso";
 import { iaRateLimitExcedido } from "@/lib/rate-limit";
 import { agentesEstaoAtivos } from "@/lib/config-agentes-db";
-import { registrarUsoIA } from "@/lib/ia-uso-db";
-import { buildIrisContextText } from "@/lib/iris-context";
 import sql from "@/lib/db";
-import {
-  IRIS_TOOLS,
-  IRIS_TOOL_LABELS,
-  executarFerramentaIris,
-} from "@/lib/iris-tools";
-import { LIDERADV_DOCS } from "@/lib/lideradv-docs";
 import { isUrlPermitida, isBlobPrivado } from "@/lib/blob-url";
-import {
-  obterConversa,
-  criarConversa,
-  listarMensagens,
-  inserirMensagem,
-  type AnexoMeta,
-  type ToolTraceItem,
-} from "@/lib/iris-conversas-db";
+import { obterConversa } from "@/lib/iris-conversas-db";
+import { executarIris, type AnexoComUrl } from "@/lib/iris-engine";
 
 export const dynamic = "force-dynamic";
 // Era 60 com um comentário dizendo que o teto da Vercel "não dá pra
@@ -32,10 +16,7 @@ export const dynamic = "force-dynamic";
 // streaming longa, que era o risco real, não o teto em si).
 export const maxDuration = 120;
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 const MAX_CHARS_TEXTO = 8000;
-const MAX_LOOP = 6;
 const MAX_ARQUIVOS = 3;
 const MIME_SUPORTADOS = new Set([
   "application/pdf",
@@ -44,12 +25,6 @@ const MIME_SUPORTADOS = new Set([
   "image/png",
   "image/webp",
 ]);
-
-interface AnexoRequest {
-  url: string;
-  nome: string;
-  mimeType: string;
-}
 
 // Blobs privados exigem o token de leitura/escrita no header — sem isso o
 // fetch volta 403. isUrlPermitida/isBlobPrivado agora centralizados em
@@ -130,14 +105,14 @@ export async function POST(req: NextRequest) {
   const attachmentsRaw = Array.isArray(body.attachments)
     ? (body.attachments as unknown[])
     : [];
-  const anexosRequest: AnexoRequest[] = attachmentsRaw
+  const anexosRequest: AnexoComUrl[] = attachmentsRaw
     .filter(
-      (a): a is AnexoRequest =>
+      (a): a is AnexoComUrl =>
         !!a &&
         typeof a === "object" &&
-        typeof (a as AnexoRequest).url === "string" &&
-        typeof (a as AnexoRequest).nome === "string" &&
-        typeof (a as AnexoRequest).mimeType === "string"
+        typeof (a as AnexoComUrl).url === "string" &&
+        typeof (a as AnexoComUrl).nome === "string" &&
+        typeof (a as AnexoComUrl).mimeType === "string"
     )
     .slice(0, MAX_ARQUIVOS);
   for (const a of anexosRequest) {
@@ -153,12 +128,11 @@ export async function POST(req: NextRequest) {
       );
   }
 
-  // Conversa: reaproveita uma existente (dona do usuário logado). A criação
-  // de uma conversa nova é adiada até termos uma resposta de fato (mais
-  // abaixo) — criar aqui deixaria uma conversa "fantasma" sem mensagens se
-  // a chamada à Anthropic falhar logo na primeira mensagem.
-  let conversaId: string | null = null;
-  let historico: Anthropic.MessageParam[] = [];
+  // Confere que a conversa existe e é do usuário logado ANTES de chamar o
+  // motor — o motor (executarIris) aceita um conversaId não encontrado como
+  // "começa uma conversa nova" (bom pra chamadores sem como escolher outro
+  // id, como o WhatsApp), mas a tela aqui já mostra o histórico errado se
+  // isso acontecer silenciosamente, então o erro 404 continua explícito.
   if (conversaIdInformado) {
     const conversa = await obterConversa(session.id, conversaIdInformado);
     if (!conversa)
@@ -166,9 +140,6 @@ export async function POST(req: NextRequest) {
         { error: "Conversa não encontrada." },
         { status: 404 }
       );
-    conversaId = conversa.id;
-    const mensagens = await listarMensagens(conversaId);
-    historico = mensagens.map((m) => ({ role: m.role, content: m.content }));
   }
 
   // Anexos só valem pro turno em que foram enviados: não são reenviados
@@ -180,7 +151,7 @@ export async function POST(req: NextRequest) {
   const temPdf = anexosRequest.some((a) => a.mimeType === "application/pdf");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let userContent: string | any[] = text;
-  const anexosMeta: AnexoMeta[] = [];
+  const anexosMeta: { nome: string; mimeType: string }[] = [];
   if (anexosRequest.length > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blocks: any[] = [];
@@ -214,207 +185,19 @@ export async function POST(req: NextRequest) {
     userContent = blocks;
   }
 
-  const currentMessages: Anthropic.MessageParam[] = [
-    ...historico,
-    { role: "user", content: userContent },
-  ];
-
-  const ehAdmin = hasPermission(session, "configuracoes", "editar");
-  const contexto = await buildIrisContextText(session);
-
-  const systemPrompt = `Você é Íris, a única assistente de IA do sistema LiderAdv (plataforma de gestão para escritórios de advocacia previdenciária). Você é responsável por TUDO relacionado a IA no sistema: tirar dúvidas de uso, mostrar dados reais e atuais do escritório (agenda, equipe, financeiro, produtividade), analisar documentos anexados na conversa e executar ações reais quando autorizada.
-
-REGRAS GERAIS:
-- REGRA MAIS IMPORTANTE DE TODAS — NUNCA finja ter feito uma ação que você não fez de verdade. Você só "cadastrou o cliente", "agendou a perícia", "atualizou o cadastro" etc. quando de fato chamou a ferramenta correspondente e ela voltou com sucesso — nunca porque "parece o tipo de coisa que eu faria" ou porque descrever a ação parece uma resposta completa. Se o usuário pedir algo pra qual você NÃO tem ferramenta (ex.: criar um tipo específico de controle que não está na sua lista), diga isso explicitamente ANTES de mais nada — "não tenho uma ferramenta pra isso" — e só depois explique o caminho manual na tela, se souber. Inventar que uma ação foi concluída é o pior erro possível aqui: pode fazer alguém achar que um prazo real está sendo controlado quando na verdade nada foi salvo.
-- Sobre COMO USAR O SISTEMA (telas, botões, campos, fluxos): responda SOMENTE com base na documentação abaixo. Nunca invente funcionalidade que não está documentada. Se não souber, diga que não tem essa informação.
-- Sobre DADOS REAIS (agenda, equipe, ranking, financeiro, risco de processos): responda SOMENTE com base no que está no contexto de dados abaixo ou no que as ferramentas retornarem. Nunca invente compromisso, cliente, processo ou valor.
-- ANTES de dizer "não tenho essa informação" ou "não consigo verificar": pare e pense se existe uma ferramenta que resolveria (consultar_financeiro, listar_processos_risco, consultar_analise_cerebro, localizar_documentos_processo, consultar_impugnacao_laudo, obter_estatisticas, verificar_saude, listar_oabs, ver_erros, listar_etiquetas, adicionar_etiqueta, consultar_atualizacoes_legais, listar_processos_parados, consultar_saude_financeira, listar_clientes_sem_resposta, remarcar_pericia, agendar_pericia, criar_controle_pericia, cadastrar_cliente, complementar_cliente, criar_controle) — se existir, USE a ferramenta primeiro. Só diga que não tem a informação depois de tentar (ou se realmente não existir ferramenta/dado pra isso). ${ehAdmin ? "Este usuário é ADMINISTRADOR com acesso total — nunca recuse ou limite uma resposta por achar que ele não teria permissão; a única razão válida pra não responder algo é o dado genuinamente não existir ou não estar disponível em nenhuma ferramenta." : "Algumas seções de dados podem aparecer como indisponíveis pro perfil deste usuário — isso é intencional (mesma regra de permissão das telas do sistema), informe isso ao invés de inventar."}
-- Se o usuário anexar um documento (comprovante, protocolo, ofício) mostrando que uma perícia/avaliação foi remarcada e pedir pra atualizar/remarcar: USE a ferramenta remarcar_pericia diretamente (nome do cliente + nova data/hora/local extraídos do documento) em vez de instruir o usuário a fazer isso manualmente na tela — ela já sincroniza a Agenda e avisa o cliente. Se o cliente tiver mais de uma perícia agendada, pergunte qual antes de chamar a ferramenta.
-- Se o usuário anexar um comprovante de agendamento do INSS (avaliação social, perícia médica) que é NOVO — ainda não está no sistema — e pedir pra agendar/marcar: USE a ferramenta agendar_pericia diretamente, extraindo cliente, tipo, data/hora/local/protocolo do documento. Ela cria o compromisso na Agenda, o registro em Perícias, o prazo em Controles e já programa os lembretes automáticos — não instrua o usuário a fazer isso manualmente. Se não tiver certeza se já existe uma perícia igual no sistema (dúvida entre "é nova" ou "é remarcação de uma existente"), pode chamar agendar_pericia mesmo assim — ela detecta duplicata sozinha e avisa em vez de criar de novo.
-- Se o usuário pedir pra registrar uma PRORROGAÇÃO DE BENEFÍCIO ou "DCB": USE a ferramenta criar_controle com tipo=dcb — é isso que aparece na tela em Controles → aba "Prorrogação (DCB)", que é onde o usuário vai conferir. Não use criar_controle_pericia (tipo=prorrogacao_beneficio) pra isso — aquele grava em Controles → aba "Perícias e Av. Sociais", um lugar DIFERENTE, e já causou confusão real (usuário via "nada cadastrado" na aba DCB mesmo a Íris tendo "criado" o registro no lugar errado). Se precisar de vários prazos (ex: 30/15/5 dias antes da cessação), chame criar_controle uma vez pra cada data. criar_controle (tipo=dcb) já cria compromisso na Agenda e agenda lembrete automático por WhatsApp pro escritório perto da data — a resposta da ferramenta confirma se o lembrete foi agendado ou não.
-- Se o usuário pedir pra registrar uma perícia/avaliação JUDICIAL (não INSS, não prorrogação): USE a ferramenta criar_controle_pericia — ela NÃO cria compromisso na Agenda nem lembrete automático, deixe isso claro pro usuário depois.
-- Se o usuário pedir pra criar AUDIÊNCIA, PRAZO PROCESSUAL, BENEFÍCIO em fase de implantação, BENEFÍCIO IMPLANTADO (1° pagamento/data de cessação) ou ALVARÁ/RPV: USE a ferramenta criar_controle (tipo: audiencias/prazos/beneficios/implantados/implantados-data/alvaras). Sempre peça/confirme o cliente e a data antes de chamar; se o prazo for de um processo específico do cliente, informe processo_busca também. Pra tipo=implantados-data, informar data_cessacao já cria automaticamente o DCB de prorrogação 15 dias antes (com lembrete) — não crie um DCB manual separado pra isso, deixe a cascata cuidar. Marque fatal=true sempre que perder o prazo prejudicar o cliente (prazo recursal, DCB, etc.) — isso dispara um alerta imediato por WhatsApp pro escritório.
-- Se o usuário pedir pra cadastrar um cliente novo (direto no chat, ou a partir de um documento anexado): USE a ferramenta cadastrar_cliente. SEMPRE confirme nome completo e CPF/CNPJ antes de chamar — nunca invente ou arredonde um documento que não veio claro no texto/imagem. Se for menor de idade ou incapaz, pergunte quem é o responsável legal e o telefone dele ANTES de cadastrar (é obrigatório pra esse tipo de cliente). Se o mesmo documento que originou o cadastro já trouxer RG, nascimento, NIS, número/tipo/status de benefício, CID ou incapacidade, passe esses dados JUNTO na própria chamada de cadastrar_cliente (ela aceita todos esses campos) — não afirme que um dado ficou "salvo no cadastro" se você não o passou em nenhuma chamada de ferramenta de verdade. Depois de cadastrar, avise que o endereço completo ficou pendente e pode ser preenchido depois na tela do cliente.
-- AUTOMAÇÃO MÁXIMA, SEM PRECISAR PEDIR: sempre que um documento anexado na conversa (ou o próprio texto do usuário) trouxer dado de identificação/endereço/benefício/saúde de um cliente que JÁ EXISTE no sistema (RG, CPF, endereço, NIS, número de benefício, CID, data de afastamento etc.), chame complementar_cliente PROATIVAMENTE pra preencher o que estiver vazio no cadastro — não espere o usuário pedir "atualiza o cadastro". Faça isso silenciosamente como parte de responder a mensagem, e só depois mencione brevemente o que foi atualizado (ex.: "aproveitei e já completei o RG e o endereço do cadastro dela"). Se o cliente não existir ainda no sistema, use cadastrar_cliente em vez disso (confirmando nome e documento antes). NUNCA sobrescreva um dado que já está cadastrado — a ferramenta já protege isso sozinha, mas se você perceber uma divergência entre o que já está cadastrado e o que o documento mostra, avise o usuário em vez de tentar decidir sozinho qual está certo.
-- DOCUMENTO ANEXADO E A PASTA DE DOCUMENTOS DO CLIENTE: um PDF/imagem anexado na conversa só é salvo automaticamente na pasta de Documentos de um cliente quando, NESTA MESMA resposta, esse cliente foi identificado de forma concreta — ou porque o usuário está com a página dele aberta (contexto de página abaixo, se houver), ou porque você chamou cadastrar_cliente/complementar_cliente/agendar_pericia/criar_controle_pericia/remarcar_pericia/criar_controle pra esse cliente nesta resposta. Nesses casos SIM pode afirmar que o documento foi salvo na pasta dele. Se você só analisou o conteúdo do documento sem cadastrar/tocar em nenhum cliente específico (ex: cliente ainda não identificado, ou você só respondeu uma pergunta sobre o conteúdo), o documento NÃO fica salvo em nenhuma pasta — não diga que foi arquivado; se for relevante, oriente o usuário a anexar o documento de novo na tela do cliente depois que ele existir no sistema.
-- NUNCA use um telefone/celular lido de um documento anexado na conversa como "telefone do cliente" pra decidir quem vai ser avisado — use sempre o telefone CADASTRADO no sistema (cliente ou responsável legal). Um documento pode trazer o celular de quem protocolou o pedido (ex: o próprio advogado), não da família — já aconteceu de a IA confundir isso. Se quiser, cite o número do documento na resposta só como observação, nunca como o contato real de envio.
-- Quando o usuário disser que algo "não aparece na tela", "deu erro" ou "não está funcionando": não responda genericamente. (1) Releia a DOCUMENTAÇÃO abaixo pra achar exatamente em qual menu/aba/botão aquilo deveria estar e diga o caminho exato (ex: "Jurídico → Processos → aba Documentos → botão Processar INSS"); (2) se for algo que uma ferramenta consegue checar de verdade (erros do sistema, saúde dos componentes, status de sincronização), rode verificar_saude e/ou ver_erros ANTES de responder, não só descreva onde clicar; (3) se depois disso ainda não achar nada que explique o problema, diga isso explicitamente ("não encontrei esse item na documentação nem nada de errado nos diagnósticos — pode ser um bug real, vale reportar") em vez de simplesmente admitir derrota sem ter checado nada.
-- Se um item de agenda/dado aparecer sem responsável definido no sistema, diga isso claramente ("sem responsável cadastrado") — não invente um nome.
-- Itens de agenda marcados "[PRAZO FATAL]" no contexto são prazos que, se perdidos, encerram o direito do cliente — SEMPRE destaque esses primeiro e com ênfase quando listar agenda, mesmo que não estejam mais próximos que os demais.
-- Sobre AÇÕES REAIS (sincronizar, reenviar mensagem, mexer em OAB, mudar dados do escritório): use as ferramentas disponíveis. ${ehAdmin ? "Este usuário TEM permissão de administrador — pode executar." : "Este usuário NÃO tem permissão de administrador — se a ferramenta retornar erro de permissão, explique isso educadamente e não insista."}
-- Sobre RISCO/PROBABILIDADE DE ÊXITO de processos: use as ferramentas listar_processos_risco e consultar_analise_cerebro — elas trazem o que o Cérebro Jurídico já analisou de cada caso (risco, % de êxito, próxima ação, base legal). Nunca estime risco de cabeça; sempre consulte essas ferramentas.
-- NUNCA invente ou fantasie base legal: cite artigo de lei, súmula, precedente ou tese jurídica apenas quando tiver certeza real de que existe e está vigente/atualizada. Se não tiver certeza absoluta de uma citação, diga isso explicitamente em vez de inventar um número de lei, súmula ou acórdão — a mesma disciplina que o Cérebro Jurídico e o gerador de petições (Dr. Lex) já seguem no resto do sistema.
-- Antes de responder sobre REGRAS/CRITÉRIOS/CARÊNCIA de um benefício específico (ex: "quantas contribuições precisa pro auxílio-doença", "qual o critério de renda do BPC"), consulte consultar_atualizacoes_legais primeiro — sua base de conhecimento pode estar desatualizada por uma instrução normativa, portaria ou decreto recente que o sistema já rastreou automaticamente. Se houver mudança relevante pro tipo de benefício em questão, avise antes de responder com a regra "de sempre".
-- Sobre PETIÇÕES e teses jurídicas de um caso específico: primeiro consulte consultar_analise_cerebro/listar_processos_risco pra trazer o que o Cérebro Jurídico já apurou daquele processo (base legal, jurisprudência, tese) — construa a resposta em cima disso, não do zero. Se o usuário quiser a peça pronta em PDF, oriente a abrir o processo → painel "IA Jurídica" → Passo 3 "Gerar Petição" (IA Dr. Lex), que já é grounded nos dados reais do caso; no chat você pode orientar estratégia e revisar teses, mas não redija uma peça inteira "às cegas" sem esse grounding.
-- Sobre LAUDO PERICIAL JUDICIAL (perícia já realizada, cliente quer impugnar/contestar, apontar contradição, pedir esclarecimento ao perito): primeiro chame consultar_impugnacao_laudo — se já existir uma análise salva daquele processo, ela já traz vícios do laudo (com o trecho exato citado), quesitos complementares de esclarecimento, teses jurídicas e uma minuta de petição prontos; discuta, aprofunde ou reformule esse conteúdo livremente no chat (ex: "explica melhor esse vício", "monta mais 3 quesitos sobre X", "reescreve esse trecho da minuta"). Se NÃO existir análise salva ainda, use localizar_documentos_processo pra achar o processo e confirmar com o usuário qual documento é o laudo pericial, e então oriente a abrir o processo → painel "IA Jurídica" → botão "📑 Impugnar Laudo", selecionar esse documento e clicar em "Gerar impugnação" — essa leitura é pesada (lê o PDF inteiro do laudo) e de propósito não roda dentro do chat pra não travar a conversa; depois de gerada uma vez, você já consegue trazer e elaborar sobre o resultado inteiro por aqui sem precisar gerar de novo. NUNCA tente montar vícios/quesitos de um laudo "de cabeça" sem ter lido o PDF de verdade via essas ferramentas — inventar um trecho citado que não está no laudo é tão grave quanto fingir uma ação não executada.
-- Perguntas de direito, jurisprudência ou fora do sistema em geral (sem relação com um caso real do escritório): diga que isso não é sua função.
-- FORMATAÇÃO: use markdown quando ajudar a organizar a resposta — títulos (##/###), **negrito** pra destacar termos, prazos e conclusões, e listas numeradas ou com marcadores. Não force formatação em respostas curtas de uma frase; use pra respostas longas, comparações e principalmente pra análise de documentos.
-- ANÁLISE DE DOCUMENTOS ANEXADOS: quando o usuário anexar PDF ou imagem pedindo análise, leia tudo com atenção e estruture a resposta em seções claras (ex: o que foi encontrado, ponto crítico, possibilidades, recomendação) citando trechos, datas e números concretos dos documentos — nunca genérico. Se faltar informação para concluir algo com segurança, diga exatamente o que falta.
-- HISTÓRICO: cada conversa fica salva (botão de relógio/histórico na tela) e pode ser retomada depois; um botão "Nova conversa" inicia outra do zero. Se o usuário perguntar se você "lembra" de algo de outra conversa: você só enxerga o histórico da conversa atualmente aberta, não de outras conversas salvas — oriente a abrir a conversa antiga pelo histórico se for isso que ele quer.
-- Seja direta e organizada — liste itens por data quando fizer sentido, cite nomes e números concretos, sem enrolação.
-${
-  paginaCliente
-    ? `- CONTEXTO DE PÁGINA: o usuário está vendo agora a página do cliente **${paginaCliente.nome}** no sistema. Se ele disser "esse cliente"/"este cliente"/"ele"/"ela" sem nomear, é dessa pessoa que está falando — não peça pra ele repetir o nome. Documento PDF/imagem anexado nesta conversa é salvo automaticamente na pasta de Documentos desse cliente (regra de DOCUMENTO ANEXADO acima) — se o pedido também envolver agendar/cadastrar/completar dado, ainda assim use as ferramentas normalmente, o cliente_busca dessas ferramentas pode usar o nome "${paginaCliente.nome}" diretamente.`
-    : ""
-}
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-DADOS ATUAIS DO ESCRITÓRIO
-━━━━━━━━━━━━━━━━━━━━━━━━
-${contexto}
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-DOCUMENTAÇÃO DO SISTEMA (como usar cada tela)
-━━━━━━━━━━━━━━━━━━━━━━━━
-${LIDERADV_DOCS}`;
-
-  const toolTrace: ToolTraceItem[] = [];
-  // Cliente que alguma ferramenta desta mesma resposta cadastrou/tocou de
-  // verdade (cadastrar_cliente, complementar_cliente, agendar_pericia,
-  // criar_controle_pericia, remarcar_pericia) — usado como alvo do anexo
-  // automático quando a conversa NÃO está aberta na página de um cliente
-  // (ex: cliente acabou de ser cadastrado nesta mesma mensagem, então
-  // paginaCliente nunca poderia ter capturado esse id).
-  let resolvedClienteId: string | null = null;
-
   try {
-    for (let i = 0; i < MAX_LOOP; i++) {
-      // Continua em Haiku por custo (mensagem de chat roda a cada troca,
-      // diferente de gerar-com-ia que é uma ação pontual) — mas agora via
-      // streaming, então o timeout de proxy numa chamada longa (PDF grande
-      // + até 6 chamadas em loop) não é mais risco; ver maxDuration acima.
-      const response = await client.messages
-        .stream(
-          {
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 2048,
-            temperature: 0,
-            system: systemPrompt,
-            tools: IRIS_TOOLS,
-            messages: currentMessages,
-          },
-          temPdf
-            ? { headers: { "anthropic-beta": "pdfs-2024-09-25" } }
-            : undefined
-        )
-        .finalMessage();
-
-      registrarUsoIA(
-        "/api/iris/chat",
-        "claude-haiku-4-5-20251001",
-        response.usage.input_tokens,
-        response.usage.output_tokens,
-        session.id
-      ).catch(() => {});
-
-      if (response.stop_reason === "tool_use") {
-        currentMessages.push({ role: "assistant", content: response.content });
-
-        const toolResults: Anthropic.ToolResultBlockParam[] = [];
-        for (const block of response.content) {
-          if (block.type === "tool_use") {
-            toolTrace.push({
-              name: block.name,
-              label: IRIS_TOOL_LABELS[block.name] ?? block.name,
-            });
-            const result = await executarFerramentaIris(
-              session,
-              block.name,
-              block.input as Record<string, string>
-            );
-            try {
-              const parsed = JSON.parse(result) as {
-                ok?: boolean;
-                cliente_id?: string;
-              };
-              if (parsed.ok && typeof parsed.cliente_id === "string") {
-                resolvedClienteId = parsed.cliente_id;
-              }
-            } catch {
-              // resultado não é o JSON estruturado esperado — ignora
-            }
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: block.id,
-              content: result,
-            });
-          }
-        }
-        currentMessages.push({ role: "user", content: toolResults });
-        continue;
-      }
-
-      const reply = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
-        .join("\n");
-
-      if (!conversaId) conversaId = await criarConversa(session.id, text);
-      await inserirMensagem(
-        conversaId,
-        "user",
-        text,
-        anexosMeta.length ? anexosMeta : null,
-        null
-      );
-      await inserirMensagem(
-        conversaId,
-        "assistant",
-        reply,
-        null,
-        toolTrace.length ? toolTrace : null
-      );
-
-      // Documento anexado na conversa: salva no arquivo do cliente
-      // automaticamente (Documentos), sem precisar que o usuário peça —
-      // mesmo espírito das outras automações da Íris. Prioriza o cliente da
-      // página (paginaCliente) mas cai pro cliente que alguma ferramenta
-      // desta mesma resposta cadastrou/tocou (resolvedClienteId) — sem esse
-      // fallback, um cadastro novo feito na mesma mensagem que anexa o PDF
-      // nunca batia com paginaCliente (a página daquele cliente não existia
-      // ainda quando a conversa foi aberta), e a Íris dizia "documento
-      // salvo" sem nada ter sido salvo de fato. Roda depois da resposta já
-      // ter sido enviada.
-      const clienteIdParaAnexo = paginaCliente?.id ?? resolvedClienteId;
-      if (clienteIdParaAnexo && anexosRequest.length > 0) {
-        after(async () => {
-          const { analisarDocumentoCliente } =
-            await import("@/lib/cliente-documento-auto");
-          for (const a of anexosRequest) {
-            try {
-              const rows = await sql`
-                INSERT INTO documentos (entity_type, entity_id, nome, tipo, caminho, url)
-                VALUES ('cliente', ${clienteIdParaAnexo}::uuid, ${a.nome}, ${a.mimeType},
-                        ${new URL(a.url).pathname.replace(/^\//, "")}, ${a.url})
-                RETURNING id::text
-              `;
-              const documentoId = rows[0]?.id as string | undefined;
-              const isPdfOrImage =
-                a.mimeType === "application/pdf" ||
-                a.mimeType.startsWith("image/");
-              if (documentoId && isPdfOrImage) {
-                await analisarDocumentoCliente(
-                  documentoId,
-                  clienteIdParaAnexo
-                ).catch((e) =>
-                  console.error(
-                    "[iris/chat] falha no preenchimento automático via anexo:",
-                    e
-                  )
-                );
-              }
-            } catch (e) {
-              console.error(
-                "[iris/chat] falha ao salvar anexo no arquivo do cliente:",
-                e
-              );
-            }
-          }
-        });
-      }
-
-      return NextResponse.json({ reply, conversaId, toolTrace });
-    }
+    const resultado = await executarIris({
+      session,
+      text,
+      userContent,
+      anexosMeta,
+      anexosRequest,
+      conversaIdInformado,
+      paginaCliente,
+      temPdf,
+      rotaUso: "/api/iris/chat",
+    });
+    return NextResponse.json(resultado);
   } catch (err) {
     // Loga tipo/status/mensagem separado (não só o objeto err) — Vercel só
     // guarda log por 12h, então na próxima vez que isso acontecer precisa
@@ -423,28 +206,10 @@ ${LIDERADV_DOCS}`;
       err instanceof Error
         ? { name: err.name, message: err.message }
         : { raw: String(err) };
-    console.error("[iris/chat] Anthropic API error:", info, err);
+    console.error("[iris/chat] erro inesperado:", info, err);
     return NextResponse.json(
       { error: "Erro ao gerar resposta. Tente novamente." },
       { status: 500 }
     );
   }
-
-  const fallback = "Não consegui completar a operação. Tente novamente.";
-  if (!conversaId) conversaId = await criarConversa(session.id, text);
-  await inserirMensagem(
-    conversaId,
-    "user",
-    text,
-    anexosMeta.length ? anexosMeta : null,
-    null
-  );
-  await inserirMensagem(
-    conversaId,
-    "assistant",
-    fallback,
-    null,
-    toolTrace.length ? toolTrace : null
-  );
-  return NextResponse.json({ reply: fallback, conversaId, toolTrace });
 }

@@ -28,8 +28,11 @@ export type TipoLembrete =
   | "dcb_15d"
   | "dcb_5d"
   | "controle_fatal_imediato"
+  | "controle_fatal_30d"
+  | "controle_fatal_15d"
+  | "controle_fatal_10d"
   | "controle_fatal_5d"
-  | "controle_fatal_1d";
+  | "controle_fatal_2d";
 
 // ── Helpers de data ───────────────────────────────────────────
 //
@@ -1161,11 +1164,12 @@ export async function agendarLembretesDcb(opts: {
 // avisar o responsável diretamente — não só o escritório — e NUNCA
 // depender só do aviso em cima da hora/no dia do vencimento: por isso,
 // além de um aviso quase-imediato (respeitando horário comercial — ver
-// proximoHorarioComercial), agenda avisos de antecedência (5 e 1 dia
-// antes), parecido com o que já existe pra DCB (agendarLembretesDcb, fluxo
-// próprio e mais escalonado por ser um prazo tipicamente de meses, não
-// dias). Sem isso, o responsável só ficava sabendo se abrisse o sistema e
-// olhasse Controles/Agenda por conta própria.
+// proximoHorarioComercial), agenda avisos de antecedência em 30/15/10/5
+// dias, com o mais próximo ("fatal") a 2 dias do vencimento — cadência
+// padrão pedida pelo Orlando (2026-11-12) pra qualquer prazo, pra sempre
+// sobrar tempo hábil de agir mesmo no aviso mais em cima da hora. Sem
+// isso, o responsável só ficava sabendo se abrisse o sistema e olhasse
+// Controles/Agenda por conta própria.
 export async function agendarLembretesResponsavelControleFatal(opts: {
   controleId: string;
   clienteId: string;
@@ -1199,14 +1203,32 @@ export async function agendarLembretesResponsavelControleFatal(opts: {
 
   const avisos: Array<{ tipo: TipoLembrete; enviarEm: Date; dias: number }> = [
     {
+      tipo: "controle_fatal_30d",
+      enviarEm: diasAntes(opts.dataEvento, 30, 8),
+      dias: 30,
+    },
+    {
+      tipo: "controle_fatal_15d",
+      enviarEm: diasAntes(opts.dataEvento, 15, 8),
+      dias: 15,
+    },
+    {
+      tipo: "controle_fatal_10d",
+      enviarEm: diasAntes(opts.dataEvento, 10, 8),
+      dias: 10,
+    },
+    {
       tipo: "controle_fatal_5d",
       enviarEm: diasAntes(opts.dataEvento, 5, 8),
       dias: 5,
     },
+    // O mais próximo do vencimento ("fatal") é a 2 dias, não 1 — pedido
+    // explícito do Orlando (2026-11-12): com 1 dia de antecedência já não
+    // sobra tempo hábil pra agir num prazo processual.
     {
-      tipo: "controle_fatal_1d",
-      enviarEm: diasAntes(opts.dataEvento, 1, 8),
-      dias: 1,
+      tipo: "controle_fatal_2d",
+      enviarEm: diasAntes(opts.dataEvento, 2, 8),
+      dias: 2,
     },
   ];
   for (const aviso of avisos) {

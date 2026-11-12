@@ -6,6 +6,23 @@ import {
 } from "@/config/mensagens";
 import { getMensagensConfig } from "@/lib/mensagens-config-db";
 
+// Nome real do escritório, usado como fallback em {{escritorio}} quando o
+// chamador não passa opts.escritorio (a maioria dos fluxos de perícia/INSS
+// nunca passava isso, e o literal antigo "nosso escritório" só não quebrava
+// porque nenhum template dizia "do {{escritorio}}" com artigo próprio na
+// frente — depois que os templates passaram a dizer "do escritório
+// {{escritorio}}" (2026-11-10), esse fallback virava "do escritório nosso
+// escritório", visivelmente duplicado. Busca uma vez e cacheia em memória —
+// nome do escritório não muda no meio de uma execução serverless.
+let _nomeEscritorioCache: string | null = null;
+async function nomeEscritorioFallback(): Promise<string> {
+  if (_nomeEscritorioCache) return _nomeEscritorioCache;
+  const rows = await sql`SELECT nome FROM escritorio_config LIMIT 1`;
+  const nome = (rows[0]?.nome as string | undefined)?.trim();
+  _nomeEscritorioCache = nome || "nosso escritório";
+  return _nomeEscritorioCache;
+}
+
 // ── Tipos ─────────────────────────────────────────────────────
 
 export type TipoLembrete =
@@ -332,6 +349,7 @@ export async function agendarLembretesInss(opts: {
 }): Promise<void> {
   const cfg = await getMensagensConfig();
   const generoCliente = await generoDoCliente(opts.clienteId);
+  const escritorio = opts.escritorio || (await nomeEscritorioFallback());
 
   const destinos: Array<{
     tipo: string;
@@ -416,7 +434,7 @@ export async function agendarLembretesInss(opts: {
             ? tratamentoNome(dest.nome, generoCliente)
             : primeiroNome(dest.nome),
         atendente: cfg.atendente_nome,
-        escritorio: opts.escritorio ?? "nosso escritório",
+        escritorio,
         servico: opts.tipoServico || "atendimento no INSS",
         diaSemana: formatarDiaSemana(opts.dataEvento),
         data: formatarData(opts.dataEvento),
@@ -504,7 +522,7 @@ export async function agendarLembretesHonorario(opts: {
     },
   ];
 
-  const escritorio = opts.escritorio ?? "nosso escritório";
+  const escritorio = opts.escritorio || (await nomeEscritorioFallback());
   const valor = formatarMoeda(opts.valor);
   // Quando responsável: prefixo identifica de quem é o honorário
   const prefixo = opts.responsavel
@@ -587,6 +605,7 @@ export async function agendarVideochamadaWhatsApp(opts: {
 }): Promise<void> {
   const cfg = await getMensagensConfig();
   const isMeet = (opts.tipoReuniao ?? "meet") === "meet";
+  const escritorio = opts.escritorio || (await nomeEscritorioFallback());
 
   const agora = new Date();
 
@@ -628,7 +647,7 @@ export async function agendarVideochamadaWhatsApp(opts: {
           ? tratamentoNome(destClienteNome, generoCliente)
           : primeiroNome(destClienteNome),
       atendente: cfg.atendente_nome,
-      escritorio: opts.escritorio ?? "nosso escritório",
+      escritorio,
       diaSemana: formatarDiaSemana(opts.dataEvento),
       data: formatarData(opts.dataEvento),
       hora: opts.horaEvento,
@@ -1277,7 +1296,7 @@ export async function agendarConfirmacaoPagamento(opts: {
       ? tratamentoNome(destNome, generoCliente)
       : primeiroNome(destNome);
   const atendente = cfg.atendente_nome;
-  const escritorio = opts.escritorio ?? "nosso escritório";
+  const escritorio = opts.escritorio || (await nomeEscritorioFallback());
   const valor = formatarMoeda(opts.valorPago);
   const data = formatarData(opts.dataPagamento);
 

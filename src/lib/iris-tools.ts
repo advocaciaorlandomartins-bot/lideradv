@@ -410,7 +410,7 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
   {
     name: "criar_controle_pericia",
     description:
-      "Cria um registro em Controles → aba 'Perícias e Av. Sociais' pra: perícia médica administrativa/judicial, avaliação social administrativa/judicial, ou o tipo prorrogacao_beneficio (legado — PREFIRA criar_controle com tipo=dcb pra prorrogação de benefício, que grava na aba 'Prorrogação (DCB)', que é onde o usuário de fato confere; só use prorrogacao_beneficio aqui se o usuário pedir explicitamente pra registrar junto de um processo/perícia já existente nesta aba). Diferente de agendar_pericia (só pra agendamento novo do INSS, com compromisso na Agenda e lembretes automáticos por WhatsApp) — este é o registro manual de controle/prazo, igual ao formulário 'Nova Perícia' da tela Controles. Use isto principalmente pra perícia/avaliação JUDICIAL (não INSS) — essas não geram compromisso na Agenda nem lembrete automático.",
+      "Cria um registro em Controles → aba 'Perícias e Av. Sociais' pra: perícia médica administrativa/judicial, avaliação social administrativa/judicial, ou o tipo prorrogacao_beneficio (legado — PREFIRA criar_controle com tipo=dcb pra prorrogação de benefício, que grava na aba 'Prorrogação (DCB)', que é onde o usuário de fato confere; só use prorrogacao_beneficio aqui se o usuário pedir explicitamente pra registrar junto de um processo/perícia já existente nesta aba). Diferente de agendar_pericia (só pra agendamento NOVO do INSS — administrativo). Use isto pra perícia/avaliação JUDICIAL (nascida de despacho dentro de um processo, não do INSS): tipo='pericia_judicial' ou 'avaliacao_social_judicial' TAMBÉM cria o compromisso na Agenda, vincula ao processo (por processo_numero ou o processo ativo mais recente do cliente) e agenda lembretes automáticos por WhatsApp em 30/15/10/5/2 dias (cadência de prazo processual, diferente da cadência curta do INSS) pro cliente/responsável legal e pro responsável do processo — nunca mencione 'INSS'/'APS' nesse caso, é um compromisso judicial. Pra pericia_administrativa/avaliacao_social_administrativa continua sendo só o registro manual (sem Agenda/lembrete) — pra isso use agendar_pericia.",
     input_schema: {
       type: "object",
       properties: {
@@ -434,6 +434,11 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
         especialidade: {
           type: "string",
           description: "Especialidade médica, ex: Ortopedia. Opcional.",
+        },
+        processo_numero: {
+          type: "string",
+          description:
+            "Número do processo (CNJ), só pra tipo pericia_judicial ou avaliacao_social_judicial. Opcional — se omitido, tenta vincular ao processo ativo mais recente do cliente automaticamente.",
         },
         status: {
           type: "string",
@@ -2250,6 +2255,47 @@ async function executarFerramentaIrisInterno(
       const dataFimBeneficio = dataOrNullCP(input.data_fim_beneficio);
       const novaDataFim = dataOrNullCP(input.nova_data_fim);
       const observacoes = strOrNullCP(input.observacoes);
+      const processoNumero = strOrNullCP(input.processo_numero);
+
+      if (tipo === "pericia_judicial" || tipo === "avaliacao_social_judicial") {
+        const { criarNovoAgendamentoPericiaJudicial } =
+          await import("./pericia-judicial-agendamento");
+        const resultadoJudicial = await criarNovoAgendamentoPericiaJudicial({
+          clienteId: String(candidatosCliente2[0].id),
+          tipo,
+          data,
+          hora: hora ?? "09:00",
+          local: local ?? "A definir",
+          perito,
+          especialidade,
+          processoNumero,
+          observacoes,
+          criadoPorLogin: session.login,
+          criadoPorUserId: session.id,
+        }).catch(
+          (
+            e
+          ): Awaited<
+            ReturnType<typeof criarNovoAgendamentoPericiaJudicial>
+          > => {
+            console.error("[iris-tools] falha ao agendar pericia judicial:", e);
+            return { ok: false, erro: "Erro ao salvar o agendamento." };
+          }
+        );
+
+        if (!resultadoJudicial.ok) {
+          return JSON.stringify(resultadoJudicial);
+        }
+
+        return JSON.stringify({
+          ok: true,
+          mensagem: `Perícia/avaliação judicial agendada pra ${resultadoJudicial.clienteNome} em ${data}${hora ? ` às ${hora}` : ""}${resultadoJudicial.processoNumero ? `, processo ${resultadoJudicial.processoNumero}` : ""}. Já criei o compromisso na Agenda, o prazo em Controles e programei os lembretes automáticos (30/15/10/5/2 dias).`,
+          aviso_enviado_cliente: resultadoJudicial.avisoEnviadoCliente,
+          aviso_enviado_responsavel: resultadoJudicial.avisoEnviadoResponsavel,
+          compromisso_id: resultadoJudicial.compromissoId,
+          cliente_id: String(candidatosCliente2[0].id),
+        });
+      }
 
       // Prorrogação de benefício é prazo interno (o escritório precisa agir
       // antes do INSS cessar o benefício), não um compromisso do cliente —

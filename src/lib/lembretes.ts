@@ -49,7 +49,12 @@ export type TipoLembrete =
   | "controle_fatal_15d"
   | "controle_fatal_10d"
   | "controle_fatal_5d"
-  | "controle_fatal_2d";
+  | "controle_fatal_2d"
+  | "pericia_judicial_30d"
+  | "pericia_judicial_15d"
+  | "pericia_judicial_10d"
+  | "pericia_judicial_5d"
+  | "pericia_judicial_2d";
 
 // ── Helpers de data ───────────────────────────────────────────
 //
@@ -454,6 +459,116 @@ export async function agendarLembretesInss(opts: {
            ${opts.clienteId}::uuid, ${opts.clienteNome},
            ${dest.tipo}, ${dest.telefone}, ${dest.nome},
            ${mensagem}, ${lembrete.enviarEm.toISOString()})
+      `;
+    }
+  }
+}
+
+// ── Agendamento de lembretes de perícia/avaliação JUDICIAL ────
+//
+// Diferente de agendarLembretesInss (agendamento administrativo do INSS,
+// cadência curta 15/5/2/véspera porque é marcado pelo próprio INSS com
+// pouca antecedência): uma perícia JUDICIAL nasce de um despacho dentro de
+// um processo, então usa a mesma cadência padrão de prazo processual já
+// pedida pelo Orlando pra controle_fatal (30/15/10/5/2 dias, ver
+// agendarLembretesResponsavelControleFatal) — e o texto nunca menciona
+// "INSS"/"APS", só o processo e o perito, pra não confundir um
+// agendamento administrativo com um judicial (bug real encontrado em
+// teste: 2026-11-12, perícia judicial saiu rotulada "AVALIAÇÃO SOCIAL
+// BPC/LOAS" e com local "APS vinculado ao processo X" — mistura dos dois
+// mundos). Notifica cliente/responsável legal (quem precisa comparecer) E
+// o responsável do processo no escritório, igual ao fluxo do INSS.
+export async function agendarLembretesPericiaJudicial(opts: {
+  compromissoId: string;
+  clienteId: string;
+  clienteNome: string;
+  telefoneCliente: string | null;
+  telefoneResponsavel: string | null;
+  nomeResponsavel: string | null;
+  guardian?: { nome: string; telefone: string } | null;
+  dataEvento: Date;
+  horaEvento: string;
+  tipoServico: string;
+  local: string;
+  perito?: string | null;
+  processoNumero?: string | null;
+  escritorio?: string;
+}): Promise<void> {
+  const generoCliente = await generoDoCliente(opts.clienteId);
+  const escritorio = opts.escritorio || (await nomeEscritorioFallback());
+
+  const destinos: Array<{
+    tipo: string;
+    telefone: string;
+    nome: string;
+    prefixo: string;
+  }> = [];
+
+  if (opts.guardian?.telefone) {
+    destinos.push({
+      tipo: "responsavel",
+      telefone: opts.guardian.telefone,
+      nome: opts.guardian.nome,
+      prefixo: `*Agendamento de: ${opts.clienteNome}*\n\n`,
+    });
+  } else if (opts.telefoneCliente) {
+    destinos.push({
+      tipo: "cliente",
+      telefone: opts.telefoneCliente,
+      nome: opts.clienteNome,
+      prefixo: "",
+    });
+  }
+  if (opts.telefoneResponsavel && opts.nomeResponsavel) {
+    destinos.push({
+      tipo: "responsavel",
+      telefone: opts.telefoneResponsavel,
+      nome: opts.nomeResponsavel,
+      prefixo: `*Agendamento de: ${opts.clienteNome}*\n\n`,
+    });
+  }
+
+  const avisos: Array<{ tipo: TipoLembrete; dias: number }> = [
+    { tipo: "pericia_judicial_30d", dias: 30 },
+    { tipo: "pericia_judicial_15d", dias: 15 },
+    { tipo: "pericia_judicial_10d", dias: 10 },
+    { tipo: "pericia_judicial_5d", dias: 5 },
+    { tipo: "pericia_judicial_2d", dias: 2 },
+  ];
+
+  const linhaProcesso = opts.processoNumero
+    ? `\n⚖️ Processo: ${opts.processoNumero}`
+    : "";
+  const linhaPerito = opts.perito ? `\n👤 Perito(a): ${opts.perito}` : "";
+
+  for (const dest of destinos) {
+    for (const aviso of avisos) {
+      const enviarEm = diasAntes(opts.dataEvento, aviso.dias, 8);
+      if (enviarEm <= new Date()) continue;
+
+      const nome =
+        dest.tipo === "cliente"
+          ? tratamentoNome(dest.nome, generoCliente)
+          : primeiroNome(dest.nome);
+      const diaSemana = formatarDiaSemana(opts.dataEvento);
+      const data = formatarData(opts.dataEvento);
+
+      const mensagem =
+        `${dest.prefixo}{{saudacao}}, ${nome}! Passando do escritório ${escritorio} pra lembrar: ` +
+        `*${opts.tipoServico}* está marcada para ${diaSemana}, dia ${data} às ${opts.horaEvento}` +
+        `${opts.local ? `, em ${opts.local}` : ""}.${linhaProcesso}${linhaPerito}\n\n` +
+        `Faltam ${aviso.dias} dia${aviso.dias > 1 ? "s" : ""}. Qualquer dúvida, é só chamar.`;
+
+      await sql`
+        INSERT INTO lembretes_agendados
+          (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+           destinatario_tipo, destinatario_telefone, destinatario_nome,
+           mensagem, enviar_em)
+        VALUES
+          (${aviso.tipo}, 'compromisso', ${opts.compromissoId}::uuid,
+           ${opts.clienteId}::uuid, ${opts.clienteNome},
+           ${dest.tipo}, ${dest.telefone}, ${dest.nome},
+           ${mensagem}, ${enviarEm.toISOString()})
       `;
     }
   }

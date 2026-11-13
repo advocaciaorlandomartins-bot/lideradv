@@ -914,6 +914,21 @@ export default function IntegracoesContent({
         {/* ── Resend ── */}
         <ResendCard status={resendStatus} />
 
+        {/* ── Lembretes Automáticos ── */}
+        <IntegrationCard
+          logo={<span className="font-heading text-lg">⏰</span>}
+          name="Lembretes Automáticos"
+          status="configurado"
+          description="Confira os lembretes de WhatsApp agendados (perícias, honorários, DCB, prazos) — o que está programado pra sair ou o que já foi enviado."
+        >
+          <a
+            href="/dashboard/integracoes/lembretes"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 font-body text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            Ver lembretes agendados
+          </a>
+        </IntegrationCard>
+
         {/* ── TramitaSign ── */}
         <IntegrationCard
           logo={<LogoTramitaSign />}

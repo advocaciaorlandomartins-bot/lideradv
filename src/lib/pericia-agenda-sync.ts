@@ -2,6 +2,7 @@ import "server-only";
 import sql from "./db";
 import {
   agendarLembretesInss,
+  agendarLembretesPericiaJudicial,
   cancelarLembretesCompromisso,
 } from "./lembretes";
 import { enviarMensagemDireta } from "./prevbot-outbound";
@@ -28,7 +29,14 @@ import { getEscritorioConfig } from "./escritorio-db";
 const TIPO_PERICIA_LABEL: Record<string, string> = {
   pericia_administrativa: "Perícia Médica",
   avaliacao_social_administrativa: "Avaliação Social",
+  pericia_judicial: "Perícia Médica (Judicial)",
+  avaliacao_social_judicial: "Perícia Social (Judicial)",
 };
+
+const TIPOS_JUDICIAIS = new Set([
+  "pericia_judicial",
+  "avaliacao_social_judicial",
+]);
 
 export async function sincronizarCompromissoDaPericia(
   periciaId: string
@@ -36,8 +44,10 @@ export async function sincronizarCompromissoDaPericia(
   const [pericia] = await sql`
     SELECT
       p.compromisso_id::text, p.tipo, p.client_id::text, p.processo_id::text,
-      p.data_pericia::text, p.hora_pericia::text, p.local_pericia, p.observacoes
+      p.data_pericia::text, p.hora_pericia::text, p.local_pericia,
+      p.observacoes, p.perito, proc.numero AS processo_numero
     FROM pericias p
+    LEFT JOIN processos proc ON proc.id = p.processo_id
     WHERE p.id = ${periciaId}::uuid
   `;
   if (!pericia?.compromisso_id)
@@ -96,53 +106,99 @@ export async function sincronizarCompromissoDaPericia(
         telefone: String(cliente.phone),
       }
     : null;
-  const tituloLabel =
+  const isJudicial = TIPOS_JUDICIAIS.has(String(pericia.tipo));
+  const processoNumero = pericia.processo_numero
+    ? String(pericia.processo_numero)
+    : null;
+  const rotuloBase =
     TIPO_PERICIA_LABEL[pericia.tipo] ?? String(pericia.tipo).replace(/_/g, " ");
+  const tituloLabel =
+    isJudicial && processoNumero
+      ? `${rotuloBase} — processo ${processoNumero}`
+      : rotuloBase;
 
-  // Responsável (staff) pelo processo vinculado — mesma busca de
-  // criarNovoAgendamentoPericia, pra avisar o colaborador também quando a
-  // perícia é remarcada, não só na criação.
-  const [respRow] = await sql`
-    SELECT col.nome AS resp_nome, col.telefone AS resp_telefone
-    FROM clients cl
-    LEFT JOIN LATERAL (
-      SELECT p.responsavel_id
-      FROM processos p
-      WHERE p.client_id = cl.id
-        AND p.deleted_at IS NULL
-        AND p.responsavel_id IS NOT NULL
-      ORDER BY p.created_at DESC
-      LIMIT 1
-    ) lp ON true
-    LEFT JOIN colaboradores col ON col.id = lp.responsavel_id AND col.status = 'ativo'
-    WHERE cl.id = ${pericia.client_id}::uuid
-    LIMIT 1
-  `;
+  // Responsável (staff) pelo processo — se a perícia já está vinculada a um
+  // processo específico (comum no caso judicial), usa o responsável DAQUELE
+  // processo; senão cai no mesmo fallback de criarNovoAgendamentoPericia
+  // (processo ativo mais recente do cliente).
+  const [respRow] = pericia.processo_id
+    ? await sql`
+        SELECT col.nome AS resp_nome, col.telefone AS resp_telefone
+        FROM processos p
+        LEFT JOIN colaboradores col ON col.id = p.responsavel_id AND col.status = 'ativo'
+        WHERE p.id = ${pericia.processo_id}::uuid
+      `
+    : await sql`
+        SELECT col.nome AS resp_nome, col.telefone AS resp_telefone
+        FROM clients cl
+        LEFT JOIN LATERAL (
+          SELECT p.responsavel_id
+          FROM processos p
+          WHERE p.client_id = cl.id
+            AND p.deleted_at IS NULL
+            AND p.responsavel_id IS NOT NULL
+          ORDER BY p.created_at DESC
+          LIMIT 1
+        ) lp ON true
+        LEFT JOIN colaboradores col ON col.id = lp.responsavel_id AND col.status = 'ativo'
+        WHERE cl.id = ${pericia.client_id}::uuid
+        LIMIT 1
+      `;
   const escritorio = await getEscritorioConfig().catch(() => null);
+  const telefoneClienteParaLembrete =
+    clienteContato && !clienteResponsavel ? clienteContato.telefone : null;
+  const telefoneRespParaLembrete = respRow?.resp_telefone
+    ? String(respRow.resp_telefone)
+    : null;
+  const nomeRespParaLembrete = respRow?.resp_nome
+    ? String(respRow.resp_nome)
+    : null;
 
-  // Modelo específico de INSS (menciona o órgão, pede pra separar
-  // documentos) — não o genérico de compromisso ("Consulta com nosso
-  // escritório"), que faz parecer uma visita ao escritório quando na
-  // verdade é um atendimento no INSS que o cliente comparece sozinho.
-  // Achado pelo Orlando: a perícia do Tiago foi remarcada em 24/09 e o
-  // lembrete de "hoje" saiu com o texto genérico, confuso.
-  await agendarLembretesInss({
-    compromissoId: pericia.compromisso_id,
-    clienteId: String(cliente.id),
-    clienteNome: String(cliente.name),
-    telefoneCliente:
-      clienteContato && !clienteResponsavel ? clienteContato.telefone : null,
-    telefoneResponsavel: respRow?.resp_telefone
-      ? String(respRow.resp_telefone)
-      : null,
-    nomeResponsavel: respRow?.resp_nome ? String(respRow.resp_nome) : null,
-    guardian: clienteResponsavel,
-    dataEvento,
-    horaEvento: horaFmt ?? "",
-    tipoServico: tituloLabel,
-    local: pericia.local_pericia ?? "",
-    escritorio: escritorio?.nome ?? undefined,
-  }).catch(() => null);
+  if (isJudicial) {
+    // Perícia judicial: cadência de prazo processual (30/15/10/5/2) e texto
+    // que nunca menciona "INSS"/"APS" — mesmo padrão usado na criação
+    // (pericia-judicial-agendamento.ts). Achado real (2026-11-13): antes,
+    // remarcar QUALQUER perícia (inclusive judicial) sempre reagendava com
+    // o texto/cadência do INSS, porque esta sincronização nunca distinguia
+    // os dois tipos.
+    await agendarLembretesPericiaJudicial({
+      compromissoId: pericia.compromisso_id,
+      clienteId: String(cliente.id),
+      clienteNome: String(cliente.name),
+      telefoneCliente: telefoneClienteParaLembrete,
+      telefoneResponsavel: telefoneRespParaLembrete,
+      nomeResponsavel: nomeRespParaLembrete,
+      guardian: clienteResponsavel,
+      dataEvento,
+      horaEvento: horaFmt ?? "",
+      tipoServico: tituloLabel,
+      local: pericia.local_pericia ?? "",
+      perito: pericia.perito ? String(pericia.perito) : null,
+      processoNumero,
+      escritorio: escritorio?.nome ?? undefined,
+    }).catch(() => null);
+  } else {
+    // Modelo específico de INSS (menciona o órgão, pede pra separar
+    // documentos) — não o genérico de compromisso ("Consulta com nosso
+    // escritório"), que faz parecer uma visita ao escritório quando na
+    // verdade é um atendimento no INSS que o cliente comparece sozinho.
+    // Achado pelo Orlando: a perícia do Tiago foi remarcada em 24/09 e o
+    // lembrete de "hoje" saiu com o texto genérico, confuso.
+    await agendarLembretesInss({
+      compromissoId: pericia.compromisso_id,
+      clienteId: String(cliente.id),
+      clienteNome: String(cliente.name),
+      telefoneCliente: telefoneClienteParaLembrete,
+      telefoneResponsavel: telefoneRespParaLembrete,
+      nomeResponsavel: nomeRespParaLembrete,
+      guardian: clienteResponsavel,
+      dataEvento,
+      horaEvento: horaFmt ?? "",
+      tipoServico: tituloLabel,
+      local: pericia.local_pericia ?? "",
+      escritorio: escritorio?.nome ?? undefined,
+    }).catch(() => null);
+  }
 
   // Aviso imediato da remarcação — os lembretes acima só disparam mais perto
   // da data (ex.: "1 dia antes"); quem remarca quer que o cliente saiba

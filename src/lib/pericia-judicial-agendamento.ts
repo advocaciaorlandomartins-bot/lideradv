@@ -27,6 +27,12 @@ export interface NovoAgendamentoJudicialInput {
   local: string;
   perito?: string | null;
   especialidade?: string | null;
+  // Quando o chamador já sabe o UUID exato do processo (ex.: select da tela
+  // "Nova Perícia"), use processoId — é preciso, sem ambiguidade de número
+  // mal formatado. processoNumero é o fallback pra quando só se tem o texto
+  // (ex.: lido pela Íris de um documento), tentando casar por número exato
+  // e, sem isso, caindo no processo ativo mais recente do cliente.
+  processoId?: string | null;
   processoNumero?: string | null;
   observacoes?: string | null;
   criadoPorLogin: string;
@@ -80,8 +86,15 @@ export async function criarNovoAgendamentoPericiaJudicial(
     telefoneCliente = null; // nunca avisa o menor diretamente
   }
 
-  const processoRows = opts.processoNumero
+  const processoRows = opts.processoId
     ? await sql`
+        SELECT id::text, numero, responsavel_id::text
+        FROM processos
+        WHERE id = ${opts.processoId}::uuid AND deleted_at IS NULL
+        LIMIT 1
+      `
+    : opts.processoNumero
+      ? await sql`
         SELECT id::text, numero, responsavel_id::text
         FROM processos
         WHERE client_id = ${opts.clienteId}::uuid
@@ -89,7 +102,7 @@ export async function criarNovoAgendamentoPericiaJudicial(
           AND deleted_at IS NULL
         LIMIT 1
       `
-    : await sql`
+      : await sql`
         SELECT id::text, numero, responsavel_id::text
         FROM processos
         WHERE client_id = ${opts.clienteId}::uuid AND deleted_at IS NULL

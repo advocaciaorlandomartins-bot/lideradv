@@ -23,6 +23,9 @@ export interface NovoAgendamentoInput {
   local: string;
   protocolo?: string | null;
   processoId?: string | null;
+  perito?: string | null;
+  especialidade?: string | null;
+  observacoes?: string | null;
   criadoPorLogin: string;
   criadoPorUserId: string;
 }
@@ -115,13 +118,22 @@ export async function criarNovoAgendamentoPericia(
   `;
   const compromissoId = String(compromisso.id);
 
+  const observacoesCombinadas = [
+    opts.protocolo ? `Protocolo INSS: ${opts.protocolo}` : null,
+    opts.observacoes || null,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
   const [pericia] = await sql`
     INSERT INTO pericias
-      (tipo, client_id, processo_id, data_pericia, hora_pericia, local_pericia, status, observacoes, compromisso_id)
+      (tipo, client_id, processo_id, data_pericia, hora_pericia, local_pericia,
+       perito, especialidade, status, observacoes, compromisso_id)
     VALUES
       (${opts.tipoPericia}, ${opts.clienteId}::uuid, ${opts.processoId ?? null}::uuid,
-       ${opts.data}::date, ${opts.hora}::time, ${opts.local}, 'agendado',
-       ${opts.protocolo ? `Protocolo INSS: ${opts.protocolo}` : null}, ${compromissoId}::uuid)
+       ${opts.data}::date, ${opts.hora}::time, ${opts.local},
+       ${opts.perito ?? null}, ${opts.especialidade ?? null}, 'agendado',
+       ${observacoesCombinadas || null}, ${compromissoId}::uuid)
     RETURNING id::text
   `.catch((e) => {
     console.error("[pericia-novo-agendamento] falha ao inserir pericia:", e);

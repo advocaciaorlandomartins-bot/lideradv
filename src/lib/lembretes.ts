@@ -15,7 +15,7 @@ import { getMensagensConfig } from "@/lib/mensagens-config-db";
 // escritório", visivelmente duplicado. Busca uma vez e cacheia em memória —
 // nome do escritório não muda no meio de uma execução serverless.
 let _nomeEscritorioCache: string | null = null;
-async function nomeEscritorioFallback(): Promise<string> {
+export async function nomeEscritorioFallback(): Promise<string> {
   if (_nomeEscritorioCache) return _nomeEscritorioCache;
   const rows = await sql`SELECT nome FROM escritorio_config LIMIT 1`;
   const nome = (rows[0]?.nome as string | undefined)?.trim();

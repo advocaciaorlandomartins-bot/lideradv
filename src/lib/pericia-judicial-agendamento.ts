@@ -1,6 +1,9 @@
 import "server-only";
 import sql from "./db";
-import { agendarLembretesPericiaJudicial } from "./lembretes";
+import {
+  agendarLembretesPericiaJudicial,
+  nomeEscritorioFallback,
+} from "./lembretes";
 import { getEscritorioConfig } from "./escritorio-db";
 import { enviarMensagemDireta } from "./prevbot-outbound";
 
@@ -146,8 +149,12 @@ export async function criarNovoAgendamentoPericiaJudicial(
     };
   }
 
+  // getEscritorioConfig() usa unstable_cache (só funciona dentro do runtime
+  // do Next) — se falhar por qualquer motivo, cai no fallback via SQL direto
+  // em vez do literal "nosso escritório", que duplicava a palavra
+  // "escritório" nos templates que dizem "do escritório {{escritorio}}".
   const escritorio = await getEscritorioConfig().catch(() => null);
-  const nomeEscritorio = escritorio?.nome ?? "nosso escritório";
+  const nomeEscritorio = escritorio?.nome || (await nomeEscritorioFallback());
   const rotulo = ROTULOS[opts.tipo] ?? "Perícia Judicial";
   const titulo = processoNumero
     ? `${rotulo} — processo ${processoNumero}`

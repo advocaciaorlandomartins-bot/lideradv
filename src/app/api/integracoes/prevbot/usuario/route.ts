@@ -46,6 +46,21 @@ function normalizarTelefone(tel: string): string {
   return digits;
 }
 
+// Celular BR pode ter 10 dígitos (DDD + 8) ou 11 (DDD + 9 + 8) — o nono
+// dígito fica logo DEPOIS do DDD, não no final. Comparar só os últimos 9
+// dígitos (como esta rota fazia antes) não resolve a ambiguidade: "82998441109"
+// (11) e "8298441109" (10, mesmo número) geram sufixos de 9 dígitos
+// diferentes ("998441109" vs "298441109"). Achado real (2026-11-16): essa
+// rota não encontrou o cadastro do Orlando (colaborador ativo, telefone
+// certo) por causa exatamente disso — mesmo bug já corrigido do lado do
+// PrevBot (mesmoTelefoneBR/chaveTelefoneBR em lideradv.ts). Remove o 9
+// extra (se houver) logo após o DDD dos dois lados antes de comparar.
+function chaveTelefoneBR(telNormalizado: string): string {
+  const d = telNormalizado.replace(/\D/g, "");
+  if (d.length === 11) return d.slice(0, 2) + d.slice(3);
+  return d;
+}
+
 // Janela de continuidade: mensagens do mesmo colaborador em menos de 20min
 // seguem a mesma conversa (pra perguntas de desambiguação da Íris fazerem
 // sentido) — depois disso, considera assunto novo.
@@ -67,15 +82,19 @@ async function resolverSessionPorTelefone(
       u.login              AS login,
       u.categoria          AS categoria,
       u.permissoes         AS permissoes,
-      COALESCE(col.nome, u.login) AS nome
+      COALESCE(col.nome, u.login) AS nome,
+      col.telefone         AS telefone
     FROM colaboradores col
     INNER JOIN usuarios u ON u.colaborador_id = col.id AND u.ativo = true
     WHERE col.status = 'ativo'
-      AND regexp_replace(col.telefone, '\D', '', 'g') LIKE ${"%" + tel.slice(-9)}
-    LIMIT 1
+      AND col.telefone IS NOT NULL
+      AND col.telefone <> ''
   `;
-  if (rows.length === 0) return null;
-  const row = rows[0];
+  const chaveAlvo = chaveTelefoneBR(tel);
+  const row = rows.find(
+    (r) => chaveTelefoneBR(normalizarTelefone(String(r.telefone))) === chaveAlvo
+  );
+  if (!row) return null;
   return {
     id: String(row.id),
     login: String(row.login),

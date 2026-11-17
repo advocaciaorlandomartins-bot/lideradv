@@ -34,6 +34,12 @@ function authOk(req: NextRequest): boolean {
  * qualificação de lead) tratou como desconhecido, perguntando "qual é o seu
  * nome?". Sem essa rota, o PrevBot não tinha como saber que aquele telefone
  * já era de alguém com caso ativo no escritório.
+ *
+ * Retorna uma LISTA porque um mesmo telefone pode ser de mais de um cliente
+ * ao mesmo tempo — achado real (2026-11-17): a mesma mãe (responsável legal)
+ * tem dois filhos menores cadastrados como clientes diferentes, cada um com
+ * seu próprio caso, usando o telefone dela nos dois cadastros. Devolver só
+ * "o primeiro que achar" faria o PrevBot assumir o caso errado.
  */
 export async function GET(req: NextRequest) {
   if (!authOk(req)) {
@@ -52,40 +58,60 @@ export async function GET(req: NextRequest) {
 
   // Só 31 clientes cadastrados hoje — busca tudo e compara em JS, mesmo
   // padrão já usado em /colaboradores e /usuario pra essa ambiguidade de
-  // telefone BR (não dá pra resolver isso só com LIKE/regexp no SQL).
+  // telefone BR (não dá pra resolver isso só com LIKE/regexp no SQL). Compara
+  // tanto o telefone do próprio cliente quanto o do responsável legal — num
+  // cadastro de menor, o número que recebe mensagem pode estar só num dos
+  // dois campos dependendo de como foi cadastrado.
   const clientes = await sql`
-    SELECT id::text, name, phone, menor_incapaz, responsavel_nome
+    SELECT id::text, name, phone, menor_incapaz, responsavel_nome, responsavel_telefone
     FROM clients
-    WHERE deleted_at IS NULL AND phone IS NOT NULL AND phone <> '' AND phone <> 'PENDENTE'
+    WHERE deleted_at IS NULL
+      AND (
+        (phone IS NOT NULL AND phone <> '' AND phone <> 'PENDENTE')
+        OR (responsavel_telefone IS NOT NULL AND responsavel_telefone <> '')
+      )
   `;
-  const cliente = clientes.find(
-    (c) => chaveTelefoneBR(normalizarTelefoneBR(String(c.phone))) === chaveAlvo
-  );
+  const encontrados = clientes.filter((c) => {
+    const chavePropria = c.phone
+      ? chaveTelefoneBR(normalizarTelefoneBR(String(c.phone)))
+      : null;
+    const chaveResp = c.responsavel_telefone
+      ? chaveTelefoneBR(normalizarTelefoneBR(String(c.responsavel_telefone)))
+      : null;
+    return chavePropria === chaveAlvo || chaveResp === chaveAlvo;
+  });
 
-  if (!cliente) {
+  if (encontrados.length === 0) {
     return NextResponse.json({ encontrado: false });
   }
 
-  const processos = await sql`
-    SELECT numero, tipo_acao
-    FROM processos
-    WHERE client_id = ${cliente.id}::uuid
-      AND deleted_at IS NULL
-      AND status NOT IN ('arquivado', 'encerrado')
-    ORDER BY created_at DESC
-  `;
+  const clientesComProcessos = await Promise.all(
+    encontrados.map(async (cliente) => {
+      const processos = await sql`
+        SELECT numero, tipo_acao
+        FROM processos
+        WHERE client_id = ${cliente.id}::uuid
+          AND deleted_at IS NULL
+          AND status NOT IN ('arquivado', 'encerrado')
+        ORDER BY created_at DESC
+      `;
+      return {
+        clienteId: String(cliente.id),
+        nome: String(cliente.name),
+        menorIncapaz: Boolean(cliente.menor_incapaz),
+        responsavelNome: cliente.responsavel_nome
+          ? String(cliente.responsavel_nome)
+          : null,
+        processosAtivos: processos.map((p) => ({
+          numero: String(p.numero),
+          tipoAcao: p.tipo_acao ? String(p.tipo_acao) : null,
+        })),
+      };
+    })
+  );
 
   return NextResponse.json({
     encontrado: true,
-    clienteId: String(cliente.id),
-    nome: String(cliente.name),
-    menorIncapaz: Boolean(cliente.menor_incapaz),
-    responsavelNome: cliente.responsavel_nome
-      ? String(cliente.responsavel_nome)
-      : null,
-    processosAtivos: processos.map((p) => ({
-      numero: String(p.numero),
-      tipoAcao: p.tipo_acao ? String(p.tipo_acao) : null,
-    })),
+    clientes: clientesComProcessos,
   });
 }

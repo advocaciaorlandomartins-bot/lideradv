@@ -3,9 +3,10 @@ import sql from "./db";
 import {
   agendarLembretesPericiaJudicial,
   nomeEscritorioFallback,
+  dentroHorarioComercial,
+  proximoHorarioComercial,
 } from "./lembretes";
 import { getEscritorioConfig } from "./escritorio-db";
-import { enviarMensagemDireta } from "./prevbot-outbound";
 
 /**
  * Cria uma perícia médica ou avaliação social JUDICIAL nova (vinda de um
@@ -242,6 +243,17 @@ export async function criarNovoAgendamentoPericiaJudicial(
     : "";
   const linhaPerito = opts.perito ? `\n👤 Perito(a): ${opts.perito}` : "";
 
+  // Avisos imediatos vão pra lembretes_agendados em vez de enviarMensagemDireta
+  // direto — dois motivos: (1) fica com rastro durável (tentativas/erro),
+  // diferente de antes, onde uma falha no fetch pro PrevBot desaparecia sem
+  // deixar vestígio em lugar nenhum (achado real: aviso da perícia judicial do
+  // Wilson/Karine em 2026-11-16 não chegou e não tinha como provar o motivo);
+  // (2) dá pra diferenciar o horário de cada destinatário — pedido do Orlando
+  // (2026-11-17): o cliente só recebe em horário comercial (mensagem fora de
+  // hora passa impressão de urgência que não existe), mas o responsável do
+  // processo recebe imediatamente mesmo fora do horário/fim de semana, porque
+  // perícia/avaliação judicial é prazo processual e não pode esperar até
+  // segunda pra ele ficar sabendo.
   let avisoEnviadoCliente = false;
   const destCliente = guardianTelefone ?? telefoneCliente;
   const destClienteNome = (guardianNome ?? clienteNome).split(" ")[0] ?? "";
@@ -253,11 +265,27 @@ export async function criarNovoAgendamentoPericiaJudicial(
       `${prefixo}Olá ${destClienteNome}! 👋 O ${nomeEscritorio} acabou de registrar uma ${rotulo.toLowerCase()} no seu processo.\n\n` +
       `*${titulo}*\n\n📅 Data: ${dataFormatada}\n🕐 Hora: ${opts.hora}\n📍 Local: ${opts.local}` +
       `${linhaProcesso}${linhaPerito}\n\nVocê receberá lembretes conforme a data se aproximar. Qualquer dúvida, entre em contato conosco! 😊`;
-    const res = await enviarMensagemDireta({
-      telefone: destCliente,
-      mensagem,
-    }).catch(() => ({ ok: false }));
-    avisoEnviadoCliente = res.ok;
+    const enviarEmCliente = dentroHorarioComercial()
+      ? new Date()
+      : proximoHorarioComercial();
+    const inseriu = await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+         destinatario_tipo, destinatario_telefone, destinatario_nome,
+         mensagem, enviar_em)
+      VALUES
+        ('pericia_judicial_imediato_cliente', 'compromisso', ${compromissoId}::uuid,
+         ${opts.clienteId}::uuid, ${clienteNome},
+         ${guardianTelefone ? "guardian" : "cliente"}, ${destCliente}, ${destClienteNome},
+         ${mensagem}, ${enviarEmCliente.toISOString()})
+    `.catch((e) => {
+      console.error(
+        "[pericia-judicial-agendamento] falha ao agendar aviso cliente:",
+        e
+      );
+      return null;
+    });
+    avisoEnviadoCliente = inseriu !== null;
   }
 
   let avisoEnviadoResponsavel = false;
@@ -266,11 +294,24 @@ export async function criarNovoAgendamentoPericiaJudicial(
       `*Agendamento de: ${clienteNome}*\n\n📌 Nova ${rotulo.toLowerCase()} registrada.\n\n` +
       `📅 Data: ${dataFormatada}\n🕐 Hora: ${opts.hora}\n📍 Local: ${opts.local}` +
       `${linhaProcesso}${linhaPerito}\n\nVocê é o responsável por esse processo no LiderAdv.`;
-    const res = await enviarMensagemDireta({
-      telefone: telefoneResponsavel,
-      mensagem: mensagemResp,
-    }).catch(() => ({ ok: false }));
-    avisoEnviadoResponsavel = res.ok;
+    const inseriu = await sql`
+      INSERT INTO lembretes_agendados
+        (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,
+         destinatario_tipo, destinatario_telefone, destinatario_nome,
+         mensagem, enviar_em)
+      VALUES
+        ('pericia_judicial_imediato_responsavel', 'compromisso', ${compromissoId}::uuid,
+         ${opts.clienteId}::uuid, ${clienteNome},
+         'responsavel', ${telefoneResponsavel}, ${nomeResponsavel},
+         ${mensagemResp}, ${new Date().toISOString()})
+    `.catch((e) => {
+      console.error(
+        "[pericia-judicial-agendamento] falha ao agendar aviso responsável:",
+        e
+      );
+      return null;
+    });
+    avisoEnviadoResponsavel = inseriu !== null;
   }
 
   return {

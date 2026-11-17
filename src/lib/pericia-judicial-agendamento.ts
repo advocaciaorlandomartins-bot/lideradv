@@ -5,6 +5,8 @@ import {
   nomeEscritorioFallback,
   dentroHorarioComercial,
   proximoHorarioComercial,
+  diasAntes,
+  formatarProximosAvisos,
 } from "./lembretes";
 import { getEscritorioConfig } from "./escritorio-db";
 
@@ -290,10 +292,17 @@ export async function criarNovoAgendamentoPericiaJudicial(
 
   let avisoEnviadoResponsavel = false;
   if (telefoneResponsavel && nomeResponsavel) {
+    const proximosAvisosResp = [30, 15, 10, 5, 2].filter(
+      (d) => diasAntes(dataEventoDate, d, 8) > new Date()
+    );
+    const linhaProximosResp =
+      proximosAvisosResp.length > 0
+        ? ` Você também vai receber avisos automáticos com ${formatarProximosAvisos(proximosAvisosResp)} de antecedência.`
+        : "";
     const mensagemResp =
       `*Agendamento de: ${clienteNome}*\n\n📌 Nova ${rotulo.toLowerCase()} registrada.\n\n` +
       `📅 Data: ${dataFormatada}\n🕐 Hora: ${opts.hora}\n📍 Local: ${opts.local}` +
-      `${linhaProcesso}${linhaPerito}\n\nVocê é o responsável por esse processo no LiderAdv.`;
+      `${linhaProcesso}${linhaPerito}\n\nVocê é o responsável por esse processo no LiderAdv.${linhaProximosResp}`;
     const inseriu = await sql`
       INSERT INTO lembretes_agendados
         (tipo, referencia_tipo, referencia_id, cliente_id, cliente_nome,

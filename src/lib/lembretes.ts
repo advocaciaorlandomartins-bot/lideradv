@@ -80,7 +80,7 @@ export function horaBrasiliaParaUTC(
   );
 }
 
-function diasAntes(
+export function diasAntes(
   dataEvento: Date,
   dias: number,
   hora: number,
@@ -105,6 +105,18 @@ export function agoraBrasilia(): Date {
   return new Date(
     new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
   );
+}
+
+// "15, 10, 5 e 2 dias" — usado pra avisar o responsável do processo, logo no
+// primeiro aviso de uma perícia/avaliação JUDICIAL, quantos avisos
+// automáticos ainda vêm pela frente. Pedido do Orlando (2026-11-17): sem
+// isso, quem recebe só o aviso de "faltam 30 dias" não sabe que o sistema já
+// vai avisar de novo em 15/10/5/2 dias e acaba mandando áudio perguntando/
+// pedindo pra configurar um lembrete que já existe.
+export function formatarProximosAvisos(dias: number[]): string {
+  if (dias.length === 0) return "";
+  if (dias.length === 1) return `${dias[0]} dias`;
+  return `${dias.slice(0, -1).join(", ")} e ${dias[dias.length - 1]} dias`;
 }
 
 const HORA_COMERCIAL_INICIO = 8;
@@ -553,11 +565,20 @@ export async function agendarLembretesPericiaJudicial(opts: {
       const diaSemana = formatarDiaSemana(opts.dataEvento);
       const data = formatarData(opts.dataEvento);
 
+      const proximosAvisos = avisos
+        .filter((a) => a.dias < aviso.dias)
+        .filter((a) => diasAntes(opts.dataEvento, a.dias, 8) > new Date())
+        .map((a) => a.dias);
+      const linhaProximos =
+        dest.tipo === "responsavel" && proximosAvisos.length > 0
+          ? `\n\nVocê também vai receber avisos automáticos com ${formatarProximosAvisos(proximosAvisos)} de antecedência.`
+          : "";
+
       const mensagem =
         `${dest.prefixo}{{saudacao}}, ${nome}! Passando do escritório ${escritorio} pra lembrar: ` +
         `*${opts.tipoServico}* está marcada para ${diaSemana}, dia ${data} às ${opts.horaEvento}` +
         `${opts.local ? `, em ${opts.local}` : ""}.${linhaProcesso}${linhaPerito}\n\n` +
-        `Faltam ${aviso.dias} dia${aviso.dias > 1 ? "s" : ""}. Qualquer dúvida, é só chamar.`;
+        `Faltam ${aviso.dias} dia${aviso.dias > 1 ? "s" : ""}. Qualquer dúvida, é só chamar.${linhaProximos}`;
 
       await sql`
         INSERT INTO lembretes_agendados

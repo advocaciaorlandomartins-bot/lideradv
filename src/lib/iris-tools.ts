@@ -84,6 +84,22 @@ export const IRIS_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "consultar_lembretes_cliente",
+    description:
+      "⚠️ USE SEMPRE ANTES de perguntar 'o que você quer monitorar/de qual cliente/qual a data' quando alguém pedir pra criar ou confirmar um lembrete de um cliente ou processo que JÁ foi citado na conversa. Lista os lembretes automáticos (enviados e pendentes) já agendados pra esse cliente/processo — perícia, prazo fatal, DCB, honorário etc. Se já existir cadência cobrindo o que foi pedido (ex: perguntaram por um aviso em 10 dias e já existe um lembrete desse tipo agendado), responda confirmando em vez de reabrir o cadastro do zero.",
+    input_schema: {
+      type: "object",
+      properties: {
+        busca: {
+          type: "string",
+          description:
+            "Nome do cliente (ou parte) ou número do processo (CNJ).",
+        },
+      },
+      required: ["busca"],
+    },
+  },
+  {
     name: "listar_oabs",
     description: "Lista todas as OABs monitoradas pelo sistema com status.",
     input_schema: { type: "object", properties: {}, required: [] },
@@ -1552,6 +1568,59 @@ async function executarFerramentaIrisInterno(
       return JSON.stringify({
         total: ordenado.length,
         processos: ordenado.slice(0, 30),
+      });
+    }
+
+    case "consultar_lembretes_cliente": {
+      const buscaLembrete = String(input.busca ?? "").trim();
+      if (!buscaLembrete)
+        return JSON.stringify({
+          erro: "Informe um nome de cliente ou número de processo.",
+        });
+      const podeVerTodosLembrete = hasPermission(
+        session,
+        "processos_ver_todos",
+        "ver"
+      );
+      const colaboradorIdLembrete = podeVerTodosLembrete
+        ? null
+        : await getColaboradorIdForUser(session.id);
+      const clientesLembrete = await sql`
+        SELECT DISTINCT cl.id::text, cl.name
+        FROM clients cl
+        LEFT JOIN processos p ON p.client_id = cl.id AND p.deleted_at IS NULL
+        WHERE cl.deleted_at IS NULL
+          AND (cl.name ILIKE ${"%" + buscaLembrete + "%"} OR p.numero ILIKE ${"%" + buscaLembrete + "%"})
+          AND (${podeVerTodosLembrete} OR p.responsavel_id = ${colaboradorIdLembrete}::uuid)
+        LIMIT 5
+      `;
+      if (clientesLembrete.length === 0)
+        return JSON.stringify({
+          mensagem: `Nenhum cliente/processo encontrado para "${buscaLembrete}".`,
+        });
+      const idsLembrete = clientesLembrete.map((c) => String(c.id));
+      const rowsLembrete = await sql`
+        SELECT tipo, destinatario_tipo, destinatario_nome, enviado,
+               enviado_em::text, enviar_em::text, erro, cliente_nome
+        FROM lembretes_agendados
+        WHERE cliente_id = ANY(${idsLembrete}::uuid[])
+        ORDER BY enviar_em ASC
+      `;
+      if (rowsLembrete.length === 0)
+        return JSON.stringify({
+          mensagem: `Nenhum lembrete automático agendado pra "${buscaLembrete}" no momento.`,
+        });
+      return JSON.stringify({
+        lembretes: rowsLembrete.map((r) => ({
+          tipo: r.tipo,
+          destinatario: r.destinatario_nome,
+          destinatario_tipo: r.destinatario_tipo,
+          cliente: r.cliente_nome,
+          enviar_em: r.enviar_em,
+          status: r.enviado ? "enviado" : r.erro ? "falhou" : "pendente",
+          enviado_em: r.enviado_em,
+          erro: r.erro,
+        })),
       });
     }
 
